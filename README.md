@@ -66,4 +66,3 @@ npm run testw # watch mode
 ```sh
 npm run coverage
 ```
-# Distributed-key-generation
