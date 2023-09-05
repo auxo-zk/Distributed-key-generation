@@ -12,7 +12,7 @@ The **Distributed Key Generation** (DKG) protocol is a fundamental component of 
 
 ## Architecture
 
-###Desired Properties:
+### Desired Properties:
 The DKG protocol implementation requires three critical properties:
 - **Homomorphism**: The ability to perform operations over ciphertexts, allowing value commitments from multiple participants to be combined into batched values.
 - **Verifiability**: Verification of the correctness of the encryption process, ensuring that a given value was encrypted accurately to a specific ciphertext.
