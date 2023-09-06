@@ -10,6 +10,9 @@ The **Distributed Key Generation** (DKG) protocol is a fundamental component of 
 
 3. **Social Recovery**: DKG can aid in securely recovering lost or forgotten passwords or keys without compromising user data privacy.
 
+## Demo (EVM):
+<a target="_blank" src="https://drive.google.com/file/d/1BLMdaG_SfAEusQINV2mpU4v390Zj6Yhd/view">Public Folder</a>
+
 ## Architecture
 
 ### Desired Properties:
