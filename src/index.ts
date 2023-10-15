@@ -1,3 +1,3 @@
-import { Add } from './Add.js';
+import { Committee } from './contracts/Committee';
 
-export { Add };
+export { Committee };
