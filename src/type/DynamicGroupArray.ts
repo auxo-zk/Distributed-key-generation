@@ -9,13 +9,17 @@ import {
   FlexibleProvable,
 } from 'o1js';
 
-export function DynamicGroupArray(maxLength: number) {
+export default function DynamicGroupArray(maxLength: number) {
   return class _DynamicGroupArray extends Struct({
     length: Field,
     values: Provable.Array(Group, maxLength),
   }) {
     static Null() {
       return Group.fromFields(Array(Group.sizeInFields()).fill(Field(0)));
+    }
+
+    static hash(values: Group): Field {
+      return Poseidon.hash(Group.toFields(values));
     }
 
     static fillWithNull([...values]: Group[], length: number): Group[] {
@@ -185,12 +189,12 @@ export function DynamicGroupArray(maxLength: number) {
 
     indexMask(index: Field): Bool[] {
       const mask = [];
-      let lengthReached = Bool(false);
+      // let lengthReached = Bool(false);
       for (let i = 0; i < this.maxLength(); i++) {
-        lengthReached = Field(i).equals(this.length).or(lengthReached);
+        // lengthReached = Field(i).equals(this.length).or(lengthReached);
         const isIndex = Field(i).equals(index);
         // assert index < length
-        isIndex.and(lengthReached).not().assertTrue();
+        // isIndex.and(lengthReached).not().assertTrue();
         mask[i] = isIndex;
       }
       return mask;
@@ -227,7 +231,7 @@ export function DynamicGroupArray(maxLength: number) {
       return mask;
     }
 
-    map(fn: (v: Group, i: Field) => T): this {
+    map(fn: (v: Group, i: Field) => Group): this {
       const newArr = this.copy();
       let masked = Bool(true);
       for (let i = 0; i < newArr.values.length; i++) {

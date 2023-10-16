@@ -20,15 +20,15 @@ import {
   Experimental,
 } from 'o1js';
 
-import DynamicArray from '../type/DynamicArray';
+import DynamicGroupArray from '../type/DynamicGroupArray.js';
 
 const accountFee = Mina.accountCreationFee();
 
-const treeHeight = 5; // setting max 32 member
+const treeHeight = 6; // setting max 32 member
 const Tree = new MerkleTree(treeHeight);
 class MyMerkleWitness extends MerkleWitness(treeHeight) {}
 
-export class GroupArray extends DynamicArray(Group, 32) {}
+export class GroupArray extends DynamicGroupArray(2 ** (treeHeight - 1)) {}
 
 export class Committee extends SmartContract {
   @state(Field) vkDKGHash = State<Field>();
@@ -44,6 +44,7 @@ export class Committee extends SmartContract {
     verificationKey.hash.assertEquals(currentVKHash);
     let dkgContract = AccountUpdate.createSigned(address);
     dkgContract.account.isNew.assertEquals(Bool(true));
+    // To-do: setting not cho change permision on the future
     dkgContract.account.permissions.set(Permissions.default());
     dkgContract.account.verificationKey.set(verificationKey);
     this.send({ to: this.sender, amount: accountFee });
@@ -53,24 +54,29 @@ export class Committee extends SmartContract {
     address: PublicKey,
     verificationKey: VerificationKey
   ) {
-    const currentVKHash = this.vkDKGHash.getAndAssertEquals();
-    verificationKey.hash.assertEquals(currentVKHash);
-    let dkgContract = AccountUpdate.createSigned(address);
-    dkgContract.account.isNew.assertEquals(Bool(true));
-    dkgContract.account.permissions.set(Permissions.default());
-    dkgContract.account.verificationKey.set(verificationKey);
-    this.send({ to: this.sender, amount: accountFee });
+    const curCommitteeId = this.curCommitteeId.getAndAssertEquals();
   }
 }
 
-// const createCommitteeProve = Experimental.ZkProgram({
-//   publicInput: GroupArray,
+export const createCommitteeProve = Experimental.ZkProgram({
+  publicInput: GroupArray,
+  publicOutput: Field,
 
-//   methods: {
-//     createProve: {
-//       privateInputs: [],
+  methods: {
+    createProve: {
+      privateInputs: [],
 
-//       method(state: GroupArray) {},
-//     },
-//   },
-// });
+      method(input: GroupArray): Field {
+        let tree = new MerkleTree(treeHeight);
+        for (let i = 0; i < 32; i++) {
+          tree.setLeaf(BigInt(i), GroupArray.hash(input.get(Field(i))));
+        }
+        return tree.getRoot();
+      },
+    },
+  },
+});
+
+class CommitteeProve extends Experimental.ZkProgram.Proof(
+  createCommitteeProve
+) {}
