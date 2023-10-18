@@ -58,7 +58,7 @@ export const createCommitteeProof = Experimental.ZkProgram({
       privateInputs: [
         SelfProof<RollupState, RollupState>,
         GroupArray,
-        MyMerkleWitness,
+        MerkleMapWitness,
         Group,
         MerkleMapWitness,
         Field,
@@ -69,8 +69,8 @@ export const createCommitteeProof = Experimental.ZkProgram({
         input: RollupState,
         preProof: SelfProof<RollupState, RollupState>,
         publickeys: GroupArray,
-        memberWitness: MyMerkleWitness,
-        newAddresses: Group,
+        memberWitness: MerkleMapWitness,
+        newAddress: Group,
         settingWitess: MerkleMapWitness,
         threshold: Field,
         dkgAddressWitness: MerkleMapWitness
@@ -78,24 +78,23 @@ export const createCommitteeProof = Experimental.ZkProgram({
         preProof.verify();
 
         ////// caculate new memberTreeRoot
-        let newCommitteeId = memberWitness.calculateIndex();
-        newCommitteeId.assertEquals(
-          preProof.publicOutput.currentCommitteeId.add(Field(1))
+        let [preMemberRoot, curCommitteeId] = memberWitness.computeRootAndKey(
+          Field(0)
         );
-        let preMemberRoot = memberWitness.calculateRoot(Field(0));
+        curCommitteeId.assertEquals(preProof.publicOutput.currentCommitteeId);
         preMemberRoot.assertEquals(preProof.publicOutput.memberTreeRoot);
         let tree = new MerkleTree(treeHeight);
         for (let i = 0; i < 32; i++) {
           tree.setLeaf(BigInt(i), GroupArray.hash(publickeys.get(Field(i))));
         }
         // update new tree of public key in to the member tree
-        let newMemberRoot = memberWitness.calculateRoot(tree.getRoot());
+        let [newMemberRoot] = memberWitness.computeRootAndKey(tree.getRoot());
 
         ////// caculate new settingTreeRoot
         let [preSettingRoot, settingKey] = settingWitess.computeRootAndKey(
           Field(0)
         );
-        settingKey.assertEquals(newCommitteeId);
+        settingKey.assertEquals(curCommitteeId);
         preSettingRoot.assertEquals(preProof.publicOutput.settingTreeRoot);
         // update new tree of public key in to the member tree
         let [newSettingRoot] = dkgAddressWitness.computeRootAndKey(
@@ -107,11 +106,11 @@ export const createCommitteeProof = Experimental.ZkProgram({
         let [preAddressRoot, addressKey] = dkgAddressWitness.computeRootAndKey(
           Field(0)
         );
-        addressKey.assertEquals(newCommitteeId);
+        addressKey.assertEquals(curCommitteeId);
         preAddressRoot.assertEquals(preProof.publicOutput.dkgAddressTreeRoot);
         // update new tree of public key in to the member tree
         let [newAddressRoot] = dkgAddressWitness.computeRootAndKey(
-          GroupArray.hash(newAddresses)
+          GroupArray.hash(newAddress)
         );
 
         return new RollupState({
@@ -119,14 +118,14 @@ export const createCommitteeProof = Experimental.ZkProgram({
             [
               publickeys.length,
               publickeys.toFields(),
-              newAddresses.toFields(),
+              newAddress.toFields(),
               threshold,
             ].flat(),
           ]),
           memberTreeRoot: newMemberRoot,
           settingTreeRoot: newSettingRoot,
           dkgAddressTreeRoot: newAddressRoot,
-          currentCommitteeId: newCommitteeId,
+          currentCommitteeId: curCommitteeId.add(Field(1)),
         });
       },
     },
@@ -198,6 +197,7 @@ export class Committee extends SmartContract {
     );
   }
 
+  // Todo: merge deployContract() into this function
   @method rollupIncrements(proof: CommitteeProof) {
     proof.verify();
     let curActionState = this.actionState.getAndAssertEquals();
@@ -213,23 +213,11 @@ export class Committee extends SmartContract {
     dkgAddressTreeRoot.assertEquals(proof.publicInput.dkgAddressTreeRoot);
 
     // compute the new counter and hash from pending actions
+    // if hash not exists, it will throw error
     let pendingActions = this.reducer.getActions({
       fromActionState: curActionState,
+      endActionState: proof.publicOutput.actionHash,
     });
-
-    let { state: newCounter, actionState: newActionState } =
-      this.reducer.reduce(
-        pendingActions,
-        // state type
-        Field,
-        // function that says how to apply an action
-        (state: Field, action: CommitteeInput) => {
-          return Field(0);
-        },
-        { state: Field(0), actionState: curActionState }
-      );
-
-    newActionState.assertEquals(proof.publicOutput.actionHash);
 
     // update on-chain state
     this.actionState.set(proof.publicOutput.actionHash);
@@ -237,5 +225,34 @@ export class Committee extends SmartContract {
     this.memberTreeRoot.set(proof.publicOutput.memberTreeRoot);
     this.settingTreeRoot.set(proof.publicOutput.settingTreeRoot);
     this.dkgAddressTreeRoot.set(proof.publicOutput.dkgAddressTreeRoot);
+  }
+
+  @method checkMember(
+    address: Group,
+    commiteeId: Field,
+    memberMerkleTreeWitness: MyMerkleWitness,
+    memberMerkleMapWitness: MerkleMapWitness
+  ) {
+    let leaf = memberMerkleTreeWitness.calculateRoot(GroupArray.hash(address));
+    let [root, _commiteeId] = memberMerkleMapWitness.computeRootAndKey(leaf);
+    const onChainRoot = this.memberTreeRoot.getAndAssertEquals();
+    root.assertEquals(onChainRoot);
+    commiteeId.assertEquals(_commiteeId);
+  }
+
+  @method checkConfig(
+    n: Field,
+    t: Field,
+    commiteeId: Field,
+    settingMerkleMapWitness: MerkleMapWitness
+  ) {
+    n.assertGreaterThanOrEqual(t);
+    // hash[t,n]
+    let hashSetting = Poseidon.hash([t, n]);
+    let [root, _commiteeId] =
+      settingMerkleMapWitness.computeRootAndKey(hashSetting);
+    const onChainRoot = this.settingTreeRoot.getAndAssertEquals();
+    root.assertEquals(onChainRoot);
+    commiteeId.assertEquals(_commiteeId);
   }
 }
