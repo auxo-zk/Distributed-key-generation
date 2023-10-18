@@ -1,7 +1,10 @@
-import { Field, Mina, PublicKey, AccountUpdate, } from 'o1js';
+import { Field, Mina, AccountUpdate, MerkleMap, } from 'o1js';
 import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
-import { Committee, createCommitteeProve, GroupArray, } from '../contracts/Committee.js';
+import { Committee, 
+// createCommitteeProof,
+GroupArray, } from '../contracts/Committee.js';
+const EmptyMerkleMap = new MerkleMap();
 function updateOutOfSnark(state, action) {
     if (action === undefined)
         return state;
@@ -26,13 +29,16 @@ async function main() {
     }
     else {
         console.log('analyzeMethods...');
-        createCommitteeProve.analyzeMethods();
+        // createCommitteeProof.analyzeMethods();
         Committee.analyzeMethods();
     }
     console.log('deploy committeeContract...');
     let tx = await Mina.transaction(feePayer, () => {
         AccountUpdate.fundNewAccount(feePayer, 1);
         committeeContract.deploy();
+        committeeContract.memberTreeRoot.set(EmptyMerkleMap.getRoot());
+        committeeContract.settingTreeRoot.set(EmptyMerkleMap.getRoot());
+        committeeContract.dkgAddressTreeRoot.set(EmptyMerkleMap.getRoot());
     });
     await tx.sign([feePayerKey, keys.committee]).send();
     console.log('committeeContract deployed!');
@@ -44,20 +50,40 @@ async function main() {
         return value.toGroup();
     });
     let myGroupArray = new GroupArray(arrayAddress);
-    console.log('myGroupArray0 ', PublicKey.fromGroup(myGroupArray.get(Field(0))).toBase58());
-    console.log('myGroupArray4 ', PublicKey.fromGroup(myGroupArray.get(Field(4))).toBase58());
-    console.log('myGroupArray5 ', PublicKey.fromGroup(myGroupArray.get(Field(5))).toBase58());
+    for (let i = 1; i <= 1; i++) {
+        console.log('committeeContract.createCommittee: ', i);
+        tx = await Mina.transaction(feePayer, () => {
+            committeeContract.createCommittee(myGroupArray, addresses.dkg.toGroup(), Field(2));
+        });
+        await tx.prove();
+        await tx.sign([feePayerKey]).send();
+        console.log('committeeContract.createCommittee sent!...');
+    }
+    let myActionArray = [];
+    let actions = await Mina.fetchActions(addresses.committee);
+    if (Array.isArray(actions)) {
+        console.log(actions[0].actions);
+        for (let action of actions) {
+            // let temp: string[] = [];
+            // if (action) temp = action.actions[0];
+            // let newAction = temp.map((value) => Field(value));
+            myActionArray.push(Field(action.actions[0][0]));
+        }
+    }
+    console.log('lmao: ', Number(myGroupArray.toFields()[0]));
     // create proof
-    console.log('compile...');
-    ActionCommitteeProfiler.start('createCommitteeProve compile');
-    await createCommitteeProve.compile();
-    ActionCommitteeProfiler.stop();
-    console.log('create proof...');
-    ActionCommitteeProfiler.start('createCommitteeProve create proof with 5 memeber');
-    let proof = await createCommitteeProve.createProve(myGroupArray);
-    ActionCommitteeProfiler.stop().store();
-    console.log('proof input: ', proof.publicInput);
-    console.log('proof input: ', proof.publicOutput);
+    // console.log('compile...');
+    // ActionCommitteeProfiler.start('createCommitteeProof compile');
+    // await createCommitteeProof.compile();
+    // ActionCommitteeProfiler.stop();
+    // console.log('create proof...');
+    // ActionCommitteeProfiler.start(
+    //   'createCommitteeProof create proof with 5 memeber'
+    // );
+    // let proof = await createCommitteeProof.createProve(myGroupArray);
+    // ActionCommitteeProfiler.stop().store();
+    // console.log('proof input: ', proof.publicInput);
+    // console.log('proof input: ', proof.publicOutput);
 }
 main();
 //# sourceMappingURL=testCommittee.js.map

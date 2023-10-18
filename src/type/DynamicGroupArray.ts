@@ -51,6 +51,10 @@ export default function DynamicGroupArray(maxLength: number) {
       return Provable.switch(mask, Group, this.values);
     }
 
+    toFields(): Field[] {
+      return this.values.map((v) => Group.toFields(v)).flat();
+    }
+
     set(index: Field, value: Group): void {
       const mask = this.indexMask(index);
       for (let i = 0; i < this.maxLength(); i++) {

@@ -2,6 +2,7 @@ import { Bool, Field, Group } from 'o1js';
 export default function DynamicGroupArray(maxLength: number): {
     new (values?: Group[]): {
         get(index: Field): Group;
+        toFields(): Field[];
         set(index: Field, value: Group): void;
         push(value: Group): void;
         pop(n: Field): void;
@@ -29,6 +30,7 @@ export default function DynamicGroupArray(maxLength: number): {
     fillWithNull([...values]: Group[], length: number): Group[];
     from(values: Group[]): {
         get(index: Field): Group;
+        toFields(): Field[];
         set(index: Field, value: Group): void;
         push(value: Group): void;
         pop(n: Field): void;
@@ -53,6 +55,7 @@ export default function DynamicGroupArray(maxLength: number): {
     };
     empty(length?: Field): {
         get(index: Field): Group;
+        toFields(): Field[];
         set(index: Field, value: Group): void;
         push(value: Group): void;
         pop(n: Field): void;

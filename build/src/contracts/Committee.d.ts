@@ -1,7 +1,8 @@
-import { SmartContract, State, PublicKey, VerificationKey } from 'o1js';
+import { Field, SmartContract, State, PublicKey, Group, VerificationKey } from 'o1js';
 declare const GroupArray_base: {
     new (values?: import("o1js/dist/node/lib/group.js").Group[] | undefined): {
         get(index: import("o1js/dist/node/lib/field.js").Field): import("o1js/dist/node/lib/group.js").Group;
+        toFields(): import("o1js/dist/node/lib/field.js").Field[];
         set(index: import("o1js/dist/node/lib/field.js").Field, value: import("o1js/dist/node/lib/group.js").Group): void;
         push(value: import("o1js/dist/node/lib/group.js").Group): void;
         pop(n: import("o1js/dist/node/lib/field.js").Field): void;
@@ -29,6 +30,7 @@ declare const GroupArray_base: {
     fillWithNull([...values]: import("o1js/dist/node/lib/group.js").Group[], length: number): import("o1js/dist/node/lib/group.js").Group[];
     from(values: import("o1js/dist/node/lib/group.js").Group[]): {
         get(index: import("o1js/dist/node/lib/field.js").Field): import("o1js/dist/node/lib/group.js").Group;
+        toFields(): import("o1js/dist/node/lib/field.js").Field[];
         set(index: import("o1js/dist/node/lib/field.js").Field, value: import("o1js/dist/node/lib/group.js").Group): void;
         push(value: import("o1js/dist/node/lib/group.js").Group): void;
         pop(n: import("o1js/dist/node/lib/field.js").Field): void;
@@ -53,6 +55,7 @@ declare const GroupArray_base: {
     };
     empty(length?: import("o1js/dist/node/lib/field.js").Field | undefined): {
         get(index: import("o1js/dist/node/lib/field.js").Field): import("o1js/dist/node/lib/group.js").Group;
+        toFields(): import("o1js/dist/node/lib/field.js").Field[];
         set(index: import("o1js/dist/node/lib/field.js").Field, value: import("o1js/dist/node/lib/group.js").Group): void;
         push(value: import("o1js/dist/node/lib/group.js").Group): void;
         pop(n: import("o1js/dist/node/lib/field.js").Field): void;
@@ -123,30 +126,103 @@ declare const GroupArray_base: {
 };
 export declare class GroupArray extends GroupArray_base {
 }
+declare const CommitteeInput_base: (new (value: {
+    addresses: GroupArray;
+    dkgAddress: import("o1js/dist/node/lib/group.js").Group;
+    threshold: import("o1js/dist/node/lib/field.js").Field;
+}) => {
+    addresses: GroupArray;
+    dkgAddress: import("o1js/dist/node/lib/group.js").Group;
+    threshold: import("o1js/dist/node/lib/field.js").Field;
+}) & {
+    _isStruct: true;
+} & import("o1js/dist/node/snarky.js").ProvablePure<{
+    addresses: GroupArray;
+    dkgAddress: import("o1js/dist/node/lib/group.js").Group;
+    threshold: import("o1js/dist/node/lib/field.js").Field;
+}> & {
+    toInput: (x: {
+        addresses: GroupArray;
+        dkgAddress: import("o1js/dist/node/lib/group.js").Group;
+        threshold: import("o1js/dist/node/lib/field.js").Field;
+    }) => {
+        fields?: import("o1js/dist/node/lib/field.js").Field[] | undefined;
+        packed?: [import("o1js/dist/node/lib/field.js").Field, number][] | undefined;
+    };
+    toJSON: (x: {
+        addresses: GroupArray;
+        dkgAddress: import("o1js/dist/node/lib/group.js").Group;
+        threshold: import("o1js/dist/node/lib/field.js").Field;
+    }) => {
+        addresses: {
+            length: string;
+            values: {
+                x: string;
+                y: string;
+            }[];
+        };
+        dkgAddress: {
+            x: string;
+            y: string;
+        };
+        threshold: string;
+    };
+    fromJSON: (x: {
+        addresses: {
+            length: string;
+            values: {
+                x: string;
+                y: string;
+            }[];
+        };
+        dkgAddress: {
+            x: string;
+            y: string;
+        };
+        threshold: string;
+    }) => {
+        addresses: GroupArray;
+        dkgAddress: import("o1js/dist/node/lib/group.js").Group;
+        threshold: import("o1js/dist/node/lib/field.js").Field;
+    };
+};
+export declare class CommitteeInput extends CommitteeInput_base {
+}
 export declare class Committee extends SmartContract {
     vkDKGHash: State<import("o1js/dist/node/lib/field.js").Field>;
     curCommitteeId: State<import("o1js/dist/node/lib/field.js").Field>;
+    memberTreeRoot: State<import("o1js/dist/node/lib/field.js").Field>;
+    settingTreeRoot: State<import("o1js/dist/node/lib/field.js").Field>;
+    dkgAddressTreeRoot: State<import("o1js/dist/node/lib/field.js").Field>;
+    actionState: State<import("o1js/dist/node/lib/field.js").Field>;
+    reducer: {
+        dispatch(action: CommitteeInput): void;
+        reduce<State_1>(actions: CommitteeInput[][], stateType: import("o1js/dist/node/lib/provable.js").Provable<State_1>, reduce: (state: State_1, action: CommitteeInput) => State_1, initial: {
+            state: State_1;
+            actionState: import("o1js/dist/node/lib/field.js").Field;
+        }, options?: {
+            maxTransactionsWithActions?: number | undefined;
+            skipActionStatePrecondition?: boolean | undefined;
+        } | undefined): {
+            state: State_1;
+            actionState: import("o1js/dist/node/lib/field.js").Field;
+        };
+        forEach(actions: CommitteeInput[][], reduce: (action: CommitteeInput) => void, fromActionState: import("o1js/dist/node/lib/field.js").Field, options?: {
+            maxTransactionsWithActions?: number | undefined;
+            skipActionStatePrecondition?: boolean | undefined;
+        } | undefined): import("o1js/dist/node/lib/field.js").Field;
+        getActions({ fromActionState, endActionState, }?: {
+            fromActionState?: import("o1js/dist/node/lib/field.js").Field | undefined;
+            endActionState?: import("o1js/dist/node/lib/field.js").Field | undefined;
+        } | undefined): CommitteeInput[][];
+        fetchActions({ fromActionState, endActionState, }: {
+            fromActionState?: import("o1js/dist/node/lib/field.js").Field | undefined;
+            endActionState?: import("o1js/dist/node/lib/field.js").Field | undefined;
+        }): Promise<CommitteeInput[][]>;
+    };
     init(): void;
+    setVkDKGHash(verificationKey: VerificationKey): void;
     deployContract(address: PublicKey, verificationKey: VerificationKey): void;
-    createCommittee(address: PublicKey, verificationKey: VerificationKey): void;
+    createCommittee(addresses: GroupArray, dkgAddress: Group, threshold: Field): void;
 }
-export declare const createCommitteeProve: {
-    name: string;
-    compile: () => Promise<{
-        verificationKey: string;
-    }>;
-    verify: (proof: import("o1js/dist/node/lib/proof_system.js").Proof<GroupArray, import("o1js/dist/node/lib/field.js").Field>) => Promise<boolean>;
-    digest: () => string;
-    analyzeMethods: () => {
-        rows: number;
-        digest: string;
-        result: unknown;
-        gates: import("o1js/dist/node/snarky.js").Gate[];
-        publicInputSize: number;
-    }[];
-    publicInputType: typeof GroupArray;
-    publicOutputType: typeof import("o1js/dist/node/lib/field.js").Field & ((x: string | number | bigint | import("o1js/dist/node/lib/field.js").Field | import("o1js/dist/node/lib/field.js").FieldVar | import("o1js/dist/node/lib/field.js").FieldConst) => import("o1js/dist/node/lib/field.js").Field);
-} & {
-    createProve: (publicInput: GroupArray, ...args: [] & any[]) => Promise<import("o1js/dist/node/lib/proof_system.js").Proof<GroupArray, import("o1js/dist/node/lib/field.js").Field>>;
-};
 export {};
