@@ -1,6 +1,6 @@
 import { Field, SmartContract, State, PublicKey, Group, VerificationKey, MerkleMapWitness, SelfProof } from 'o1js';
 declare const MyMerkleWitness_base: typeof import("o1js/dist/node/lib/merkle_tree.js").BaseMerkleWitness;
-declare class MyMerkleWitness extends MyMerkleWitness_base {
+export declare class MyMerkleWitness extends MyMerkleWitness_base {
 }
 declare const GroupArray_base: {
     new (values?: import("o1js/dist/node/lib/group.js").Group[] | undefined): {
@@ -310,7 +310,7 @@ export declare class CommitteeInput extends CommitteeInput_base {
 }
 export declare class Committee extends SmartContract {
     vkDKGHash: State<import("o1js/dist/node/lib/field.js").Field>;
-    curCommitteeId: State<import("o1js/dist/node/lib/field.js").Field>;
+    nextCommitteeId: State<import("o1js/dist/node/lib/field.js").Field>;
     memberTreeRoot: State<import("o1js/dist/node/lib/field.js").Field>;
     settingTreeRoot: State<import("o1js/dist/node/lib/field.js").Field>;
     dkgAddressTreeRoot: State<import("o1js/dist/node/lib/field.js").Field>;
@@ -343,9 +343,14 @@ export declare class Committee extends SmartContract {
     init(): void;
     setVkDKGHash(verificationKey: VerificationKey): void;
     deployContract(address: PublicKey, verificationKey: VerificationKey): void;
-    createCommittee(addresses: GroupArray, dkgAddress: Group, threshold: Field): void;
+    createCommittee(addresses: GroupArray, threshold: Field, dkgAddress: Group, verificationKey: VerificationKey): void;
     rollupIncrements(proof: CommitteeProof): void;
     checkMember(address: Group, commiteeId: Field, memberMerkleTreeWitness: MyMerkleWitness, memberMerkleMapWitness: MerkleMapWitness): void;
     checkConfig(n: Field, t: Field, commiteeId: Field, settingMerkleMapWitness: MerkleMapWitness): void;
+}
+export declare class MockDKGContract extends SmartContract {
+    num: State<import("o1js/dist/node/lib/field.js").Field>;
+    init(): void;
+    addNum(addNum: Field): void;
 }
 export {};

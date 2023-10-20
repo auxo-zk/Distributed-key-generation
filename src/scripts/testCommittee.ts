@@ -25,6 +25,8 @@ import {
   createCommitteeProof,
   GroupArray,
   RollupState,
+  MyMerkleWitness,
+  MockDKGContract,
 } from '../contracts/Committee.js';
 
 const EmptyMerkleMap = new MerkleMap();
@@ -37,17 +39,12 @@ const settingMerkleMap = new MerkleMap();
 
 class memberMerkleTreeWitness extends MerkleWitness(treeHeight) {}
 
-// function updateOutOfSnark(state: Field, action: Field[][]) {
-//   if (action === undefined) return state;
-//   let actionsHash = AccountUpdate.Actions.hash(action);
-//   return AccountUpdate.Actions.updateSequenceState(state, actionsHash);
-// }
-
 async function main() {
   // fresh account
   let { keys, addresses } = randomAccounts(
     'committee',
-    'dkg',
+    'dkg1',
+    'dkg2',
     'p1',
     'p2',
     'p3',
@@ -75,13 +72,21 @@ async function main() {
   let tx = await Mina.transaction(feePayer, () => {
     AccountUpdate.fundNewAccount(feePayer, 1);
     committeeContract.deploy();
-    committeeContract.memberTreeRoot.set(EmptyMerkleMap.getRoot());
-    committeeContract.settingTreeRoot.set(EmptyMerkleMap.getRoot());
-    committeeContract.dkgAddressTreeRoot.set(EmptyMerkleMap.getRoot());
-    committeeContract.actionState.set(Reducer.initialActionState);
   });
   await tx.sign([feePayerKey, keys.committee]).send();
   console.log('committeeContract deployed!');
+
+  console.log('compile mockDKG contract... ');
+  await MockDKGContract.compile();
+
+  // set verification key
+  console.log('committeeContract.createCommittee: ');
+  tx = await Mina.transaction(feePayer, () => {
+    committeeContract.setVkDKGHash(MockDKGContract._verificationKey!);
+  });
+  await tx.prove();
+  await tx.sign([feePayerKey]).send();
+  console.log('committeeContract.createCommittee sent!...');
 
   // create commitee consist of 2 people with thresh hold 1
   let arrayAddress = [];
@@ -91,38 +96,60 @@ async function main() {
     return value.toGroup();
   });
   // console.log(`dkg: `, addresses.dkg.toBase58());
-  let myGroupArray = new GroupArray(arrayAddress);
+  let myGroupArray1 = new GroupArray(arrayAddress);
 
   console.log('committeeContract.createCommittee: ');
   tx = await Mina.transaction(feePayer, () => {
+    AccountUpdate.fundNewAccount(feePayer, 1);
     committeeContract.createCommittee(
-      myGroupArray,
-      addresses.dkg.toGroup(),
-      Field(1)
+      myGroupArray1,
+      Field(1),
+      addresses.dkg1.toGroup(),
+      MockDKGContract._verificationKey!
     );
   });
   await tx.prove();
-  await tx.sign([feePayerKey]).send();
+  await tx.sign([feePayerKey, keys.dkg1]).send();
   console.log('committeeContract.createCommittee sent!...');
 
-  // let myActionArray: Field[] = [];
-  // let actions = await Mina.fetchActions(addresses.committee);
-  // if (Array.isArray(actions)) {
-  //   for (let action of actions) {
-  //     // let temp: string[] = [];
-  //     // if (action) temp = action.actions[0];
-  //     // let newAction = temp.map((value) => Field(value));
-  //     // myActionArray.push(Field(action.actions[0][0]));
-  //     console.log(action.hash);
-  //   }
-  // }
+  // Test MockDKG contract
+  let mockDKGContract = new MockDKGContract(addresses.dkg1);
+  console.log(
+    'Number in mockDKG contract: ',
+    Number(mockDKGContract.num.get())
+  );
 
-  // create proof
+  // create commitee consist of 3 people with thresh hold 2
+  arrayAddress = [];
+  arrayAddress.push(addresses.p3, addresses.p4, addresses.p5);
+  arrayAddress = arrayAddress.map((value) => {
+    // console.log(`address: `, value.toBase58());
+    return value.toGroup();
+  });
+  // console.log(`dkg: `, addresses.dkg.toBase58());
+  let myGroupArray2 = new GroupArray(arrayAddress);
+
+  console.log('committeeContract.createCommittee: ');
+  tx = await Mina.transaction(feePayer, () => {
+    AccountUpdate.fundNewAccount(feePayer, 1);
+    committeeContract.createCommittee(
+      myGroupArray2,
+      Field(2),
+      addresses.dkg2.toGroup(),
+      MockDKGContract._verificationKey!
+    );
+  });
+  await tx.prove();
+  await tx.sign([feePayerKey, keys.dkg2]).send();
+  console.log('committeeContract.createCommittee sent!...');
+
+  // compile proof
   console.log('compile...');
   ActionCommitteeProfiler.start('createCommitteeProof compile');
   await createCommitteeProof.compile();
   ActionCommitteeProfiler.stop().store();
 
+  // create first step proof
   console.log('create proof first step...');
   ActionCommitteeProfiler.start('createCommitteeProof create fist step');
   let proof = await createCommitteeProof.firstStep(
@@ -131,7 +158,7 @@ async function main() {
       memberTreeRoot: EmptyMerkleMap.getRoot(),
       settingTreeRoot: EmptyMerkleMap.getRoot(),
       dkgAddressTreeRoot: EmptyMerkleMap.getRoot(),
-      currentCommitteeId: Field(0),
+      currentCommitteeId: committeeContract.nextCommitteeId.get(), // 0
     })
   );
   ActionCommitteeProfiler.stop().store();
@@ -139,14 +166,43 @@ async function main() {
   console.log('create proof next step...');
   ActionCommitteeProfiler.start('createCommitteeProof create next step');
   proof = await createCommitteeProof.nextStep(
-    proof.publicOutput,
+    proof.publicInput,
     proof,
-    myGroupArray,
+    myGroupArray1,
     memberMerkleMap.getWitness(Field(0)),
-    addresses.dkg.toGroup(),
+    addresses.dkg1.toGroup(),
     settingMerkleMap.getWitness(Field(0)),
     Field(1), // threshold
     dkgAddressMerkleMap.getWitness(Field(0))
+  );
+  ActionCommitteeProfiler.stop();
+
+  ////// udpate data to local
+
+  // memberMerkleTree.set
+  let tree = new MerkleTree(treeHeight);
+  for (let i = 0; i < 32; i++) {
+    tree.setLeaf(BigInt(i), GroupArray.hash(myGroupArray1.get(Field(i))));
+  }
+
+  memberMerkleMap.set(Field(0), tree.getRoot());
+  settingMerkleMap.set(
+    Field(0),
+    Poseidon.hash([Field(1), myGroupArray1.length])
+  );
+  dkgAddressMerkleMap.set(Field(0), GroupArray.hash(addresses.dkg1.toGroup()));
+
+  console.log('create proof next step again...');
+  ActionCommitteeProfiler.start('createCommitteeProof create next step');
+  proof = await createCommitteeProof.nextStep(
+    proof.publicInput,
+    proof,
+    myGroupArray2,
+    memberMerkleMap.getWitness(Field(1)),
+    addresses.dkg2.toGroup(),
+    settingMerkleMap.getWitness(Field(1)),
+    Field(2), // threshold
+    dkgAddressMerkleMap.getWitness(Field(1))
   );
   ActionCommitteeProfiler.stop();
 
@@ -169,6 +225,34 @@ async function main() {
   await tx.sign([feePayerKey]).send();
   console.log('committeeContract.rollupIncrements sent!...');
   ActionCommitteeProfiler.stop().store();
+
+  ////// udpate data to local
+
+  // memberMerkleTree.set
+  let tree2 = new MerkleTree(treeHeight);
+  for (let i = 0; i < 32; i++) {
+    tree2.setLeaf(BigInt(i), GroupArray.hash(myGroupArray2.get(Field(i))));
+  }
+
+  memberMerkleMap.set(Field(1), tree2.getRoot());
+  settingMerkleMap.set(
+    Field(1),
+    Poseidon.hash([Field(2), myGroupArray2.length])
+  );
+  dkgAddressMerkleMap.set(Field(1), GroupArray.hash(addresses.dkg2.toGroup()));
+
+  // check if memerber belong to committeeId
+  console.log('committeeContract.checkMember p2: ');
+  tx = await Mina.transaction(feePayer, () => {
+    committeeContract.checkMember(
+      addresses.p2.toGroup(),
+      Field(0),
+      new MyMerkleWitness(tree.getWitness(1n)),
+      memberMerkleMap.getWitness(Field(0))
+    );
+  });
+  await tx.prove();
+  await tx.sign([feePayerKey]).send();
 }
 
 main();

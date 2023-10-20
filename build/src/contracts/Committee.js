@@ -7,12 +7,13 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { Field, SmartContract, state, State, method, PublicKey, MerkleWitness, Group, Bool, Reducer, Permissions, VerificationKey, AccountUpdate, Mina, MerkleTree, MerkleMapWitness, Struct, Experimental, SelfProof, Poseidon, } from 'o1js';
+import { Field, SmartContract, state, State, method, PublicKey, MerkleWitness, Group, Bool, Reducer, Permissions, VerificationKey, AccountUpdate, Mina, MerkleTree, MerkleMap, MerkleMapWitness, Struct, Experimental, SelfProof, Poseidon, } from 'o1js';
 import DynamicGroupArray from '../type/DynamicGroupArray.js';
 const accountFee = Mina.accountCreationFee();
 const treeHeight = 6; // setting max 32 member
+const EmptyMerkleMap = new MerkleMap();
 const Tree = new MerkleTree(treeHeight);
-class MyMerkleWitness extends MerkleWitness(treeHeight) {
+export class MyMerkleWitness extends MerkleWitness(treeHeight) {
 }
 export class GroupArray extends DynamicGroupArray(2 ** (treeHeight - 1)) {
 }
@@ -47,8 +48,8 @@ export const createCommitteeProof = Experimental.ZkProgram({
             method(input, preProof, publickeys, memberWitness, newAddress, settingWitess, threshold, dkgAddressWitness) {
                 preProof.verify();
                 ////// caculate new memberTreeRoot
-                let [preMemberRoot, curCommitteeId] = memberWitness.computeRootAndKey(Field(0));
-                curCommitteeId.assertEquals(preProof.publicOutput.currentCommitteeId);
+                let [preMemberRoot, nextCommitteeId] = memberWitness.computeRootAndKey(Field(0));
+                nextCommitteeId.assertEquals(preProof.publicOutput.currentCommitteeId);
                 preMemberRoot.assertEquals(preProof.publicOutput.memberTreeRoot);
                 let tree = new MerkleTree(treeHeight);
                 for (let i = 0; i < 32; i++) {
@@ -58,7 +59,7 @@ export const createCommitteeProof = Experimental.ZkProgram({
                 let [newMemberRoot] = memberWitness.computeRootAndKey(tree.getRoot());
                 ////// caculate new settingTreeRoot
                 let [preSettingRoot, settingKey] = settingWitess.computeRootAndKey(Field(0));
-                settingKey.assertEquals(curCommitteeId);
+                settingKey.assertEquals(nextCommitteeId);
                 preSettingRoot.assertEquals(preProof.publicOutput.settingTreeRoot);
                 // update new tree of public key in to the member tree
                 let [newSettingRoot] = dkgAddressWitness.computeRootAndKey(
@@ -66,7 +67,7 @@ export const createCommitteeProof = Experimental.ZkProgram({
                 Poseidon.hash([threshold, publickeys.length]));
                 ////// caculate new address tree root
                 let [preAddressRoot, addressKey] = dkgAddressWitness.computeRootAndKey(Field(0));
-                addressKey.assertEquals(curCommitteeId);
+                addressKey.assertEquals(nextCommitteeId);
                 preAddressRoot.assertEquals(preProof.publicOutput.dkgAddressTreeRoot);
                 // update new tree of public key in to the member tree
                 let [newAddressRoot] = dkgAddressWitness.computeRootAndKey(GroupArray.hash(newAddress));
@@ -82,7 +83,7 @@ export const createCommitteeProof = Experimental.ZkProgram({
                     memberTreeRoot: newMemberRoot,
                     settingTreeRoot: newSettingRoot,
                     dkgAddressTreeRoot: newAddressRoot,
-                    currentCommitteeId: curCommitteeId.add(Field(1)),
+                    currentCommitteeId: nextCommitteeId.add(Field(1)),
                 });
             },
         },
@@ -106,7 +107,7 @@ export class Committee extends SmartContract {
     constructor() {
         super(...arguments);
         this.vkDKGHash = State();
-        this.curCommitteeId = State();
+        this.nextCommitteeId = State();
         this.memberTreeRoot = State();
         this.settingTreeRoot = State();
         this.dkgAddressTreeRoot = State();
@@ -115,6 +116,10 @@ export class Committee extends SmartContract {
     }
     init() {
         super.init();
+        this.memberTreeRoot.set(EmptyMerkleMap.getRoot());
+        this.settingTreeRoot.set(EmptyMerkleMap.getRoot());
+        this.dkgAddressTreeRoot.set(EmptyMerkleMap.getRoot());
+        this.actionState.set(Reducer.initialActionState);
     }
     // to-do add permission only owner
     setVkDKGHash(verificationKey) {
@@ -128,10 +133,11 @@ export class Committee extends SmartContract {
         // To-do: setting not cho change permision on the future
         dkgContract.account.permissions.set(Permissions.default());
         dkgContract.account.verificationKey.set(verificationKey);
-        this.send({ to: this.sender, amount: accountFee });
+        // this.send({ to: this.sender, amount: accountFee });
     }
-    createCommittee(addresses, dkgAddress, threshold) {
+    createCommittee(addresses, threshold, dkgAddress, verificationKey) {
         threshold.assertLessThanOrEqual(addresses.length);
+        this.deployContract(PublicKey.fromGroup(dkgAddress), verificationKey);
         this.reducer.dispatch(new CommitteeInput({
             addresses,
             dkgAddress,
@@ -142,12 +148,12 @@ export class Committee extends SmartContract {
     rollupIncrements(proof) {
         proof.verify();
         let curActionState = this.actionState.getAndAssertEquals();
-        let curCommitteeId = this.curCommitteeId.getAndAssertEquals();
+        let nextCommitteeId = this.nextCommitteeId.getAndAssertEquals();
         let memberTreeRoot = this.memberTreeRoot.getAndAssertEquals();
         let settingTreeRoot = this.settingTreeRoot.getAndAssertEquals();
         let dkgAddressTreeRoot = this.dkgAddressTreeRoot.getAndAssertEquals();
         curActionState.assertEquals(proof.publicInput.actionHash);
-        curCommitteeId.assertEquals(proof.publicInput.currentCommitteeId);
+        nextCommitteeId.assertEquals(proof.publicInput.currentCommitteeId);
         memberTreeRoot.assertEquals(proof.publicInput.memberTreeRoot);
         settingTreeRoot.assertEquals(proof.publicInput.settingTreeRoot);
         dkgAddressTreeRoot.assertEquals(proof.publicInput.dkgAddressTreeRoot);
@@ -159,7 +165,7 @@ export class Committee extends SmartContract {
         });
         // update on-chain state
         this.actionState.set(proof.publicOutput.actionHash);
-        this.curCommitteeId.set(proof.publicOutput.currentCommitteeId);
+        this.nextCommitteeId.set(proof.publicOutput.currentCommitteeId);
         this.memberTreeRoot.set(proof.publicOutput.memberTreeRoot);
         this.settingTreeRoot.set(proof.publicOutput.settingTreeRoot);
         this.dkgAddressTreeRoot.set(proof.publicOutput.dkgAddressTreeRoot);
@@ -188,7 +194,7 @@ __decorate([
 __decorate([
     state(Field),
     __metadata("design:type", Object)
-], Committee.prototype, "curCommitteeId", void 0);
+], Committee.prototype, "nextCommitteeId", void 0);
 __decorate([
     state(Field),
     __metadata("design:type", Object)
@@ -221,8 +227,9 @@ __decorate([
     method,
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [GroupArray,
+        Field,
         Group,
-        Field]),
+        VerificationKey]),
     __metadata("design:returntype", void 0)
 ], Committee.prototype, "createCommittee", null);
 __decorate([
@@ -249,4 +256,29 @@ __decorate([
         MerkleMapWitness]),
     __metadata("design:returntype", void 0)
 ], Committee.prototype, "checkConfig", null);
+export class MockDKGContract extends SmartContract {
+    constructor() {
+        super(...arguments);
+        this.num = State();
+    }
+    init() {
+        super.init();
+        this.num.set(Field(1));
+    }
+    addNum(addNum) {
+        const currentState = this.num.getAndAssertEquals();
+        const newState = currentState.add(addNum);
+        this.num.set(newState);
+    }
+}
+__decorate([
+    state(Field),
+    __metadata("design:type", Object)
+], MockDKGContract.prototype, "num", void 0);
+__decorate([
+    method,
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Field]),
+    __metadata("design:returntype", void 0)
+], MockDKGContract.prototype, "addNum", null);
 //# sourceMappingURL=Committee.js.map

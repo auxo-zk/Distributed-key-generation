@@ -30,8 +30,9 @@ import DynamicGroupArray from '../type/DynamicGroupArray.js';
 const accountFee = Mina.accountCreationFee();
 
 const treeHeight = 6; // setting max 32 member
+const EmptyMerkleMap = new MerkleMap();
 const Tree = new MerkleTree(treeHeight);
-class MyMerkleWitness extends MerkleWitness(treeHeight) {}
+export class MyMerkleWitness extends MerkleWitness(treeHeight) {}
 
 export class GroupArray extends DynamicGroupArray(2 ** (treeHeight - 1)) {}
 
@@ -78,10 +79,10 @@ export const createCommitteeProof = Experimental.ZkProgram({
         preProof.verify();
 
         ////// caculate new memberTreeRoot
-        let [preMemberRoot, curCommitteeId] = memberWitness.computeRootAndKey(
+        let [preMemberRoot, nextCommitteeId] = memberWitness.computeRootAndKey(
           Field(0)
         );
-        curCommitteeId.assertEquals(preProof.publicOutput.currentCommitteeId);
+        nextCommitteeId.assertEquals(preProof.publicOutput.currentCommitteeId);
         preMemberRoot.assertEquals(preProof.publicOutput.memberTreeRoot);
         let tree = new MerkleTree(treeHeight);
         for (let i = 0; i < 32; i++) {
@@ -94,7 +95,7 @@ export const createCommitteeProof = Experimental.ZkProgram({
         let [preSettingRoot, settingKey] = settingWitess.computeRootAndKey(
           Field(0)
         );
-        settingKey.assertEquals(curCommitteeId);
+        settingKey.assertEquals(nextCommitteeId);
         preSettingRoot.assertEquals(preProof.publicOutput.settingTreeRoot);
         // update new tree of public key in to the member tree
         let [newSettingRoot] = dkgAddressWitness.computeRootAndKey(
@@ -106,7 +107,7 @@ export const createCommitteeProof = Experimental.ZkProgram({
         let [preAddressRoot, addressKey] = dkgAddressWitness.computeRootAndKey(
           Field(0)
         );
-        addressKey.assertEquals(curCommitteeId);
+        addressKey.assertEquals(nextCommitteeId);
         preAddressRoot.assertEquals(preProof.publicOutput.dkgAddressTreeRoot);
         // update new tree of public key in to the member tree
         let [newAddressRoot] = dkgAddressWitness.computeRootAndKey(
@@ -125,7 +126,7 @@ export const createCommitteeProof = Experimental.ZkProgram({
           memberTreeRoot: newMemberRoot,
           settingTreeRoot: newSettingRoot,
           dkgAddressTreeRoot: newAddressRoot,
-          currentCommitteeId: curCommitteeId.add(Field(1)),
+          currentCommitteeId: nextCommitteeId.add(Field(1)),
         });
       },
     },
@@ -153,7 +154,7 @@ export class CommitteeInput extends Struct({
 export class Committee extends SmartContract {
   @state(Field) vkDKGHash = State<Field>();
 
-  @state(Field) curCommitteeId = State<Field>();
+  @state(Field) nextCommitteeId = State<Field>();
   @state(Field) memberTreeRoot = State<Field>();
   @state(Field) settingTreeRoot = State<Field>();
   @state(Field) dkgAddressTreeRoot = State<Field>();
@@ -164,6 +165,10 @@ export class Committee extends SmartContract {
 
   init() {
     super.init();
+    this.memberTreeRoot.set(EmptyMerkleMap.getRoot());
+    this.settingTreeRoot.set(EmptyMerkleMap.getRoot());
+    this.dkgAddressTreeRoot.set(EmptyMerkleMap.getRoot());
+    this.actionState.set(Reducer.initialActionState);
   }
 
   // to-do add permission only owner
@@ -179,15 +184,17 @@ export class Committee extends SmartContract {
     // To-do: setting not cho change permision on the future
     dkgContract.account.permissions.set(Permissions.default());
     dkgContract.account.verificationKey.set(verificationKey);
-    this.send({ to: this.sender, amount: accountFee });
+    // this.send({ to: this.sender, amount: accountFee });
   }
 
   @method createCommittee(
     addresses: GroupArray,
+    threshold: Field,
     dkgAddress: Group,
-    threshold: Field
+    verificationKey: VerificationKey
   ) {
     threshold.assertLessThanOrEqual(addresses.length);
+    this.deployContract(PublicKey.fromGroup(dkgAddress), verificationKey);
     this.reducer.dispatch(
       new CommitteeInput({
         addresses,
@@ -201,13 +208,13 @@ export class Committee extends SmartContract {
   @method rollupIncrements(proof: CommitteeProof) {
     proof.verify();
     let curActionState = this.actionState.getAndAssertEquals();
-    let curCommitteeId = this.curCommitteeId.getAndAssertEquals();
+    let nextCommitteeId = this.nextCommitteeId.getAndAssertEquals();
     let memberTreeRoot = this.memberTreeRoot.getAndAssertEquals();
     let settingTreeRoot = this.settingTreeRoot.getAndAssertEquals();
     let dkgAddressTreeRoot = this.dkgAddressTreeRoot.getAndAssertEquals();
 
     curActionState.assertEquals(proof.publicInput.actionHash);
-    curCommitteeId.assertEquals(proof.publicInput.currentCommitteeId);
+    nextCommitteeId.assertEquals(proof.publicInput.currentCommitteeId);
     memberTreeRoot.assertEquals(proof.publicInput.memberTreeRoot);
     settingTreeRoot.assertEquals(proof.publicInput.settingTreeRoot);
     dkgAddressTreeRoot.assertEquals(proof.publicInput.dkgAddressTreeRoot);
@@ -221,7 +228,7 @@ export class Committee extends SmartContract {
 
     // update on-chain state
     this.actionState.set(proof.publicOutput.actionHash);
-    this.curCommitteeId.set(proof.publicOutput.currentCommitteeId);
+    this.nextCommitteeId.set(proof.publicOutput.currentCommitteeId);
     this.memberTreeRoot.set(proof.publicOutput.memberTreeRoot);
     this.settingTreeRoot.set(proof.publicOutput.settingTreeRoot);
     this.dkgAddressTreeRoot.set(proof.publicOutput.dkgAddressTreeRoot);
@@ -254,5 +261,15 @@ export class Committee extends SmartContract {
     const onChainRoot = this.settingTreeRoot.getAndAssertEquals();
     root.assertEquals(onChainRoot);
     commiteeId.assertEquals(_commiteeId);
+  }
+}
+
+export class MockDKGContract extends SmartContract {
+  @state(Field) num = State<Field>();
+
+  @method addNum(addNum: Field) {
+    const currentState = this.num.getAndAssertEquals();
+    const newState = currentState.add(addNum);
+    this.num.set(newState);
   }
 }
