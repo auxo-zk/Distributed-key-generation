@@ -348,9 +348,4 @@ export declare class Committee extends SmartContract {
     checkMember(address: Group, commiteeId: Field, memberMerkleTreeWitness: MyMerkleWitness, memberMerkleMapWitness: MerkleMapWitness): void;
     checkConfig(n: Field, t: Field, commiteeId: Field, settingMerkleMapWitness: MerkleMapWitness): void;
 }
-export declare class MockDKGContract extends SmartContract {
-    num: State<import("o1js/dist/node/lib/field.js").Field>;
-    init(): void;
-    addNum(addNum: Field): void;
-}
 export {};

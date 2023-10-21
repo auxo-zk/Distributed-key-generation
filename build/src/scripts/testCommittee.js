@@ -1,7 +1,8 @@
 import { Field, Reducer, Mina, AccountUpdate, Poseidon, MerkleMap, MerkleTree, MerkleWitness, } from 'o1js';
 import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
-import { Committee, createCommitteeProof, GroupArray, RollupState, MyMerkleWitness, MockDKGContract, } from '../contracts/Committee.js';
+import { Committee, createCommitteeProof, GroupArray, RollupState, MyMerkleWitness, } from '../contracts/Committee.js';
+import { MockDKGContract } from '../contracts/DKG.js';
 const EmptyMerkleMap = new MerkleMap();
 const treeHeight = 6; // setting max 32 member
 // const memberMerkleTree = new MerkleTree(treeHeight);

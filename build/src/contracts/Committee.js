@@ -256,29 +256,4 @@ __decorate([
         MerkleMapWitness]),
     __metadata("design:returntype", void 0)
 ], Committee.prototype, "checkConfig", null);
-export class MockDKGContract extends SmartContract {
-    constructor() {
-        super(...arguments);
-        this.num = State();
-    }
-    init() {
-        super.init();
-        this.num.set(Field(1));
-    }
-    addNum(addNum) {
-        const currentState = this.num.getAndAssertEquals();
-        const newState = currentState.add(addNum);
-        this.num.set(newState);
-    }
-}
-__decorate([
-    state(Field),
-    __metadata("design:type", Object)
-], MockDKGContract.prototype, "num", void 0);
-__decorate([
-    method,
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Field]),
-    __metadata("design:returntype", void 0)
-], MockDKGContract.prototype, "addNum", null);
 //# sourceMappingURL=Committee.js.map

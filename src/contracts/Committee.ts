@@ -263,13 +263,3 @@ export class Committee extends SmartContract {
     commiteeId.assertEquals(_commiteeId);
   }
 }
-
-export class MockDKGContract extends SmartContract {
-  @state(Field) num = State<Field>();
-
-  @method addNum(addNum: Field) {
-    const currentState = this.num.getAndAssertEquals();
-    const newState = currentState.add(addNum);
-    this.num.set(newState);
-  }
-}

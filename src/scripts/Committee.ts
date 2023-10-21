@@ -26,8 +26,9 @@ import {
   GroupArray,
   RollupState,
   MyMerkleWitness,
-  MockDKGContract,
 } from '../contracts/Committee.js';
+
+import { MockDKGContract } from '../contracts/DKG.js';
 
 const EmptyMerkleMap = new MerkleMap();
 
