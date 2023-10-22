@@ -321,3 +321,34 @@ In total, it took 227.23 seconds to run the entire benchmark
 In total, it took 255.82 seconds to run the entire benchmark
 
 
+## Times for Testing committee
+
+| Name | time passed in s |
+|---|---|
+|createCommitteeProof compile|258.89|
+
+In total, it took 258.89 seconds to run the entire benchmark
+
+
+## Times for Testing committee
+
+| Name | time passed in s |
+|---|---|
+|createCommitteeProof compile|258.89|
+|createCommitteeProof create fist step|33.47|
+
+In total, it took 292.36 seconds to run the entire benchmark
+
+
+## Times for Testing committee
+
+| Name | time passed in s |
+|---|---|
+|createCommitteeProof compile|258.89|
+|createCommitteeProof create fist step|33.47|
+|createCommitteeProof create next step|124.85|
+|committeeContract.rollupIncrements...|1.78|
+
+In total, it took 418.99 seconds to run the entire benchmark
+
+

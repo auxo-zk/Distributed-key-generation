@@ -244,16 +244,20 @@ async function main() {
 
   // check if memerber belong to committeeId
   console.log('committeeContract.checkMember p2: ');
+  console.log('1');
   tx = await Mina.transaction(feePayer, () => {
     committeeContract.checkMember(
       addresses.p2.toGroup(),
       Field(0),
       new MyMerkleWitness(tree.getWitness(1n)),
-      memberMerkleMap.getWitness(Field(0))
+      memberMerkleMap.getWitness(Field(111))
     );
   });
+  console.log('2');
   await tx.prove();
+  console.log('3');
   await tx.sign([feePayerKey]).send();
+  console.log('4');
 }
 
 main();
