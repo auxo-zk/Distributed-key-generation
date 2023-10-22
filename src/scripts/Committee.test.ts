@@ -71,33 +71,27 @@ describe('Committee', () => {
     feePayer = Local.testAccounts[0].publicKey;
     committeeContract = new Committee(addresses.committee);
     if (doProofs) {
-      console.log('compile');
       await Committee.compile();
     } else {
-      console.log('analyzeMethods...');
       // createCommitteeProof.analyzeMethods();
       Committee.analyzeMethods();
     }
 
-    console.log('deploy committeeContract...');
     let tx = await Mina.transaction(feePayer, () => {
       AccountUpdate.fundNewAccount(feePayer, 1);
       committeeContract.deploy();
     });
     await tx.sign([feePayerKey, keys.committee]).send();
-    console.log('committeeContract deployed!');
 
-    console.log('compile mockDKG contract... ');
     if (!doProofs) await MockDKGContract.compile();
 
     // set verification key
-    console.log('committeeContract.createCommittee: ');
+
     tx = await Mina.transaction(feePayer, () => {
       committeeContract.setVkDKGHash(MockDKGContract._verificationKey!);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();
-    console.log('committeeContract.createCommittee sent!...');
   });
 
   beforeEach(() => {});
@@ -106,13 +100,11 @@ describe('Committee', () => {
     let arrayAddress = [];
     arrayAddress.push(addresses.p1, addresses.p2);
     arrayAddress = arrayAddress.map((value) => {
-      // console.log(`address: `, value.toBase58());
       return value.toGroup();
     });
-    // console.log(`dkg: `, addresses.dkg.toBase58());
+
     myGroupArray1 = new GroupArray(arrayAddress);
 
-    console.log('committeeContract.createCommittee: ');
     let tx = await Mina.transaction(feePayer, () => {
       AccountUpdate.fundNewAccount(feePayer, 1);
       committeeContract.createCommittee(
@@ -124,7 +116,6 @@ describe('Committee', () => {
     });
     await tx.prove();
     await tx.sign([feePayerKey, keys.dkg1]).send();
-    console.log('committeeContract.createCommittee sent!...');
 
     // Test MockDKG contract
     let mockDKGContract = new MockDKGContract(addresses.dkg1);
@@ -135,13 +126,11 @@ describe('Committee', () => {
     let arrayAddress = [];
     arrayAddress.push(addresses.p3, addresses.p4, addresses.p5);
     arrayAddress = arrayAddress.map((value) => {
-      // console.log(`address: `, value.toBase58());
       return value.toGroup();
     });
-    // console.log(`dkg: `, addresses.dkg.toBase58());
+
     myGroupArray2 = new GroupArray(arrayAddress);
 
-    console.log('committeeContract.createCommittee: ');
     let tx = await Mina.transaction(feePayer, () => {
       AccountUpdate.fundNewAccount(feePayer, 1);
       committeeContract.createCommittee(
@@ -153,18 +142,15 @@ describe('Committee', () => {
     });
     await tx.prove();
     await tx.sign([feePayerKey, keys.dkg2]).send();
-    console.log('committeeContract.createCommittee sent!...');
   });
 
   it('compile proof', async () => {
     // compile proof
-    console.log('compile...');
     await createCommitteeProof.compile();
   });
 
   it('create proof first step...', async () => {
     // create first step proof
-    console.log('create proof first step...');
     proof = await createCommitteeProof.firstStep(
       new RollupState({
         actionHash: Reducer.initialActionState,
@@ -212,7 +198,6 @@ describe('Committee', () => {
   });
 
   it('create proof next step 2...', async () => {
-    console.log('create proof next step again...');
     proof = await createCommitteeProof.nextStep(
       proof.publicInput,
       proof,
@@ -245,18 +230,15 @@ describe('Committee', () => {
   });
 
   it('committeeContract rollupIncrements', async () => {
-    console.log('committeeContract.rollupIncrements: ');
     let tx = await Mina.transaction(feePayer, () => {
       committeeContract.rollupIncrements(proof);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();
-    console.log('committeeContract.rollupIncrements sent!...');
   });
 
   it('check if p2 belong to committee 0', async () => {
     // check if memerber belong to committeeId
-    console.log('committeeContract.checkMember p2: ');
     let tx = await Mina.transaction(feePayer, () => {
       committeeContract.checkMember(
         addresses.p2.toGroup(),
@@ -269,18 +251,15 @@ describe('Committee', () => {
     await tx.sign([feePayerKey]).send();
   });
 
-  it('check if p2 belong to committee 1: to be error', async () => {
+  it('check if p2 belong to committee 1: to throw error', async () => {
     // check if memerber belong to committeeId
-    console.log('committeeContract.checkMember p2: ');
-    let tx = await Mina.transaction(feePayer, () => {
+    expect(() => {
       committeeContract.checkMember(
         addresses.p2.toGroup(),
         Field(1),
         new MyMerkleWitness(tree1.getWitness(1n)),
         memberMerkleMap.getWitness(Field(1))
       );
-    });
-    await tx.prove();
-    await tx.sign([feePayerKey]).send();
+    }).toThrowError();
   });
 });

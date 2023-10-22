@@ -25,7 +25,7 @@ import {
   Poseidon,
 } from 'o1js';
 
-import DynamicGroupArray from '../type/DynamicGroupArray.js';
+import DynamicArray from '../type/DynamicArray.js';
 
 const accountFee = Mina.accountCreationFee();
 
@@ -34,7 +34,7 @@ const EmptyMerkleMap = new MerkleMap();
 const Tree = new MerkleTree(treeHeight);
 export class MyMerkleWitness extends MerkleWitness(treeHeight) {}
 
-export class GroupArray extends DynamicGroupArray(2 ** (treeHeight - 1)) {}
+export class GroupArray extends DynamicArray(Group, 2 ** (treeHeight - 1)) {}
 
 function updateOutOfSnark(state: Field, action: Field[][]) {
   if (action === undefined) return state;

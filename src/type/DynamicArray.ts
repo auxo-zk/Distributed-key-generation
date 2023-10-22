@@ -1,88 +1,112 @@
 import {
   Bool,
-  Provable,
+  Circuit,
   Field,
-  Poseidon,
-  Struct,
-  Experimental,
-  Group,
   FlexibleProvable,
+  Poseidon,
+  Provable,
+  ProvablePure,
+  Struct,
 } from 'o1js';
 
-export default function DynamicGroupArray(maxLength: number) {
-  return class _DynamicGroupArray extends Struct({
+export { DynamicArray };
+
+type HashableProvable<T> = Provable<T> & {
+  hash(x: T): Field;
+  equals(x: T, other: T): Bool;
+};
+
+function hashable<T>(type: Provable<T>): HashableProvable<T> {
+  return {
+    ...type,
+    hash(x: T): Field {
+      return Poseidon.hash(type.toFields(x));
+    },
+    equals(x: T, other: T): Bool {
+      return this.hash(x).equals(this.hash(other));
+    },
+  };
+}
+
+export default function DynamicArray<T>(
+  type: ProvablePure<T>,
+  maxLength: number
+) {
+  const _type = hashable(type);
+
+  return class _DynamicArray extends Struct({
     length: Field,
-    values: Provable.Array(Group, maxLength),
+    values: Provable.Array(type, maxLength),
   }) {
-    static Null() {
-      return Group.fromFields(Array(Group.sizeInFields()).fill(Field(0)));
+    static from(values: T[]): _DynamicArray {
+      return new _DynamicArray(values);
     }
 
-    static hash(values: Group): Field {
-      return Poseidon.hash(Group.toFields(values));
-    }
-
-    static fillWithNull([...values]: Group[], length: number): Group[] {
-      for (let i = values.length; i < length; i++) {
-        values[i] = _DynamicGroupArray.Null();
-      }
-      return values;
-    }
-
-    static from(values: Group[]): _DynamicGroupArray {
-      return new _DynamicGroupArray(values);
-    }
-
-    static empty(length?: Field): _DynamicGroupArray {
-      const arr = new _DynamicGroupArray();
+    static empty(length?: Field): _DynamicArray {
+      const arr = new _DynamicArray();
       arr.length = length ?? Field(0);
       return arr;
     }
 
-    constructor(values?: Group[]) {
+    static hash(value: T): Field {
+      return Poseidon.hash(type.toFields(value));
+    }
+
+    static Null(): T {
+      return type.fromFields(Array(type.sizeInFields()).fill(Field(0)));
+    }
+
+    static fillWithNull(values: T[], length: number): T[] {
+      for (let i = values.length; i < length; i++) {
+        values[i] = _DynamicArray.Null();
+      }
+      return values;
+    }
+
+    public constructor(values?: T[]) {
       super({
-        values: _DynamicGroupArray.fillWithNull(values ?? [], maxLength),
+        values: _DynamicArray.fillWithNull(values ?? [], maxLength),
         length: values === undefined ? Field(0) : Field(values.length),
       });
     }
 
-    get(index: Field): Group {
+    public get(index: Field): T {
       const mask = this.indexMask(index);
-      return Provable.switch(mask, Group, this.values);
+      return Provable.switch(mask, type, this.values);
     }
 
-    toFields(): Field[] {
-      return this.values.map((v) => Group.toFields(v)).flat();
-    }
-
-    set(index: Field, value: Group): void {
+    public set(index: Field, value: T): void {
       const mask = this.indexMask(index);
       for (let i = 0; i < this.maxLength(); i++) {
-        this.values[i] = Provable.switch([mask[i], mask[i].not()], Group, [
+        this.values[i] = Provable.switch([mask[i], mask[i].not()], type, [
           value,
           this.values[i],
         ]);
       }
     }
 
-    push(value: Group): void {
+    public toFields(): Field[] {
+      return this.values.map((v) => type.toFields(v)).flat();
+    }
+
+    public push(value: T): void {
       this.incrementLength(Field(1));
       this.set(this.length.sub(1), value);
     }
 
-    pop(n: Field): void {
+    public pop(n: Field): void {
       const mask = this.lengthMask(this.length.sub(n));
       this.decrementLength(n);
 
       for (let i = 0; i < this.maxLength(); i++) {
-        this.values[i] = Provable.switch([mask[i], mask[i].not()], Group, [
+        this.values[i] = Provable.switch([mask[i], mask[i].not()], type, [
           this.values[i],
-          _DynamicGroupArray.Null(),
+          _DynamicArray.Null(),
         ]);
       }
     }
 
-    concat(other: this): this {
+    public concat(other: this): this {
       const newArr = other.copy();
       newArr.shiftRight(this.length);
       let masked = Bool(true);
@@ -90,6 +114,7 @@ export default function DynamicGroupArray(maxLength: number) {
         masked = Provable.if(Field(i).equals(this.length), Bool(false), masked);
         newArr.values[i] = Provable.if(
           masked,
+          type,
           this.values[i],
           newArr.values[i]
         );
@@ -97,21 +122,22 @@ export default function DynamicGroupArray(maxLength: number) {
       return newArr;
     }
 
-    copy(): this {
+    public copy(): this {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const newArr = new (<any>this.constructor)();
       newArr.values = this.values.slice();
       newArr.length = this.length;
       return newArr;
     }
 
-    slice(start: Field, end: Field): this {
+    public slice(start: Field, end: Field): this {
       const newArr = this.copy();
       newArr.shiftLeft(start);
       newArr.pop(newArr.length.sub(end.sub(start)));
       return newArr;
     }
 
-    insert(index: Field, value: Group): void {
+    public insert(index: Field, value: T): void {
       const arr1 = this.slice(Field(0), index);
       const arr2 = this.slice(index, this.length);
       arr2.shiftRight(Field(1));
@@ -121,25 +147,25 @@ export default function DynamicGroupArray(maxLength: number) {
       this.length = concatArr.length;
     }
 
-    includes(value: Group): Bool {
+    public includes(value: T): Bool {
       let result = Field(0);
       for (let i = 0; i < this.maxLength(); i++) {
         result = result.add(
-          Provable.if(this.values[i].equals(value), Field(1), Field(0))
+          Provable.if(_type.equals(this.values[i], value), Field(1), Field(0))
         );
       }
       return result.equals(Field(0)).not();
     }
 
-    assertIncludes(value: Group): void {
+    public assertIncludes(value: T): void {
       this.includes(value).assertTrue();
     }
 
-    shiftLeft(n: Field): void {
+    public shiftLeft(n: Field): void {
       n.equals(this.length).assertFalse();
       this.decrementLength(n);
 
-      const nullArray = _DynamicGroupArray.empty(n);
+      const nullArray = _DynamicArray.empty(n);
 
       const possibleResults = [];
       const mask = [];
@@ -153,13 +179,13 @@ export default function DynamicGroupArray(maxLength: number) {
       const result = [];
       for (let i = 0; i < this.maxLength(); i++) {
         const possibleFieldsAtI = possibleResults.map((r) => r[i]);
-        result[i] = Provable.switch(mask, Group, possibleFieldsAtI);
+        result[i] = Provable.switch(mask, type, possibleFieldsAtI);
       }
       this.values = result;
     }
 
-    shiftRight(n: Field): void {
-      const nullArray = _DynamicGroupArray.empty(n);
+    public shiftRight(n: Field): void {
+      const nullArray = _DynamicArray.empty(n);
       this.incrementLength(n);
 
       const possibleResults = [];
@@ -174,37 +200,37 @@ export default function DynamicGroupArray(maxLength: number) {
       const result = [];
       for (let i = 0; i < this.maxLength(); i++) {
         const possibleFieldsAtI = possibleResults.map((r) => r[i]);
-        result[i] = Provable.switch(mask, Group, possibleFieldsAtI);
+        result[i] = Provable.switch(mask, type, possibleFieldsAtI);
       }
       this.values = result;
     }
 
-    hash(): Field {
-      return Poseidon.hash(this.values.map((v) => Group.toFields(v)).flat());
+    public hash(): Field {
+      return Poseidon.hash(this.values.map((v) => type.toFields(v)).flat());
     }
 
-    maxLength(): number {
+    public maxLength(): number {
       return maxLength;
     }
 
-    toString(): string {
+    public toString(): string {
       return this.values.slice(0, parseInt(this.length.toString())).toString();
     }
 
-    indexMask(index: Field): Bool[] {
+    public indexMask(index: Field): Bool[] {
       const mask = [];
-      // let lengthReached = Bool(false);
+      let lengthReached = Bool(false);
       for (let i = 0; i < this.maxLength(); i++) {
-        // lengthReached = Field(i).equals(this.length).or(lengthReached);
+        lengthReached = Field(i).equals(this.length).or(lengthReached);
         const isIndex = Field(i).equals(index);
         // assert index < length
-        // isIndex.and(lengthReached).not().assertTrue();
+        isIndex.and(lengthReached).not().assertTrue();
         mask[i] = isIndex;
       }
       return mask;
     }
 
-    incrementLength(n: Field): void {
+    public incrementLength(n: Field): void {
       const newLength = this.length.add(n);
       // assert length + n <= maxLength
       let lengthLteMaxLength = Bool(false);
@@ -215,7 +241,7 @@ export default function DynamicGroupArray(maxLength: number) {
       this.length = newLength;
     }
 
-    decrementLength(n: Field): void {
+    public decrementLength(n: Field): void {
       this.length = this.length.sub(n);
       // make sure length did not underflow
       let newLengthFound = Bool(false);
@@ -225,7 +251,7 @@ export default function DynamicGroupArray(maxLength: number) {
       newLengthFound.assertTrue();
     }
 
-    lengthMask(n: Field): Bool[] {
+    public lengthMask(n: Field): Bool[] {
       const mask = [];
       let masked = Bool(true);
       for (let i = 0; i < this.maxLength(); i++) {
@@ -235,7 +261,7 @@ export default function DynamicGroupArray(maxLength: number) {
       return mask;
     }
 
-    map(fn: (v: Group, i: Field) => Group): this {
+    public map(fn: (v: T, i: Field) => T): this {
       const newArr = this.copy();
       let masked = Bool(true);
       for (let i = 0; i < newArr.values.length; i++) {
@@ -246,8 +272,9 @@ export default function DynamicGroupArray(maxLength: number) {
         );
         newArr.values[i] = Provable.if(
           masked,
+          type,
           fn(newArr.values[i], Field(i)),
-          _DynamicGroupArray.Null()
+          _DynamicArray.Null()
         );
       }
       return newArr;
