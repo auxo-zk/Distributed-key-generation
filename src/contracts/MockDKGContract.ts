@@ -25,16 +25,7 @@ import {
   Poseidon,
 } from 'o1js';
 
-export class RollupState extends Struct({
-  actionHash: Field,
-  memberTreeRoot: Field,
-}) {
-  hash(): Field {
-    return Poseidon.hash([this.actionHash, this.memberTreeRoot]);
-  }
-}
-
-export class DKGContract extends SmartContract {
+export class MockDKGContract extends SmartContract {
   @state(Field) num = State<Field>();
 
   @method addNum(addNum: Field) {
