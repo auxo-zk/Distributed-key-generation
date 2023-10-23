@@ -28,7 +28,7 @@ import {
   MyMerkleWitness,
 } from '../contracts/Committee.js';
 
-import { MockDKGContract } from '../contracts/DKG.js';
+import { DKGContract } from '../contracts/DKG.js';
 
 const EmptyMerkleMap = new MerkleMap();
 
@@ -78,12 +78,12 @@ async function main() {
   console.log('committeeContract deployed!');
 
   console.log('compile mockDKG contract... ');
-  await MockDKGContract.compile();
+  await DKGContract.compile();
 
   // set verification key
   console.log('committeeContract.createCommittee: ');
   tx = await Mina.transaction(feePayer, () => {
-    committeeContract.setVkDKGHash(MockDKGContract._verificationKey!);
+    committeeContract.setVkDKGHash(DKGContract._verificationKey!);
   });
   await tx.prove();
   await tx.sign([feePayerKey]).send();
@@ -106,7 +106,7 @@ async function main() {
       myGroupArray1,
       Field(1),
       addresses.dkg1.toGroup(),
-      MockDKGContract._verificationKey!
+      DKGContract._verificationKey!
     );
   });
   await tx.prove();
@@ -114,11 +114,8 @@ async function main() {
   console.log('committeeContract.createCommittee sent!...');
 
   // Test MockDKG contract
-  let mockDKGContract = new MockDKGContract(addresses.dkg1);
-  console.log(
-    'Number in mockDKG contract: ',
-    Number(mockDKGContract.num.get())
-  );
+  let dkgContract = new DKGContract(addresses.dkg1);
+  console.log('Number in mockDKG contract: ', Number(dkgContract.num.get()));
 
   // create commitee consist of 3 people with thresh hold 2
   arrayAddress = [];
@@ -137,7 +134,7 @@ async function main() {
       myGroupArray2,
       Field(2),
       addresses.dkg2.toGroup(),
-      MockDKGContract._verificationKey!
+      DKGContract._verificationKey!
     );
   });
   await tx.prove();
@@ -244,20 +241,16 @@ async function main() {
 
   // check if memerber belong to committeeId
   console.log('committeeContract.checkMember p2: ');
-  console.log('1');
   tx = await Mina.transaction(feePayer, () => {
     committeeContract.checkMember(
       addresses.p2.toGroup(),
       Field(0),
       new MyMerkleWitness(tree.getWitness(1n)),
-      memberMerkleMap.getWitness(Field(111))
+      memberMerkleMap.getWitness(Field(0))
     );
   });
-  console.log('2');
   await tx.prove();
-  console.log('3');
   await tx.sign([feePayerKey]).send();
-  console.log('4');
 }
 
 main();

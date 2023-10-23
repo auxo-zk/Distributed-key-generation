@@ -29,7 +29,7 @@ import {
   MyMerkleWitness,
 } from '../contracts/Committee.js';
 
-import { MockDKGContract } from '../contracts/DKG.js';
+import { DKGContract } from '../contracts/DKG.js';
 
 const doProofs = false;
 
@@ -83,18 +83,18 @@ describe('Committee', () => {
     });
     await tx.sign([feePayerKey, keys.committee]).send();
 
-    if (!doProofs) await MockDKGContract.compile();
+    if (!doProofs) await DKGContract.compile();
 
     // set verification key
 
     tx = await Mina.transaction(feePayer, () => {
-      committeeContract.setVkDKGHash(MockDKGContract._verificationKey!);
+      committeeContract.setVkDKGHash(DKGContract._verificationKey!);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();
   });
 
-  beforeEach(() => {});
+  // beforeEach(() => {});
 
   it('Create commitee consist of 2 people with threshhold 1, and test deploy DKG', async () => {
     let arrayAddress = [];
@@ -111,14 +111,14 @@ describe('Committee', () => {
         myGroupArray1,
         threshold1,
         addresses.dkg1.toGroup(),
-        MockDKGContract._verificationKey!
+        DKGContract._verificationKey!
       );
     });
     await tx.prove();
     await tx.sign([feePayerKey, keys.dkg1]).send();
 
     // Test MockDKG contract
-    let mockDKGContract = new MockDKGContract(addresses.dkg1);
+    let mockDKGContract = new DKGContract(addresses.dkg1);
     expect(mockDKGContract.num.get()).toEqual(Field(0));
   });
 
@@ -137,7 +137,7 @@ describe('Committee', () => {
         myGroupArray2,
         Field(2),
         addresses.dkg2.toGroup(),
-        MockDKGContract._verificationKey!
+        DKGContract._verificationKey!
       );
     });
     await tx.prove();

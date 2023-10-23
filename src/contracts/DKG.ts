@@ -25,7 +25,10 @@ import {
   Poseidon,
 } from 'o1js';
 
-export class MockDKGContract extends SmartContract {
+// import * as CommitteeMember from '../libs/CommitteeMember';
+// import { DynamicArray } from '../libs/DynamicArray';
+
+export class DKGContract extends SmartContract {
   @state(Field) num = State<Field>();
 
   @method addNum(addNum: Field) {
