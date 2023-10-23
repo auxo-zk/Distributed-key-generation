@@ -7,15 +7,15 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { Field, SmartContract, state, State, method, PublicKey, MerkleWitness, Group, Bool, Reducer, Permissions, VerificationKey, AccountUpdate, Mina, MerkleTree, MerkleMap, MerkleMapWitness, Struct, Experimental, SelfProof, Poseidon, } from 'o1js';
-import DynamicGroupArray from '../type/DynamicGroupArray.js';
+import { Field, SmartContract, state, State, method, PublicKey, MerkleWitness, Group, Bool, Reducer, VerificationKey, AccountUpdate, Mina, MerkleTree, MerkleMap, MerkleMapWitness, Struct, Experimental, SelfProof, Poseidon, } from 'o1js';
+import DynamicArray from '../type/DynamicArray.js';
 const accountFee = Mina.accountCreationFee();
 const treeHeight = 6; // setting max 32 member
 const EmptyMerkleMap = new MerkleMap();
 const Tree = new MerkleTree(treeHeight);
 export class MyMerkleWitness extends MerkleWitness(treeHeight) {
 }
-export class GroupArray extends DynamicGroupArray(2 ** (treeHeight - 1)) {
+export class GroupArray extends DynamicArray(Group, 2 ** (treeHeight - 1)) {
 }
 function updateOutOfSnark(state, action) {
     if (action === undefined)
@@ -30,6 +30,15 @@ export class RollupState extends Struct({
     dkgAddressTreeRoot: Field,
     currentCommitteeId: Field,
 }) {
+    hash() {
+        return Poseidon.hash([
+            this.actionHash,
+            this.memberTreeRoot,
+            this.settingTreeRoot,
+            this.dkgAddressTreeRoot,
+            this.currentCommitteeId,
+        ]);
+    }
 }
 export const createCommitteeProof = Experimental.ZkProgram({
     publicInput: RollupState,
@@ -47,6 +56,7 @@ export const createCommitteeProof = Experimental.ZkProgram({
             ],
             method(input, preProof, publickeys, memberWitness, newAddress, settingWitess, threshold, dkgAddressWitness) {
                 preProof.verify();
+                input.hash().assertEquals(preProof.publicInput.hash());
                 ////// caculate new memberTreeRoot
                 let [preMemberRoot, nextCommitteeId] = memberWitness.computeRootAndKey(Field(0));
                 nextCommitteeId.assertEquals(preProof.publicOutput.currentCommitteeId);
@@ -131,9 +141,10 @@ export class Committee extends SmartContract {
         let dkgContract = AccountUpdate.createSigned(address);
         dkgContract.account.isNew.assertEquals(Bool(true));
         // To-do: setting not cho change permision on the future
-        dkgContract.account.permissions.set(Permissions.default());
-        dkgContract.account.verificationKey.set(verificationKey);
-        // this.send({ to: this.sender, amount: accountFee });
+        // dkgContract.account.permissions.set(Permissions.default());
+        // dkgContract.account.verificationKey.set(verificationKey);
+        let dkgContract2 = new SmartContract(this.sender);
+        dkgContract2.deploy({ verificationKey });
     }
     createCommittee(addresses, threshold, dkgAddress, verificationKey) {
         threshold.assertLessThanOrEqual(addresses.length);

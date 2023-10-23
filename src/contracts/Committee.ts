@@ -48,7 +48,17 @@ export class RollupState extends Struct({
   settingTreeRoot: Field,
   dkgAddressTreeRoot: Field,
   currentCommitteeId: Field,
-}) {}
+}) {
+  hash(): Field {
+    return Poseidon.hash([
+      this.actionHash,
+      this.memberTreeRoot,
+      this.settingTreeRoot,
+      this.dkgAddressTreeRoot,
+      this.currentCommitteeId,
+    ]);
+  }
+}
 
 export const createCommitteeProof = Experimental.ZkProgram({
   publicInput: RollupState,
@@ -77,6 +87,8 @@ export const createCommitteeProof = Experimental.ZkProgram({
         dkgAddressWitness: MerkleMapWitness
       ): RollupState {
         preProof.verify();
+
+        input.hash().assertEquals(preProof.publicInput.hash());
 
         ////// caculate new memberTreeRoot
         let [preMemberRoot, nextCommitteeId] = memberWitness.computeRootAndKey(
@@ -184,7 +196,6 @@ export class Committee extends SmartContract {
     // To-do: setting not cho change permision on the future
     dkgContract.account.permissions.set(Permissions.default());
     dkgContract.account.verificationKey.set(verificationKey);
-    // this.send({ to: this.sender, amount: accountFee });
   }
 
   @method createCommittee(
@@ -219,12 +230,7 @@ export class Committee extends SmartContract {
     settingTreeRoot.assertEquals(proof.publicInput.settingTreeRoot);
     dkgAddressTreeRoot.assertEquals(proof.publicInput.dkgAddressTreeRoot);
 
-    // compute the new counter and hash from pending actions
-    // if hash not exists, it will throw error
-    let pendingActions = this.reducer.getActions({
-      fromActionState: curActionState,
-      endActionState: proof.publicOutput.actionHash,
-    });
+    this.account.actionState.assertEquals(proof.publicOutput.actionHash);
 
     // update on-chain state
     this.actionState.set(proof.publicOutput.actionHash);

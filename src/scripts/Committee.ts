@@ -28,7 +28,7 @@ import {
   MyMerkleWitness,
 } from '../contracts/Committee.js';
 
-import { MockDKGContract } from '../contracts/DKG.js';
+import { MockDKGContract } from '../contracts/MockDKGContract.js';
 
 const EmptyMerkleMap = new MerkleMap();
 

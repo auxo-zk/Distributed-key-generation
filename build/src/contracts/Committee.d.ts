@@ -5,8 +5,8 @@ export declare class MyMerkleWitness extends MyMerkleWitness_base {
 declare const GroupArray_base: {
     new (values?: import("o1js/dist/node/lib/group.js").Group[] | undefined): {
         get(index: import("o1js/dist/node/lib/field.js").Field): import("o1js/dist/node/lib/group.js").Group;
-        toFields(): import("o1js/dist/node/lib/field.js").Field[];
         set(index: import("o1js/dist/node/lib/field.js").Field, value: import("o1js/dist/node/lib/group.js").Group): void;
+        toFields(): import("o1js/dist/node/lib/field.js").Field[];
         push(value: import("o1js/dist/node/lib/group.js").Group): void;
         pop(n: import("o1js/dist/node/lib/field.js").Field): void;
         concat(other: any): any;
@@ -28,13 +28,10 @@ declare const GroupArray_base: {
         length: import("o1js/dist/node/lib/field.js").Field;
         values: import("o1js/dist/node/lib/group.js").Group[];
     };
-    Null(): import("o1js/dist/node/lib/group.js").Group;
-    hash(values: import("o1js/dist/node/lib/group.js").Group): import("o1js/dist/node/lib/field.js").Field;
-    fillWithNull([...values]: import("o1js/dist/node/lib/group.js").Group[], length: number): import("o1js/dist/node/lib/group.js").Group[];
     from(values: import("o1js/dist/node/lib/group.js").Group[]): {
         get(index: import("o1js/dist/node/lib/field.js").Field): import("o1js/dist/node/lib/group.js").Group;
-        toFields(): import("o1js/dist/node/lib/field.js").Field[];
         set(index: import("o1js/dist/node/lib/field.js").Field, value: import("o1js/dist/node/lib/group.js").Group): void;
+        toFields(): import("o1js/dist/node/lib/field.js").Field[];
         push(value: import("o1js/dist/node/lib/group.js").Group): void;
         pop(n: import("o1js/dist/node/lib/field.js").Field): void;
         concat(other: any): any;
@@ -58,8 +55,8 @@ declare const GroupArray_base: {
     };
     empty(length?: import("o1js/dist/node/lib/field.js").Field | undefined): {
         get(index: import("o1js/dist/node/lib/field.js").Field): import("o1js/dist/node/lib/group.js").Group;
-        toFields(): import("o1js/dist/node/lib/field.js").Field[];
         set(index: import("o1js/dist/node/lib/field.js").Field, value: import("o1js/dist/node/lib/group.js").Group): void;
+        toFields(): import("o1js/dist/node/lib/field.js").Field[];
         push(value: import("o1js/dist/node/lib/group.js").Group): void;
         pop(n: import("o1js/dist/node/lib/field.js").Field): void;
         concat(other: any): any;
@@ -81,6 +78,9 @@ declare const GroupArray_base: {
         length: import("o1js/dist/node/lib/field.js").Field;
         values: import("o1js/dist/node/lib/group.js").Group[];
     };
+    hash(value: import("o1js/dist/node/lib/group.js").Group): import("o1js/dist/node/lib/field.js").Field;
+    Null(): import("o1js/dist/node/lib/group.js").Group;
+    fillWithNull(values: import("o1js/dist/node/lib/group.js").Group[], length: number): import("o1js/dist/node/lib/group.js").Group[];
     _isStruct: true;
     toFields: (value: {
         length: import("o1js/dist/node/lib/field.js").Field;
@@ -112,15 +112,21 @@ declare const GroupArray_base: {
     }) => {
         length: string;
         values: {
-            x: string;
-            y: string;
+            toFields: {};
+            toAuxiliary: {};
+            fromFields: {};
+            sizeInFields: {};
+            check: {};
         }[];
     };
     fromJSON: (x: {
         length: string;
         values: {
-            x: string;
-            y: string;
+            toFields: {};
+            toAuxiliary: {};
+            fromFields: {};
+            sizeInFields: {};
+            check: {};
         }[];
     }) => {
         length: import("o1js/dist/node/lib/field.js").Field;
@@ -188,6 +194,7 @@ declare const RollupState_base: (new (value: {
     };
 };
 export declare class RollupState extends RollupState_base {
+    hash(): Field;
 }
 export declare const createCommitteeProof: {
     name: string;
@@ -214,12 +221,12 @@ declare const CommitteeProof_base: {
         proof: unknown;
         publicInput: RollupState;
         publicOutput: RollupState;
-        maxProofsVerified: 0 | 1 | 2;
+        maxProofsVerified: 0 | 2 | 1;
     }): {
         publicInput: RollupState;
         publicOutput: RollupState;
         proof: unknown;
-        maxProofsVerified: 0 | 1 | 2;
+        maxProofsVerified: 0 | 2 | 1;
         shouldVerify: import("o1js/dist/node/lib/bool.js").Bool;
         verify(): void;
         verifyIf(condition: import("o1js/dist/node/lib/bool.js").Bool): void;
@@ -277,8 +284,11 @@ declare const CommitteeInput_base: (new (value: {
         addresses: {
             length: string;
             values: {
-                x: string;
-                y: string;
+                toFields: {};
+                toAuxiliary: {};
+                fromFields: {};
+                sizeInFields: {};
+                check: {};
             }[];
         };
         dkgAddress: {
@@ -291,8 +301,11 @@ declare const CommitteeInput_base: (new (value: {
         addresses: {
             length: string;
             values: {
-                x: string;
-                y: string;
+                toFields: {};
+                toAuxiliary: {};
+                fromFields: {};
+                sizeInFields: {};
+                check: {};
             }[];
         };
         dkgAddress: {
