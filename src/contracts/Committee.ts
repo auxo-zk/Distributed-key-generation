@@ -24,8 +24,8 @@ import {
   Empty,
   Poseidon,
 } from 'o1js';
-
-import DynamicArray from '../type/DynamicArray.js';
+import DynamicArray from '../libs/DynamicArray.js';
+import { updateOutOfSnark } from '../libs/utils.js';
 
 const accountFee = Mina.accountCreationFee();
 
@@ -35,12 +35,6 @@ const Tree = new MerkleTree(treeHeight);
 export class MyMerkleWitness extends MerkleWitness(treeHeight) {}
 
 export class GroupArray extends DynamicArray(Group, 2 ** (treeHeight - 1)) {}
-
-function updateOutOfSnark(state: Field, action: Field[][]) {
-  if (action === undefined) return state;
-  let actionsHash = AccountUpdate.Actions.hash(action);
-  return AccountUpdate.Actions.updateSequenceState(state, actionsHash);
-}
 
 export class RollupState extends Struct({
   actionHash: Field,

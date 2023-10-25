@@ -77,17 +77,17 @@ async function main() {
   await tx.sign([feePayerKey, keys.committee]).send();
   console.log('committeeContract deployed!');
 
-  console.log('compile mockDKG contract... ');
-  await DKGContract.compile();
+  // console.log('compile mockDKG contract... ');
+  // await DKGContract.compile();
 
-  // set verification key
-  console.log('committeeContract.createCommittee: ');
-  tx = await Mina.transaction(feePayer, () => {
-    committeeContract.setVkDKGHash(DKGContract._verificationKey!);
-  });
-  await tx.prove();
-  await tx.sign([feePayerKey]).send();
-  console.log('committeeContract.createCommittee sent!...');
+  // // set verification key
+  // console.log('committeeContract.createCommittee: ');
+  // tx = await Mina.transaction(feePayer, () => {
+  //   committeeContract.setVkDKGHash(DKGContract._verificationKey!);
+  // });
+  // await tx.prove();
+  // await tx.sign([feePayerKey]).send();
+  // console.log('committeeContract.createCommittee sent!...');
 
   // create commitee consist of 2 people with thresh hold 1
   let arrayAddress = [];
@@ -112,10 +112,14 @@ async function main() {
   await tx.prove();
   await tx.sign([feePayerKey, keys.dkg1]).send();
   console.log('committeeContract.createCommittee sent!...');
+  console.log(
+    'actionState in Committee contract (account):',
+    committeeContract.account.actionState.get()
+  );
 
-  // Test MockDKG contract
-  let dkgContract = new DKGContract(addresses.dkg1);
-  console.log('Number in mockDKG contract: ', Number(dkgContract.num.get()));
+  // // Test MockDKG contract
+  // let dkgContract = new DKGContract(addresses.dkg1);
+  // console.log('Number in mockDKG contract: ', Number(dkgContract.num.get()));
 
   // create commitee consist of 3 people with thresh hold 2
   arrayAddress = [];
@@ -140,6 +144,10 @@ async function main() {
   await tx.prove();
   await tx.sign([feePayerKey, keys.dkg2]).send();
   console.log('committeeContract.createCommittee sent!...');
+  console.log(
+    'actionState in Committee contract (account):',
+    committeeContract.account.actionState.get()
+  );
 
   // compile proof
   console.log('compile...');
@@ -205,14 +213,8 @@ async function main() {
   ActionCommitteeProfiler.stop();
 
   console.log('proof info: ');
-  console.log(
-    'poof public input actionHash: ',
-    Number(proof.publicInput.actionHash)
-  );
-  console.log(
-    'poof public output actionHash: ',
-    Number(proof.publicOutput.actionHash)
-  );
+  console.log('poof public input actionHash: ', proof.publicInput.actionHash);
+  console.log('poof public output actionHash: ', proof.publicOutput.actionHash);
 
   ActionCommitteeProfiler.start('committeeContract.rollupIncrements...');
   console.log('committeeContract.rollupIncrements: ');
@@ -238,6 +240,14 @@ async function main() {
     Poseidon.hash([Field(2), myGroupArray2.length])
   );
   dkgAddressMerkleMap.set(Field(1), GroupArray.hash(addresses.dkg2.toGroup()));
+  console.log(
+    'actionState in Committee contract (@state):',
+    committeeContract.actionState.get()
+  );
+  console.log(
+    'actionState in Committee contract (account):',
+    committeeContract.account.actionState.get()
+  );
 
   // check if memerber belong to committeeId
   console.log('committeeContract.checkMember p2: ');

@@ -116,10 +116,6 @@ describe('Committee', () => {
     });
     await tx.prove();
     await tx.sign([feePayerKey, keys.dkg1]).send();
-
-    // Test MockDKG contract
-    let mockDKGContract = new DKGContract(addresses.dkg1);
-    expect(mockDKGContract.num.get()).toEqual(Field(0));
   });
 
   it('Create commitee consist of 3 people with threshhold 2', async () => {

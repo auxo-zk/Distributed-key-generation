@@ -28,21 +28,28 @@ function hashable<T>(type: Provable<T>): HashableProvable<T> {
   };
 }
 
-function DynamicArray<T>(type: ProvablePure<T>, maxLength: number) {
+export default function DynamicArray<T>(
+  type: ProvablePure<T>,
+  maxLength: number
+) {
   const _type = hashable(type);
 
   return class _DynamicArray extends Struct({
     length: Field,
     values: Provable.Array(type, maxLength),
   }) {
-    // static from(values: T[]): _DynamicArray {
-    //   return new _DynamicArray(values);
-    // }
+    static from(values: T[]): _DynamicArray {
+      return new _DynamicArray(values);
+    }
 
     static empty(length?: Field): _DynamicArray {
       const arr = new _DynamicArray();
       arr.length = length ?? Field(0);
       return arr;
+    }
+
+    static hash(value: T): Field {
+      return Poseidon.hash(type.toFields(value));
     }
 
     static Null(): T {
