@@ -29,7 +29,7 @@ import {
   MyMerkleWitness,
 } from '../contracts/Committee.js';
 
-import { DKGContract } from '../contracts/DKG.js';
+import { MockDKGContract } from '../contracts/MockDKGContract.js';
 
 const doProofs = false;
 
@@ -83,12 +83,12 @@ describe('Committee', () => {
     });
     await tx.sign([feePayerKey, keys.committee]).send();
 
-    if (!doProofs) await DKGContract.compile();
+    if (!doProofs) await MockDKGContract.compile();
 
     // set verification key
 
     tx = await Mina.transaction(feePayer, () => {
-      committeeContract.setVkDKGHash(DKGContract._verificationKey!);
+      committeeContract.setVkDKGHash(MockDKGContract._verificationKey!);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();
@@ -111,7 +111,7 @@ describe('Committee', () => {
         myGroupArray1,
         threshold1,
         addresses.dkg1.toGroup(),
-        DKGContract._verificationKey!
+        MockDKGContract._verificationKey!
       );
     });
     await tx.prove();
@@ -133,7 +133,7 @@ describe('Committee', () => {
         myGroupArray2,
         Field(2),
         addresses.dkg2.toGroup(),
-        DKGContract._verificationKey!
+        MockDKGContract._verificationKey!
       );
     });
     await tx.prove();

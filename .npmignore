@@ -1,5 +1,5 @@
 # TypeScript files
-src
+#src
 
 # Editor
 .vscode
@@ -9,3 +9,5 @@ src
 
 # Never reveal your keys!
 keys
+
+profiling.md

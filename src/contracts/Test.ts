@@ -12,9 +12,13 @@ import {
   Experimental,
   SelfProof,
   MerkleMapWitness,
+  MerkleMap,
 } from 'o1js';
 import DynamicArray from '../libs/DynamicArray.js';
 import { updateOutOfSnark } from '../libs/utils.js';
+import { stat } from 'fs';
+
+const EmptyMerkleMap = new MerkleMap();
 
 export const enum ActionEnum {
   ADDITION,
@@ -68,15 +72,10 @@ export const ReduceActions = Experimental.ZkProgram({
     },
     // Next actions to reduce
     nextStep: {
-      privateInputs: [
-        SelfProof<ReduceInput, ReduceOutput>,
-        MerkleMapWitness,
-        MerkleMapWitness,
-      ],
+      privateInputs: [SelfProof<ReduceInput, ReduceOutput>, MerkleMapWitness],
       method(
         input: ReduceInput,
         earlierProof: SelfProof<ReduceInput, ReduceOutput>,
-        notReducedWitness: MerkleMapWitness,
         reducedWitness: MerkleMapWitness
       ) {
         // Verify earlier proof
@@ -87,16 +86,15 @@ export const ReduceActions = Experimental.ZkProgram({
         );
         // Calculate action hash
         let actionHash = input.action.hash();
-        Provable.log(input.action);
-        Provable.log(actionHash);
+        // Provable.log(input.action);
+        // Provable.log(actionHash);
         // Current value of the action hash should be 0
-        let [root, key] = notReducedWitness.computeRootAndKey(Field(0));
+        let [root, key] = reducedWitness.computeRootAndKey(Field(0));
         root.assertEquals(earlierProof.publicOutput.newRollupState);
         key.assertEquals(actionHash);
 
         // New value of the action hash should be 1
-        [root, key] = reducedWitness.computeRootAndKey(Field(1));
-        key.assertEquals(actionHash);
+        [root] = reducedWitness.computeRootAndKey(Field(1));
 
         return {
           newActionState: updateOutOfSnark(
@@ -145,15 +143,10 @@ export const RollupActions = Experimental.ZkProgram({
     },
     // Next actions to rollup
     nextStep: {
-      privateInputs: [
-        SelfProof<RollupInput, RollupOutput>,
-        MerkleMapWitness,
-        MerkleMapWitness,
-      ],
+      privateInputs: [SelfProof<RollupInput, RollupOutput>, MerkleMapWitness],
       method(
         input: RollupInput,
         earlierProof: SelfProof<RollupInput, RollupOutput>,
-        notRollupedWitness: MerkleMapWitness,
         rollupedWitness: MerkleMapWitness
       ) {
         // Verify earlier proof
@@ -166,13 +159,12 @@ export const RollupActions = Experimental.ZkProgram({
         // Calculate action hash
         let actionHash = input.action.hash();
         // Current value of the action hash should be 1
-        let [root, key] = notRollupedWitness.computeRootAndKey(Field(1));
+        let [root, key] = rollupedWitness.computeRootAndKey(Field(1));
         root.assertEquals(earlierProof.publicOutput.newRollupState);
         key.assertEquals(actionHash);
 
-        // New value of the action hash should be 1
-        [root, key] = rollupedWitness.computeRootAndKey(Field(2));
-        key.assertEquals(actionHash);
+        // New value of the action hash should be 2
+        [root] = rollupedWitness.computeRootAndKey(Field(2));
 
         return {
           newValue: Provable.switch(input.action.mask.values, Field, [
@@ -197,6 +189,12 @@ export class TestZkapp extends SmartContract {
   @state(Field) actionState = State<Field>();
   // TODO Check if updating merkle map value causes any unexpected consequences
   @state(Field) rollupState = State<Field>();
+
+  init() {
+    super.init();
+    this.actionState.set(Reducer.initialActionState);
+    this.rollupState.set(EmptyMerkleMap.getRoot());
+  }
 
   @method add(x: Field) {
     this.reducer.dispatch(
