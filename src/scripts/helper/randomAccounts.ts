@@ -14,3 +14,15 @@ export default function randomAccounts<K extends string>(
   ) as Record<K, PublicKey>;
   return { keys, addresses };
 }
+
+// function main() {
+//   let { keys, addresses } = randomAccounts('dkg1', 'p1', 'p2');
+//   console.log('dkg1 privatekey: ', keys.dkg1.toBase58());
+//   console.log('dkg1 publickey: ', addresses.dkg1.toBase58());
+//   console.log('p1 publickey: ', addresses.dkg1.toBase58());
+//   console.log('p2 publickey: ', addresses.dkg1.toBase58());
+// }
+
+// if (require.main === module) {
+//   main();
+// }
