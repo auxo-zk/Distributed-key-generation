@@ -19,15 +19,17 @@ import {
   Mina,
   Provable,
   AccountUpdate,
+  UInt64,
 } from 'o1js';
 
 import DynamicArray from '../libs/DynamicArray.js';
 import { updateOutOfSnark } from '../libs/utils.js';
+import { findSourceMap } from 'node:module';
 
 const treeHeight = 6; // setting max 32 member
 const EmptyMerkleMap = new MerkleMap();
-const RequestFee = 0.1 * 10 ** 9; // 0.1 Mina
-
+const RequestFee = Field(10 ** 8); // 0.1 Mina
+const ZeroFee = Field(0); // 0.1 Mina
 export class GroupArray extends DynamicArray(Group, 2 ** (treeHeight - 1)) {}
 
 export class RequestInput extends Struct({
@@ -130,7 +132,7 @@ export const createRequestProof = Experimental.ZkProgram({
 
         // 0 -> 1 - 0 = 1
         // 1 -> 1 - 1 = 0
-        let newState = Field(1).sub(currentState);
+        let newState = Field(1).add(currentState);
 
         // caculate pre request root
         let [preRequestStateRoot, caculateRequestId] =
@@ -152,27 +154,26 @@ export const createRequestProof = Experimental.ZkProgram({
         // if want to unrequest: so the current requester must be requester
         let currentRequester = Provable.if(
           requestInput.isRequest,
-          Group.from(Field(0), Field(0)),
-          requestInput.requester
+          Field(0),
+          GroupArray.hash(requestInput.requester)
         );
 
         let newRequester = Provable.if(
           requestInput.isRequest,
-          requestInput.requester,
-          Group.from(Field(0), Field(0))
+          GroupArray.hash(requestInput.requester),
+          Field(0)
         );
 
         let [preRequesterRoot, caculateRequestId2] =
-          requesterWitness.computeRootAndKey(GroupArray.hash(currentRequester));
+          requesterWitness.computeRootAndKey(currentRequester);
 
         caculateRequestId2.assertEquals(requestId);
 
         preRequesterRoot.assertEquals(preProof.publicOutput.requesterRoot);
 
         // caculate new requester root
-        let [newRequesterRoot] = requesterWitness.computeRootAndKey(
-          GroupArray.hash(newRequester)
-        );
+        let [newRequesterRoot] =
+          requesterWitness.computeRootAndKey(newRequester);
 
         return new RollupState({
           actionHash: updateOutOfSnark(preProof.publicOutput.actionHash, [
@@ -244,33 +245,10 @@ export class Request extends SmartContract {
 
     this.reducer.dispatch(toEmit);
 
-    // take fee
+    // take fee if it is request
+    let sendAmount = Provable.if(requestInput.isRequest, RequestFee, ZeroFee);
     let requester = AccountUpdate.createSigned(this.sender);
-    requester.send({ to: this, amount: RequestFee });
-  }
-
-  @method unRequested(requestInput: RequestInput) {
-    let actionState = this.actionState.getAndAssertEquals();
-    let requestInputHash = requestInput.hash();
-    // checking if the request already exists within the accumulator
-    let { state: exists } = this.reducer.reduce(
-      this.reducer.getActions({
-        fromActionState: actionState,
-      }),
-      Bool,
-      (state: Bool, action: RequestInput) => {
-        return action.hash().equals(requestInputHash).or(state);
-      },
-      // initial state
-      { state: Bool(false), actionState: actionState }
-    );
-
-    // if exists then don't dispatch any more
-    exists.assertEquals(Bool(false));
-
-    let toEmit = Provable.if(exists, RequestInput.empty(), requestInput);
-
-    this.reducer.dispatch(toEmit);
+    requester.send({ to: this, amount: UInt64.from(sendAmount) });
   }
 
   @method rollupRequest(proof: requestProof) {
@@ -283,12 +261,34 @@ export class Request extends SmartContract {
     requestStateRoot.assertEquals(proof.publicInput.requestStateRoot);
     requesterRoot.assertEquals(proof.publicInput.requesterRoot);
 
-    // to-do: add refund money back
-    this.account.actionState.assertEquals(proof.publicOutput.actionHash);
+    let pendingActions = this.reducer.getActions({
+      fromActionState: actionState,
+    });
+
+    let { state: finalState, actionState: newActionState } =
+      this.reducer.reduce(
+        pendingActions,
+        // state type
+        Field,
+        // function that says how to apply an action
+        (state: Field, action: RequestInput) => {
+          let sendAmount = Provable.if(action.isRequest, ZeroFee, RequestFee);
+          this.send({
+            to: PublicKey.fromGroup(action.requester),
+            amount: UInt64.from(sendAmount),
+          });
+          return Field(0);
+        },
+        { state: Field(0), actionState: actionState }
+      );
+
+    newActionState.assertEquals(proof.publicOutput.actionHash);
 
     // update on-chain state
-    this.actionState.set(proof.publicOutput.actionHash);
+    this.actionState.set(newActionState);
     this.requestStateRoot.set(proof.publicOutput.requestStateRoot);
     this.requesterRoot.set(proof.publicOutput.requesterRoot);
   }
+
+  // to-do: after finished request, committee can take fee (maybe using another contract)
 }
