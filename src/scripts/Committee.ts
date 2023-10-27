@@ -70,12 +70,11 @@ const settingMerkleMap = new MerkleMap();
 class memberMerkleTreeWitness extends MerkleWitness(treeHeight) {}
 
 const isLocal = false;
-let step = 0;
-// 0 deploy
-// 1 set DKG
-// 2 dispatch
-// 3 rollup
-// 4 check
+// 0: deploy
+// 1: set DKG ================== 
+// 2: dispatch: add thành viên, dkg địa chỉ
+// 3: rollup: reduce ================== sever
+// 4: check ================= dựa vào check trong db
 let actionn = 4;
 
 async function main() {

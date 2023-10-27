@@ -209,7 +209,6 @@ export class Committee extends SmartContract {
     );
   }
 
-  // Todo: merge deployContract() into this function
   @method rollupIncrements(proof: CommitteeProof) {
     proof.verify();
     let curActionState = this.actionState.getAndAssertEquals();
