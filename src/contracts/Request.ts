@@ -28,9 +28,10 @@ import { findSourceMap } from 'node:module';
 
 const treeHeight = 6; // setting max 32 member
 const EmptyMerkleMap = new MerkleMap();
-const RequestFee = Field(10 ** 8); // 0.1 Mina
-const ZeroFee = Field(0); // 0.1 Mina
+export const RequestFee = Field(10 ** 9); // 1 Mina
+const ZeroFee = Field(0); // 0 Mina
 export class GroupArray extends DynamicArray(Group, 2 ** (treeHeight - 1)) {}
+const Field32Array = Provable.Array(Field, 32);
 
 export class RequestInput extends Struct({
   committeeId: Field,
@@ -132,7 +133,7 @@ export const createRequestProof = Experimental.ZkProgram({
 
         // 0 -> 1 - 0 = 1
         // 1 -> 1 - 1 = 0
-        let newState = Field(1).add(currentState);
+        let newState = Field(1).sub(currentState);
 
         // caculate pre request root
         let [preRequestStateRoot, caculateRequestId] =
@@ -273,6 +274,13 @@ export class Request extends SmartContract {
         // function that says how to apply an action
         (state: Field, action: RequestInput) => {
           let sendAmount = Provable.if(action.isRequest, ZeroFee, RequestFee);
+          // do this again to check if this action is dummy
+          // since dummy action will have isRequest is False
+          sendAmount = Provable.if(
+            action.committeeId.equals(Field(0)),
+            ZeroFee,
+            sendAmount
+          );
           this.send({
             to: PublicKey.fromGroup(action.requester),
             amount: UInt64.from(sendAmount),

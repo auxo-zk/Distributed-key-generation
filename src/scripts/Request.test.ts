@@ -21,6 +21,7 @@ import {
   Bool,
   Account,
   Provable,
+  fetchAccount,
 } from 'o1js';
 
 import { getProfiler } from './helper/profiler.js';
@@ -31,6 +32,7 @@ import {
   createRequestProof,
   GroupArray,
   RollupState,
+  RequestFee,
 } from '../contracts/Request.js';
 import { Committee } from '../contracts/Committee.js';
 
@@ -111,48 +113,47 @@ describe('Testing Request Contract', () => {
     feePayerKey = Local.testAccounts[0].privateKey;
     feePayer = Local.testAccounts[0].publicKey;
     requestContract = new Request(addresses.request);
+
+    let tx = await Mina.transaction(feePayer, () => {
+      AccountUpdate.fundNewAccount(feePayer, 3);
+      requestContract.deploy();
+      let feePayerAccount = AccountUpdate.createSigned(feePayer);
+      feePayerAccount.send({ to: addresses.rqter1, amount: 10 * 10 ** 9 }); // 11 Mina
+      feePayerAccount.send({ to: addresses.rqter2, amount: 10 * 10 ** 9 }); // 11 Mina
+    });
+    await tx.sign([feePayerKey, keys.request]).send();
+
     if (doProofs) {
       await Request.compile();
     } else {
-      console.log('createRequestProof.analyzeMethods');
-      // createRequestProof.analyzeMethods();
-      console.log('Request.analyzeMethods');
       Request.analyzeMethods();
       console.log('Done analyzeMethods');
     }
-
-    let tx = await Mina.transaction(feePayer, () => {
-      AccountUpdate.fundNewAccount(feePayer, 1);
-      requestContract.deploy();
-    });
-    await tx.sign([feePayerKey, keys.request]).send();
   });
 
   // beforeEach(() => {});
 
   it('compile proof', async () => {
     // compile proof
-    if (doProofs) await createRequestProof.compile();
+    ActionRequestProfiler.start('createRequestProof.compile');
+    await createRequestProof.compile();
+    ActionRequestProfiler.stop().store();
   });
 
   it('Requester 2 requestInput2', async () => {
-    Provable.log(
-      'Balance before requestInput2: ',
-      Account(addresses.rqter2).balance
-    );
+    let balanceBefore = Number(Account(addresses.rqter2).balance.get());
     let tx = await Mina.transaction(addresses.rqter2, () => {
       requestContract.request(requestInput2);
     });
     await tx.prove();
     await tx.sign([keys.rqter2]).send();
-    Provable.log(
-      'Balance after requestInput2: ',
-      Account(addresses.rqter2).balance
-    );
+    let balanceAfter = Number(Account(addresses.rqter2).balance.get());
+    expect(balanceBefore - balanceAfter).toEqual(Number(RequestFee));
   });
 
   it('Create proof for request2 and rollup', async () => {
     console.log('Create createRequestProof.firstStep...');
+    ActionRequestProfiler.start('createRequestProof.firstStep');
     proof = await createRequestProof.firstStep(
       new RollupState({
         actionHash: Reducer.initialActionState,
@@ -160,9 +161,11 @@ describe('Testing Request Contract', () => {
         requesterRoot: requesterMap.getRoot(),
       })
     );
+    ActionRequestProfiler.stop().store();
     expect(proof.publicInput.actionHash).toEqual(Reducer.initialActionState);
 
     console.log('Create createRequestProof.nextStep requestInput2...');
+    ActionRequestProfiler.start('createRequestProof.nextStep');
     proof = await createRequestProof.nextStep(
       proof.publicInput,
       proof,
@@ -170,6 +173,7 @@ describe('Testing Request Contract', () => {
       requestStateMap.getWitness(requestInput2.requestId()),
       requesterMap.getWitness(requestInput2.requestId())
     );
+    ActionRequestProfiler.stop().store();
 
     let tx = await Mina.transaction(feePayer, () => {
       requestContract.rollupRequest(proof);
@@ -183,37 +187,27 @@ describe('Testing Request Contract', () => {
       GroupArray.hash(addresses.rqter2.toGroup())
     );
     // turn to request state
-    requesterMap.set(requestInput2.requestId(), Field(1));
+    requestStateMap.set(requestInput2.requestId(), Field(1));
   });
 
   it('Requester 1 requestInput1 and requestInput3', async () => {
-    Provable.log(
-      'Balance before requestInput1: ',
-      Account(addresses.rqter1).balance
-    );
+    let balanceBefore = Number(Account(addresses.rqter1).balance.get());
     let tx = await Mina.transaction(addresses.rqter1, () => {
       requestContract.request(requestInput1);
     });
     await tx.prove();
     await tx.sign([keys.rqter1]).send();
-    Provable.log(
-      'Balance after requestInput1: ',
-      Account(addresses.rqter1).balance
-    );
+    let balanceAfter = Number(Account(addresses.rqter1).balance.get());
+    expect(balanceBefore - balanceAfter).toEqual(Number(RequestFee));
 
-    Provable.log(
-      'Balance before requestInput3: ',
-      Account(addresses.rqter1).balance
-    );
+    balanceBefore = Number(Account(addresses.rqter1).balance.get());
     tx = await Mina.transaction(addresses.rqter1, () => {
       requestContract.request(requestInput3);
     });
     await tx.prove();
     await tx.sign([keys.rqter1]).send();
-    Provable.log(
-      'Balance after requestInput3: ',
-      Account(addresses.rqter1).balance
-    );
+    balanceAfter = Number(Account(addresses.rqter1).balance.get());
+    expect(balanceBefore - balanceAfter).toEqual(Number(0));
   });
 
   it('Create proof for request1 and request3 and rollup', async () => {
@@ -231,8 +225,8 @@ describe('Testing Request Contract', () => {
       proof.publicInput,
       proof,
       requestInput1,
-      requestStateMap.getWitness(requestInput2.requestId()),
-      requesterMap.getWitness(requestInput2.requestId())
+      requestStateMap.getWitness(requestInput1.requestId()),
+      requesterMap.getWitness(requestInput1.requestId())
     );
 
     ////// update local state:
@@ -241,7 +235,7 @@ describe('Testing Request Contract', () => {
       GroupArray.hash(addresses.rqter1.toGroup())
     );
     // turn to request state
-    requesterMap.set(requestInput1.requestId(), Field(1));
+    requestStateMap.set(requestInput1.requestId(), Field(1));
 
     console.log('Create createRequestProof.nextStep requestInput3...');
     proof = await createRequestProof.nextStep(
@@ -253,38 +247,28 @@ describe('Testing Request Contract', () => {
     );
 
     ////// update local state:
-    requesterMap.set(
-      requestInput3.requestId(),
-      GroupArray.hash(addresses.rqter1.toGroup())
-    );
-    // turn to request state
     requesterMap.set(requestInput3.requestId(), Field(0));
+    // turn to request state back to 0
+    requestStateMap.set(requestInput3.requestId(), Field(0));
 
-    Provable.log(
-      'Balance before requestInput3: ',
-      Account(addresses.rqter1).balance
-    );
+    let balanceBefore = Number(Account(addresses.rqter1).balance.get());
     // rollUp
     let tx = await Mina.transaction(feePayer, () => {
       requestContract.rollupRequest(proof);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();
-    Provable.log(
-      'Balance before requestInput3: ',
-      Account(addresses.rqter1).balance
-    );
+    let balanceAfter = Number(Account(addresses.rqter1).balance.get());
+    expect(balanceAfter - balanceBefore).toEqual(Number(RequestFee)); // refunded
   });
 
-  // it('check if p2 belong to request 1: to throw error', async () => {
-  //   // check if memerber belong to committeeId
-  //   expect(() => {
-  //     requestContract.checkMember(
-  //       addresses.p2.toGroup(),
-  //       Field(1),
-  //       new MyMerkleWitness(tree1.getWitness(1n)),
-  //       memberMerkleMap.getWitness(Field(1))
-  //     );
-  //   }).toThrowError();
-  // });
+  it('check if requestId1 is empty and requestId2 is requester 2', async () => {
+    await fetchAccount({ publicKey: addresses.request });
+    expect(requestContract.requestStateRoot.get().toString()).toEqual(
+      requestStateMap.getRoot().toString()
+    );
+    expect(requestContract.requesterRoot.get().toString()).toEqual(
+      requesterMap.getRoot().toString()
+    );
+  });
 });
