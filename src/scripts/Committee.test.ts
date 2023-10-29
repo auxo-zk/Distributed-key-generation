@@ -25,8 +25,10 @@ import {
   Committee,
   createCommitteeProof,
   GroupArray,
-  RollupState,
-  MyMerkleWitness,
+  CommitteeRollupState,
+  CommitteeMerkleWitness,
+  CheckMemberInput,
+  CheckConfigInput,
 } from '../contracts/Committee.js';
 
 import { MockDKGContract } from '../contracts/MockDKGContract.js';
@@ -54,7 +56,7 @@ describe('Committee', () => {
   let feePayerKey: PrivateKey;
   let feePayer: PublicKey;
   let committeeContract: Committee;
-  let proof: Proof<RollupState, RollupState>;
+  let proof: Proof<CommitteeRollupState, CommitteeRollupState>;
   let myGroupArray1: GroupArray;
   let threshold1 = Field(1);
   let threshold2 = Field(2);
@@ -148,7 +150,7 @@ describe('Committee', () => {
   it('create proof first step...', async () => {
     // create first step proof
     proof = await createCommitteeProof.firstStep(
-      new RollupState({
+      new CommitteeRollupState({
         actionHash: Reducer.initialActionState,
         memberTreeRoot: EmptyMerkleMap.getRoot(),
         settingTreeRoot: EmptyMerkleMap.getRoot(),
@@ -235,13 +237,14 @@ describe('Committee', () => {
 
   it('check if p2 belong to committee 0', async () => {
     // check if memerber belong to committeeId
+    let checkInput = new CheckMemberInput({
+      address: addresses.p2.toGroup(),
+      commiteeId: Field(0),
+      memberMerkleTreeWitness: new CommitteeMerkleWitness(tree1.getWitness(1n)),
+      memberMerkleMapWitness: memberMerkleMap.getWitness(Field(0)),
+    });
     let tx = await Mina.transaction(feePayer, () => {
-      committeeContract.checkMember(
-        addresses.p2.toGroup(),
-        Field(0),
-        new MyMerkleWitness(tree1.getWitness(1n)),
-        memberMerkleMap.getWitness(Field(0))
-      );
+      committeeContract.checkMember(checkInput);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();
@@ -249,13 +252,14 @@ describe('Committee', () => {
 
   it('check if p2 belong to committee 1: to throw error', async () => {
     // check if memerber belong to committeeId
+    let checkInput = new CheckMemberInput({
+      address: addresses.p2.toGroup(),
+      commiteeId: Field(1),
+      memberMerkleTreeWitness: new CommitteeMerkleWitness(tree1.getWitness(1n)),
+      memberMerkleMapWitness: memberMerkleMap.getWitness(Field(1)),
+    });
     expect(() => {
-      committeeContract.checkMember(
-        addresses.p2.toGroup(),
-        Field(1),
-        new MyMerkleWitness(tree1.getWitness(1n)),
-        memberMerkleMap.getWitness(Field(1))
-      );
+      committeeContract.checkMember(checkInput);
     }).toThrowError();
   });
 });

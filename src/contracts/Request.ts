@@ -29,7 +29,7 @@ import { findSourceMap } from 'node:module';
 const treeHeight = 6; // setting max 32 member
 const EmptyMerkleMap = new MerkleMap();
 export const RequestFee = Field(10 ** 9); // 1 Mina
-const ZeroFee = Field(0); // 0 Mina
+export const ZeroFee = Field(0); // 0 Mina
 export class GroupArray extends DynamicArray(Group, 2 ** (treeHeight - 1)) {}
 const Field32Array = Provable.Array(Field, 32);
 
@@ -82,7 +82,7 @@ export class RequestInput extends Struct({
   }
 }
 
-export class RollupState extends Struct({
+export class RequestRollupState extends Struct({
   actionHash: Field,
   requestStateRoot: Field,
   requesterRoot: Field,
@@ -97,25 +97,25 @@ export class RollupState extends Struct({
 }
 
 export const createRequestProof = Experimental.ZkProgram({
-  publicInput: RollupState,
-  publicOutput: RollupState,
+  publicInput: RequestRollupState,
+  publicOutput: RequestRollupState,
 
   methods: {
     nextStep: {
       privateInputs: [
-        SelfProof<RollupState, RollupState>,
+        SelfProof<RequestRollupState, RequestRollupState>,
         RequestInput,
         MerkleMapWitness,
         MerkleMapWitness,
       ],
 
       method(
-        input: RollupState,
-        preProof: SelfProof<RollupState, RollupState>,
+        input: RequestRollupState,
+        preProof: SelfProof<RequestRollupState, RequestRollupState>,
         requestInput: RequestInput,
         requestStateWitness: MerkleMapWitness,
         requesterWitness: MerkleMapWitness
-      ): RollupState {
+      ): RequestRollupState {
         preProof.verify();
 
         input.hash().assertEquals(preProof.publicInput.hash());
@@ -176,7 +176,7 @@ export const createRequestProof = Experimental.ZkProgram({
         let [newRequesterRoot] =
           requesterWitness.computeRootAndKey(newRequester);
 
-        return new RollupState({
+        return new RequestRollupState({
           actionHash: updateOutOfSnark(preProof.publicOutput.actionHash, [
             [requestInput.toFields()].flat(),
           ]),
@@ -189,7 +189,7 @@ export const createRequestProof = Experimental.ZkProgram({
     firstStep: {
       privateInputs: [],
 
-      method(input: RollupState): RollupState {
+      method(input: RequestRollupState): RequestRollupState {
         return input;
       },
     },

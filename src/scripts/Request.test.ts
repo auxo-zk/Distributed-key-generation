@@ -31,7 +31,7 @@ import {
   RequestInput,
   createRequestProof,
   GroupArray,
-  RollupState,
+  RequestRollupState,
   RequestFee,
 } from '../contracts/Request.js';
 import { Committee } from '../contracts/Committee.js';
@@ -56,7 +56,7 @@ describe('Testing Request Contract', () => {
   let feePayerKey: PrivateKey;
   let feePayer: PublicKey;
   let requestContract: Request;
-  let proof: Proof<RollupState, RollupState>;
+  let proof: Proof<RequestRollupState, RequestRollupState>;
   let R1: GroupArray = GroupArray.from([
     addresses.R1.toGroup(),
     addresses.R1.toGroup(),
@@ -155,7 +155,7 @@ describe('Testing Request Contract', () => {
     console.log('Create createRequestProof.firstStep...');
     ActionRequestProfiler.start('createRequestProof.firstStep');
     proof = await createRequestProof.firstStep(
-      new RollupState({
+      new RequestRollupState({
         actionHash: Reducer.initialActionState,
         requestStateRoot: requestStateMap.getRoot(),
         requesterRoot: requesterMap.getRoot(),
@@ -213,7 +213,7 @@ describe('Testing Request Contract', () => {
   it('Create proof for request1 and request3 and rollup', async () => {
     console.log('Create createRequestProof.firstStep...');
     proof = await createRequestProof.firstStep(
-      new RollupState({
+      new RequestRollupState({
         actionHash: requestContract.actionState.get(),
         requestStateRoot: requestStateMap.getRoot(),
         requesterRoot: requesterMap.getRoot(),

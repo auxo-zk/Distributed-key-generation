@@ -32,11 +32,11 @@ const accountFee = Mina.accountCreationFee();
 const treeHeight = 6; // setting max 32 member
 const EmptyMerkleMap = new MerkleMap();
 const Tree = new MerkleTree(treeHeight);
-export class MyMerkleWitness extends MerkleWitness(treeHeight) {}
+export class CommitteeMerkleWitness extends MerkleWitness(treeHeight) {}
 
 export class GroupArray extends DynamicArray(Group, 2 ** (treeHeight - 1)) {}
 
-export class RollupState extends Struct({
+export class CommitteeRollupState extends Struct({
   actionHash: Field,
   memberTreeRoot: Field,
   settingTreeRoot: Field,
@@ -54,14 +54,28 @@ export class RollupState extends Struct({
   }
 }
 
+export class CheckMemberInput extends Struct({
+  address: Group,
+  commiteeId: Field,
+  memberMerkleTreeWitness: CommitteeMerkleWitness,
+  memberMerkleMapWitness: MerkleMapWitness,
+}) {}
+
+export class CheckConfigInput extends Struct({
+  n: Field,
+  t: Field,
+  commiteeId: Field,
+  settingMerkleMapWitness: MerkleMapWitness,
+}) {}
+
 export const createCommitteeProof = Experimental.ZkProgram({
-  publicInput: RollupState,
-  publicOutput: RollupState,
+  publicInput: CommitteeRollupState,
+  publicOutput: CommitteeRollupState,
 
   methods: {
     nextStep: {
       privateInputs: [
-        SelfProof<RollupState, RollupState>,
+        SelfProof<CommitteeRollupState, CommitteeRollupState>,
         GroupArray,
         MerkleMapWitness,
         Group,
@@ -71,15 +85,15 @@ export const createCommitteeProof = Experimental.ZkProgram({
       ],
 
       method(
-        input: RollupState,
-        preProof: SelfProof<RollupState, RollupState>,
+        input: CommitteeRollupState,
+        preProof: SelfProof<CommitteeRollupState, CommitteeRollupState>,
         publickeys: GroupArray,
         memberWitness: MerkleMapWitness,
         newAddress: Group,
         settingWitess: MerkleMapWitness,
         threshold: Field,
         dkgAddressWitness: MerkleMapWitness
-      ): RollupState {
+      ): CommitteeRollupState {
         preProof.verify();
 
         input.hash().assertEquals(preProof.publicInput.hash());
@@ -120,7 +134,7 @@ export const createCommitteeProof = Experimental.ZkProgram({
           GroupArray.hash(newAddress)
         );
 
-        return new RollupState({
+        return new CommitteeRollupState({
           actionHash: updateOutOfSnark(preProof.publicOutput.actionHash, [
             [
               publickeys.length,
@@ -140,7 +154,7 @@ export const createCommitteeProof = Experimental.ZkProgram({
     firstStep: {
       privateInputs: [],
 
-      method(input: RollupState): RollupState {
+      method(input: CommitteeRollupState): CommitteeRollupState {
         return input;
       },
     },
@@ -233,32 +247,25 @@ export class Committee extends SmartContract {
     this.dkgAddressTreeRoot.set(proof.publicOutput.dkgAddressTreeRoot);
   }
 
-  @method checkMember(
-    address: Group,
-    commiteeId: Field,
-    memberMerkleTreeWitness: MyMerkleWitness,
-    memberMerkleMapWitness: MerkleMapWitness
-  ) {
-    let leaf = memberMerkleTreeWitness.calculateRoot(GroupArray.hash(address));
-    let [root, _commiteeId] = memberMerkleMapWitness.computeRootAndKey(leaf);
+  @method checkMember(input: CheckMemberInput) {
+    let leaf = input.memberMerkleTreeWitness.calculateRoot(
+      GroupArray.hash(input.address)
+    );
+    let [root, _commiteeId] =
+      input.memberMerkleMapWitness.computeRootAndKey(leaf);
     const onChainRoot = this.memberTreeRoot.getAndAssertEquals();
     root.assertEquals(onChainRoot);
-    commiteeId.assertEquals(_commiteeId);
+    input.commiteeId.assertEquals(_commiteeId);
   }
 
-  @method checkConfig(
-    n: Field,
-    t: Field,
-    commiteeId: Field,
-    settingMerkleMapWitness: MerkleMapWitness
-  ) {
-    n.assertGreaterThanOrEqual(t);
+  @method checkConfig(input: CheckConfigInput) {
+    input.n.assertGreaterThanOrEqual(input.t);
     // hash[t,n]
-    let hashSetting = Poseidon.hash([t, n]);
+    let hashSetting = Poseidon.hash([input.t, input.n]);
     let [root, _commiteeId] =
-      settingMerkleMapWitness.computeRootAndKey(hashSetting);
+      input.settingMerkleMapWitness.computeRootAndKey(hashSetting);
     const onChainRoot = this.settingTreeRoot.getAndAssertEquals();
     root.assertEquals(onChainRoot);
-    commiteeId.assertEquals(_commiteeId);
+    input.commiteeId.assertEquals(_commiteeId);
   }
 }

@@ -94,8 +94,6 @@ export const ReduceActions = Experimental.ZkProgram({
         );
         // Calculate action hash
         let actionHash = input.action.hash();
-        // Provable.log(input.action);
-        // Provable.log(actionHash);
         // Current value of the action hash should be 0
         let [root, key] = reducedWitness.computeRootAndKey(Field(0));
         root.assertEquals(earlierProof.publicOutput.newRollupState);

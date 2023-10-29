@@ -26,8 +26,10 @@ import {
   Committee,
   createCommitteeProof,
   GroupArray,
-  RollupState,
-  MyMerkleWitness,
+  CommitteeRollupState,
+  CommitteeMerkleWitness,
+  CheckMemberInput,
+  CheckConfigInput,
 } from '../contracts/Committee.js';
 
 import { MockDKGContract } from '../contracts/MockDKGContract.js';
@@ -71,7 +73,7 @@ class memberMerkleTreeWitness extends MerkleWitness(treeHeight) {}
 
 const isLocal = false;
 // 0: deploy
-// 1: set DKG ================== 
+// 1: set DKG ==================
 // 2: dispatch: add thành viên, dkg địa chỉ
 // 3: rollup: reduce ================== sever
 // 4: check ================= dựa vào check trong db
@@ -196,7 +198,7 @@ async function main() {
     console.log('create proof first step...');
     ActionCommitteeProfiler.start('createCommitteeProof create fist step');
     let proof = await createCommitteeProof.firstStep(
-      new RollupState({
+      new CommitteeRollupState({
         actionHash: Reducer.initialActionState,
         memberTreeRoot: EmptyMerkleMap.getRoot(),
         settingTreeRoot: EmptyMerkleMap.getRoot(),
@@ -297,13 +299,14 @@ async function main() {
 
     // check if memerber belong to committeeId
     console.log('committeeContract.checkMember p2: ');
+    let checkInput = new CheckMemberInput({
+      address: addresses.p2.toGroup(),
+      commiteeId: Field(0),
+      memberMerkleTreeWitness: new CommitteeMerkleWitness(tree.getWitness(1n)),
+      memberMerkleMapWitness: memberMerkleMap.getWitness(Field(0)),
+    });
     tx = await Mina.transaction(feePayer, () => {
-      committeeContract.checkMember(
-        addresses.p2.toGroup(),
-        Field(0),
-        new MyMerkleWitness(tree.getWitness(1n)),
-        memberMerkleMap.getWitness(Field(0))
-      );
+      committeeContract.checkMember(checkInput);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();
@@ -429,7 +432,7 @@ async function main() {
       // create first step proof
       console.log('create proof first step...');
       let proof = await createCommitteeProof.firstStep(
-        new RollupState({
+        new CommitteeRollupState({
           actionHash: Reducer.initialActionState,
           memberTreeRoot: EmptyMerkleMap.getRoot(),
           settingTreeRoot: EmptyMerkleMap.getRoot(),
@@ -463,15 +466,18 @@ async function main() {
     if (actionn == 4) {
       // check if memerber belong to committeeId
       console.log('committeeContract.checkMember p2: ');
+      let checkInput = new CheckMemberInput({
+        address: p2Address.toGroup(),
+        commiteeId: Field(0),
+        memberMerkleTreeWitness: new CommitteeMerkleWitness(
+          tree.getWitness(1n)
+        ),
+        memberMerkleMapWitness: memberMerkleMap.getWitness(Field(0)),
+      });
       let tx = await Mina.transaction(
         { sender: feePayer, fee, nonce: currentNonce },
         () => {
-          committeeContract.checkMember(
-            p2Address.toGroup(),
-            Field(0),
-            new MyMerkleWitness(tree.getWitness(1n)),
-            memberMerkleMap.getWitness(Field(0))
-          );
+          committeeContract.checkMember(checkInput);
         }
       );
       console.log('tx.prove: ');
