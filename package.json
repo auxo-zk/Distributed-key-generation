@@ -47,5 +47,8 @@
   },
   "peerDependencies": {
     "o1js": "0.13.*"
+  },
+  "dependencies": {
+    "@auxo-dev/dkg-libs": "^0.1.3"
   }
 }
