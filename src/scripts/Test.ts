@@ -188,9 +188,11 @@ async function main() {
     }
     console.log('reduce pending actions..');
 
+    TestProfiler.start('zkapp.reduceActions');
     tx = await Mina.transaction(feePayer, () => {
       zkapp.reduceActions(reduceProof);
     });
+    TestProfiler.stop().store();
     await tx.prove();
     await tx.sign([feePayerKey]).send();
     assert.deepEqual(zkapp.num.get().toString(), '0');
@@ -280,106 +282,71 @@ async function main() {
     await tx.sign([feePayerKey]).send();
     assert.deepEqual(zkapp.num.get().toString(), '36');
     Provable.log('zkapp.num.get().toString(): ', zkapp.num.get().toString());
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////
+    initialActionState = zkapp.account.actionState.get();
+    initialRollupState = zkapp.rollupState.get();
+    reduceProof = await ReduceActions.firstStep(
+      new ReduceInput({
+        initialActionState: initialActionState,
+        initialRollupState: initialRollupState,
+        action: actions[0],
+      })
+    );
+    for (let i = 4; i < 6; i++) {
+      tx = await Mina.transaction(feePayer, () => {
+        actions[i].mask.values[0].toBoolean()
+          ? zkapp.add(actions[i].data)
+          : zkapp.mul(actions[i].data);
+      });
+      await tx.prove();
+      await tx.sign([feePayerKey]).send();
+
+      let actionHash = actions[i].hash();
+      let reducedWitness = rollupMerkleMap.getWitness(actionHash);
+      reduceProof = await ReduceActions.nextStep(
+        new ReduceInput({
+          initialActionState: initialActionState,
+          initialRollupState: initialRollupState,
+          action: actions[i],
+        }),
+        reduceProof,
+        reducedWitness
+      );
+      rollupMerkleMap.set(actionHash, Field(1));
+    }
+
+    initialValue = zkapp.num.get();
+    initialRollupState = rollupMerkleMap.getRoot();
+    rollupProof = await RollupActions.firstStep(
+      new RollupInput({
+        initialValue: initialValue,
+        initialRollupState: initialRollupState,
+        action: actions[0],
+      })
+    );
+    for (let i = 4; i < 6; i++) {
+      let actionHash = actions[i].hash();
+      let rollupWitness = rollupMerkleMap.getWitness(actionHash);
+
+      rollupProof = await RollupActions.nextStep(
+        new RollupInput({
+          initialValue: initialValue,
+          initialRollupState: initialRollupState,
+          action: actions[i],
+        }),
+        rollupProof,
+        rollupWitness
+      );
+    }
+
+    tx = await Mina.transaction(feePayer, () => {
+      zkapp.rollupActionsWithReduce(reduceProof, rollupProof);
+    });
+    await tx.prove();
+    await tx.sign([feePayerKey]).send();
+    assert.deepEqual(zkapp.num.get().toString(), '111');
   }
-
-  //////////////////////////////////////////////////////////////////////////////////////////////////
-
-  // initialActionState = zkapp.account.actionState.get();
-  // initialRollupState = rollupMerkleMap.getRoot();
-  // reduceProof = await ReduceActions.firstStep(
-  //   new ReduceInput({
-  //     initialActionState: initialActionState,
-  //     initialRollupState: initialRollupState,
-  //     action: actions[0],
-  //   })
-  // );
-  //   for (let i = 4; i < 6; i++) {
-  //     tx = await Mina.transaction(feePayer, () => {
-  //       actions[i].mask.values[0].toBoolean()
-  //         ? zkapp.add(actions[i].data)
-  //         : zkapp.mul(actions[i].data);
-  //     });
-  //     await tx.prove();
-  //     await tx.sign([feePayerKey]).send();
-
-  //     let actionHash = actions[i].hash();
-  //     let reducedWitness = rollupMerkleMap.getWitness(actionHash);
-  //     rollupMerkleMap.set(actionHash, Field(1));
-
-  //     reduceProof = await ReduceActions.nextStep(
-  //       new ReduceInput({
-  //         initialActionState: initialActionState,
-  //         initialRollupState: initialRollupState,
-  //         action: actions[i],
-  //       }),
-  //       reduceProof,
-  //       reducedWitness
-  //     );
-  //   }
-
-  //   initialValue = zkapp.num.get();
-  //   initialRollupState = rollupMerkleMap.getRoot();
-  //   rollupProof = await RollupActions.firstStep(
-  //     new RollupInput({
-  //       initialValue: initialValue,
-  //       initialRollupState: initialRollupState,
-  //       action: actions[0],
-  //     })
-  //   );
-  //   for (let i = 4; i < 6; i++) {
-  //     let actionHash = actions[i].hash();
-  //     let rollupWitness = rollupMerkleMap.getWitness(actionHash);
-
-  //     rollupProof = await RollupActions.nextStep(
-  //       new RollupInput({
-  //         initialValue: initialValue,
-  //         initialRollupState: initialRollupState,
-  //         action: actions[i],
-  //       }),
-  //       rollupProof,
-  //       rollupWitness
-  //     );
-  //   }
-
-  //   tx = await Mina.transaction(feePayer, () => {
-  //     zkapp.rollupActionsWithReduce(reduceProof, rollupProof);
-  //   });
-  //   await tx.prove();
-  //   await tx.sign([feePayerKey]).send();
-  //   assert.deepEqual(zkapp.num.get().toString(), '99');
-  // }
-
-  //////////////////////////////////////////////////////////////////////////////////////////////////
-
-  // console.log('applying more actions');
-
-  // console.log('action 4 (no increment)');
-  // tx = await Mina.transaction(feePayer, () => {
-  //   zkapp.dispatchData(Field.random());
-  // });
-  // await tx.prove();
-  // await tx.sign([feePayerKey]).send();
-
-  // console.log('action 5');
-  // tx = await Mina.transaction(feePayer, () => {
-  //   zkapp.incrementCounter();
-  // });
-  // await tx.prove();
-  // await tx.sign([feePayerKey]).send();
-
-  // console.log('rolling up pending actions..');
-
-  // console.log('state before: ' + zkapp.counter.get());
-
-  // tx = await Mina.transaction(feePayer, () => {
-  //   zkapp.rollupIncrements();
-  // });
-  // await tx.prove();
-  // await tx.sign([feePayerKey]).send();
-
-  // console.log('state after rollup: ' + zkapp.counter.get());
-  // assert.equal(zkapp.counter.get().toString(), '4');
-  TestProfiler.stop().store();
 }
 
 main()

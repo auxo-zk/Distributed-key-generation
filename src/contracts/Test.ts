@@ -28,8 +28,16 @@ export const enum ActionEnum {
 export class ActionMask extends DynamicArray(Bool, ActionEnum.__LENGTH) {}
 
 export const ACTIONS = {
-  [ActionEnum.ADDITION]: ActionMask.from([Bool(true), Bool(false)]),
-  [ActionEnum.MULTIPLICATION]: ActionMask.from([Bool(false), Bool(true)]),
+  [ActionEnum.ADDITION]: ActionMask.from(
+    [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
+      e == ActionEnum.ADDITION ? Bool(true) : Bool(false)
+    )
+  ),
+  [ActionEnum.MULTIPLICATION]: ActionMask.from(
+    [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
+      e == ActionEnum.MULTIPLICATION ? Bool(true) : Bool(false)
+    )
+  ),
 };
 
 export class Action extends Struct({
