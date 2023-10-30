@@ -32,7 +32,6 @@ import {
   CheckConfigInput,
 } from '../contracts/Committee.js';
 
-import { MockDKGContract } from '../contracts/MockDKGContract.js';
 import fs from 'fs/promises';
 
 // check command line arg
@@ -66,26 +65,22 @@ const EmptyMerkleMap = new MerkleMap();
 const treeHeight = 6; // setting max 32 member
 // const memberMerkleTree = new MerkleTree(treeHeight);
 const memberMerkleMap = new MerkleMap();
-const dkgAddressMerkleMap = new MerkleMap();
 const settingMerkleMap = new MerkleMap();
 
 class memberMerkleTreeWitness extends MerkleWitness(treeHeight) {}
 
-const isLocal = false;
+const isLocal = true;
 // 0: deploy
-// 1: set DKG ==================
-// 2: dispatch: add thành viên, dkg địa chỉ
-// 3: rollup: reduce ================== sever
-// 4: check ================= dựa vào check trong db
-let actionn = 4;
+// 1: dispatch: add thành viên, dkg địa chỉ
+// 2: rollup: reduce ================== sever
+// 3: check ================= dựa vào check trong db
+let actionn = 0;
 
 async function main() {
   if (isLocal) {
     // fresh account
     let { keys, addresses } = randomAccounts(
       'committee',
-      'dkg1',
-      'dkg2',
       'p1',
       'p2',
       'p3',
@@ -117,18 +112,6 @@ async function main() {
     await tx.sign([feePayerKey, keys.committee]).send();
     console.log('committeeContract deployed!');
 
-    // console.log('compile mockDKG contract... ');
-    await MockDKGContract.compile();
-
-    // set verification key
-    console.log('committeeContract.createCommittee: ');
-    tx = await Mina.transaction(feePayer, () => {
-      committeeContract.setVkDKGHash(MockDKGContract._verificationKey!);
-    });
-    await tx.prove();
-    await tx.sign([feePayerKey]).send();
-    console.log('committeeContract.createCommittee sent!...');
-
     // create commitee consist of 2 people with thresh hold 1
     let arrayAddress = [];
     arrayAddress.push(addresses.p1, addresses.p2);
@@ -141,25 +124,16 @@ async function main() {
 
     console.log('committeeContract.createCommittee: ');
     tx = await Mina.transaction(feePayer, () => {
-      AccountUpdate.fundNewAccount(feePayer, 1);
-      committeeContract.createCommittee(
-        myGroupArray1,
-        Field(1),
-        addresses.dkg1.toGroup(),
-        MockDKGContract._verificationKey!
-      );
+      committeeContract.createCommittee(myGroupArray1, Field(1));
     });
     await tx.prove();
-    await tx.sign([feePayerKey, keys.dkg1]).send();
+    await tx.sign([feePayerKey]).send();
+
     console.log('committeeContract.createCommittee sent!...');
     console.log(
       'actionState in Committee contract (account):',
       committeeContract.account.actionState.get()
     );
-
-    // // Test MockDKG contract
-    let dkgContract = new MockDKGContract(addresses.dkg1);
-    console.log('Number in mockDKG contract: ', Number(dkgContract.num.get()));
 
     // create commitee consist of 3 people with thresh hold 2
     arrayAddress = [];
@@ -172,16 +146,10 @@ async function main() {
 
     console.log('committeeContract.createCommittee: ');
     tx = await Mina.transaction(feePayer, () => {
-      AccountUpdate.fundNewAccount(feePayer, 1);
-      committeeContract.createCommittee(
-        myGroupArray2,
-        Field(2),
-        addresses.dkg2.toGroup(),
-        MockDKGContract._verificationKey!
-      );
+      committeeContract.createCommittee(myGroupArray2, Field(2));
     });
     await tx.prove();
-    await tx.sign([feePayerKey, keys.dkg2]).send();
+    await tx.sign([feePayerKey]).send();
     console.log('committeeContract.createCommittee sent!...');
     console.log(
       'actionState in Committee contract (account):',
@@ -202,7 +170,6 @@ async function main() {
         actionHash: Reducer.initialActionState,
         memberTreeRoot: EmptyMerkleMap.getRoot(),
         settingTreeRoot: EmptyMerkleMap.getRoot(),
-        dkgAddressTreeRoot: EmptyMerkleMap.getRoot(),
         currentCommitteeId: committeeContract.nextCommitteeId.get(), // 0
       })
     );
@@ -215,10 +182,8 @@ async function main() {
       proof,
       myGroupArray1,
       memberMerkleMap.getWitness(Field(0)),
-      addresses.dkg1.toGroup(),
       settingMerkleMap.getWitness(Field(0)),
-      Field(1), // threshold
-      dkgAddressMerkleMap.getWitness(Field(0))
+      Field(1) // threshold
     );
     ActionCommitteeProfiler.stop();
 
@@ -235,10 +200,6 @@ async function main() {
       Field(0),
       Poseidon.hash([Field(1), myGroupArray1.length])
     );
-    dkgAddressMerkleMap.set(
-      Field(0),
-      GroupArray.hash(addresses.dkg1.toGroup())
-    );
 
     console.log('create proof next step again...');
     ActionCommitteeProfiler.start('createCommitteeProof create next step');
@@ -247,10 +208,8 @@ async function main() {
       proof,
       myGroupArray2,
       memberMerkleMap.getWitness(Field(1)),
-      addresses.dkg2.toGroup(),
       settingMerkleMap.getWitness(Field(1)),
-      Field(2), // threshold
-      dkgAddressMerkleMap.getWitness(Field(1))
+      Field(2) // threshold
     );
     ActionCommitteeProfiler.stop();
 
@@ -284,10 +243,7 @@ async function main() {
       Field(1),
       Poseidon.hash([Field(2), myGroupArray2.length])
     );
-    dkgAddressMerkleMap.set(
-      Field(1),
-      GroupArray.hash(addresses.dkg2.toGroup())
-    );
+
     console.log(
       'actionState in Committee contract (@state):',
       committeeContract.actionState.get()
@@ -356,10 +312,6 @@ async function main() {
     await createCommitteeProof.compile();
     console.log('compile Committee contract... ');
     await Committee.compile();
-    if (actionn == 1 || actionn == 2) {
-      console.log('compile MockDKGContract contract... ');
-      await MockDKGContract.compile();
-    }
 
     if (actionn == 0) {
       console.log('deploy committeeContract...');
@@ -372,20 +324,6 @@ async function main() {
       );
       await tx.sign([feePayerKey, committeeKey]).send();
       console.log('committeeContract deployed!');
-    }
-
-    // set verification key
-    if (actionn == 1) {
-      console.log('committeeContract.setVkDKGHash: ');
-      let tx = await Mina.transaction(
-        { sender: feePayer, fee, nonce: currentNonce },
-        () => {
-          committeeContract.setVkDKGHash(MockDKGContract._verificationKey!);
-        }
-      );
-      await tx.prove();
-      await tx.sign([feePayerKey]).send();
-      console.log('committeeContract.setVkDKGHash sent!...');
     }
 
     // create commitee consist of 2 people with thresh hold 1
@@ -407,20 +345,13 @@ async function main() {
       Field(0),
       Poseidon.hash([Field(1), myGroupArray1.length])
     );
-    dkgAddressMerkleMap.set(Field(0), GroupArray.hash(dkgAddress.toGroup()));
 
-    if (actionn == 2) {
+    if (actionn == 1) {
       console.log('committeeContract.createCommittee: ');
       let tx = await Mina.transaction(
         { sender: feePayer, fee, nonce: currentNonce },
         () => {
-          AccountUpdate.fundNewAccount(feePayer, 1);
-          committeeContract.createCommittee(
-            myGroupArray1,
-            Field(1),
-            dkgAddress.toGroup(),
-            MockDKGContract._verificationKey!
-          );
+          committeeContract.createCommittee(myGroupArray1, Field(1));
         }
       );
       await tx.prove();
@@ -428,7 +359,7 @@ async function main() {
       console.log('committeeContract.createCommittee sent!...');
     }
 
-    if (actionn == 3) {
+    if (actionn == 2) {
       // create first step proof
       console.log('create proof first step...');
       let proof = await createCommitteeProof.firstStep(
@@ -436,7 +367,6 @@ async function main() {
           actionHash: Reducer.initialActionState,
           memberTreeRoot: EmptyMerkleMap.getRoot(),
           settingTreeRoot: EmptyMerkleMap.getRoot(),
-          dkgAddressTreeRoot: EmptyMerkleMap.getRoot(),
           currentCommitteeId: committeeContract.nextCommitteeId.get(), // 0
         })
       );
@@ -446,10 +376,8 @@ async function main() {
         proof,
         myGroupArray1,
         memberMerkleMap.getWitness(Field(0)),
-        dkgAddress.toGroup(),
         settingMerkleMap.getWitness(Field(0)),
-        Field(1), // threshold
-        dkgAddressMerkleMap.getWitness(Field(0))
+        Field(1) // threshold
       );
       console.log('committeeContract.rollupIncrements: ');
       let tx = await Mina.transaction(
@@ -463,7 +391,7 @@ async function main() {
       console.log('committeeContract.rollupIncrements sent!...');
     }
 
-    if (actionn == 4) {
+    if (actionn == 3) {
       // check if memerber belong to committeeId
       console.log('committeeContract.checkMember p2: ');
       let checkInput = new CheckMemberInput({

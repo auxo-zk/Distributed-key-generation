@@ -40,7 +40,6 @@ export class CommitteeRollupState extends Struct({
   actionHash: Field,
   memberTreeRoot: Field,
   settingTreeRoot: Field,
-  dkgAddressTreeRoot: Field,
   currentCommitteeId: Field,
 }) {
   hash(): Field {
@@ -48,7 +47,6 @@ export class CommitteeRollupState extends Struct({
       this.actionHash,
       this.memberTreeRoot,
       this.settingTreeRoot,
-      this.dkgAddressTreeRoot,
       this.currentCommitteeId,
     ]);
   }
@@ -78,10 +76,8 @@ export const createCommitteeProof = Experimental.ZkProgram({
         SelfProof<CommitteeRollupState, CommitteeRollupState>,
         GroupArray,
         MerkleMapWitness,
-        Group,
         MerkleMapWitness,
         Field,
-        MerkleMapWitness,
       ],
 
       method(
@@ -89,10 +85,8 @@ export const createCommitteeProof = Experimental.ZkProgram({
         preProof: SelfProof<CommitteeRollupState, CommitteeRollupState>,
         publickeys: GroupArray,
         memberWitness: MerkleMapWitness,
-        newAddress: Group,
         settingWitess: MerkleMapWitness,
-        threshold: Field,
-        dkgAddressWitness: MerkleMapWitness
+        threshold: Field
       ): CommitteeRollupState {
         preProof.verify();
 
@@ -118,34 +112,17 @@ export const createCommitteeProof = Experimental.ZkProgram({
         settingKey.assertEquals(nextCommitteeId);
         preSettingRoot.assertEquals(preProof.publicOutput.settingTreeRoot);
         // update new tree of public key in to the member tree
-        let [newSettingRoot] = dkgAddressWitness.computeRootAndKey(
+        let [newSettingRoot] = settingWitess.computeRootAndKey(
           // hash [t,n]
           Poseidon.hash([threshold, publickeys.length])
         );
 
-        ////// caculate new address tree root
-        let [preAddressRoot, addressKey] = dkgAddressWitness.computeRootAndKey(
-          Field(0)
-        );
-        addressKey.assertEquals(nextCommitteeId);
-        preAddressRoot.assertEquals(preProof.publicOutput.dkgAddressTreeRoot);
-        // update new tree of public key in to the member tree
-        let [newAddressRoot] = dkgAddressWitness.computeRootAndKey(
-          GroupArray.hash(newAddress)
-        );
-
         return new CommitteeRollupState({
           actionHash: updateOutOfSnark(preProof.publicOutput.actionHash, [
-            [
-              publickeys.length,
-              publickeys.toFields(),
-              newAddress.toFields(),
-              threshold,
-            ].flat(),
+            [publickeys.length, publickeys.toFields(), threshold].flat(),
           ]),
           memberTreeRoot: newMemberRoot,
           settingTreeRoot: newSettingRoot,
-          dkgAddressTreeRoot: newAddressRoot,
           currentCommitteeId: nextCommitteeId.add(Field(1)),
         });
       },
@@ -167,60 +144,41 @@ class CommitteeProof extends Experimental.ZkProgram.Proof(
 
 export class CommitteeInput extends Struct({
   addresses: GroupArray,
-  dkgAddress: Group,
   threshold: Field,
 }) {}
 
 export class Committee extends SmartContract {
-  @state(Field) vkDKGHash = State<Field>();
-
   @state(Field) nextCommitteeId = State<Field>();
   @state(Field) memberTreeRoot = State<Field>();
   @state(Field) settingTreeRoot = State<Field>();
-  @state(Field) dkgAddressTreeRoot = State<Field>();
 
   @state(Field) actionState = State<Field>();
 
   reducer = Reducer({ actionType: CommitteeInput });
 
+  events = {
+    addresses: GroupArray,
+    threshold: Field,
+  };
+
   init() {
     super.init();
     this.memberTreeRoot.set(EmptyMerkleMap.getRoot());
     this.settingTreeRoot.set(EmptyMerkleMap.getRoot());
-    this.dkgAddressTreeRoot.set(EmptyMerkleMap.getRoot());
     this.actionState.set(Reducer.initialActionState);
   }
 
-  // to-do add permission only owner
-  @method setVkDKGHash(verificationKey: VerificationKey) {
-    this.vkDKGHash.set(verificationKey.hash);
-  }
-
-  @method deployContract(address: PublicKey, verificationKey: VerificationKey) {
-    const currentVKHash = this.vkDKGHash.getAndAssertEquals();
-    verificationKey.hash.assertEquals(currentVKHash);
-    let dkgContract = AccountUpdate.createSigned(address);
-    dkgContract.account.isNew.assertEquals(Bool(true));
-    // To-do: setting not cho change permision on the future
-    dkgContract.account.permissions.set(Permissions.default());
-    dkgContract.account.verificationKey.set(verificationKey);
-  }
-
-  @method createCommittee(
-    addresses: GroupArray,
-    threshold: Field,
-    dkgAddress: Group,
-    verificationKey: VerificationKey
-  ) {
+  @method createCommittee(addresses: GroupArray, threshold: Field) {
     threshold.assertLessThanOrEqual(addresses.length);
-    this.deployContract(PublicKey.fromGroup(dkgAddress), verificationKey);
     this.reducer.dispatch(
       new CommitteeInput({
         addresses,
-        dkgAddress,
         threshold,
       })
     );
+
+    this.emitEvent('addresses', addresses);
+    this.emitEvent('threshold', threshold);
   }
 
   @method rollupIncrements(proof: CommitteeProof) {
@@ -229,13 +187,11 @@ export class Committee extends SmartContract {
     let nextCommitteeId = this.nextCommitteeId.getAndAssertEquals();
     let memberTreeRoot = this.memberTreeRoot.getAndAssertEquals();
     let settingTreeRoot = this.settingTreeRoot.getAndAssertEquals();
-    let dkgAddressTreeRoot = this.dkgAddressTreeRoot.getAndAssertEquals();
 
     curActionState.assertEquals(proof.publicInput.actionHash);
     nextCommitteeId.assertEquals(proof.publicInput.currentCommitteeId);
     memberTreeRoot.assertEquals(proof.publicInput.memberTreeRoot);
     settingTreeRoot.assertEquals(proof.publicInput.settingTreeRoot);
-    dkgAddressTreeRoot.assertEquals(proof.publicInput.dkgAddressTreeRoot);
 
     let lastActionState = this.account.actionState.getAndAssertEquals();
     lastActionState.assertEquals(proof.publicOutput.actionHash);
@@ -245,7 +201,6 @@ export class Committee extends SmartContract {
     this.nextCommitteeId.set(proof.publicOutput.currentCommitteeId);
     this.memberTreeRoot.set(proof.publicOutput.memberTreeRoot);
     this.settingTreeRoot.set(proof.publicOutput.settingTreeRoot);
-    this.dkgAddressTreeRoot.set(proof.publicOutput.dkgAddressTreeRoot);
   }
 
   @method checkMember(input: CheckMemberInput) {

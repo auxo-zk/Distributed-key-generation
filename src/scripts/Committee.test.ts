@@ -39,14 +39,11 @@ describe('Committee', () => {
   const EmptyMerkleMap = new MerkleMap();
   const treeHeight = 6; // setting max 32 member
   const memberMerkleMap = new MerkleMap();
-  const dkgAddressMerkleMap = new MerkleMap();
   const settingMerkleMap = new MerkleMap();
   class memberMerkleTreeWitness extends MerkleWitness(treeHeight) {}
 
   let { keys, addresses } = randomAccounts(
     'committee',
-    'dkg1',
-    'dkg2',
     'p1',
     'p2',
     'p3',
@@ -86,14 +83,6 @@ describe('Committee', () => {
     await tx.sign([feePayerKey, keys.committee]).send();
 
     if (!doProofs) await MockDKGContract.compile();
-
-    // set verification key
-
-    tx = await Mina.transaction(feePayer, () => {
-      committeeContract.setVkDKGHash(MockDKGContract._verificationKey!);
-    });
-    await tx.prove();
-    await tx.sign([feePayerKey]).send();
   });
 
   // beforeEach(() => {});
@@ -108,16 +97,10 @@ describe('Committee', () => {
     myGroupArray1 = new GroupArray(arrayAddress);
 
     let tx = await Mina.transaction(feePayer, () => {
-      AccountUpdate.fundNewAccount(feePayer, 1);
-      committeeContract.createCommittee(
-        myGroupArray1,
-        threshold1,
-        addresses.dkg1.toGroup(),
-        MockDKGContract._verificationKey!
-      );
+      committeeContract.createCommittee(myGroupArray1, threshold1);
     });
     await tx.prove();
-    await tx.sign([feePayerKey, keys.dkg1]).send();
+    await tx.sign([feePayerKey]).send();
   });
 
   it('Create commitee consist of 3 people with threshhold 2', async () => {
@@ -130,16 +113,10 @@ describe('Committee', () => {
     myGroupArray2 = new GroupArray(arrayAddress);
 
     let tx = await Mina.transaction(feePayer, () => {
-      AccountUpdate.fundNewAccount(feePayer, 1);
-      committeeContract.createCommittee(
-        myGroupArray2,
-        Field(2),
-        addresses.dkg2.toGroup(),
-        MockDKGContract._verificationKey!
-      );
+      committeeContract.createCommittee(myGroupArray2, Field(2));
     });
     await tx.prove();
-    await tx.sign([feePayerKey, keys.dkg2]).send();
+    await tx.sign([feePayerKey]).send();
   });
 
   it('compile proof', async () => {
@@ -154,7 +131,6 @@ describe('Committee', () => {
         actionHash: Reducer.initialActionState,
         memberTreeRoot: EmptyMerkleMap.getRoot(),
         settingTreeRoot: EmptyMerkleMap.getRoot(),
-        dkgAddressTreeRoot: EmptyMerkleMap.getRoot(),
         currentCommitteeId: committeeContract.nextCommitteeId.get(),
       })
     );
@@ -168,10 +144,8 @@ describe('Committee', () => {
       proof,
       myGroupArray1,
       memberMerkleMap.getWitness(Field(0)),
-      addresses.dkg1.toGroup(),
       settingMerkleMap.getWitness(Field(0)),
-      threshold1,
-      dkgAddressMerkleMap.getWitness(Field(0))
+      threshold1
     );
 
     expect(proof.publicInput.actionHash).toEqual(Reducer.initialActionState);
@@ -189,10 +163,6 @@ describe('Committee', () => {
       Field(0),
       Poseidon.hash([Field(1), myGroupArray1.length])
     );
-    dkgAddressMerkleMap.set(
-      Field(0),
-      GroupArray.hash(addresses.dkg1.toGroup())
-    );
   });
 
   it('create proof next step 2...', async () => {
@@ -201,10 +171,8 @@ describe('Committee', () => {
       proof,
       myGroupArray2,
       memberMerkleMap.getWitness(Field(1)),
-      addresses.dkg2.toGroup(),
       settingMerkleMap.getWitness(Field(1)),
-      threshold2, // threshold
-      dkgAddressMerkleMap.getWitness(Field(1))
+      threshold2 // threshold
     );
 
     expect(proof.publicInput.actionHash).toEqual(Reducer.initialActionState);
@@ -220,10 +188,6 @@ describe('Committee', () => {
     settingMerkleMap.set(
       Field(1),
       Poseidon.hash([Field(2), myGroupArray2.length])
-    );
-    dkgAddressMerkleMap.set(
-      Field(1),
-      GroupArray.hash(addresses.dkg2.toGroup())
     );
   });
 
