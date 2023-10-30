@@ -237,7 +237,8 @@ export class Committee extends SmartContract {
     settingTreeRoot.assertEquals(proof.publicInput.settingTreeRoot);
     dkgAddressTreeRoot.assertEquals(proof.publicInput.dkgAddressTreeRoot);
 
-    this.account.actionState.assertEquals(proof.publicOutput.actionHash);
+    let lastActionState = this.account.actionState.getAndAssertEquals();
+    lastActionState.assertEquals(proof.publicOutput.actionHash);
 
     // update on-chain state
     this.actionState.set(proof.publicOutput.actionHash);
