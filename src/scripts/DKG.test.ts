@@ -75,6 +75,7 @@ describe('Committee', () => {
   // beforeEach(() => {});
 
   it('Should compile', async () => {
-    await DKGContract.compile();
+    // await DKGContract.compile();
+    await DKGContract.analyzeMethods();
   });
 });

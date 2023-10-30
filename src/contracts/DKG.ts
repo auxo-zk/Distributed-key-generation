@@ -31,6 +31,8 @@ export const enum KeyStatus {
 }
 
 export const enum ActionEnum {
+  KEY_GENERATION,
+  KEY_DEPRECATION,
   ROUND_1_CONTRIBUTION,
   ROUND_2_CONTRIBUTION,
   TALLY_CONTRIBUTION,
@@ -40,6 +42,16 @@ export const enum ActionEnum {
 export class ActionMask extends Utils.DynamicArray(Bool, ActionEnum.__LENGTH) {}
 
 export const ACTIONS = {
+  [ActionEnum.KEY_GENERATION]: ActionMask.from(
+    [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
+      e == ActionEnum.KEY_GENERATION ? Bool(true) : Bool(false)
+    )
+  ),
+  [ActionEnum.KEY_DEPRECATION]: ActionMask.from(
+    [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
+      e == ActionEnum.KEY_DEPRECATION ? Bool(true) : Bool(false)
+    )
+  ),
   [ActionEnum.ROUND_1_CONTRIBUTION]: ActionMask.from(
     [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
       e == ActionEnum.ROUND_1_CONTRIBUTION ? Bool(true) : Bool(false)
@@ -57,32 +69,31 @@ export const ACTIONS = {
   ),
 };
 
+export class ActionData extends Struct({
+  committeeId: Field,
+  keyId: Field,
+  round1Contribution: DKG.Committee.Round1Contribution,
+  round2Contribution: DKG.Committee.Round2Contribution,
+  tallyContribution: DKG.Committee.TallyContribution,
+}) {
+  toFields(): Field[] {
+    return [this.committeeId]
+      .concat([this.keyId])
+      .concat(this.round1Contribution.toFields())
+      .concat(this.round2Contribution.toFields())
+      .concat(this.tallyContribution.toFields());
+  }
+}
+
 export class Action extends Struct({
   mask: ActionMask,
-  contribution:
-    Field ||
-    DKG.Committee.Round1Contribution ||
-    DKG.Committee.Round2Contribution ||
-    DKG.Committee.TallyContribution,
+  data: ActionData,
 }) {
   hash(): Field {
     return Poseidon.hash(
-      [
-        this.mask.length,
-        this.mask.toFields(),
-        this.contribution.toFields(),
-      ].flat()
+      [this.mask.length, this.mask.toFields(), this.data.toFields()].flat()
     );
   }
-  // isRound1Contribution(): Bool {
-  //   return Bool(this.contribution instanceof DKG.Committee.Round1Contribution);
-  // }
-  // isRound2Contribution(): Bool {
-  //   return Bool(this.contribution instanceof DKG.Committee.Round2Contribution);
-  // }
-  // isTallyContribution(): Bool {
-  //   return Bool(this.contribution instanceof DKG.Committee.TallyContribution);
-  // }
 }
 
 export class ReduceInput extends Struct({
@@ -143,7 +154,7 @@ export const ReduceActions = Experimental.ZkProgram({
               [
                 input.action.mask.length,
                 input.action.mask.toFields(),
-                input.action.contribution.toFields(),
+                input.action.data.toFields(),
               ].flat(),
             ]
           ),
@@ -208,8 +219,8 @@ export const RollupActions = Experimental.ZkProgram({
 
         return {
           newValue: Provable.switch(input.action.mask.values, Field, [
-            earlierProof.publicOutput.newValue.add(input.action.data),
-            earlierProof.publicOutput.newValue.mul(input.action.data),
+            Field(0),
+            Field(0),
           ]),
           newRollupState: root,
         };
@@ -229,12 +240,33 @@ export class DKGContract extends SmartContract {
   @state(Field) round2Contributions = State<Field>();
   @state(Field) tallyContributions = State<Field>();
 
-  @method generateKey() {
-    return;
+  @method generateKey(committeeId: Field) {
+    // this.reducer.dispatch(
+    //   new Action({
+    //     mask: ACTIONS[ActionEnum.KEY_GENERATION],
+    //     data: committeeId,
+    //   })
+    // );
   }
 
-  @method submitRound1Contribution() {
-    return;
+  @method deprecateKey(keyId: Field) {
+    // this.reducer.dispatch(
+    //   new Action({
+    //     mask: ACTIONS[ActionEnum.KEY_DEPRECATION],
+    //     data: keyId,
+    //   })
+    // );
+  }
+
+  @method submitRound1Contribution(
+    round1Contribution: DKG.Committee.Round1Contribution
+  ) {
+    // this.reducer.dispatch(
+    //   new Action({
+    //     mask: ACTIONS[ActionEnum.ROUND_1_CONTRIBUTION],
+    //     data: round1Contribution,
+    //   })
+    // );
   }
 
   @method submitRound2Contribution() {
