@@ -23,6 +23,7 @@ import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
 import {
   Committee,
+  CommitteeInput,
   createCommitteeProof,
   GroupArray,
   CommitteeRollupState,
@@ -96,8 +97,13 @@ describe('Committee', () => {
 
     myGroupArray1 = new GroupArray(arrayAddress);
 
+    let input = new CommitteeInput({
+      addresses: myGroupArray1,
+      threshold: threshold1,
+    });
+
     let tx = await Mina.transaction(feePayer, () => {
-      committeeContract.createCommittee(myGroupArray1, threshold1);
+      committeeContract.createCommittee(input);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();
@@ -112,8 +118,13 @@ describe('Committee', () => {
 
     myGroupArray2 = new GroupArray(arrayAddress);
 
+    let input = new CommitteeInput({
+      addresses: myGroupArray2,
+      threshold: threshold2,
+    });
+
     let tx = await Mina.transaction(feePayer, () => {
-      committeeContract.createCommittee(myGroupArray2, Field(2));
+      committeeContract.createCommittee(input);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();

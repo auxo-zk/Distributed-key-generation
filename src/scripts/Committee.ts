@@ -24,6 +24,7 @@ import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
 import {
   Committee,
+  CommitteeInput,
   createCommitteeProof,
   GroupArray,
   CommitteeRollupState,
@@ -123,8 +124,12 @@ async function main() {
     let myGroupArray1 = new GroupArray(arrayAddress);
 
     console.log('committeeContract.createCommittee: ');
+    let input = new CommitteeInput({
+      addresses: myGroupArray1,
+      threshold: Field(1),
+    });
     tx = await Mina.transaction(feePayer, () => {
-      committeeContract.createCommittee(myGroupArray1, Field(1));
+      committeeContract.createCommittee(input);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();
@@ -145,8 +150,12 @@ async function main() {
     let myGroupArray2 = new GroupArray(arrayAddress);
 
     console.log('committeeContract.createCommittee: ');
+    input = new CommitteeInput({
+      addresses: myGroupArray2,
+      threshold: Field(2),
+    });
     tx = await Mina.transaction(feePayer, () => {
-      committeeContract.createCommittee(myGroupArray2, Field(2));
+      committeeContract.createCommittee(input);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();
@@ -348,10 +357,14 @@ async function main() {
 
     if (actionn == 1) {
       console.log('committeeContract.createCommittee: ');
+      let input = new CommitteeInput({
+        addresses: myGroupArray1,
+        threshold: Field(1),
+      });
       let tx = await Mina.transaction(
         { sender: feePayer, fee, nonce: currentNonce },
         () => {
-          committeeContract.createCommittee(myGroupArray1, Field(1));
+          committeeContract.createCommittee(input);
         }
       );
       await tx.prove();

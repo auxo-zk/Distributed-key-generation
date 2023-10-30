@@ -50,19 +50,6 @@ export class RequestInput extends Struct({
     });
   }
 
-  hash(): Field {
-    return Poseidon.hash(
-      [
-        this.committeeId,
-        this.keyId,
-        this.requester.toFields(),
-        this.R.length,
-        this.R.toFields(),
-        this.isRequest.toField(),
-      ].flat()
-    );
-  }
-
   // using this id to check if value R is requested with keyId and committeeId
   requestId(): Field {
     return Poseidon.hash(
@@ -79,6 +66,10 @@ export class RequestInput extends Struct({
       this.R.toFields(),
       this.isRequest.toField(),
     ].flat();
+  }
+
+  hash(): Field {
+    return Poseidon.hash(this.toFields());
   }
 }
 
@@ -178,7 +169,7 @@ export const createRequestProof = Experimental.ZkProgram({
 
         return new RequestRollupState({
           actionHash: updateOutOfSnark(preProof.publicOutput.actionHash, [
-            [requestInput.toFields()].flat(),
+            requestInput.toFields(),
           ]),
           requestStateRoot: newRequestStateRoot,
           requesterRoot: newRequesterRoot,

@@ -157,8 +157,8 @@ export class Committee extends SmartContract {
   reducer = Reducer({ actionType: CommitteeInput });
 
   events = {
-    addresses: GroupArray,
-    threshold: Field,
+    'committee-input': CommitteeInput,
+    'last-committee-id': Field,
   };
 
   init() {
@@ -168,17 +168,11 @@ export class Committee extends SmartContract {
     this.actionState.set(Reducer.initialActionState);
   }
 
-  @method createCommittee(addresses: GroupArray, threshold: Field) {
-    threshold.assertLessThanOrEqual(addresses.length);
-    this.reducer.dispatch(
-      new CommitteeInput({
-        addresses,
-        threshold,
-      })
-    );
+  @method createCommittee(input: CommitteeInput) {
+    input.threshold.assertLessThanOrEqual(input.addresses.length);
+    this.reducer.dispatch(input);
 
-    this.emitEvent('addresses', addresses);
-    this.emitEvent('threshold', threshold);
+    this.emitEvent('committee-input', input);
   }
 
   @method rollupIncrements(proof: CommitteeProof) {
@@ -201,6 +195,8 @@ export class Committee extends SmartContract {
     this.nextCommitteeId.set(proof.publicOutput.currentCommitteeId);
     this.memberTreeRoot.set(proof.publicOutput.memberTreeRoot);
     this.settingTreeRoot.set(proof.publicOutput.settingTreeRoot);
+
+    this.emitEvent('last-committee-id', proof.publicOutput.currentCommitteeId);
   }
 
   @method checkMember(input: CheckMemberInput) {
