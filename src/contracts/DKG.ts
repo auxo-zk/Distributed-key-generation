@@ -16,11 +16,19 @@ import {
   SelfProof,
   Poseidon,
   Provable,
+  MerkleTree,
+  MerkleWitness,
 } from 'o1js';
 import { DKG, Utils } from '@auxo-dev/dkg-libs';
 import { updateOutOfSnark } from '../libs/utils.js';
 
-const EmptyMerkleMap = new MerkleMap();
+const CONTRIBUTION_TREE_HEIGHT = 6;
+export const Round1MT = new MerkleTree(CONTRIBUTION_TREE_HEIGHT);
+export class Round1Witness extends MerkleWitness(2 ** (CONTRIBUTION_TREE_HEIGHT - 1)) {}
+export const Round2MT = new MerkleTree(CONTRIBUTION_TREE_HEIGHT);
+export class Round2Witness extends MerkleWitness(2 ** (CONTRIBUTION_TREE_HEIGHT - 1)) {}
+export const TallyMT = new MerkleTree(CONTRIBUTION_TREE_HEIGHT);
+export class TallyWitness extends MerkleWitness(2 ** (CONTRIBUTION_TREE_HEIGHT - 1)) {}
 
 export const enum KeyStatus {
   EMPTY,
@@ -28,6 +36,12 @@ export const enum KeyStatus {
   ROUND_2,
   ACTIVE,
   DEPRECATED,
+}
+
+export const enum ActionStatus {
+  NOT_EXISTED,
+  REDUCED,
+  ROLLUPED,
 }
 
 export const enum ActionEnum {
@@ -39,7 +53,7 @@ export const enum ActionEnum {
   __LENGTH,
 }
 
-export class ActionMask extends Utils.DynamicArray(Bool, ActionEnum.__LENGTH) {}
+export class ActionMask extends Utils.DynamicArray(Bool, ActionEnum.__LENGTH) { }
 
 export const ACTIONS = {
   [ActionEnum.KEY_GENERATION]: ActionMask.from(
@@ -100,12 +114,12 @@ export class ReduceInput extends Struct({
   initialActionState: Field,
   initialRollupState: Field,
   action: Action,
-}) {}
+}) { }
 
 export class ReduceOutput extends Struct({
   newActionState: Field,
   newRollupState: Field,
-}) {}
+}) { }
 
 export const ReduceActions = Experimental.ZkProgram({
   publicInput: ReduceInput,
@@ -139,25 +153,26 @@ export const ReduceActions = Experimental.ZkProgram({
         );
         // Calculate action hash
         let actionHash = input.action.hash();
+        let actionState = updateOutOfSnark(
+          earlierProof.publicOutput.newActionState,
+          [
+            [
+              input.action.mask.length,
+              input.action.mask.toFields(),
+              input.action.data.toFields(),
+            ].flat(),
+          ]
+        );
         // Current value of the action hash should be 0
-        let [root, key] = reducedWitness.computeRootAndKey(Field(0));
+        let [root, key] = reducedWitness.computeRootAndKey(Field(ActionStatus.NOT_EXISTED));
         root.assertEquals(earlierProof.publicOutput.newRollupState);
-        key.assertEquals(actionHash);
+        key.assertEquals(actionState);
 
         // New value of the action hash should be 1
-        [root] = reducedWitness.computeRootAndKey(Field(1));
+        [root] = reducedWitness.computeRootAndKey(Field(ActionStatus.REDUCED));
 
         return {
-          newActionState: updateOutOfSnark(
-            earlierProof.publicOutput.newActionState,
-            [
-              [
-                input.action.mask.length,
-                input.action.mask.toFields(),
-                input.action.data.toFields(),
-              ].flat(),
-            ]
-          ),
+          newActionState: actionState,
           newRollupState: root,
         };
       },
@@ -165,69 +180,107 @@ export const ReduceActions = Experimental.ZkProgram({
   },
 });
 
-export class RollupInput extends Struct({
-  initialValue: Field,
+export class Round1Input extends Struct({
+  T: Field,
+  N: Field,
+  initialKeyRoot: Field,
+  initialContributionRoot: Field,
   initialRollupState: Field,
   action: Action,
+  memberIndex: Field,
 }) {}
 
-export class RollupOutput extends Struct({
-  newValue: Field,
+export class Round1Output extends Struct({
+  newContributionRoot: Field,
   newRollupState: Field,
+  counter: Field,
 }) {}
 
-export const RollupActions = Experimental.ZkProgram({
-  publicInput: RollupInput,
-  publicOutput: RollupOutput,
-
+export const FinalizeRound1 = Experimental.ZkProgram({
+  publicInput: Round1Input,
+  publicOutput: Round1Output,
   methods: {
-    // First action to rollup
     firstStep: {
       privateInputs: [],
-      method(input: RollupInput) {
+      method(input: Round1Input) {
         // Do nothing
         return {
-          newValue: input.initialValue,
+          newContributionRoot: input.initialContributionRoot,
           newRollupState: input.initialRollupState,
+          counter: Field(0),
         };
       },
     },
-    // Next actions to rollup
     nextStep: {
-      privateInputs: [SelfProof<RollupInput, RollupOutput>, MerkleMapWitness],
+      privateInputs: [
+        SelfProof<Round1Input, Round1Output>, 
+        MerkleMapWitness, 
+        MerkleMapWitness,
+        MerkleMapWitness, 
+        Round1Witness,
+      ],
       method(
-        input: RollupInput,
-        earlierProof: SelfProof<RollupInput, RollupOutput>,
-        rollupedWitness: MerkleMapWitness
+        input: Round1Input,
+        earlierProof: SelfProof<Round1Input, Round1Output>,
+        rollupedWitness: MerkleMapWitness,
+        keyStatusWitness: MerkleMapWitness,
+        contributionWitnessLevel1: MerkleMapWitness, 
+        contributionWitnessLevel2: Round1Witness,
       ) {
         // Verify earlier proof
         earlierProof.verify();
-        // Check consistency of the initial value & rollupState value
-        input.initialValue.assertEquals(earlierProof.publicInput.initialValue);
+        // Check consistency of the initial values
+        input.T.assertEquals(earlierProof.publicInput.T);
+        input.N.assertEquals(earlierProof.publicInput.N);
+        input.initialKeyRoot.assertEquals(
+          earlierProof.publicInput.initialKeyRoot
+        );
+        input.initialContributionRoot.assertEquals(
+          earlierProof.publicInput.initialContributionRoot
+        );
         input.initialRollupState.assertEquals(
           earlierProof.publicInput.initialRollupState
         );
-        // Calculate action hash
+        // Calculate action hash & keyId
         let actionHash = input.action.hash();
+        let keyId = Poseidon.hash([
+          input.action.data.committeeId,
+          input.action.data.keyId,
+        ])
         // Current value of the action hash should be 1
-        let [root, key] = rollupedWitness.computeRootAndKey(Field(1));
+        let [root, key] = rollupedWitness.computeRootAndKey(Field(ActionStatus.REDUCED));
         root.assertEquals(earlierProof.publicOutput.newRollupState);
         key.assertEquals(actionHash);
-
         // New value of the action hash should be 2
-        [root] = rollupedWitness.computeRootAndKey(Field(2));
+        [root] = rollupedWitness.computeRootAndKey(Field(ActionStatus.ROLLUPED));
+
+        // Check the selected key is in round 1 contribution period
+        let [keysRoot, keysIndex] = keyStatusWitness.computeRootAndKey(Field(KeyStatus.ROUND_1));
+        keysRoot.assertEquals(input.initialKeyRoot);
+        keysIndex.equals(keyId);
+
+        // Check if this committee member has contributed yet
+        contributionWitnessLevel2.calculateIndex().assertEquals(input.memberIndex);
+        let [contributionRoot, contributionIndex] = contributionWitnessLevel1.computeRootAndKey(
+          contributionWitnessLevel2.calculateRoot(Field(0))
+        );
+        contributionRoot.assertEquals(earlierProof.publicOutput.newContributionRoot);
+        contributionIndex.assertEquals(keyId);
+
+        // Compute new contribution root
+        [contributionRoot,] = contributionWitnessLevel1.computeRootAndKey(
+          contributionWitnessLevel2.calculateRoot(input.action.data.round1Contribution.hash())
+        )
 
         return {
-          newValue: Provable.switch(input.action.mask.values, Field, [
-            Field(0),
-            Field(0),
-          ]),
+          newContributionRoot: contributionRoot,
           newRollupState: root,
+          counter: earlierProof.publicOutput.counter.add(1),
         };
       },
     },
-  },
-});
+  }
+})
 
 export class DKGContract extends SmartContract {
   reducer = Reducer({ actionType: Action });
