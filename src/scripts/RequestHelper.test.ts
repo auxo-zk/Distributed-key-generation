@@ -21,10 +21,7 @@ import {
 
 import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
-import {
-  RequestHelper,
-  RequestHelperRollupState,
-} from '../contracts/RequestHelper.js';
+import { RequestHelper } from '../contracts/RequestHelper.js';
 
 const doProofs = false;
 
@@ -33,7 +30,7 @@ describe('RequestHelper', () => {
 
   // beforeEach(() => {});
 
-  it('Should compile', async () => {
+  it('Should be able analyzeMethods', async () => {
     RequestHelper.analyzeMethods();
   });
 });
