@@ -219,12 +219,13 @@ export default function DynamicArray<T>(
 
     public indexMask(index: Field): Bool[] {
       const mask = [];
-      let lengthReached = Bool(false);
+      // let lengthReached = Bool(false);
       for (let i = 0; i < this.maxLength(); i++) {
-        lengthReached = Field(i).equals(this.length).or(lengthReached);
+        // lengthReached = Field(i).equals(this.length).or(lengthReached);
         const isIndex = Field(i).equals(index);
         // assert index < length
-        isIndex.and(lengthReached).not().assertTrue();
+        // isIndex.and(lengthReached).not().assertTrue();
+        // no more, assert index < length, if index < length then return type null()
         mask[i] = isIndex;
       }
       return mask;
