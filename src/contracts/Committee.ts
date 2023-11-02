@@ -198,7 +198,7 @@ export class Committee extends SmartContract {
 
     this.emitEvent('last-committee-id', proof.publicOutput.currentCommitteeId);
   }
-
+  // Add memberIndex to input for checking
   @method checkMember(input: CheckMemberInput): Field {
     let leaf = input.memberMerkleTreeWitness.calculateRoot(
       GroupArray.hash(input.address)
