@@ -199,15 +199,17 @@ export class Committee extends SmartContract {
     this.emitEvent('last-committee-id', proof.publicOutput.currentCommitteeId);
   }
 
-  @method checkMember(input: CheckMemberInput) {
+  @method checkMember(input: CheckMemberInput): Field {
     let leaf = input.memberMerkleTreeWitness.calculateRoot(
       GroupArray.hash(input.address)
     );
+    let memberId = input.memberMerkleTreeWitness.calculateIndex();
     let [root, _commiteeId] =
       input.memberMerkleMapWitness.computeRootAndKey(leaf);
     const onChainRoot = this.memberTreeRoot.getAndAssertEquals();
     root.assertEquals(onChainRoot);
     input.commiteeId.assertEquals(_commiteeId);
+    return memberId;
   }
 
   @method checkConfig(input: CheckConfigInput) {
