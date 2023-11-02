@@ -70,12 +70,12 @@ const settingMerkleMap = new MerkleMap();
 
 class memberMerkleTreeWitness extends MerkleWitness(treeHeight) {}
 
-const isLocal = true;
+const isLocal = false;
 // 0: deploy
 // 1: dispatch: add thành viên, dkg địa chỉ
 // 2: rollup: reduce ================== sever
 // 3: check ================= dựa vào check trong db
-let actionn = 0;
+let actionn = 1;
 
 async function main() {
   if (isLocal) {
@@ -317,10 +317,12 @@ async function main() {
     );
 
     // compile proof
-    console.log('compile createCommitteeProof...');
-    await createCommitteeProof.compile();
-    console.log('compile Committee contract... ');
-    await Committee.compile();
+    if (actionn == 0 || actionn == 1 || actionn == 2) {
+      console.log('compile createCommitteeProof...');
+      await createCommitteeProof.compile();
+      console.log('compile Committee contract... ');
+      await Committee.compile();
+    }
 
     if (actionn == 0) {
       console.log('deploy committeeContract...');

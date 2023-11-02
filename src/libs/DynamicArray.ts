@@ -57,10 +57,11 @@ export default function DynamicArray<T>(
     }
 
     static fillWithNull(values: T[], length: number): T[] {
+      let tempValues = [...values];
       for (let i = values.length; i < length; i++) {
-        values[i] = _DynamicArray.Null();
+        tempValues[i] = _DynamicArray.Null();
       }
-      return values;
+      return tempValues;
     }
 
     public constructor(values?: T[]) {
