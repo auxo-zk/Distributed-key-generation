@@ -66,8 +66,14 @@ export const Elgamal = Experimental.ZkProgram({
   }
 })
 
-export class ElgamalInputBatch extends Struct({
+export class BatchEncryptionInput extends Struct({
   publicKeys: PublicKeyDynamicArray,
   c: ScalarDynamicArray,
   U: GroupDynamicArray,
 }) { }
+
+export class BatchDecryptionInput extends Struct({
+  publicKey: PublicKey,
+  c: ScalarDynamicArray,
+  U: GroupDynamicArray,
+}) {}

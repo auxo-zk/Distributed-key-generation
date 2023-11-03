@@ -21,7 +21,7 @@ import {
 
 import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
-import { DKGContract } from '../contracts/DKG.js';
+import { CompleteResponse, DKGContract, DeprecateKey, FinalizeRound1, FinalizeRound2, GenerateKey } from '../contracts/DKG.js';
 
 const doProofs = false;
 
@@ -75,7 +75,17 @@ describe('Committee', () => {
   // beforeEach(() => {});
 
   it('Should compile', async () => {
-    // await DKGContract.compile();
-    DKGContract.analyzeMethods();
+    await GenerateKey.compile();
+    console.log(GenerateKey.analyzeMethods());
+    await DeprecateKey.compile();
+    console.log(DeprecateKey.analyzeMethods());
+    await FinalizeRound1.compile();
+    console.log(FinalizeRound1.analyzeMethods());
+    await FinalizeRound2.compile();
+    console.log(FinalizeRound2.analyzeMethods());
+    await CompleteResponse.compile();
+    console.log(CompleteResponse.analyzeMethods());
+    await DKGContract.compile();
+    console.log(DKGContract.analyzeMethods());
   });
 });

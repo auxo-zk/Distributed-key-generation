@@ -20,7 +20,7 @@ import {
 } from 'o1js';
 import { DKG, Utils } from '@auxo-dev/dkg-libs';
 import { updateOutOfSnark } from '../libs/utils.js';
-import { Bit255, Elgamal, ElgamalInput, ElgamalInputBatch } from './Encryption.js';
+import { BatchEncryptionInput, BatchDecryptionInput } from './Encryption.js';
 
 export const CONTRIBUTION_TREE_HEIGHT = 6;
 export const SubMT = new MerkleTree(CONTRIBUTION_TREE_HEIGHT);
@@ -569,6 +569,8 @@ export class Round2Output extends Struct({
   counter: Field,
 }) { }
 
+export class EncryptionProof extends Proof<BatchEncryptionInput, void> {}
+
 export const FinalizeRound2 = Experimental.ZkProgram({
   publicInput: Round2Input,
   publicOutput: Round2Output,
@@ -588,7 +590,7 @@ export const FinalizeRound2 = Experimental.ZkProgram({
         SelfProof<Round2Input, Round2Output>,
         MerkleMapWitness,
         MerkleMapWitness,
-        Proof<ElgamalInputBatch, void>,
+        EncryptionProof,
         FullMTWitness,
         MerkleMapWitness,
       ],
@@ -597,7 +599,7 @@ export const FinalizeRound2 = Experimental.ZkProgram({
         earlierProof: SelfProof<Round2Input, Round2Output>,
         keyStatusWitness: MerkleMapWitness,
         publicKeyWitness: MerkleMapWitness,
-        encryptionProof: Proof<ElgamalInputBatch, void>,
+        encryptionProof: EncryptionProof,
         contributionWitness: FullMTWitness,
         rollupWitness: MerkleMapWitness,
       ) {
@@ -696,6 +698,168 @@ export const FinalizeRound2 = Experimental.ZkProgram({
         return {
           newContributionRoot: contributionRoot,
           newRollupState: root,
+          counter: earlierProof.publicOutput.counter.add(1),
+        };
+      }
+    }
+  }
+});
+
+export class ResponseInput extends Struct({
+  T: Field,
+  N: Field,
+  DIM: Field,
+  publicKeyRoot: Field,
+  publicKey: PublicKey,
+  requestStatusRoot: Field,
+  initialContributionRoot: Field,
+  initialRollupState: Field,
+  previousActionState: Field,
+  action: Action,
+}) {}
+
+export class ResponseOutput extends Struct({
+  newContributionRoot: Field,
+  newRollupState: Field,
+  D: GroupDynamicArray,
+  counter: Field,
+}) {}
+
+export class DecryptionProof extends Proof<BatchDecryptionInput, void> {}
+
+export const CompleteResponse = Experimental.ZkProgram({
+  publicInput: ResponseInput,
+  publicOutput: ResponseOutput,
+  methods: {
+    firstStep: {
+      privateInputs: [],
+      method(input: ResponseInput) {
+        return {
+          newContributionRoot: input.initialContributionRoot,
+          newRollupState: input.initialRollupState,
+          D: new GroupDynamicArray([...Array(Number(input.DIM)).keys()].map(e => Group.zero)),
+          counter: Field(0),
+        }
+      }
+    },
+    nextStep: {
+      privateInputs: [
+        SelfProof<ResponseInput, ResponseOutput>,
+        FullMTWitness,
+        DecryptionProof,
+        MerkleMapWitness,
+        FullMTWitness,
+        MerkleMapWitness,
+      ],
+      method(
+        input: ResponseInput,
+        earlierProof: SelfProof<ResponseInput, ResponseOutput>,
+        publicKeyWitness: FullMTWitness,
+        decryptionProof: DecryptionProof,
+        requestStatusWitness: MerkleMapWitness,
+        contributionWitness: FullMTWitness,
+        rollupWitness: MerkleMapWitness,
+      ) {
+        // Verify earlier proof
+        earlierProof.verify();
+
+        // Check consistency of the initial values
+        input.T.assertEquals(earlierProof.publicInput.T);
+        input.N.assertEquals(earlierProof.publicInput.N);
+        input.DIM.assertEquals(earlierProof.publicInput.DIM);
+        input.publicKeyRoot.assertEquals(
+          earlierProof.publicInput.publicKeyRoot
+        );
+        input.initialContributionRoot.assertEquals(
+          earlierProof.publicInput.initialContributionRoot
+        );
+        input.initialRollupState.assertEquals(
+          earlierProof.publicInput.initialRollupState
+        );
+
+        // Calculate key index in MT
+        let keyIndex = Poseidon.hash([
+          input.action.committeeId,
+          input.action.keyId,
+        ]);
+        let requestIndex = Poseidon.hash([
+          input.action.committeeId,
+          input.action.keyId,
+          input.action.requestId,
+        ])
+
+        // Check if decryption is correct
+        for (let i = 0; i < Number(input.N); i++) {
+          decryptionProof.verify();
+          
+          decryptionProof.publicInput.publicKey.assertEquals(input.publicKey);
+          decryptionProof.publicInput.c.length.assertEquals(
+            input.action.round2Contribution.c.length
+          );
+          decryptionProof.publicInput.U.length.assertEquals(
+            input.action.round2Contribution.U.length
+          );
+
+          for (let j = 0; j < Number(input.N); j++) {
+            decryptionProof.publicInput.c.get(Field(j)).toScalar().assertEquals(
+              input.action.round2Contribution.c.get(Field(j)).toScalar()
+            );
+            decryptionProof.publicInput.U.get(Field(j)).assertEquals(
+              input.action.round2Contribution.U.get(Field(j))
+            );
+          }
+        }
+
+        // Check if the member' public key have been registered
+        let memberIndex = publicKeyWitness.level1.calculateIndex();
+        memberIndex.assertEquals(input.action.memberId);
+        let [publicKeyRoot, publicKeyIndex] = publicKeyWitness.level2.computeRootAndKey(
+          Poseidon.hash(input.publicKey.toFields())
+        );
+        publicKeyRoot.assertEquals(input.publicKeyRoot);
+        publicKeyIndex.assertEquals(keyIndex);
+
+        // Check the selected key is in round 2 contribution period
+        let [requestStatus, requestStatusIndex] = requestStatusWitness.computeRootAndKey(Field(RequestStatus.RESPONSE_CONTRIBUTION));
+        requestStatus.assertEquals(input.requestStatusRoot);
+        requestStatusIndex.equals(requestIndex);
+
+        // Check if this committee member has contributed yet
+        contributionWitness.level1.calculateIndex().assertEquals(input.action.memberId);
+        let [contributionRoot, contributionIndex] = contributionWitness.level2.computeRootAndKey(
+          contributionWitness.level1.calculateRoot(Field(0))
+        );
+        contributionRoot.assertEquals(earlierProof.publicOutput.newContributionRoot);
+        contributionIndex.assertEquals(requestIndex);
+
+        // Calculate new D value
+        let D = earlierProof.publicOutput.D;
+        for (let i = 0; i < Number(input.DIM); i++) {
+          D.set(Field(i), D.get(Field(i)).add(input.action.responseContribution.D.get(Field(i))));
+        }
+
+        // Compute new contribution root
+        [contributionRoot,] = contributionWitness.level2.computeRootAndKey(
+          contributionWitness.level1.calculateRoot(input.action.round2Contribution.hash())
+        );
+
+        // Calculate corresponding action state
+        let actionState = updateOutOfSnark(
+          input.previousActionState,
+          [input.action.toFields()]
+        );
+
+        // Current value of the action hash should be 1
+        let [root, key] = rollupWitness.computeRootAndKey(Field(ActionStatus.REDUCED));
+        root.assertEquals(earlierProof.publicOutput.newRollupState);
+        key.assertEquals(actionState);
+        // New value of the action hash should be 2
+        [root] = rollupWitness.computeRootAndKey(Field(ActionStatus.ROLLUPED));
+
+        return {
+          newContributionRoot: contributionRoot,
+          newRollupState: root,
+          D: D,
           counter: earlierProof.publicOutput.counter.add(1),
         };
       }
