@@ -4,8 +4,6 @@ import {
   state,
   State,
   method,
-  PublicKey,
-  Group,
   Bool,
   Reducer,
   MerkleMapWitness,
@@ -15,20 +13,26 @@ import {
   Poseidon,
   MerkleTree,
   MerkleWitness,
+  Proof,
   Provable,
+  PublicKey,
+  Group,
 } from 'o1js';
 import { DKG, Utils } from '@auxo-dev/dkg-libs';
 import { updateOutOfSnark } from '../libs/utils.js';
+import { Bit255, Elgamal, ElgamalInput, ElgamalInputBatch } from './Encryption.js';
 
-const CONTRIBUTION_TREE_HEIGHT = 6;
-export const Round1MT = new MerkleTree(CONTRIBUTION_TREE_HEIGHT);
-export class Round1Witness extends MerkleWitness(2 ** (CONTRIBUTION_TREE_HEIGHT - 1)) {}
-export const Round2MT = new MerkleTree(CONTRIBUTION_TREE_HEIGHT);
-export class Round2Witness extends MerkleWitness(2 ** (CONTRIBUTION_TREE_HEIGHT - 1)) {}
-export const TallyMT = new MerkleTree(CONTRIBUTION_TREE_HEIGHT);
-export class TallyWitness extends MerkleWitness(2 ** (CONTRIBUTION_TREE_HEIGHT - 1)) {}
+export const CONTRIBUTION_TREE_HEIGHT = 6;
+export const SubMT = new MerkleTree(CONTRIBUTION_TREE_HEIGHT);
+export class SubMTWitness extends MerkleWitness(2 ** (CONTRIBUTION_TREE_HEIGHT - 1)) { }
+export class FullMTWitness extends Struct({
+  level1: SubMTWitness,
+  level2: MerkleMapWitness,
+}) { }
 
-class GroupDynamicArray extends Utils.GroupDynamicArray(32) {}
+class GroupDynamicArray extends Utils.GroupDynamicArray(32) { }
+class PublicKeyDynamicArray extends Utils.PublicKeyDynamicArray(32) { }
+class ScalarDynamicArray extends Utils.ScalarDynamicArray(32) { }
 
 export const enum KeyStatus {
   EMPTY,
@@ -40,7 +44,7 @@ export const enum KeyStatus {
 
 export const enum RequestStatus {
   EMPTY,
-  CONTRIBUTION,
+  RESPONSE_CONTRIBUTION,
   COMPLETED,
 }
 
@@ -51,53 +55,61 @@ export const enum ActionStatus {
 }
 
 export const enum ActionEnum {
-  KEY_GENERATION,
-  KEY_DEPRECATION,
-  ROUND_1_CONTRIBUTION,
-  ROUND_2_CONTRIBUTION,
-  TALLY_CONTRIBUTION,
+  GENERATE_KEY,
+  DEPRECATE_KEY,
+  REGISTER_REQUEST,
+  CONTRIBUTE_ROUND_1,
+  CONTRIBUTE_ROUND_2,
+  CONTRIBUTE_RESPONSE,
   __LENGTH,
 }
 
 export const enum EventEnum {
   GENERATE_KEY,
   DEPRECATE_KEY,
-  SUBMIT_ROUND_1_CONTRIBUTION,
-  SUBMIT_ROUND_2_CONTRIBUTION,
-  SUBMIT_TALLY_CONTRIBUTION,
+  REGISTER_REQUEST,
+  CONTRIBUTE_ROUND_1,
+  CONTRIBUTE_ROUND_2,
+  CONTRIBUTE_RESPONSE,
   KEY_GENERATED,
   KEY_DEPRECATED,
+  REQUEST_REGISTERED,
   ROUND_1_FINALIZED,
   ROUND_2_FINALIZED,
-  TALLY_FINALIZED,
+  RESPONSE_COMPLETED,
 }
 
 export class ActionMask extends Utils.DynamicArray(Bool, ActionEnum.__LENGTH) { }
 
 export const ACTION_MASKS = {
-  [ActionEnum.KEY_GENERATION]: ActionMask.from(
+  [ActionEnum.GENERATE_KEY]: ActionMask.from(
     [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
-      e == ActionEnum.KEY_GENERATION ? Bool(true) : Bool(false)
+      e == ActionEnum.GENERATE_KEY ? Bool(true) : Bool(false)
     )
   ),
-  [ActionEnum.KEY_DEPRECATION]: ActionMask.from(
+  [ActionEnum.DEPRECATE_KEY]: ActionMask.from(
     [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
-      e == ActionEnum.KEY_DEPRECATION ? Bool(true) : Bool(false)
+      e == ActionEnum.DEPRECATE_KEY ? Bool(true) : Bool(false)
     )
   ),
-  [ActionEnum.ROUND_1_CONTRIBUTION]: ActionMask.from(
+  [ActionEnum.REGISTER_REQUEST]: ActionMask.from(
     [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
-      e == ActionEnum.ROUND_1_CONTRIBUTION ? Bool(true) : Bool(false)
+      e == ActionEnum.REGISTER_REQUEST ? Bool(true) : Bool(false)
     )
   ),
-  [ActionEnum.ROUND_2_CONTRIBUTION]: ActionMask.from(
+  [ActionEnum.CONTRIBUTE_ROUND_1]: ActionMask.from(
     [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
-      e == ActionEnum.ROUND_2_CONTRIBUTION ? Bool(true) : Bool(false)
+      e == ActionEnum.CONTRIBUTE_ROUND_1 ? Bool(true) : Bool(false)
     )
   ),
-  [ActionEnum.TALLY_CONTRIBUTION]: ActionMask.from(
+  [ActionEnum.CONTRIBUTE_ROUND_2]: ActionMask.from(
     [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
-      e == ActionEnum.TALLY_CONTRIBUTION ? Bool(true) : Bool(false)
+      e == ActionEnum.CONTRIBUTE_ROUND_2 ? Bool(true) : Bool(false)
+    )
+  ),
+  [ActionEnum.CONTRIBUTE_RESPONSE]: ActionMask.from(
+    [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
+      e == ActionEnum.CONTRIBUTE_RESPONSE ? Bool(true) : Bool(false)
     )
   ),
   'EMPTY': ActionMask.from(
@@ -114,7 +126,7 @@ export const ACTION_MASKS = {
  * @param memberId Incremental member index of a committee
  * @param round1Contribution Round 1 contribution in the key generation process
  * @param round2Contribution Round 2 contribution in the key generation process
- * @param tallyContribution Tally contribution in the key usage process
+ * @param responseContribution Tally contribution in the key usage process
  * @function hash Return the action's hash to append in the action state hash chain
  * @function toFields Return the action in the form of Fields[]
  */
@@ -123,9 +135,10 @@ export class Action extends Struct({
   committeeId: Field,
   keyId: Field,
   memberId: Field,
+  requestId: Field,
   round1Contribution: DKG.Committee.Round1Contribution,
   round2Contribution: DKG.Committee.Round2Contribution,
-  tallyContribution: DKG.Committee.TallyContribution,
+  responseContribution: DKG.Committee.TallyContribution,
 }) {
   static empty(): Action {
     return new Action({
@@ -133,34 +146,60 @@ export class Action extends Struct({
       committeeId: Field(0),
       keyId: Field(0),
       memberId: Field(0),
+      requestId: Field(0),
       round1Contribution: DKG.Committee.Round1Contribution.empty(),
       round2Contribution: DKG.Committee.Round2Contribution.empty(),
-      tallyContribution: DKG.Committee.TallyContribution.empty(),
+      responseContribution: DKG.Committee.TallyContribution.empty(),
     })
   }
   hash(): Field {
     return Poseidon.hash(this.toFields());
   }
-
   toFields(): Field[] {
     return [this.mask.length].concat(this.mask.toFields())
-      .concat([this.committeeId, this.keyId, this.memberId])
+      .concat([this.committeeId, this.keyId, this.memberId, this.requestId])
       .concat(this.round1Contribution.toFields())
       .concat(this.round2Contribution.toFields())
-      .concat(this.tallyContribution.toFields()).flat();
+      .concat(this.responseContribution.toFields()).flat();
   }
 }
 
-export class GenerateKeyEvent extends Struct({
-  committeeId: Field,
-  sender: Field,
-}) {}
+const ActionEvent = Action;
 
-export class DeprecateKeyEvent extends Struct({
+export class KeyGeneratedEvent extends Struct({
   committeeId: Field,
   keyId: Field,
-  memberId: Field,
-}) {}
+}) { }
+
+export class KeyDeprecatedEvent extends Struct({
+  committeeId: Field,
+  keyId: Field,
+}) { }
+
+export class Round1FinalizedEvent extends Struct({
+  committeeId: Field,
+  keyId: Field,
+  publicKey: Field,
+}) { }
+
+export class Round2FinalizedEvent extends Struct({
+  committeeId: Field,
+  keyId: Field,
+}) { }
+
+export class RequestRegisteredEvent extends Struct({
+  committeeId: Field,
+  keyId: Field,
+  requestId: Field,
+  R: GroupDynamicArray,
+}) { }
+
+export class ResponseCompletedEvent extends Struct({
+  committeeId: Field,
+  keyId: Field,
+  requestId: Field,
+  D: GroupDynamicArray,
+}) { }
 
 export class ReduceInput extends Struct({
   initialActionState: Field,
@@ -198,7 +237,7 @@ export const ReduceActions = Experimental.ZkProgram({
       ) {
         // Verify earlier proof
         earlierProof.verify();
-        
+
         // Check consistency of the initial values
         input.initialRollupState.assertEquals(
           earlierProof.publicInput.initialRollupState
@@ -232,12 +271,12 @@ export class KeyUpdateInput extends Struct({
   initialRollupState: Field,
   previousActionState: Field,
   action: Action,
-}) {}
+}) { }
 
 export class KeyUpdateOutput extends Struct({
   newKeyStatus: Field,
   newRollupState: Field,
-}) {}
+}) { }
 
 export const GenerateKey = Experimental.ZkProgram({
   publicInput: KeyUpdateInput,
@@ -266,7 +305,7 @@ export const GenerateKey = Experimental.ZkProgram({
       ) {
         // Verify earlier proof
         earlierProof.verify();
-        
+
         // Check consistency of the initial values
         input.initialKeyStatus.assertEquals(
           earlierProof.publicInput.initialKeyStatus
@@ -287,7 +326,7 @@ export const GenerateKey = Experimental.ZkProgram({
         // Calculate corresponding action state
         let actionState = updateOutOfSnark(
           input.previousActionState,
-          [input.action.toFields()] 
+          [input.action.toFields()]
         );
 
         // Check if the action was reduced and is waiting for rollup
@@ -334,7 +373,7 @@ export const DeprecateKey = Experimental.ZkProgram({
       ) {
         // Verify earlier proof
         earlierProof.verify();
-        
+
         // Check consistency of the initial values
         input.initialKeyStatus.assertEquals(
           earlierProof.publicInput.initialKeyStatus
@@ -355,7 +394,7 @@ export const DeprecateKey = Experimental.ZkProgram({
         // Calculate corresponding action state
         let actionState = updateOutOfSnark(
           input.previousActionState,
-          [input.action.toFields()] 
+          [input.action.toFields()]
         );
 
         // Check if the action was reduced and is waiting for rollup
@@ -374,22 +413,24 @@ export const DeprecateKey = Experimental.ZkProgram({
     }
   }
 });
-
 export class Round1Input extends Struct({
   T: Field,
   N: Field,
-  initialKeyRoot: Field,
+  keyStatusRoot: Field,
   initialContributionRoot: Field,
+  initialPublicKeyRoot: Field,
   initialRollupState: Field,
+  previousActionState: Field,
   action: Action,
-  memberIndex: Field,
-}) {}
+}) { }
 
 export class Round1Output extends Struct({
   newContributionRoot: Field,
+  newPublicKeyRoot: Field,
   newRollupState: Field,
+  publicKey: PublicKey,
   counter: Field,
-}) {}
+}) { }
 
 export const FinalizeRound1 = Experimental.ZkProgram({
   publicInput: Round1Input,
@@ -401,75 +442,108 @@ export const FinalizeRound1 = Experimental.ZkProgram({
         // Do nothing
         return {
           newContributionRoot: input.initialContributionRoot,
+          newPublicKeyRoot: input.initialPublicKeyRoot,
           newRollupState: input.initialRollupState,
+          publicKey: PublicKey.fromGroup(Group.zero),
           counter: Field(0),
         };
       },
     },
     nextStep: {
       privateInputs: [
-        SelfProof<Round1Input, Round1Output>, 
-        MerkleMapWitness, 
+        SelfProof<Round1Input, Round1Output>,
         MerkleMapWitness,
-        MerkleMapWitness, 
-        Round1Witness,
+        FullMTWitness,
+        FullMTWitness,
+        MerkleMapWitness,
       ],
       method(
         input: Round1Input,
         earlierProof: SelfProof<Round1Input, Round1Output>,
-        rollupedWitness: MerkleMapWitness,
         keyStatusWitness: MerkleMapWitness,
-        contributionWitnessLevel1: MerkleMapWitness, 
-        contributionWitnessLevel2: Round1Witness,
+        contributionWitness: FullMTWitness,
+        publicKeyWitness: FullMTWitness,
+        rollupWitness: MerkleMapWitness,
       ) {
         // Verify earlier proof
         earlierProof.verify();
+
         // Check consistency of the initial values
         input.T.assertEquals(earlierProof.publicInput.T);
         input.N.assertEquals(earlierProof.publicInput.N);
-        input.initialKeyRoot.assertEquals(
-          earlierProof.publicInput.initialKeyRoot
+        input.keyStatusRoot.assertEquals(
+          earlierProof.publicInput.keyStatusRoot
         );
         input.initialContributionRoot.assertEquals(
           earlierProof.publicInput.initialContributionRoot
         );
+        input.initialPublicKeyRoot.assertEquals(
+          earlierProof.publicInput.initialPublicKeyRoot
+        );
         input.initialRollupState.assertEquals(
           earlierProof.publicInput.initialRollupState
         );
-        // Calculate action hash & keyId
-        let actionHash = input.action.hash();
-        let keyId = Poseidon.hash([
+
+        // Calculate key index in MT
+        let keyIndex = Poseidon.hash([
           input.action.committeeId,
           input.action.keyId,
         ])
-        // Current value of the action hash should be 1
-        let [root, key] = rollupedWitness.computeRootAndKey(Field(ActionStatus.REDUCED));
-        root.assertEquals(earlierProof.publicOutput.newRollupState);
-        key.assertEquals(actionHash);
-        // New value of the action hash should be 2
-        [root] = rollupedWitness.computeRootAndKey(Field(ActionStatus.ROLLUPED));
 
         // Check the selected key is in round 1 contribution period
-        let [keysRoot, keysIndex] = keyStatusWitness.computeRootAndKey(Field(KeyStatus.ROUND_1_CONTRIBUTION));
-        keysRoot.assertEquals(input.initialKeyRoot);
-        keysIndex.equals(keyId);
+        let [keyStatus, keyStatusIndex] = keyStatusWitness.computeRootAndKey(Field(KeyStatus.ROUND_1_CONTRIBUTION));
+        keyStatus.assertEquals(input.keyStatusRoot);
+        keyStatusIndex.equals(keyIndex);
 
         // Check if this committee member has contributed yet
-        contributionWitnessLevel2.calculateIndex().assertEquals(input.memberIndex);
-        let [contributionRoot, contributionIndex] = contributionWitnessLevel1.computeRootAndKey(
-          contributionWitnessLevel2.calculateRoot(Field(0))
+        contributionWitness.level1.calculateIndex().assertEquals(input.action.memberId);
+        let [contributionRoot, contributionIndex] = contributionWitness.level2.computeRootAndKey(
+          contributionWitness.level1.calculateRoot(Field(0))
         );
         contributionRoot.assertEquals(earlierProof.publicOutput.newContributionRoot);
-        contributionIndex.assertEquals(keyId);
+        contributionIndex.assertEquals(keyIndex);
 
         // Compute new contribution root
-        [contributionRoot,] = contributionWitnessLevel1.computeRootAndKey(
-          contributionWitnessLevel2.calculateRoot(input.action.round1Contribution.hash())
-        )
+        [contributionRoot,] = contributionWitness.level2.computeRootAndKey(
+          contributionWitness.level1.calculateRoot(input.action.round1Contribution.hash())
+        );
+
+        // Check if this member's public key has not been registered
+        publicKeyWitness.level1.calculateIndex().assertEquals(input.action.memberId);
+        let [publicKeyRoot, publicKeyIndex] = publicKeyWitness.level2.computeRootAndKey(
+          publicKeyWitness.level1.calculateRoot(Field(0))
+        );
+        publicKeyRoot.assertEquals(earlierProof.publicOutput.newPublicKeyRoot);
+        publicKeyIndex.assertEquals(keyIndex);
+
+        // Compute new public key root
+        let memberPublicKey = input.action.round1Contribution.C.values[0];
+        [publicKeyRoot,] = contributionWitness.level2.computeRootAndKey(
+          publicKeyWitness.level1.calculateRoot(
+            Poseidon.hash(memberPublicKey.toFields())
+          )
+        );
+
+        // Calculate corresponding action state
+        let actionState = updateOutOfSnark(
+          input.previousActionState,
+          [input.action.toFields()]
+        );
+
+        // Current value of the action hash should be 1
+        let [root, key] = rollupWitness.computeRootAndKey(Field(ActionStatus.REDUCED));
+        root.assertEquals(earlierProof.publicOutput.newRollupState);
+        key.assertEquals(actionState);
+        // New value of the action hash should be 2
+        [root] = rollupWitness.computeRootAndKey(Field(ActionStatus.ROLLUPED));
 
         return {
           newContributionRoot: contributionRoot,
+          newPublicKeyRoot: input.initialPublicKeyRoot,
           newRollupState: root,
+          publicKey: PublicKey.fromGroup(
+            earlierProof.publicOutput.publicKey.toGroup().add(memberPublicKey)
+          ),
           counter: earlierProof.publicOutput.counter.add(1),
         };
       },
@@ -480,33 +554,180 @@ export const FinalizeRound1 = Experimental.ZkProgram({
 export class Round2Input extends Struct({
   T: Field,
   N: Field,
-  keyRoot: Field,
+  keyStatusRoot: Field,
+  publicKeyRoot: Field,
+  publicKeys: PublicKeyDynamicArray,
   initialContributionRoot: Field,
   initialRollupState: Field,
+  previousActionState: Field,
   action: Action,
-  memberIndex: Field,
-  publicKeys: GroupDynamicArray,
-}) {}
+}) { }
 
 export class Round2Output extends Struct({
   newContributionRoot: Field,
   newRollupState: Field,
   counter: Field,
-}) {}
+}) { }
+
+export const FinalizeRound2 = Experimental.ZkProgram({
+  publicInput: Round2Input,
+  publicOutput: Round2Output,
+  methods: {
+    firstStep: {
+      privateInputs: [],
+      method(input: Round2Input) {
+        return {
+          newContributionRoot: input.initialContributionRoot,
+          newRollupState: input.initialRollupState,
+          counter: Field(0),
+        }
+      }
+    },
+    nextStep: {
+      privateInputs: [
+        SelfProof<Round2Input, Round2Output>,
+        MerkleMapWitness,
+        MerkleMapWitness,
+        Proof<ElgamalInputBatch, void>,
+        FullMTWitness,
+        MerkleMapWitness,
+      ],
+      method(
+        input: Round2Input,
+        earlierProof: SelfProof<Round2Input, Round2Output>,
+        keyStatusWitness: MerkleMapWitness,
+        publicKeyWitness: MerkleMapWitness,
+        encryptionProof: Proof<ElgamalInputBatch, void>,
+        contributionWitness: FullMTWitness,
+        rollupWitness: MerkleMapWitness,
+      ) {
+        // Verify earlier proof
+        earlierProof.verify();
+
+        // Check consistency of the initial values
+        input.T.assertEquals(earlierProof.publicInput.T);
+        input.N.assertEquals(earlierProof.publicInput.N);
+        input.keyStatusRoot.assertEquals(
+          earlierProof.publicInput.keyStatusRoot
+        );
+        input.publicKeyRoot.assertEquals(
+          earlierProof.publicInput.publicKeyRoot
+        );
+        input.initialContributionRoot.assertEquals(
+          earlierProof.publicInput.initialContributionRoot
+        );
+        input.initialRollupState.assertEquals(
+          earlierProof.publicInput.initialRollupState
+        );
+
+        // Calculate key index in MT
+        let keyIndex = Poseidon.hash([
+          input.action.committeeId,
+          input.action.keyId,
+        ]);
+
+        // Check if encryption is correct
+        for (let i = 0; i < Number(input.N); i++) {
+          encryptionProof.verify();
+          
+          encryptionProof.publicInput.publicKeys.length.assertEquals(
+            input.publicKeys.length
+          );
+          encryptionProof.publicInput.c.length.assertEquals(
+            input.action.round2Contribution.c.length
+          );
+          encryptionProof.publicInput.U.length.assertEquals(
+            input.action.round2Contribution.U.length
+          );
+
+          for (let j = 0; j < Number(input.N); j++) {
+            encryptionProof.publicInput.publicKeys.get(Field(j)).assertEquals(
+              input.publicKeys.get(Field(i))
+            );
+            encryptionProof.publicInput.c.get(Field(j)).toScalar().assertEquals(
+              input.action.round2Contribution.c.get(Field(j)).toScalar()
+            );
+            encryptionProof.publicInput.U.get(Field(j)).assertEquals(
+              input.action.round2Contribution.U.get(Field(j))
+            );
+          }
+        }
+
+        // Check if members' public keys have been registered
+        let publicKeyMT = new MerkleTree(CONTRIBUTION_TREE_HEIGHT);
+        for (let i = 0; i < Number(input.N); i++) {
+          publicKeyMT.setLeaf(BigInt(i), Poseidon.hash(input.publicKeys.get(Field(i)).toFields()))
+        }
+        let publicKeyLeaf = Provable.witness(Field, () => publicKeyMT.getRoot());
+        let [publicKeyRoot,] = publicKeyWitness.computeRootAndKey(publicKeyLeaf);
+        publicKeyRoot.assertEquals(input.publicKeyRoot);
+
+        // Check the selected key is in round 2 contribution period
+        let [keyStatus, keyStatusIndex] = keyStatusWitness.computeRootAndKey(Field(KeyStatus.ROUND_2_CONTRIBUTION));
+        keyStatus.assertEquals(input.keyStatusRoot);
+        keyStatusIndex.equals(keyIndex);
+
+        // Check if this committee member has contributed yet
+        contributionWitness.level1.calculateIndex().assertEquals(input.action.memberId);
+        let [contributionRoot, contributionIndex] = contributionWitness.level2.computeRootAndKey(
+          contributionWitness.level1.calculateRoot(Field(0))
+        );
+        contributionRoot.assertEquals(earlierProof.publicOutput.newContributionRoot);
+        contributionIndex.assertEquals(keyIndex);
+
+        // Compute new contribution root
+        [contributionRoot,] = contributionWitness.level2.computeRootAndKey(
+          contributionWitness.level1.calculateRoot(input.action.round2Contribution.hash())
+        );
+
+        // Calculate corresponding action state
+        let actionState = updateOutOfSnark(
+          input.previousActionState,
+          [input.action.toFields()]
+        );
+
+        // Current value of the action hash should be 1
+        let [root, key] = rollupWitness.computeRootAndKey(Field(ActionStatus.REDUCED));
+        root.assertEquals(earlierProof.publicOutput.newRollupState);
+        key.assertEquals(actionState);
+        // New value of the action hash should be 2
+        [root] = rollupWitness.computeRootAndKey(Field(ActionStatus.ROLLUPED));
+
+        return {
+          newContributionRoot: contributionRoot,
+          newRollupState: root,
+          counter: earlierProof.publicOutput.counter.add(1),
+        };
+      }
+    }
+  }
+});
 
 export class DKGContract extends SmartContract {
   reducer = Reducer({ actionType: Action });
   events = {
-    [EventEnum.GENERATE_KEY]: Action,
-    
+    [EventEnum.GENERATE_KEY]: ActionEvent,
+    [EventEnum.DEPRECATE_KEY]: ActionEvent,
+    [EventEnum.REGISTER_REQUEST]: ActionEvent,
+    [EventEnum.CONTRIBUTE_ROUND_1]: ActionEvent,
+    [EventEnum.CONTRIBUTE_ROUND_2]: ActionEvent,
+    [EventEnum.CONTRIBUTE_RESPONSE]: ActionEvent,
+    [EventEnum.KEY_GENERATED]: KeyGeneratedEvent,
+    [EventEnum.KEY_DEPRECATED]: KeyDeprecatedEvent,
+    [EventEnum.REQUEST_REGISTERED]: RequestRegisteredEvent,
+    [EventEnum.ROUND_1_FINALIZED]: Round1FinalizedEvent,
+    [EventEnum.ROUND_2_FINALIZED]: Round2FinalizedEvent,
+    [EventEnum.RESPONSE_COMPLETED]: ResponseCompletedEvent,
   }
 
   @state(Field) actionState = State<Field>();
   @state(Field) rollupState = State<Field>();
 
   @state(Field) keyStatus = State<Field>();
+  @state(Field) publicKey = State<Field>();
   @state(Field) round1Contribution = State<Field>();
   @state(Field) round2Contribution = State<Field>();
+
   @state(Field) requestStatus = State<Field>();
   @state(Field) tallyContribution = State<Field>();
 
@@ -516,13 +737,14 @@ export class DKGContract extends SmartContract {
     // Dispatch key generation actions
     this.reducer.dispatch(
       new Action({
-        mask: ACTION_MASKS[ActionEnum.KEY_GENERATION],
+        mask: ACTION_MASKS[ActionEnum.GENERATE_KEY],
         committeeId: committeeId,
         keyId: keyId,
         memberId: memberId,
+        requestId: Field(0),
         round1Contribution: DKG.Committee.Round1Contribution.empty(),
         round2Contribution: DKG.Committee.Round2Contribution.empty(),
-        tallyContribution: DKG.Committee.TallyContribution.empty(),
+        responseContribution: DKG.Committee.TallyContribution.empty(),
       })
     );
   }
@@ -530,13 +752,17 @@ export class DKGContract extends SmartContract {
   @method deprecateKey(keyId: Field) {
     // this.reducer.dispatch(
     //   new Action({
-    //     mask: ACTIONS[ActionEnum.KEY_DEPRECATION],
+    //     mask: ACTIONS[ActionEnum.DEPRECATE_KEY],
     //     data: keyId,
     //   })
     // );
   }
 
-  @method submitRound1Contribution(
+  @method registerRequest() {
+    return;
+  }
+
+  @method contributeRound1(
     round1Contribution: DKG.Committee.Round1Contribution
   ) {
     // this.reducer.dispatch(
@@ -547,23 +773,39 @@ export class DKGContract extends SmartContract {
     // );
   }
 
-  @method submitRound2Contribution() {
+  @method contributeRound2() {
     return;
   }
 
-  @method submitTallyContribution() {
+  @method contributeResponse() {
+    return;
+  }
+
+  @method generateKeys() {
+    return;
+  }
+
+  @method deprecateKeys() {
+    return;
+  }
+
+  @method registerRequests() {
+    return;
+  }
+
+  @method finalizeRound1() {
+    return;
+  }
+
+  @method finalizeRound2() {
+    return;
+  }
+
+  @method completeResponse() {
     return;
   }
 
   @method reduce() {
-    return;
-  }
-
-  @method rollup() {
-    return;
-  }
-
-  @method reduceAndRollup() {
     return;
   }
 }

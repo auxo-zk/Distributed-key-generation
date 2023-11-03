@@ -1,7 +1,11 @@
 import { Experimental, Field, Group, Poseidon, PrivateKey, Provable, PublicKey, Scalar, Struct } from "o1js";
-import { FieldDynamicArray } from "@auxo-dev/dkg-libs/build/src/utils/DynamicArray";
+import { Utils } from "@auxo-dev/dkg-libs";
 
-class Bit255 extends FieldDynamicArray(255) {
+export class GroupDynamicArray extends Utils.GroupDynamicArray(32) { }
+export class PublicKeyDynamicArray extends Utils.PublicKeyDynamicArray(32) { }
+export class ScalarDynamicArray extends Utils.PublicKeyDynamicArray(32) { }
+
+export class Bit255 extends Utils.FieldDynamicArray(255) {
   static fromXOR(a: Scalar | Bit255, b: Scalar | Bit255): Bit255 {
     let res: Bit255 = new Bit255;
     let aBits = a.toFields();
@@ -27,7 +31,7 @@ export class ElgamalInput extends Struct({
   pubKey: PublicKey,
   cipher: Bit255,
   U: Group,
-}) {}
+}) { }
 
 export const Elgamal = Experimental.ZkProgram({
   publicInput: ElgamalInput,
@@ -55,5 +59,15 @@ export const Elgamal = Experimental.ZkProgram({
         decrypted.assertEquals(new Bit255(plain.toFields()));
       },
     },
+    empty: {
+      privateInputs: [],
+      method(input: ElgamalInput) { }
+    }
   }
 })
+
+export class ElgamalInputBatch extends Struct({
+  publicKeys: PublicKeyDynamicArray,
+  c: ScalarDynamicArray,
+  U: GroupDynamicArray,
+}) { }
