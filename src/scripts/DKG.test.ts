@@ -21,7 +21,19 @@ import {
 
 import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
-import { CompleteResponse, DKGContract, DeprecateKey, FinalizeRound1, FinalizeRound2, GenerateKey } from '../contracts/DKG.js';
+import {
+  CompleteResponse,
+  DKGContract,
+  DeprecateKey,
+  FinalizeRound1,
+  FinalizeRound2,
+  GenerateKey,
+} from '../contracts/DKG.js';
+import {
+  BatchDecryption,
+  BatchEncryption,
+  Elgamal,
+} from '../contracts/Encryption.js';
 
 const doProofs = false;
 
@@ -44,7 +56,8 @@ describe('Committee', () => {
     'p5'
   );
 
-  const ActionCommitteeProfiler = getProfiler('Testing committee');
+  const DKGProfiler = getProfiler('Benchmark DKG');
+  DKGProfiler.start('DKG test flow');
 
   beforeAll(async () => {
     // let Local = Mina.LocalBlockchain({ proofsEnabled: doProofs });
@@ -75,17 +88,45 @@ describe('Committee', () => {
   // beforeEach(() => {});
 
   it('Should compile', async () => {
+    DKGProfiler.start('GenerateKey.compile');
     await GenerateKey.compile();
+    DKGProfiler.stop();
     console.log(GenerateKey.analyzeMethods());
+    DKGProfiler.start('DeprecateKey.compile');
     await DeprecateKey.compile();
+    DKGProfiler.stop();
     console.log(DeprecateKey.analyzeMethods());
+    DKGProfiler.start('FinalizeRound1.compile');
     await FinalizeRound1.compile();
+    DKGProfiler.stop();
     console.log(FinalizeRound1.analyzeMethods());
+    DKGProfiler.start('Elgamal.compile');
+    await Elgamal.compile();
+    DKGProfiler.stop();
+    console.log(Elgamal.analyzeMethods());
+    DKGProfiler.start('BatchEncryption.compile');
+    await BatchEncryption.compile();
+    DKGProfiler.stop();
+    console.log(BatchEncryption.analyzeMethods());
+    DKGProfiler.start('FinalizeRound2.compile');
     await FinalizeRound2.compile();
+    DKGProfiler.stop();
     console.log(FinalizeRound2.analyzeMethods());
+    DKGProfiler.start('BatchDecryption.compile');
+    await BatchDecryption.compile();
+    DKGProfiler.stop();
+    console.log(BatchDecryption.analyzeMethods());
+    DKGProfiler.start('CompleteResponse.compile');
     await CompleteResponse.compile();
+    DKGProfiler.stop();
     console.log(CompleteResponse.analyzeMethods());
+    DKGProfiler.start('DKGContract.compile');
     await DKGContract.compile();
+    DKGProfiler.stop();
     console.log(DKGContract.analyzeMethods());
+  });
+
+  afterAll(async () => {
+    DKGProfiler.stop().store();
   });
 });

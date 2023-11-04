@@ -32,8 +32,6 @@ import {
   CheckConfigInput,
 } from '../contracts/Committee.js';
 
-import { MockDKGContract } from '../contracts/MockDKGContract.js';
-
 const doProofs = false;
 
 describe('Committee', () => {
@@ -82,8 +80,6 @@ describe('Committee', () => {
       committeeContract.deploy();
     });
     await tx.sign([feePayerKey, keys.committee]).send();
-
-    if (!doProofs) await MockDKGContract.compile();
   });
 
   // beforeEach(() => {});
