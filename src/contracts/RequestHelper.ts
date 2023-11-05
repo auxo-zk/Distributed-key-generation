@@ -36,14 +36,13 @@ import { Request, RequestInput, RequestFee, ZeroFee } from './Request.js';
 //   CommitteeMerkleWitness,
 // } from './Committee.js';
 
-const treeHeight = 8; // setting vector size 128
+const treeHeight = 7; // setting vector size 64
 const size = 2 ** (treeHeight - 1);
 const EmptyMerkleMap = new MerkleMap();
 
 export class CustomScalarArray extends DynamicArray(Utils.CustomScalar, size) {}
 
 export class GroupArray extends DynamicArray(Group, size) {}
-export class FieldArray extends DynamicArray(Field, size) {}
 
 export class RequestHelperInput extends Struct({
   committeeId: Field,

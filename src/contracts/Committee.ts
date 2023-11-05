@@ -29,7 +29,7 @@ import { updateOutOfSnark } from '../libs/utils.js';
 
 const accountFee = Mina.accountCreationFee();
 
-const treeHeight = 6; // setting max 32 member
+const treeHeight = 5; // setting max 16 member
 const EmptyMerkleMap = new MerkleMap();
 const Tree = new MerkleTree(treeHeight);
 export class CommitteeMerkleWitness extends MerkleWitness(treeHeight) {}

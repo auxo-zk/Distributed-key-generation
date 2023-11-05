@@ -24,7 +24,6 @@ import {
 
 import DynamicArray from '../libs/DynamicArray.js';
 import { updateOutOfSnark } from '../libs/utils.js';
-import { findSourceMap } from 'node:module';
 
 const treeHeight = 6; // setting max 32 member
 const EmptyMerkleMap = new MerkleMap();
@@ -194,7 +193,7 @@ export class Request extends SmartContract {
   // -> state: enable to check if request the same data
   // state: 0: not yet requested
   // state: 1: requesting
-  // state: !0 and !=1 which is hash(D): request complete
+  // state: !0 and !=1 -> which is hash(D): request complete
   @state(Field) requestStateRoot = State<Field>();
   // request id -> requester (Publickey/Group)
   @state(Field) requesterRoot = State<Field>();
