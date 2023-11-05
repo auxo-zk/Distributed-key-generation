@@ -76,13 +76,13 @@ export const enum ActionEnum {
 }
 
 export const enum EventEnum {
-  COMMITTEE_ACTION,
-  REDUCE,
-  KEY_GENERATED,
-  KEY_DEPRECATED,
-  ROUND_1_FINALIZED,
-  ROUND_2_FINALIZED,
-  RESPONSE_COMPLETED,
+  COMMITTEE_ACTION = 'committee-action',
+  REDUCE = 'reduce-actions',
+  KEY_GENERATED = 'key-generated',
+  KEY_DEPRECATED = 'key-deprecated',
+  ROUND_1_FINALIZED = 'round-1-finalized',
+  ROUND_2_FINALIZED = 'round-2-finalized',
+  RESPONSE_COMPLETED = 'response-completed',
 }
 
 export class ActionMask extends Utils.BoolDynamicArray(ActionEnum.__LENGTH) {}
@@ -355,10 +355,14 @@ export const GenerateKey = Experimental.ZkProgram({
           Field(ActionStatus.ROLLUPED)
         );
 
+        // Add updated key
+        let updatedKeys = earlierProof.publicOutput.updatedKeys;
+        updatedKeys.push(keyIndex);
+
         return {
           newKeyStatus: keyStatus,
           newRollupState: rollupRoot,
-          updatedKeys: earlierProof.publicOutput.updatedKeys.concat([keyIndex]),
+          updatedKeys: updatedKeys,
         };
       },
     },
@@ -451,10 +455,14 @@ export const DeprecateKey = Experimental.ZkProgram({
           Field(ActionStatus.ROLLUPED)
         );
 
+        // Add updated key
+        let updatedKeys = earlierProof.publicOutput.updatedKeys;
+        updatedKeys.push(keyIndex);
+
         return {
           newKeyStatus: keyStatus,
           newRollupState: rollupRoot,
-          updatedKeys: earlierProof.publicOutput.updatedKeys.concat([keyIndex]),
+          updatedKeys: updatedKeys,
         };
       },
     },
