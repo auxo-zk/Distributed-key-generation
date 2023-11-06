@@ -21,7 +21,6 @@ import {
 import {
   FieldDynamicArray,
   GroupDynamicArray,
-  PublicKeyDynamicArray,
 } from '@auxo-dev/auxo-libs';
 import {
   COMMITTEE_MAX_SIZE,

@@ -4,39 +4,25 @@ import {
   state,
   State,
   method,
-  PublicKey,
   MerkleWitness,
   Group,
-  Bool,
   Reducer,
-  DeployArgs,
-  Permissions,
-  provablePure,
-  VerificationKey,
-  AccountUpdate,
-  Mina,
   MerkleTree,
   MerkleMap,
   MerkleMapWitness,
   Struct,
-  Experimental,
   SelfProof,
-  Empty,
   Poseidon,
+  ZkProgram,
 } from 'o1js';
-import { Utils } from '@auxo-dev/dkg-libs';
+import { GroupDynamicArray } from '@auxo-dev/auxo-libs';
+import { COMMITTEE_MAX_SIZE } from '../libs/Committee.js';
 import { updateOutOfSnark } from '../libs/utils.js';
 
-const accountFee = Mina.accountCreationFee();
-
-const treeHeight = 6; // setting max 32 member
+export const LEVEL2_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;
 const EmptyMerkleMap = new MerkleMap();
-const Tree = new MerkleTree(treeHeight);
-export class CommitteeMerkleWitness extends MerkleWitness(treeHeight) {}
-
-export class GroupArray extends Utils.GroupDynamicArray(
-  2 ** (treeHeight - 1)
-) {}
+export class CommitteeMerkleWitness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
+export class MemberArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
 
 export class CommitteeRollupState extends Struct({
   actionHash: Field,
@@ -68,7 +54,8 @@ export class CheckConfigInput extends Struct({
   settingMerkleMapWitness: MerkleMapWitness,
 }) {}
 
-export const createCommitteeProof = Experimental.ZkProgram({
+export const CreateCommittee = ZkProgram({
+  name: 'create-committee',
   publicInput: CommitteeRollupState,
   publicOutput: CommitteeRollupState,
 
@@ -76,7 +63,7 @@ export const createCommitteeProof = Experimental.ZkProgram({
     nextStep: {
       privateInputs: [
         SelfProof<CommitteeRollupState, CommitteeRollupState>,
-        GroupArray,
+        MemberArray,
         MerkleMapWitness,
         MerkleMapWitness,
         Field,
@@ -85,7 +72,7 @@ export const createCommitteeProof = Experimental.ZkProgram({
       method(
         input: CommitteeRollupState,
         preProof: SelfProof<CommitteeRollupState, CommitteeRollupState>,
-        publickeys: GroupArray,
+        publickeys: MemberArray,
         memberWitness: MerkleMapWitness,
         settingWitess: MerkleMapWitness,
         threshold: Field
@@ -100,9 +87,9 @@ export const createCommitteeProof = Experimental.ZkProgram({
         );
         nextCommitteeId.assertEquals(preProof.publicOutput.currentCommitteeId);
         preMemberRoot.assertEquals(preProof.publicOutput.memberTreeRoot);
-        let tree = new MerkleTree(treeHeight);
+        let tree = new MerkleTree(LEVEL2_TREE_HEIGHT);
         for (let i = 0; i < 32; i++) {
-          tree.setLeaf(BigInt(i), GroupArray.hash(publickeys.get(Field(i))));
+          tree.setLeaf(BigInt(i), MemberArray.hash(publickeys.get(Field(i))));
         }
         // update new tree of public key in to the member tree
         let [newMemberRoot] = memberWitness.computeRootAndKey(tree.getRoot());
@@ -140,12 +127,12 @@ export const createCommitteeProof = Experimental.ZkProgram({
   },
 });
 
-class CommitteeProof extends Experimental.ZkProgram.Proof(
-  createCommitteeProof
+class CommitteeProof extends ZkProgram.Proof(
+  CreateCommittee
 ) {}
 
 export class CommitteeInput extends Struct({
-  addresses: GroupArray,
+  addresses: MemberArray,
   threshold: Field,
 }) {}
 
@@ -203,7 +190,7 @@ export class Committee extends SmartContract {
   // Add memberIndex to input for checking
   @method checkMember(input: CheckMemberInput): Field {
     let leaf = input.memberMerkleTreeWitness.calculateRoot(
-      GroupArray.hash(input.address)
+      MemberArray.hash(input.address)
     );
     let memberId = input.memberMerkleTreeWitness.calculateIndex();
     let [root, _commiteeId] =
