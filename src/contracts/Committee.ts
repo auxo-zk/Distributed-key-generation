@@ -24,7 +24,7 @@ import {
   Empty,
   Poseidon,
 } from 'o1js';
-import DynamicArray from '../libs/DynamicArray.js';
+import { Utils } from '@auxo-dev/dkg-libs';
 import { updateOutOfSnark } from '../libs/utils.js';
 
 const accountFee = Mina.accountCreationFee();
@@ -34,7 +34,9 @@ const EmptyMerkleMap = new MerkleMap();
 const Tree = new MerkleTree(treeHeight);
 export class CommitteeMerkleWitness extends MerkleWitness(treeHeight) {}
 
-export class GroupArray extends DynamicArray(Group, 2 ** (treeHeight - 1)) {}
+export class GroupArray extends Utils.GroupDynamicArray(
+  2 ** (treeHeight - 1)
+) {}
 
 export class CommitteeRollupState extends Struct({
   actionHash: Field,

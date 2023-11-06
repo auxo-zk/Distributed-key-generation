@@ -1,7 +1,5 @@
 import {
-  Bool,
   Encoding,
-  Experimental,
   Field,
   Group,
   method,
@@ -17,10 +15,22 @@ import {
   State,
   Struct,
   SelfProof,
+  ZkProgram,
 } from 'o1js';
-import { DKG, Utils } from '@auxo-dev/dkg-libs';
+import {
+  FieldDynamicArray,
+  GroupDynamicArray,
+  PublicKeyDynamicArray,
+} from '@auxo-dev/auxo-libs';
+import {
+  COMMITTEE_MAX_SIZE,
+  ResponseContribution,
+  Round1Contribution,
+  Round2Contribution,
+} from '../libs/Committee.js';
+import { DArray, REQUEST_MAX_SIZE } from '../libs/Requestor.js';
 import { updateOutOfSnark } from '../libs/utils.js';
-import { EncryptionProof, DecryptionProof } from './Encryption.js';
+import { BatchEncryptionProof, BatchDecryptionProof } from './Encryption.js';
 import {
   CheckConfigInput,
   CheckMemberInput,
@@ -32,25 +42,24 @@ export class OtherZkApp extends Struct({
   address: PublicKey,
   witness: MerkleMapWitness,
 }) {}
+
 export const ZK_APP = {
   COMMITTEE: Encoding.stringToFields('committee'),
   REQUEST: Encoding.stringToFields('request'),
 };
-export const CONTRIBUTION_TREE_HEIGHT = 5;
+
+export const CONTRIBUTION_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;
 export const SUB_MT = new MerkleTree(CONTRIBUTION_TREE_HEIGHT);
-export class SubMTWitness extends MerkleWitness(
-  2 ** (CONTRIBUTION_TREE_HEIGHT - 1)
-) {}
+export class SubMTWitness extends MerkleWitness(CONTRIBUTION_TREE_HEIGHT) {}
 export class FullMTWitness extends Struct({
   level1: SubMTWitness,
   level2: MerkleMapWitness,
 }) {}
 
-class GroupDynamicArray extends Utils.GroupDynamicArray(16) {}
-class PublicKeyDynamicArray extends Utils.PublicKeyDynamicArray(16) {}
-class ScalarDynamicArray extends Utils.ScalarDynamicArray(16) {}
-class RequestVector extends Utils.GroupDynamicArray(64) {}
-class UpdatedValues extends Utils.FieldDynamicArray(64) {}
+export const ROLLUP_MAX_SIZE = 32;
+class PublicKeyArray extends PublicKeyDynamicArray(COMMITTEE_MAX_SIZE) {}
+class RequestVector extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
+class UpdatedValues extends FieldDynamicArray(ROLLUP_MAX_SIZE) {}
 
 export const enum KeyStatus {
   EMPTY,
@@ -85,42 +94,9 @@ export const enum EventEnum {
   RESPONSE_COMPLETED = 'response-completed',
 }
 
-export class ActionMask extends Utils.BoolDynamicArray(ActionEnum.__LENGTH) {}
-
-export const ACTION_MASKS = {
-  [ActionEnum.GENERATE_KEY]: ActionMask.from(
-    [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
-      e == ActionEnum.GENERATE_KEY ? Bool(true) : Bool(false)
-    )
-  ),
-  [ActionEnum.DEPRECATE_KEY]: ActionMask.from(
-    [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
-      e == ActionEnum.DEPRECATE_KEY ? Bool(true) : Bool(false)
-    )
-  ),
-  [ActionEnum.CONTRIBUTE_ROUND_1]: ActionMask.from(
-    [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
-      e == ActionEnum.CONTRIBUTE_ROUND_1 ? Bool(true) : Bool(false)
-    )
-  ),
-  [ActionEnum.CONTRIBUTE_ROUND_2]: ActionMask.from(
-    [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
-      e == ActionEnum.CONTRIBUTE_ROUND_2 ? Bool(true) : Bool(false)
-    )
-  ),
-  [ActionEnum.CONTRIBUTE_RESPONSE]: ActionMask.from(
-    [...Array(ActionEnum.__LENGTH).keys()].map((e) =>
-      e == ActionEnum.CONTRIBUTE_RESPONSE ? Bool(true) : Bool(false)
-    )
-  ),
-  EMPTY: ActionMask.from(
-    [...Array(ActionEnum.__LENGTH).keys()].map((e) => Bool(false))
-  ),
-};
-
 /**
  * Class of actions dispatched by users
- * @param mask Specify action type (defined with ActionEnum)
+ * @param enum Specify action type (defined with ActionEnum)
  * @param committeeId Incremental committee index
  * @param keyId Incremental key index of a committee
  * @param memberId Incremental member index of a committee
@@ -131,34 +107,38 @@ export const ACTION_MASKS = {
  * @function toFields Return the action in the form of Fields[]
  */
 export class Action extends Struct({
-  mask: ActionMask,
+  enum: Field,
   committeeId: Field,
   keyId: Field,
   memberId: Field,
   requestId: Field,
-  round1Contribution: DKG.Committee.Round1Contribution,
-  round2Contribution: DKG.Committee.Round2Contribution,
-  responseContribution: DKG.Committee.TallyContribution,
+  round1Contribution: Round1Contribution,
+  round2Contribution: Round2Contribution,
+  responseContribution: ResponseContribution,
 }) {
   static empty(): Action {
     return new Action({
-      mask: ACTION_MASKS.EMPTY,
+      enum: Field(ActionEnum.__LENGTH),
       committeeId: Field(0),
       keyId: Field(0),
       memberId: Field(0),
       requestId: Field(0),
-      round1Contribution: DKG.Committee.Round1Contribution.empty(),
-      round2Contribution: DKG.Committee.Round2Contribution.empty(),
-      responseContribution: DKG.Committee.TallyContribution.empty(),
+      round1Contribution: Round1Contribution.empty(),
+      round2Contribution: Round2Contribution.empty(),
+      responseContribution: ResponseContribution.empty(),
     });
   }
   hash(): Field {
     return Poseidon.hash(this.toFields());
   }
   toFields(): Field[] {
-    return [this.mask.length]
-      .concat(this.mask.toFields())
-      .concat([this.committeeId, this.keyId, this.memberId, this.requestId])
+    return [
+      this.enum,
+      this.committeeId,
+      this.keyId,
+      this.memberId,
+      this.requestId,
+    ]
       .concat(this.round1Contribution.toFields())
       .concat(this.round2Contribution.toFields())
       .concat(this.responseContribution.toFields())
@@ -187,7 +167,7 @@ export class Round2FinalizedEvent extends Struct({
 
 export class ResponseCompletedEvent extends Struct({
   requestIndex: Field,
-  D: GroupDynamicArray,
+  D: DArray,
 }) {}
 
 export class ReduceInput extends Struct({
@@ -200,7 +180,8 @@ export class ReduceOutput extends Struct({
   newRollupState: Field,
 }) {}
 
-export const ReduceActions = Experimental.ZkProgram({
+export const ReduceActions = ZkProgram({
+  name: 'reduce-actions',
   publicInput: ReduceInput,
   publicOutput: ReduceOutput,
   methods: {
@@ -256,7 +237,7 @@ export const ReduceActions = Experimental.ZkProgram({
   },
 });
 
-class ReduceProof extends Experimental.ZkProgram.Proof(ReduceActions) {}
+class ReduceProof extends ZkProgram.Proof(ReduceActions) {}
 
 export class KeyUpdateInput extends Struct({
   initialKeyStatus: Field,
@@ -271,7 +252,8 @@ export class KeyUpdateOutput extends Struct({
   updatedKeys: UpdatedValues,
 }) {}
 
-export const GenerateKey = Experimental.ZkProgram({
+export const GenerateKey = ZkProgram({
+  name: 'generate-key',
   publicInput: KeyUpdateInput,
   publicOutput: KeyUpdateOutput,
   methods: {
@@ -301,18 +283,7 @@ export const GenerateKey = Experimental.ZkProgram({
         earlierProof.verify();
 
         // Check correct action type
-        let checkMask = new ActionMask(
-          input.action.mask
-            .toFields()
-            .map((e, i) =>
-              Provable.if(
-                Field(i).equals(Field(ActionEnum.GENERATE_KEY)),
-                Bool.fromFields([e]).equals(Bool(true)),
-                Bool.fromFields([e]).equals(Bool(false))
-              )
-            )
-        );
-        checkMask.includes(Bool(false)).assertFalse();
+        input.action.enum.assertEquals(Field(ActionEnum.GENERATE_KEY));
 
         // Check consistency of the initial values
         input.initialKeyStatus.assertEquals(
@@ -369,9 +340,10 @@ export const GenerateKey = Experimental.ZkProgram({
   },
 });
 
-class GenerateKeyProof extends Experimental.ZkProgram.Proof(GenerateKey) {}
+class GenerateKeyProof extends ZkProgram.Proof(GenerateKey) {}
 
-export const DeprecateKey = Experimental.ZkProgram({
+export const DeprecateKey = ZkProgram({
+  name: 'deprecate-key',
   publicInput: KeyUpdateInput,
   publicOutput: KeyUpdateOutput,
   methods: {
@@ -401,18 +373,7 @@ export const DeprecateKey = Experimental.ZkProgram({
         earlierProof.verify();
 
         // Check correct action type
-        let checkMask = new ActionMask(
-          input.action.mask
-            .toFields()
-            .map((e, i) =>
-              Provable.if(
-                Field(i).equals(Field(ActionEnum.GENERATE_KEY)),
-                Bool.fromFields([e]).equals(Bool(true)),
-                Bool.fromFields([e]).equals(Bool(false))
-              )
-            )
-        );
-        checkMask.includes(Bool(false)).assertFalse();
+        input.action.enum.assertEquals(Field(ActionEnum.DEPRECATE_KEY));
 
         // Check consistency of the initial values
         input.initialKeyStatus.assertEquals(
@@ -430,7 +391,7 @@ export const DeprecateKey = Experimental.ZkProgram({
         let [keyStatus, keyStatusIndex] = keyStatusWitness.computeRootAndKey(
           Field(KeyStatus.ACTIVE)
         );
-        keyStatus.assertEquals(input.initialKeyStatus);
+        keyStatus.assertEquals(earlierProof.publicOutput.newKeyStatus);
         keyStatusIndex.assertEquals(keyIndex);
 
         // Calculate the new keyStatus tree root
@@ -469,7 +430,7 @@ export const DeprecateKey = Experimental.ZkProgram({
   },
 });
 
-class DeprecateKeyProof extends Experimental.ZkProgram.Proof(DeprecateKey) {}
+class DeprecateKeyProof extends ZkProgram.Proof(DeprecateKey) {}
 
 export class Round1Input extends Struct({
   T: Field,
@@ -490,7 +451,8 @@ export class Round1Output extends Struct({
   counter: Field,
 }) {}
 
-export const FinalizeRound1 = Experimental.ZkProgram({
+export const FinalizeRound1 = ZkProgram({
+  name: 'finalize-round-1',
   publicInput: Round1Input,
   publicOutput: Round1Output,
   methods: {
@@ -527,18 +489,7 @@ export const FinalizeRound1 = Experimental.ZkProgram({
         earlierProof.verify();
 
         // Check correct action type
-        let checkMask = new ActionMask(
-          input.action.mask
-            .toFields()
-            .map((e, i) =>
-              Provable.if(
-                Field(i).equals(Field(ActionEnum.GENERATE_KEY)),
-                Bool.fromFields([e]).equals(Bool(true)),
-                Bool.fromFields([e]).equals(Bool(false))
-              )
-            )
-        );
-        checkMask.includes(Bool(false)).assertFalse();
+        input.action.enum.assertEquals(Field(ActionEnum.CONTRIBUTE_ROUND_1));
 
         // Check consistency of the initial values
         input.T.assertEquals(earlierProof.publicInput.T);
@@ -637,14 +588,14 @@ export const FinalizeRound1 = Experimental.ZkProgram({
   },
 });
 
-class Round1Proof extends Experimental.ZkProgram.Proof(FinalizeRound1) {}
+class Round1Proof extends ZkProgram.Proof(FinalizeRound1) {}
 
 export class Round2Input extends Struct({
   T: Field,
   N: Field,
   keyStatusRoot: Field,
   publicKeyRoot: Field,
-  publicKeys: PublicKeyDynamicArray,
+  publicKeys: PublicKeyArray,
   initialContributionRoot: Field,
   initialRollupState: Field,
   previousActionState: Field,
@@ -657,7 +608,8 @@ export class Round2Output extends Struct({
   counter: Field,
 }) {}
 
-export const FinalizeRound2 = Experimental.ZkProgram({
+export const FinalizeRound2 = ZkProgram({
+  name: 'finalize-round-2',
   publicInput: Round2Input,
   publicOutput: Round2Output,
   methods: {
@@ -676,7 +628,7 @@ export const FinalizeRound2 = Experimental.ZkProgram({
         SelfProof<Round2Input, Round2Output>,
         MerkleMapWitness,
         MerkleMapWitness,
-        EncryptionProof,
+        BatchEncryptionProof,
         FullMTWitness,
         MerkleMapWitness,
       ],
@@ -685,7 +637,7 @@ export const FinalizeRound2 = Experimental.ZkProgram({
         earlierProof: SelfProof<Round2Input, Round2Output>,
         keyStatusWitness: MerkleMapWitness,
         publicKeyWitness: MerkleMapWitness,
-        encryptionProof: EncryptionProof,
+        encryptionProof: BatchEncryptionProof,
         contributionWitness: FullMTWitness,
         rollupWitness: MerkleMapWitness
       ) {
@@ -693,18 +645,7 @@ export const FinalizeRound2 = Experimental.ZkProgram({
         earlierProof.verify();
 
         // Check correct action type
-        let checkMask = new ActionMask(
-          input.action.mask
-            .toFields()
-            .map((e, i) =>
-              Provable.if(
-                Field(i).equals(Field(ActionEnum.GENERATE_KEY)),
-                Bool.fromFields([e]).equals(Bool(true)),
-                Bool.fromFields([e]).equals(Bool(false))
-              )
-            )
-        );
-        checkMask.includes(Bool(false)).assertFalse();
+        input.action.enum.assertEquals(Field(ActionEnum.CONTRIBUTE_ROUND_2));
 
         // Check consistency of the initial values
         input.T.assertEquals(earlierProof.publicInput.T);
@@ -821,7 +762,7 @@ export const FinalizeRound2 = Experimental.ZkProgram({
   },
 });
 
-class Round2Proof extends Experimental.ZkProgram.Proof(FinalizeRound2) {}
+class Round2Proof extends ZkProgram.Proof(FinalizeRound2) {}
 
 export class ResponseInput extends Struct({
   T: Field,
@@ -841,7 +782,8 @@ export class ResponseOutput extends Struct({
   counter: Field,
 }) {}
 
-export const CompleteResponse = Experimental.ZkProgram({
+export const CompleteResponse = ZkProgram({
+  name: 'complete-response',
   publicInput: ResponseInput,
   publicOutput: ResponseOutput,
   methods: {
@@ -860,7 +802,7 @@ export const CompleteResponse = Experimental.ZkProgram({
       privateInputs: [
         SelfProof<ResponseInput, ResponseOutput>,
         FullMTWitness,
-        DecryptionProof,
+        BatchDecryptionProof,
         FullMTWitness,
         MerkleMapWitness,
       ],
@@ -868,7 +810,7 @@ export const CompleteResponse = Experimental.ZkProgram({
         input: ResponseInput,
         earlierProof: SelfProof<ResponseInput, ResponseOutput>,
         publicKeyWitness: FullMTWitness,
-        decryptionProof: DecryptionProof,
+        decryptionProof: BatchDecryptionProof,
         contributionWitness: FullMTWitness,
         rollupWitness: MerkleMapWitness
       ) {
@@ -876,18 +818,7 @@ export const CompleteResponse = Experimental.ZkProgram({
         earlierProof.verify();
 
         // Check correct action type
-        let checkMask = new ActionMask(
-          input.action.mask
-            .toFields()
-            .map((e, i) =>
-              Provable.if(
-                Field(i).equals(Field(ActionEnum.GENERATE_KEY)),
-                Bool.fromFields([e]).equals(Bool(true)),
-                Bool.fromFields([e]).equals(Bool(false))
-              )
-            )
-        );
-        checkMask.includes(Bool(false)).assertFalse();
+        input.action.enum.assertEquals(Field(ActionEnum.CONTRIBUTE_RESPONSE));
 
         // Check consistency of the initial values
         input.T.assertEquals(earlierProof.publicInput.T);
@@ -1002,7 +933,7 @@ export const CompleteResponse = Experimental.ZkProgram({
   },
 });
 
-class ResponseProof extends Experimental.ZkProgram.Proof(CompleteResponse) {}
+class ResponseProof extends ZkProgram.Proof(CompleteResponse) {}
 
 export class DKGContract extends SmartContract {
   reducer = Reducer({ actionType: Action });

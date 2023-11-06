@@ -9,43 +9,17 @@ import {
   PublicKey,
   Scalar,
   Struct,
+  ZkProgram,
 } from 'o1js';
-import { Utils } from '@auxo-dev/dkg-libs';
-
-class GroupDynamicArray extends Utils.GroupDynamicArray(16) {}
-class PublicKeyDynamicArray extends Utils.PublicKeyDynamicArray(16) {}
-class ScalarDynamicArray extends Utils.ScalarDynamicArray(16) {}
-
-export class Bit255 extends Utils.FieldDynamicArray(255) {
-  static fromXOR(a: Scalar | Bit255, b: Scalar | Bit255): Bit255 {
-    let res = [];
-    let aBits = a.toFields();
-    let bBits = b.toFields();
-    for (let i = 0; i < 255; i++) {
-      let xorRes = Provable.if(
-        aBits[i].add(bBits[i]).equals(Field(1)),
-        Field(1),
-        Field(0)
-      );
-      res.push(xorRes);
-    }
-    return new Bit255(res);
-  }
-
-  equals(c: Bit255): Bool {
-    let res = Bool(true);
-    for (let i = 0; i < 255; i++) {
-      res.and(this.values[i].equals(c.values[i]));
-    }
-    return res;
-  }
-
-  assertEquals(c: Bit255): void {
-    for (let i = 0; i < 255; i++) {
-      this.values[i].assertEquals(c.values[i]);
-    }
-  }
-}
+import { Bit255, ScalarDynamicArray } from '@auxo-dev/auxo-libs';
+import {
+  COMMITTEE_MAX_SIZE,
+  CArray,
+  cArray,
+  UArray,
+} from '../libs/Committee.js';
+export class PlainArray extends ScalarDynamicArray(COMMITTEE_MAX_SIZE) {}
+export class RandomArray extends ScalarDynamicArray(COMMITTEE_MAX_SIZE) {}
 
 export class ElgamalInput extends Struct({
   pubKey: PublicKey,
@@ -53,7 +27,8 @@ export class ElgamalInput extends Struct({
   U: Group,
 }) {}
 
-export const Elgamal = Experimental.ZkProgram({
+export const Elgamal = ZkProgram({
+  name: 'Elgamal',
   publicInput: ElgamalInput,
   methods: {
     encrypt: {
@@ -61,12 +36,11 @@ export const Elgamal = Experimental.ZkProgram({
       method(input: ElgamalInput, plain: Scalar, random: Scalar) {
         input.U.assertEquals(Group.generator.scale(random));
         let V = input.pubKey.toGroup().scale(random);
-        let k = Scalar.fromFields(
-          Poseidon.hash(input.U.toFields().concat(V.toFields()))
-            .toBits()
-            .map((e) => e.toField())
+        let k = Bit255.fromBigInt(
+          Poseidon.hash(input.U.toFields().concat(V.toFields())).toBigInt()
         );
-        let encrypted = Bit255.fromXOR(plain, k);
+        let plainBits = Bit255.fromScalar(plain);
+        let encrypted = Bit255.xor(plainBits, k);
         encrypted.assertEquals(input.cipher);
       },
     },
@@ -74,34 +48,33 @@ export const Elgamal = Experimental.ZkProgram({
       privateInputs: [Scalar, PrivateKey],
       method(input: ElgamalInput, plain: Scalar, prvKey: PrivateKey) {
         let V = input.U.scale(Scalar.fromFields(prvKey.toFields()));
-        let k = Scalar.fromFields(
-          Poseidon.hash(input.U.toFields().concat(V.toFields()))
-            .toBits()
-            .map((e) => e.toField())
+        let k = Bit255.fromBigInt(
+          Poseidon.hash(input.U.toFields().concat(V.toFields())).toBigInt()
         );
-        let decrypted = Bit255.fromXOR(input.cipher, k);
-        decrypted.assertEquals(new Bit255(plain.toFields()));
+        let decrypted = Bit255.xor(input.cipher, k);
+        decrypted.assertEquals(Bit255.fromScalar(plain));
       },
     },
   },
 });
 
 export class BatchEncryptionInput extends Struct({
-  publicKeys: GroupDynamicArray,
-  c: ScalarDynamicArray,
-  U: GroupDynamicArray,
+  publicKeys: CArray,
+  c: cArray,
+  U: UArray,
   memberId: Field,
 }) {}
 
-export const BatchEncryption = Experimental.ZkProgram({
+export const BatchEncryption = ZkProgram({
+  name: 'batch-encryption',
   publicInput: BatchEncryptionInput,
   methods: {
     encrypt: {
-      privateInputs: [ScalarDynamicArray, ScalarDynamicArray],
+      privateInputs: [PlainArray, RandomArray],
       method(
         input: BatchEncryptionInput,
-        randomValues: ScalarDynamicArray,
-        polynomialValues: ScalarDynamicArray
+        polynomialValues: PlainArray,
+        randomValues: RandomArray
       ) {
         let length = input.publicKeys.length;
         input.c.length.assertEquals(length);
@@ -112,7 +85,7 @@ export const BatchEncryption = Experimental.ZkProgram({
           let random = randomValues.get(iField).toScalar();
           let plain = polynomialValues.get(iField).toScalar();
           let pubKey = input.publicKeys.get(iField);
-          let cipher = new Bit255(input.c.get(iField).toScalar().toFields());
+          let cipher = input.c.get(iField);
           let U = Provable.if(
             input.memberId.equals(iField),
             Group.zero,
@@ -124,12 +97,11 @@ export const BatchEncryption = Experimental.ZkProgram({
             .add(Group.generator)
             .scale(random)
             .sub(Group.generator.scale(random));
-          let k = Scalar.fromFields(
-            Poseidon.hash(input.U.toFields().concat(V.toFields()))
-              .toBits()
-              .map((e) => e.toField())
+          let k = Bit255.fromBigInt(
+            Poseidon.hash(input.U.toFields().concat(V.toFields())).toBigInt()
           );
-          let encrypted = Bit255.fromXOR(plain, k);
+          let plainBits = Bit255.fromScalar(plain);
+          let encrypted = Bit255.xor(plainBits, k);
           Provable.if(
             input.memberId.equals(iField),
             Bool(true),
@@ -141,25 +113,24 @@ export const BatchEncryption = Experimental.ZkProgram({
   },
 });
 
-export class EncryptionProof extends Experimental.ZkProgram.Proof(
-  BatchEncryption
-) {}
+export class BatchEncryptionProof extends ZkProgram.Proof(BatchEncryption) {}
 
 export class BatchDecryptionInput extends Struct({
   publicKey: PublicKey,
-  c: ScalarDynamicArray,
-  U: GroupDynamicArray,
+  c: cArray,
+  U: UArray,
   memberId: Field,
 }) {}
 
-export const BatchDecryption = Experimental.ZkProgram({
+export const BatchDecryption = ZkProgram({
+  name: 'batch-decryption',
   publicInput: BatchDecryptionInput,
   methods: {
     decrypt: {
-      privateInputs: [ScalarDynamicArray, Scalar],
+      privateInputs: [PlainArray, Scalar],
       method(
         input: BatchDecryptionInput,
-        polynomialValues: ScalarDynamicArray,
+        polynomialValues: PlainArray,
         privateKey: Scalar
       ) {
         let length = input.c.length;
@@ -169,19 +140,17 @@ export const BatchDecryption = Experimental.ZkProgram({
         for (let i = 0; i < 16; i++) {
           let iField = Field(i);
           let plain = polynomialValues.get(iField).toScalar();
-          let cipher = new Bit255(input.c.get(iField).toScalar().toFields());
+          let cipher = input.c.get(iField);
           // Avoid scaling zero point
           let V = input.U.get(iField).scale(privateKey);
-          let k = Scalar.fromFields(
-            Poseidon.hash(input.U.toFields().concat(V.toFields()))
-              .toBits()
-              .map((e) => e.toField())
+          let k = Bit255.fromBigInt(
+            Poseidon.hash(input.U.toFields().concat(V.toFields())).toBigInt()
           );
-          let decrypted = Bit255.fromXOR(cipher, k);
+          let decrypted = Bit255.xor(cipher, k);
           Provable.if(
             input.memberId.equals(iField),
             Bool(true),
-            decrypted.equals(new Bit255(plain.toFields()))
+            decrypted.equals(Bit255.fromScalar(plain))
           ).assertTrue();
         }
       },
@@ -189,6 +158,4 @@ export const BatchDecryption = Experimental.ZkProgram({
   },
 });
 
-export class DecryptionProof extends Experimental.ZkProgram.Proof(
-  BatchDecryption
-) {}
+export class BatchDecryptionProof extends ZkProgram.Proof(BatchDecryption) {}

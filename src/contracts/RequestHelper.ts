@@ -25,8 +25,6 @@ import {
 } from 'o1js';
 
 import { DKG, Utils } from '@auxo-dev/dkg-libs';
-
-import DynamicArray from '../libs/DynamicArray.js';
 import { updateOutOfSnark } from '../libs/utils.js';
 import { Request, RequestInput, RequestFee, ZeroFee } from './Request.js';
 
@@ -40,10 +38,9 @@ const treeHeight = 8; // setting vector size 128
 const size = 2 ** (treeHeight - 1);
 const EmptyMerkleMap = new MerkleMap();
 
-export class CustomScalarArray extends DynamicArray(Utils.CustomScalar, size) {}
-
-export class GroupArray extends DynamicArray(Group, size) {}
-export class FieldArray extends DynamicArray(Field, size) {}
+export class CustomScalarArray extends Utils.ScalarDynamicArray(size) {}
+export class GroupArray extends Utils.GroupDynamicArray(size) {}
+export class FieldArray extends Utils.FieldDynamicArray(size) {}
 
 export class RequestHelperInput extends Struct({
   committeeId: Field,

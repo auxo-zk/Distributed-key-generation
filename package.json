@@ -45,10 +45,8 @@
     "ts-jest": "^27.0.7",
     "typescript": "^4.7.2"
   },
-  "peerDependencies": {
-    "o1js": "0.13.*"
-  },
   "dependencies": {
-    "@auxo-dev/dkg-libs": "^0.1.7"
+    "@auxo-dev/auxo-libs": "^0.2.3",
+    "o1js": "^0.14.0"
   }
 }

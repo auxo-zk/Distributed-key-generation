@@ -1,4 +1,3 @@
-import { assert } from 'node:console';
 import {
   Field,
   SmartContract,
@@ -22,7 +21,7 @@ import {
   UInt64,
 } from 'o1js';
 
-import DynamicArray from '../libs/DynamicArray.js';
+import { Utils } from '@auxo-dev/dkg-libs';
 import { updateOutOfSnark } from '../libs/utils.js';
 import { findSourceMap } from 'node:module';
 
@@ -30,7 +29,9 @@ const treeHeight = 6; // setting max 32 member
 const EmptyMerkleMap = new MerkleMap();
 export const RequestFee = Field(10 ** 9); // 1 Mina
 export const ZeroFee = Field(0); // 0 Mina
-export class GroupArray extends DynamicArray(Group, 2 ** (treeHeight - 1)) {}
+export class GroupArray extends Utils.GroupDynamicArray(
+  2 ** (treeHeight - 1)
+) {}
 const Field32Array = Provable.Array(Field, 32);
 
 export class RequestInput extends Struct({
