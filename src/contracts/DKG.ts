@@ -3,6 +3,7 @@ import {
   Field,
   Group,
   method,
+  MerkleMap,
   MerkleMapWitness,
   MerkleTree,
   MerkleWitness,
@@ -37,29 +38,27 @@ import {
   Committee,
   CommitteeMerkleWitness,
 } from './Committee.js';
+import { ZkAppRef } from '../libs/ZkAppRef.js';
 
-export class OtherZkApp extends Struct({
-  address: PublicKey,
-  witness: MerkleMapWitness,
+export const ROLLUP_MAX_SIZE = 32;
+export class PublicKeyArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
+class RequestVector extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
+class UpdatedValues extends FieldDynamicArray(ROLLUP_MAX_SIZE) {}
+
+export const LEVEL2_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;
+export class Level1MT extends MerkleMap {}
+export class Level1Witness extends MerkleMapWitness {}
+export class Level2MT extends MerkleTree {}
+export class Level2Witness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
+export class FullMTWitness extends Struct({
+  level1: Level1Witness,
+  level2: Level2Witness,
 }) {}
 
 export const ZK_APP = {
   COMMITTEE: Encoding.stringToFields('committee'),
   REQUEST: Encoding.stringToFields('request'),
 };
-
-export const CONTRIBUTION_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;
-export const SUB_MT = new MerkleTree(CONTRIBUTION_TREE_HEIGHT);
-export class SubMTWitness extends MerkleWitness(CONTRIBUTION_TREE_HEIGHT) {}
-export class FullMTWitness extends Struct({
-  level1: SubMTWitness,
-  level2: MerkleMapWitness,
-}) {}
-
-export const ROLLUP_MAX_SIZE = 32;
-class PublicKeyArray extends PublicKeyDynamicArray(COMMITTEE_MAX_SIZE) {}
-class RequestVector extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
-class UpdatedValues extends FieldDynamicArray(ROLLUP_MAX_SIZE) {}
 
 export const enum KeyStatus {
   EMPTY,
@@ -521,12 +520,12 @@ export const FinalizeRound1 = ZkProgram({
         keyStatusIndex.equals(keyIndex);
 
         // Check if this committee member has contributed yet
-        contributionWitness.level1
+        contributionWitness.level2
           .calculateIndex()
           .assertEquals(input.action.memberId);
         let [contributionRoot, contributionIndex] =
-          contributionWitness.level2.computeRootAndKey(
-            contributionWitness.level1.calculateRoot(Field(0))
+          contributionWitness.level1.computeRootAndKey(
+            contributionWitness.level2.calculateRoot(Field(0))
           );
         contributionRoot.assertEquals(
           earlierProof.publicOutput.newContributionRoot
@@ -534,19 +533,19 @@ export const FinalizeRound1 = ZkProgram({
         contributionIndex.assertEquals(keyIndex);
 
         // Compute new contribution root
-        [contributionRoot] = contributionWitness.level2.computeRootAndKey(
-          contributionWitness.level1.calculateRoot(
+        [contributionRoot] = contributionWitness.level1.computeRootAndKey(
+          contributionWitness.level2.calculateRoot(
             input.action.round1Contribution.hash()
           )
         );
 
         // Check if this member's public key has not been registered
-        publicKeyWitness.level1
+        publicKeyWitness.level2
           .calculateIndex()
           .assertEquals(input.action.memberId);
         let [publicKeyRoot, publicKeyIndex] =
-          publicKeyWitness.level2.computeRootAndKey(
-            publicKeyWitness.level1.calculateRoot(Field(0))
+          publicKeyWitness.level1.computeRootAndKey(
+            publicKeyWitness.level2.calculateRoot(Field(0))
           );
         publicKeyRoot.assertEquals(earlierProof.publicOutput.newPublicKeyRoot);
         publicKeyIndex.assertEquals(keyIndex);
@@ -554,8 +553,8 @@ export const FinalizeRound1 = ZkProgram({
         // Compute new public key root
         let memberPublicKey = input.action.round1Contribution.C.values[0];
         memberPublicKey.equals(Group.zero).assertFalse();
-        [publicKeyRoot] = contributionWitness.level2.computeRootAndKey(
-          publicKeyWitness.level1.calculateRoot(
+        [publicKeyRoot] = contributionWitness.level1.computeRootAndKey(
+          publicKeyWitness.level2.calculateRoot(
             Poseidon.hash(memberPublicKey.toFields())
           )
         );
@@ -685,9 +684,8 @@ export const FinalizeRound2 = ZkProgram({
         );
         for (let i = 0; i < 16; i++) {
           let iField = Field(i);
-          PublicKey.fromGroup(
-            encryptionProof.publicInput.publicKeys.get(iField)
-          ).assertEquals(input.publicKeys.get(iField));
+          encryptionProof.publicInput.publicKeys.get(iField)
+            .assertEquals(input.publicKeys.get(iField));
           encryptionProof.publicInput.c
             .get(iField)
             .equals(input.action.round2Contribution.c.get(iField))
@@ -698,7 +696,7 @@ export const FinalizeRound2 = ZkProgram({
         }
 
         // Check if members' public keys have been registered
-        let publicKeyMT = new MerkleTree(CONTRIBUTION_TREE_HEIGHT);
+        let publicKeyMT = new MerkleTree(LEVEL2_TREE_HEIGHT);
         for (let i = 0; i < 16; i++) {
           publicKeyMT.setLeaf(
             BigInt(i),
@@ -719,12 +717,12 @@ export const FinalizeRound2 = ZkProgram({
         keyStatusIndex.equals(keyIndex);
 
         // Check if this committee member has contributed yet
-        contributionWitness.level1
+        contributionWitness.level2
           .calculateIndex()
           .assertEquals(input.action.memberId);
         let [contributionRoot, contributionIndex] =
-          contributionWitness.level2.computeRootAndKey(
-            contributionWitness.level1.calculateRoot(Field(0))
+          contributionWitness.level1.computeRootAndKey(
+            contributionWitness.level2.calculateRoot(Field(0))
           );
         contributionRoot.assertEquals(
           earlierProof.publicOutput.newContributionRoot
@@ -732,8 +730,8 @@ export const FinalizeRound2 = ZkProgram({
         contributionIndex.assertEquals(keyIndex);
 
         // Compute new contribution root
-        [contributionRoot] = contributionWitness.level2.computeRootAndKey(
-          contributionWitness.level1.calculateRoot(
+        [contributionRoot] = contributionWitness.level1.computeRootAndKey(
+          contributionWitness.level2.calculateRoot(
             input.action.round2Contribution.hash()
           )
         );
@@ -868,22 +866,22 @@ export const CompleteResponse = ZkProgram({
         }
 
         // Check if the member' public key have been registered
-        let memberIndex = publicKeyWitness.level1.calculateIndex();
+        let memberIndex = publicKeyWitness.level2.calculateIndex();
         memberIndex.assertEquals(input.action.memberId);
         let [publicKeyRoot, publicKeyIndex] =
-          publicKeyWitness.level2.computeRootAndKey(
+          publicKeyWitness.level1.computeRootAndKey(
             Poseidon.hash(input.publicKey.toFields())
           );
         publicKeyRoot.assertEquals(input.publicKeyRoot);
         publicKeyIndex.assertEquals(keyIndex);
 
         // Check if this committee member has contributed yet
-        contributionWitness.level1
+        contributionWitness.level2
           .calculateIndex()
           .assertEquals(input.action.memberId);
         let [contributionRoot, contributionIndex] =
-          contributionWitness.level2.computeRootAndKey(
-            contributionWitness.level1.calculateRoot(Field(0))
+          contributionWitness.level1.computeRootAndKey(
+            contributionWitness.level2.calculateRoot(Field(0))
           );
         contributionRoot.assertEquals(
           earlierProof.publicOutput.newContributionRoot
@@ -902,8 +900,8 @@ export const CompleteResponse = ZkProgram({
         }
 
         // Compute new contribution root
-        [contributionRoot] = contributionWitness.level2.computeRootAndKey(
-          contributionWitness.level1.calculateRoot(
+        [contributionRoot] = contributionWitness.level1.computeRootAndKey(
+          contributionWitness.level2.calculateRoot(
             input.action.round2Contribution.hash()
           )
         );
@@ -947,11 +945,11 @@ export class DKGContract extends SmartContract {
     [EventEnum.RESPONSE_COMPLETED]: ResponseCompletedEvent,
   };
 
-  // Verify action state and rollup state
-  @state(Field) rollupState = State<Field>();
-
   // Merkle tree of other zkApp address
   @state(Field) zkApps = State<Field>();
+
+  // Verify action state and rollup state
+  @state(Field) rollupState = State<Field>();
 
   // Merkle tree of all keys' status
   @state(Field) keyStatus = State<Field>();
@@ -966,7 +964,7 @@ export class DKGContract extends SmartContract {
 
   @method committeeAction(
     action: Action,
-    committee: OtherZkApp,
+    committee: ZkAppRef,
     memberMerkleTreeWitness: CommitteeMerkleWitness,
     memberMerkleMapWitness: MerkleMapWitness
   ) {
@@ -1057,7 +1055,7 @@ export class DKGContract extends SmartContract {
 
   @method finalizeRound1(
     proof: Round1Proof,
-    committee: OtherZkApp,
+    committee: ZkAppRef,
     settingMerkleMapWitness: MerkleMapWitness
   ) {
     // Get current state values
@@ -1113,7 +1111,7 @@ export class DKGContract extends SmartContract {
 
   @method finalizeRound2(
     proof: Round2Proof,
-    committee: OtherZkApp,
+    committee: ZkAppRef,
     settingMerkleMapWitness: MerkleMapWitness
   ) {
     // Get current state values
@@ -1167,7 +1165,7 @@ export class DKGContract extends SmartContract {
 
   @method completeResponse(
     proof: ResponseProof,
-    committee: OtherZkApp,
+    committee: ZkAppRef,
     settingMerkleMapWitness: MerkleMapWitness
   ) {
     // Get current state values
