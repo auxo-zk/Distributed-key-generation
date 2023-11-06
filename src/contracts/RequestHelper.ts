@@ -10,7 +10,6 @@ import {
   MerkleMap,
   MerkleMapWitness,
   Struct,
-  Experimental,
   SelfProof,
   Poseidon,
   Provable,
@@ -70,9 +69,9 @@ export class RollupStatusOutput extends Struct({
   finalRollupStatusRoot: Field,
 }) {}
 
-export const CreateRollupStatus = Experimental.ZkProgram({
+export const CreateRollupStatus = ZkProgram({
+  name: 'create-rollup-status',
   publicOutput: RollupStatusOutput,
-
   methods: {
     // First action to rollup
     firstStep: {

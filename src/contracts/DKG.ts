@@ -35,10 +35,10 @@ import {
   CommitteeMerkleWitness,
 } from './Committee.js';
 import { ZkAppRef } from '../libs/ZkAppRef.js';
+import { RequestVector } from './RequestHelper.js';
 
 export const ROLLUP_MAX_SIZE = 32;
 export class PublicKeyArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
-class RequestVector extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 class UpdatedValues extends FieldDynamicArray(ROLLUP_MAX_SIZE) {}
 
 export const LEVEL2_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;
