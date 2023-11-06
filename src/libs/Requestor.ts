@@ -1,7 +1,7 @@
 import { Group, PublicKey, Scalar } from 'o1js';
 import { GroupDynamicArray } from '@auxo-dev/auxo-libs';
 
-export const REQUEST_MAX_SIZE = 32;
+export const REQUEST_MAX_SIZE = 64;
 export class MArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class RArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class DArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}

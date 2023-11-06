@@ -1,26 +1,15 @@
 import {
   Field,
-  SmartContract,
-  state,
-  State,
-  method,
   Reducer,
   Mina,
   PrivateKey,
   PublicKey,
   AccountUpdate,
-  Struct,
-  Experimental,
-  SelfProof,
-  Poseidon,
   MerkleMap,
-  MerkleTree,
   MerkleWitness,
   Proof,
-  Group,
   Bool,
   Account,
-  Provable,
   fetchAccount,
 } from 'o1js';
 
@@ -29,8 +18,8 @@ import randomAccounts from './helper/randomAccounts.js';
 import {
   Request,
   RequestInput,
-  createRequestProof,
-  GroupArray,
+  CreateRequest,
+  MemberArray,
   RequestRollupState,
   RequestFee,
 } from '../contracts/Request.js';
@@ -57,7 +46,7 @@ describe('Testing Request Contract', () => {
   let feePayer: PublicKey;
   let requestContract: Request;
   let proof: Proof<RequestRollupState, RequestRollupState>;
-  let R1: GroupArray = GroupArray.from([
+  let R1: MemberArray = MemberArray.from([
     addresses.R1.toGroup(),
     addresses.R1.toGroup(),
   ]);
@@ -65,7 +54,7 @@ describe('Testing Request Contract', () => {
   let keyId1 = Field(1);
   let commiteeId2 = Field(2);
   let keyId2 = Field(2);
-  let R2: GroupArray = GroupArray.from([
+  let R2: MemberArray = MemberArray.from([
     addresses.R2.toGroup(),
     addresses.R2.toGroup(),
   ]);
@@ -135,8 +124,8 @@ describe('Testing Request Contract', () => {
 
   it('compile proof', async () => {
     // compile proof
-    ActionRequestProfiler.start('createRequestProof.compile');
-    await createRequestProof.compile();
+    ActionRequestProfiler.start('CreateRequest.compile');
+    await CreateRequest.compile();
     ActionRequestProfiler.stop().store();
   });
 
@@ -152,9 +141,9 @@ describe('Testing Request Contract', () => {
   });
 
   it('Create proof for request2 and rollup', async () => {
-    console.log('Create createRequestProof.firstStep...');
-    ActionRequestProfiler.start('createRequestProof.firstStep');
-    proof = await createRequestProof.firstStep(
+    console.log('Create CreateRequest.firstStep...');
+    ActionRequestProfiler.start('CreateRequest.firstStep');
+    proof = await CreateRequest.firstStep(
       new RequestRollupState({
         actionHash: Reducer.initialActionState,
         requestStateRoot: requestStateMap.getRoot(),
@@ -164,9 +153,9 @@ describe('Testing Request Contract', () => {
     ActionRequestProfiler.stop().store();
     expect(proof.publicInput.actionHash).toEqual(Reducer.initialActionState);
 
-    console.log('Create createRequestProof.nextStep requestInput2...');
-    ActionRequestProfiler.start('createRequestProof.nextStep');
-    proof = await createRequestProof.nextStep(
+    console.log('Create CreateRequest.nextStep requestInput2...');
+    ActionRequestProfiler.start('CreateRequest.nextStep');
+    proof = await CreateRequest.nextStep(
       proof.publicInput,
       proof,
       requestInput2,
@@ -184,7 +173,7 @@ describe('Testing Request Contract', () => {
     ////// update local state:
     requesterMap.set(
       requestInput2.requestId(),
-      GroupArray.hash(addresses.rqter2.toGroup())
+      MemberArray.hash(addresses.rqter2.toGroup())
     );
     // turn to request state
     requestStateMap.set(requestInput2.requestId(), Field(1));
@@ -211,8 +200,8 @@ describe('Testing Request Contract', () => {
   });
 
   it('Create proof for request1 and request3 and rollup', async () => {
-    console.log('Create createRequestProof.firstStep...');
-    proof = await createRequestProof.firstStep(
+    console.log('Create CreateRequest.firstStep...');
+    proof = await CreateRequest.firstStep(
       new RequestRollupState({
         actionHash: requestContract.actionState.get(),
         requestStateRoot: requestStateMap.getRoot(),
@@ -220,8 +209,8 @@ describe('Testing Request Contract', () => {
       })
     );
 
-    console.log('Create createRequestProof.nextStep requestInput1...');
-    proof = await createRequestProof.nextStep(
+    console.log('Create CreateRequest.nextStep requestInput1...');
+    proof = await CreateRequest.nextStep(
       proof.publicInput,
       proof,
       requestInput1,
@@ -232,13 +221,13 @@ describe('Testing Request Contract', () => {
     ////// update local state:
     requesterMap.set(
       requestInput1.requestId(),
-      GroupArray.hash(addresses.rqter1.toGroup())
+      MemberArray.hash(addresses.rqter1.toGroup())
     );
     // turn to request state
     requestStateMap.set(requestInput1.requestId(), Field(1));
 
-    console.log('Create createRequestProof.nextStep requestInput3...');
-    proof = await createRequestProof.nextStep(
+    console.log('Create CreateRequest.nextStep requestInput3...');
+    proof = await CreateRequest.nextStep(
       proof.publicInput,
       proof,
       requestInput3,

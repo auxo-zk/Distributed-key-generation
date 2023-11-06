@@ -80,7 +80,7 @@ export const BatchEncryption = ZkProgram({
         input.c.length.assertEquals(length);
         input.U.length.assertEquals(length);
 
-        for (let i = 0; i < 16; i++) {
+        for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
           let iField = Field(i);
           let random = randomValues.get(iField).toScalar();
           let plain = polynomialValues.get(iField).toScalar();
@@ -137,7 +137,7 @@ export const BatchDecryption = ZkProgram({
         input.U.length.assertEquals(length);
         new PrivateKey(privateKey).toPublicKey().assertEquals(input.publicKey);
 
-        for (let i = 0; i < 16; i++) {
+        for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
           let iField = Field(i);
           let plain = polynomialValues.get(iField).toScalar();
           let cipher = input.c.get(iField);

@@ -8,7 +8,6 @@ import {
   Group,
   Bool,
   Reducer,
-  Permissions,
   MerkleMap,
   MerkleMapWitness,
   Struct,
@@ -19,26 +18,26 @@ import {
   Provable,
   AccountUpdate,
   UInt64,
+  ZkProgram,
 } from 'o1js';
 
-import { Utils } from '@auxo-dev/dkg-libs';
+import { GroupDynamicArray } from '@auxo-dev/auxo-libs';
+import { COMMITTEE_MAX_SIZE } from '../libs/Committee.js';
 import { updateOutOfSnark } from '../libs/utils.js';
-import { findSourceMap } from 'node:module';
 
-const treeHeight = 6; // setting max 32 member
+export const LEVEL2_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;
 const EmptyMerkleMap = new MerkleMap();
 export const RequestFee = Field(10 ** 9); // 1 Mina
 export const ZeroFee = Field(0); // 0 Mina
-export class GroupArray extends Utils.GroupDynamicArray(
-  2 ** (treeHeight - 1)
-) {}
+export class MemberArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
+
 const Field32Array = Provable.Array(Field, 32);
 
 export class RequestInput extends Struct({
   committeeId: Field,
   keyId: Field,
   requester: Group,
-  R: GroupArray, // request value
+  R: MemberArray, // request value
   isRequest: Bool, // True if request, False if unrequest
 }) {
   static empty(): RequestInput {
@@ -46,7 +45,7 @@ export class RequestInput extends Struct({
       committeeId: Field(0),
       keyId: Field(0),
       requester: Group.from(Field(0), Field(0)),
-      R: GroupArray.empty(),
+      R: MemberArray.empty(),
       isRequest: Bool(false),
     });
   }
@@ -88,7 +87,7 @@ export class RequestRollupState extends Struct({
   }
 }
 
-export const createRequestProof = Experimental.ZkProgram({
+export const CreateRequest = Experimental.ZkProgram({
   publicInput: RequestRollupState,
   publicOutput: RequestRollupState,
 
@@ -148,12 +147,12 @@ export const createRequestProof = Experimental.ZkProgram({
         let currentRequester = Provable.if(
           requestInput.isRequest,
           Field(0),
-          GroupArray.hash(requestInput.requester)
+          MemberArray.hash(requestInput.requester)
         );
 
         let newRequester = Provable.if(
           requestInput.isRequest,
-          GroupArray.hash(requestInput.requester),
+          MemberArray.hash(requestInput.requester),
           Field(0)
         );
 
@@ -188,14 +187,14 @@ export const createRequestProof = Experimental.ZkProgram({
   },
 });
 
-class requestProof extends Experimental.ZkProgram.Proof(createRequestProof) {}
+class RequestProof extends ZkProgram.Proof(CreateRequest) {}
 
 export class Request extends SmartContract {
   // requestId = hash(committeeId, keyId, hash(valueR))
   // -> state: enable to check if request the same data
   // state: 0: not yet requested
   // state: 1: requesting
-  // state: !0 and !=1 which is hash(D): request complete
+  // state: !0 and !=1 -> which is hash(D): request complete
   @state(Field) requestStateRoot = State<Field>();
   // request id -> requester (Publickey/Group)
   @state(Field) requesterRoot = State<Field>();
@@ -244,7 +243,7 @@ export class Request extends SmartContract {
     requester.send({ to: this, amount: UInt64.from(sendAmount) });
   }
 
-  @method rollupRequest(proof: requestProof) {
+  @method rollupRequest(proof: RequestProof) {
     proof.verify();
     let actionState = this.actionState.getAndAssertEquals();
     let requestStateRoot = this.requestStateRoot.getAndAssertEquals();

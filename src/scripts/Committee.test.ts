@@ -1,17 +1,10 @@
 import {
   Field,
-  SmartContract,
-  state,
-  State,
-  method,
   Reducer,
   Mina,
   PrivateKey,
   PublicKey,
   AccountUpdate,
-  Struct,
-  Experimental,
-  SelfProof,
   Poseidon,
   MerkleMap,
   MerkleTree,
@@ -24,13 +17,14 @@ import randomAccounts from './helper/randomAccounts.js';
 import {
   Committee,
   CommitteeInput,
-  createCommitteeProof,
-  GroupArray,
+  CreateCommittee,
+  MemberArray,
   CommitteeRollupState,
   CommitteeMerkleWitness,
   CheckMemberInput,
   CheckConfigInput,
 } from '../contracts/Committee.js';
+import { COMMITTEE_MAX_SIZE } from '../libs/Committee.js';
 
 const doProofs = false;
 
@@ -53,10 +47,10 @@ describe('Committee', () => {
   let feePayer: PublicKey;
   let committeeContract: Committee;
   let proof: Proof<CommitteeRollupState, CommitteeRollupState>;
-  let myGroupArray1: GroupArray;
+  let myMemberArray1: MemberArray;
   let threshold1 = Field(1);
   let threshold2 = Field(2);
-  let myGroupArray2: GroupArray;
+  let myMemberArray2: MemberArray;
   let tree1: MerkleTree;
   let tree2: MerkleTree;
 
@@ -71,7 +65,7 @@ describe('Committee', () => {
     if (doProofs) {
       await Committee.compile();
     } else {
-      // createCommitteeProof.analyzeMethods();
+      // CreateCommittee.analyzeMethods();
       Committee.analyzeMethods();
     }
 
@@ -91,10 +85,10 @@ describe('Committee', () => {
       return value.toGroup();
     });
 
-    myGroupArray1 = new GroupArray(arrayAddress);
+    myMemberArray1 = new MemberArray(arrayAddress);
 
     let input = new CommitteeInput({
-      addresses: myGroupArray1,
+      addresses: myMemberArray1,
       threshold: threshold1,
     });
 
@@ -112,10 +106,10 @@ describe('Committee', () => {
       return value.toGroup();
     });
 
-    myGroupArray2 = new GroupArray(arrayAddress);
+    myMemberArray2 = new MemberArray(arrayAddress);
 
     let input = new CommitteeInput({
-      addresses: myGroupArray2,
+      addresses: myMemberArray2,
       threshold: threshold2,
     });
 
@@ -128,12 +122,12 @@ describe('Committee', () => {
 
   it('compile proof', async () => {
     // compile proof
-    await createCommitteeProof.compile();
+    await CreateCommittee.compile();
   });
 
   it('create proof first step...', async () => {
     // create first step proof
-    proof = await createCommitteeProof.firstStep(
+    proof = await CreateCommittee.firstStep(
       new CommitteeRollupState({
         actionHash: Reducer.initialActionState,
         memberTreeRoot: EmptyMerkleMap.getRoot(),
@@ -146,10 +140,10 @@ describe('Committee', () => {
   });
 
   it('create proof next step 1...', async () => {
-    proof = await createCommitteeProof.nextStep(
+    proof = await CreateCommittee.nextStep(
       proof.publicInput,
       proof,
-      myGroupArray1,
+      myMemberArray1,
       memberMerkleMap.getWitness(Field(0)),
       settingMerkleMap.getWitness(Field(0)),
       threshold1
@@ -161,22 +155,22 @@ describe('Committee', () => {
 
     // memberMerkleTree.set
     tree1 = new MerkleTree(treeHeight);
-    for (let i = 0; i < 32; i++) {
-      tree1.setLeaf(BigInt(i), GroupArray.hash(myGroupArray1.get(Field(i))));
+    for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+      tree1.setLeaf(BigInt(i), MemberArray.hash(myMemberArray1.get(Field(i))));
     }
 
     memberMerkleMap.set(Field(0), tree1.getRoot());
     settingMerkleMap.set(
       Field(0),
-      Poseidon.hash([Field(1), myGroupArray1.length])
+      Poseidon.hash([Field(1), myMemberArray1.length])
     );
   });
 
   it('create proof next step 2...', async () => {
-    proof = await createCommitteeProof.nextStep(
+    proof = await CreateCommittee.nextStep(
       proof.publicInput,
       proof,
-      myGroupArray2,
+      myMemberArray2,
       memberMerkleMap.getWitness(Field(1)),
       settingMerkleMap.getWitness(Field(1)),
       threshold2 // threshold
@@ -187,14 +181,14 @@ describe('Committee', () => {
 
     // memberMerkleTree.set
     tree2 = new MerkleTree(treeHeight);
-    for (let i = 0; i < 32; i++) {
-      tree2.setLeaf(BigInt(i), GroupArray.hash(myGroupArray2.get(Field(i))));
+    for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+      tree2.setLeaf(BigInt(i), MemberArray.hash(myMemberArray2.get(Field(i))));
     }
 
     memberMerkleMap.set(Field(1), tree2.getRoot());
     settingMerkleMap.set(
       Field(1),
-      Poseidon.hash([Field(2), myGroupArray2.length])
+      Poseidon.hash([Field(2), myMemberArray2.length])
     );
   });
 

@@ -6,51 +6,40 @@ import {
   method,
   PublicKey,
   Group,
-  Bool,
   Reducer,
-  Permissions,
   MerkleMap,
   MerkleMapWitness,
   Struct,
   Experimental,
   SelfProof,
   Poseidon,
-  Mina,
   Provable,
-  AccountUpdate,
-  UInt64,
   Void,
   Scalar,
-  provablePure,
+  ZkProgram,
 } from 'o1js';
 
-import { DKG, Utils } from '@auxo-dev/dkg-libs';
+import {
+  CustomScalar,
+  FieldDynamicArray,
+  GroupDynamicArray,
+  ScalarDynamicArray,
+} from '@auxo-dev/auxo-libs';
+import { REQUEST_MAX_SIZE } from '../libs/Requestor.js';
+// import { Request, RequestInput, RequestFee, ZeroFee } from './Request.js';
 import { updateOutOfSnark } from '../libs/utils.js';
-import { Request, RequestInput, RequestFee, ZeroFee } from './Request.js';
 
-// import {
-//   Committee,
-//   CheckConfigInput,
-//   CommitteeMerkleWitness,
-// } from './Committee.js';
-
-const treeHeight = 8; // setting vector size 128
-const size = 2 ** (treeHeight - 1);
 const EmptyMerkleMap = new MerkleMap();
-
-export class CustomScalarArray extends Utils.ScalarDynamicArray(size) {}
-export class GroupArray extends Utils.GroupDynamicArray(size) {}
-export class FieldArray extends Utils.FieldDynamicArray(size) {}
+export class CustomScalarArray extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
+export class GroupArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 
 export class RequestHelperInput extends Struct({
   committeeId: Field,
   keyId: Field,
-  //   N: Field,
-  //   T: Field,
   requetsTime: Field,
   committeePublicKey: PublicKey,
   // to-do wintess to check if it the right publickey
-  secreteVector: CustomScalarArray,
+  secretVector: CustomScalarArray,
   //   settingMerkleMapWitness: MerkleMapWitness,
 }) {
   requestId(): Field {
@@ -140,9 +129,7 @@ export const CreateRollupStatus = Experimental.ZkProgram({
     },
   },
 });
-class RollupStatusProof extends Experimental.ZkProgram.Proof(
-  CreateRollupStatus
-) {}
+class RollupStatusProof extends ZkProgram.Proof(CreateRollupStatus) {}
 
 export class RollupActionsOutput extends Struct({
   requestId: Field,
@@ -166,9 +153,9 @@ export class RollupActionsOutput extends Struct({
   }
 }
 
-export const CreateProofRollupAction = Experimental.ZkProgram({
+export const RollupActions = ZkProgram({
+  name: 'rollup-actions',
   publicOutput: RollupActionsOutput,
-
   methods: {
     nextStep: {
       privateInputs: [
@@ -201,7 +188,7 @@ export const CreateProofRollupAction = Experimental.ZkProgram({
         let sum_R = preProof.publicOutput.sum_R;
         let sum_M = preProof.publicOutput.sum_M;
 
-        for (let i = 0; i < size; i++) {
+        for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
           sum_R.set(Field(i), sum_R.get(Field(i)).add(action.R.get(Field(i))));
           sum_M.set(Field(i), sum_M.get(Field(i)).add(action.M.get(Field(i))));
         }
@@ -222,13 +209,13 @@ export const CreateProofRollupAction = Experimental.ZkProgram({
 
       method(
         requestId: Field,
-        size: Field,
+        REQUEST_MAX_SIZE: Field,
         initialStatusRoot: Field
       ): RollupActionsOutput {
         return new RollupActionsOutput({
           requestId,
-          sum_R: GroupArray.empty(size),
-          sum_M: GroupArray.empty(size),
+          sum_R: GroupArray.empty(REQUEST_MAX_SIZE),
+          sum_M: GroupArray.empty(REQUEST_MAX_SIZE),
           cur_T: Field(0),
           initialStatusRoot,
           finalStatusRoot: initialStatusRoot,
@@ -238,9 +225,7 @@ export const CreateProofRollupAction = Experimental.ZkProgram({
   },
 });
 
-class ProofRollupAction extends Experimental.ZkProgram.Proof(
-  CreateProofRollupAction
-) {}
+class ProofRollupAction extends ZkProgram.Proof(RollupActions) {}
 
 export class RequestHelper extends SmartContract {
   @state(Field) actionState = State<Field>();
@@ -269,26 +254,26 @@ export class RequestHelper extends SmartContract {
     M: GroupArray;
   } {
     let requestId = requestInput.requestId();
-    let dimension = requestInput.secreteVector.length;
+    let dimension = requestInput.secretVector.length;
     let r = new CustomScalarArray();
     let R = new GroupArray();
     let M = new GroupArray();
-    for (let i = 0; i < size; i++) {
+    for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
       let random = Scalar.random();
-      r.push(Utils.CustomScalar.fromScalar(random));
+      r.push(CustomScalar.fromScalar(random));
       R.push(Group.generator.scale(random));
       let M_i = Provable.if(
         Poseidon.hash(
-          requestInput.secreteVector.get(Field(i)).toFields()
+          requestInput.secretVector.get(Field(i)).toFields()
         ).equals(Poseidon.hash([Field(0), Field(0)])),
         Group.generator
-          .scale(requestInput.secreteVector.get(Field(i)).toScalar())
+          .scale(requestInput.secretVector.get(Field(i)).toScalar())
           .add(requestInput.committeePublicKey.toGroup().scale(random)),
         Group.zero.add(requestInput.committeePublicKey.toGroup().scale(random))
       );
       M.push(M_i);
     }
-    let dercementAmount = Field(size).sub(dimension);
+    let dercementAmount = Field(REQUEST_MAX_SIZE).sub(dimension);
     r.decrementLength(dercementAmount);
     R.decrementLength(dercementAmount);
     M.decrementLength(dercementAmount);
@@ -324,7 +309,7 @@ export class RequestHelper extends SmartContract {
     this.rollupStatusRoot.set(proof.publicOutput.finalRollupStatusRoot);
   }
 
-  // to-do: adding N, T to check size by interact with Committee contract
+  // to-do: adding N, T to check REQUEST_MAX_SIZE by interact with Committee contract
   // to-do: request to Request contract
   @method rollupRequest(
     proof: ProofRollupAction,

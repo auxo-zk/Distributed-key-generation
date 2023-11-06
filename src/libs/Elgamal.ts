@@ -1,17 +1,4 @@
-import {
-  Bool,
-  Encryption,
-  Field,
-  Group,
-  MerkleWitness,
-  Poseidon,
-  PrivateKey,
-  Provable,
-  PublicKey,
-  Scalar,
-  Struct,
-  UInt32,
-} from 'o1js';
+import { Group, Poseidon, PrivateKey, PublicKey, Scalar } from 'o1js';
 
 export { encrypt, decrypt };
 

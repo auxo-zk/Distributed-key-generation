@@ -1,23 +1,15 @@
 import {
   Field,
-  SmartContract,
-  state,
-  State,
-  method,
   Reducer,
   Mina,
   PrivateKey,
   PublicKey,
   AccountUpdate,
-  Struct,
-  Experimental,
-  SelfProof,
   Poseidon,
   MerkleMap,
   MerkleTree,
   MerkleWitness,
   fetchAccount,
-  Provable,
 } from 'o1js';
 
 import { getProfiler } from './helper/profiler.js';
@@ -25,8 +17,8 @@ import randomAccounts from './helper/randomAccounts.js';
 import {
   Committee,
   CommitteeInput,
-  createCommitteeProof,
-  GroupArray,
+  CreateCommittee,
+  MemberArray,
   CommitteeRollupState,
   CommitteeMerkleWitness,
   CheckMemberInput,
@@ -34,6 +26,7 @@ import {
 } from '../contracts/Committee.js';
 
 import fs from 'fs/promises';
+import { COMMITTEE_MAX_SIZE } from '../libs/Committee.js';
 
 // check command line arg
 const deployAlias = process.argv[2];
@@ -102,7 +95,7 @@ async function main() {
       await Committee.compile();
     } else {
       console.log('analyzeMethods...');
-      // createCommitteeProof.analyzeMethods();
+      // CreateCommittee.analyzeMethods();
       Committee.analyzeMethods();
     }
     console.log('deploy committeeContract...');
@@ -121,11 +114,11 @@ async function main() {
       return value.toGroup();
     });
     // console.log(`dkg: `, addresses.dkg.toBase58());
-    let myGroupArray1 = new GroupArray(arrayAddress);
+    let myMemberArray1 = new MemberArray(arrayAddress);
 
     console.log('committeeContract.createCommittee: ');
     let input = new CommitteeInput({
-      addresses: myGroupArray1,
+      addresses: myMemberArray1,
       threshold: Field(1),
     });
     tx = await Mina.transaction(feePayer, () => {
@@ -147,11 +140,11 @@ async function main() {
       // console.log(`address: `, value.toBase58());
       return value.toGroup();
     });
-    let myGroupArray2 = new GroupArray(arrayAddress);
+    let myMemberArray2 = new MemberArray(arrayAddress);
 
     console.log('committeeContract.createCommittee: ');
     input = new CommitteeInput({
-      addresses: myGroupArray2,
+      addresses: myMemberArray2,
       threshold: Field(2),
     });
     tx = await Mina.transaction(feePayer, () => {
@@ -167,14 +160,14 @@ async function main() {
 
     // compile proof
     console.log('compile...');
-    ActionCommitteeProfiler.start('createCommitteeProof compile');
-    await createCommitteeProof.compile();
+    ActionCommitteeProfiler.start('CreateCommittee compile');
+    await CreateCommittee.compile();
     ActionCommitteeProfiler.stop().store();
 
     // create first step proof
     console.log('create proof first step...');
-    ActionCommitteeProfiler.start('createCommitteeProof create fist step');
-    let proof = await createCommitteeProof.firstStep(
+    ActionCommitteeProfiler.start('CreateCommittee create fist step');
+    let proof = await CreateCommittee.firstStep(
       new CommitteeRollupState({
         actionHash: Reducer.initialActionState,
         memberTreeRoot: EmptyMerkleMap.getRoot(),
@@ -185,11 +178,11 @@ async function main() {
     ActionCommitteeProfiler.stop().store();
 
     console.log('create proof next step...');
-    ActionCommitteeProfiler.start('createCommitteeProof create next step');
-    proof = await createCommitteeProof.nextStep(
+    ActionCommitteeProfiler.start('CreateCommittee create next step');
+    proof = await CreateCommittee.nextStep(
       proof.publicInput,
       proof,
-      myGroupArray1,
+      myMemberArray1,
       memberMerkleMap.getWitness(Field(0)),
       settingMerkleMap.getWitness(Field(0)),
       Field(1) // threshold
@@ -200,22 +193,22 @@ async function main() {
 
     // memberMerkleTree.set
     let tree = new MerkleTree(treeHeight);
-    for (let i = 0; i < 32; i++) {
-      tree.setLeaf(BigInt(i), GroupArray.hash(myGroupArray1.get(Field(i))));
+    for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+      tree.setLeaf(BigInt(i), MemberArray.hash(myMemberArray1.get(Field(i))));
     }
 
     memberMerkleMap.set(Field(0), tree.getRoot());
     settingMerkleMap.set(
       Field(0),
-      Poseidon.hash([Field(1), myGroupArray1.length])
+      Poseidon.hash([Field(1), myMemberArray1.length])
     );
 
     console.log('create proof next step again...');
-    ActionCommitteeProfiler.start('createCommitteeProof create next step');
-    proof = await createCommitteeProof.nextStep(
+    ActionCommitteeProfiler.start('CreateCommittee create next step');
+    proof = await CreateCommittee.nextStep(
       proof.publicInput,
       proof,
-      myGroupArray2,
+      myMemberArray2,
       memberMerkleMap.getWitness(Field(1)),
       settingMerkleMap.getWitness(Field(1)),
       Field(2) // threshold
@@ -243,14 +236,14 @@ async function main() {
 
     // memberMerkleTree.set
     let tree2 = new MerkleTree(treeHeight);
-    for (let i = 0; i < 32; i++) {
-      tree2.setLeaf(BigInt(i), GroupArray.hash(myGroupArray2.get(Field(i))));
+    for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+      tree2.setLeaf(BigInt(i), MemberArray.hash(myMemberArray2.get(Field(i))));
     }
 
     memberMerkleMap.set(Field(1), tree2.getRoot());
     settingMerkleMap.set(
       Field(1),
-      Poseidon.hash([Field(2), myGroupArray2.length])
+      Poseidon.hash([Field(2), myMemberArray2.length])
     );
 
     console.log(
@@ -318,8 +311,8 @@ async function main() {
 
     // compile proof
     if (actionn == 0 || actionn == 1 || actionn == 2) {
-      console.log('compile createCommitteeProof...');
-      await createCommitteeProof.compile();
+      console.log('compile CreateCommittee...');
+      await CreateCommittee.compile();
       console.log('compile Committee contract... ');
       await Committee.compile();
     }
@@ -343,24 +336,24 @@ async function main() {
     arrayAddress = arrayAddress.map((value) => {
       return value.toGroup();
     });
-    let myGroupArray1 = new GroupArray(arrayAddress);
+    let myMemberArray1 = new MemberArray(arrayAddress);
 
     // memberMerkleTree.set
     let tree = new MerkleTree(treeHeight);
-    for (let i = 0; i < 32; i++) {
-      tree.setLeaf(BigInt(i), GroupArray.hash(myGroupArray1.get(Field(i))));
+    for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+      tree.setLeaf(BigInt(i), MemberArray.hash(myMemberArray1.get(Field(i))));
     }
 
     memberMerkleMap.set(Field(0), tree.getRoot());
     settingMerkleMap.set(
       Field(0),
-      Poseidon.hash([Field(1), myGroupArray1.length])
+      Poseidon.hash([Field(1), myMemberArray1.length])
     );
 
     if (actionn == 1) {
       console.log('committeeContract.createCommittee: ');
       let input = new CommitteeInput({
-        addresses: myGroupArray1,
+        addresses: myMemberArray1,
         threshold: Field(1),
       });
       let tx = await Mina.transaction(
@@ -377,7 +370,7 @@ async function main() {
     if (actionn == 2) {
       // create first step proof
       console.log('create proof first step...');
-      let proof = await createCommitteeProof.firstStep(
+      let proof = await CreateCommittee.firstStep(
         new CommitteeRollupState({
           actionHash: Reducer.initialActionState,
           memberTreeRoot: EmptyMerkleMap.getRoot(),
@@ -386,10 +379,10 @@ async function main() {
         })
       );
       console.log('create proof next step...');
-      proof = await createCommitteeProof.nextStep(
+      proof = await CreateCommittee.nextStep(
         proof.publicInput,
         proof,
-        myGroupArray1,
+        myMemberArray1,
         memberMerkleMap.getWitness(Field(0)),
         settingMerkleMap.getWitness(Field(0)),
         Field(1) // threshold

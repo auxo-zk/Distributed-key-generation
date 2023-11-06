@@ -18,10 +18,7 @@ import {
   SelfProof,
   ZkProgram,
 } from 'o1js';
-import {
-  FieldDynamicArray,
-  GroupDynamicArray,
-} from '@auxo-dev/auxo-libs';
+import { FieldDynamicArray, GroupDynamicArray } from '@auxo-dev/auxo-libs';
 import {
   COMMITTEE_MAX_SIZE,
   ResponseContribution,
@@ -681,9 +678,10 @@ export const FinalizeRound2 = ZkProgram({
         encryptionProof.publicInput.U.length.assertEquals(
           input.action.round2Contribution.U.length
         );
-        for (let i = 0; i < 16; i++) {
+        for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
           let iField = Field(i);
-          encryptionProof.publicInput.publicKeys.get(iField)
+          encryptionProof.publicInput.publicKeys
+            .get(iField)
             .assertEquals(input.publicKeys.get(iField));
           encryptionProof.publicInput.c
             .get(iField)
@@ -696,7 +694,7 @@ export const FinalizeRound2 = ZkProgram({
 
         // Check if members' public keys have been registered
         let publicKeyMT = new MerkleTree(LEVEL2_TREE_HEIGHT);
-        for (let i = 0; i < 16; i++) {
+        for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
           publicKeyMT.setLeaf(
             BigInt(i),
             Poseidon.hash(input.publicKeys.get(Field(i)).toFields())
@@ -853,7 +851,7 @@ export const CompleteResponse = ZkProgram({
         decryptionProof.publicInput.U.length.assertEquals(
           input.action.round2Contribution.U.length
         );
-        for (let i = 0; i < 16; i++) {
+        for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
           let iField = Field(i);
           decryptionProof.publicInput.c
             .get(iField)
@@ -889,7 +887,7 @@ export const CompleteResponse = ZkProgram({
 
         // Calculate new D value
         let D = earlierProof.publicOutput.D;
-        for (let i = 0; i < 64; i++) {
+        for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
           D.set(
             Field(i),
             D.get(Field(i)).add(

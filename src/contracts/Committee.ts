@@ -88,7 +88,7 @@ export const CreateCommittee = ZkProgram({
         nextCommitteeId.assertEquals(preProof.publicOutput.currentCommitteeId);
         preMemberRoot.assertEquals(preProof.publicOutput.memberTreeRoot);
         let tree = new MerkleTree(LEVEL2_TREE_HEIGHT);
-        for (let i = 0; i < 32; i++) {
+        for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
           tree.setLeaf(BigInt(i), MemberArray.hash(publickeys.get(Field(i))));
         }
         // update new tree of public key in to the member tree
@@ -127,9 +127,7 @@ export const CreateCommittee = ZkProgram({
   },
 });
 
-class CommitteeProof extends ZkProgram.Proof(
-  CreateCommittee
-) {}
+class CommitteeProof extends ZkProgram.Proof(CreateCommittee) {}
 
 export class CommitteeInput extends Struct({
   addresses: MemberArray,
