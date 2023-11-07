@@ -297,9 +297,6 @@ async function main() {
     let p2Address = PublicKey.fromBase58(
       'B62qo2KEdpRTGDu9hQDc8gTRLJn5G37PKAoiAam7PUBhtyd9ZKGyrzv'
     );
-    let dkgAddress = PublicKey.fromBase58(
-      `B62qrePDizNdTqLbqhzWTAQpj4MmdSNvYrj4pwdpmZ8AApLR38cuWpX`
-    );
 
     // compile proof
     if (actionn == 0 || actionn == 1 || actionn == 2) {
