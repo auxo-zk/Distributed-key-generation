@@ -2,6 +2,7 @@ import {
   Bool,
   Experimental,
   Field,
+  Gadgets,
   Group,
   Poseidon,
   PrivateKey,
@@ -36,11 +37,10 @@ export const Elgamal = ZkProgram({
       method(input: ElgamalInput, plain: Scalar, random: Scalar) {
         input.U.assertEquals(Group.generator.scale(random));
         let V = input.pubKey.toGroup().scale(random);
-        let k = Bit255.fromBigInt(
-          Poseidon.hash(input.U.toFields().concat(V.toFields())).toBigInt()
-        );
+        let k = Poseidon.hash(input.U.toFields().concat(V.toFields()));
+        let kBits = Bit255.fromBits(k.toBits());
         let plainBits = Bit255.fromScalar(plain);
-        let encrypted = Bit255.xor(plainBits, k);
+        let encrypted = Bit255.xor(plainBits, kBits);
         encrypted.assertEquals(input.cipher);
       },
     },
@@ -48,10 +48,9 @@ export const Elgamal = ZkProgram({
       privateInputs: [Scalar, PrivateKey],
       method(input: ElgamalInput, plain: Scalar, prvKey: PrivateKey) {
         let V = input.U.scale(Scalar.fromFields(prvKey.toFields()));
-        let k = Bit255.fromBigInt(
-          Poseidon.hash(input.U.toFields().concat(V.toFields())).toBigInt()
-        );
-        let decrypted = Bit255.xor(input.cipher, k);
+        let k = Poseidon.hash(input.U.toFields().concat(V.toFields()));
+        let kBits = Bit255.fromBits(k.toBits());
+        let decrypted = Bit255.xor(input.cipher, kBits);
         decrypted.assertEquals(Bit255.fromScalar(plain));
       },
     },
@@ -97,11 +96,10 @@ export const BatchEncryption = ZkProgram({
             .add(Group.generator)
             .scale(random)
             .sub(Group.generator.scale(random));
-          let k = Bit255.fromBigInt(
-            Poseidon.hash(input.U.toFields().concat(V.toFields())).toBigInt()
-          );
+            let k = Poseidon.hash(input.U.toFields().concat(V.toFields()));
+            let kBits = Bit255.fromBits(k.toBits());
           let plainBits = Bit255.fromScalar(plain);
-          let encrypted = Bit255.xor(plainBits, k);
+          let encrypted = Bit255.xor(plainBits, kBits);
           Provable.if(
             input.memberId.equals(iField),
             Bool(true),
@@ -141,12 +139,10 @@ export const BatchDecryption = ZkProgram({
           let iField = Field(i);
           let plain = polynomialValues.get(iField).toScalar();
           let cipher = input.c.get(iField);
-          // Avoid scaling zero point
           let V = input.U.get(iField).scale(privateKey);
-          let k = Bit255.fromBigInt(
-            Poseidon.hash(input.U.toFields().concat(V.toFields())).toBigInt()
-          );
-          let decrypted = Bit255.xor(cipher, k);
+          let k = Poseidon.hash(input.U.toFields().concat(V.toFields()));
+          let kBits = Bit255.fromBits(k.toBits());
+          let decrypted = Bit255.xor(cipher, kBits);
           Provable.if(
             input.memberId.equals(iField),
             Bool(true),

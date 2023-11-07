@@ -20,6 +20,15 @@ import { COMMITTEE_MAX_SIZE } from '../libs/Committee.js';
 import { updateOutOfSnark } from '../libs/utils.js';
 
 export const LEVEL2_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;
+export class Level1MT extends MerkleMap {}
+export class Level1Witness extends MerkleMapWitness {}
+export class Level2MT extends MerkleTree {}
+export class Level2Witness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
+export class FullMTWitness extends Struct({
+  level1: Level1Witness,
+  level2: Level2Witness,
+}) {}
+
 const EmptyMerkleMap = new MerkleMap();
 export class CommitteeMerkleWitness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
 export class MemberArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
@@ -134,6 +143,11 @@ export class CommitteeInput extends Struct({
   threshold: Field,
 }) {}
 
+export enum EventEnum {
+  CREATE_COMMITEE = 'create-committee',
+  COMMITTEE_CREATED = 'committee-created',
+}
+
 export class Committee extends SmartContract {
   @state(Field) nextCommitteeId = State<Field>();
   @state(Field) memberTreeRoot = State<Field>();
@@ -144,8 +158,8 @@ export class Committee extends SmartContract {
   reducer = Reducer({ actionType: CommitteeInput });
 
   events = {
-    'committee-input': CommitteeInput,
-    'last-committee-id': Field,
+    [EventEnum.CREATE_COMMITEE]: CommitteeInput,
+    [EventEnum.COMMITTEE_CREATED]: Field,
   };
 
   init() {
@@ -159,7 +173,7 @@ export class Committee extends SmartContract {
     input.threshold.assertLessThanOrEqual(input.addresses.length);
     this.reducer.dispatch(input);
 
-    this.emitEvent('committee-input', input);
+    this.emitEvent(EventEnum.CREATE_COMMITEE, input);
   }
 
   @method rollupIncrements(proof: CommitteeProof) {
@@ -183,7 +197,7 @@ export class Committee extends SmartContract {
     this.memberTreeRoot.set(proof.publicOutput.memberTreeRoot);
     this.settingTreeRoot.set(proof.publicOutput.settingTreeRoot);
 
-    this.emitEvent('last-committee-id', proof.publicOutput.currentCommitteeId);
+    this.emitEvent(EventEnum.COMMITTEE_CREATED, proof.publicOutput.currentCommitteeId);
   }
   // Add memberIndex to input for checking
   @method checkMember(input: CheckMemberInput): Field {

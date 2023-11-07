@@ -37,13 +37,17 @@ import {
 
 const doProofs = false;
 
-describe('Committee', () => {
+describe('DKG', () => {
   const EmptyMerkleMap = new MerkleMap();
   const treeHeight = 6; // setting max 32 member
   const memberMerkleMap = new MerkleMap();
   const dkgAddressMerkleMap = new MerkleMap();
   const settingMerkleMap = new MerkleMap();
   class memberMerkleTreeWitness extends MerkleWitness(treeHeight) {}
+  let feePayerKey: any;
+  let feePayer: any;
+  let committeeContract: any;
+  let dkgContract: any;
 
   let { keys, addresses } = randomAccounts(
     'committee',
@@ -60,10 +64,10 @@ describe('Committee', () => {
   DKGProfiler.start('DKG test flow');
 
   beforeAll(async () => {
-    // let Local = Mina.LocalBlockchain({ proofsEnabled: doProofs });
-    // Mina.setActiveInstance(Local);
-    // feePayerKey = Local.testAccounts[0].privateKey;
-    // feePayer = Local.testAccounts[0].publicKey;
+    let Local = Mina.LocalBlockchain({ proofsEnabled: doProofs });
+    Mina.setActiveInstance(Local);
+    feePayerKey = Local.testAccounts[0].privateKey;
+    feePayer = Local.testAccounts[0].publicKey;
     // committeeContract = new Committee(addresses.committee);
     // if (doProofs) {
     //   await Committee.compile();
@@ -88,30 +92,30 @@ describe('Committee', () => {
   // beforeEach(() => {});
 
   it('Should compile all ZK programs', async () => {
-    DKGProfiler.start('GenerateKey.compile');
-    await GenerateKey.compile();
-    DKGProfiler.stop();
-    console.log(GenerateKey.analyzeMethods());
-    DKGProfiler.start('DeprecateKey.compile');
-    await DeprecateKey.compile();
-    DKGProfiler.stop();
-    console.log(DeprecateKey.analyzeMethods());
-    DKGProfiler.start('FinalizeRound1.compile');
-    await FinalizeRound1.compile();
-    DKGProfiler.stop();
-    console.log(FinalizeRound1.analyzeMethods());
-    DKGProfiler.start('Elgamal.compile');
-    await Elgamal.compile();
-    DKGProfiler.stop();
-    console.log(Elgamal.analyzeMethods());
-    DKGProfiler.start('BatchEncryption.compile');
-    await BatchEncryption.compile();
-    DKGProfiler.stop();
-    console.log(BatchEncryption.analyzeMethods());
-    DKGProfiler.start('FinalizeRound2.compile');
-    await FinalizeRound2.compile();
-    DKGProfiler.stop();
-    console.log(FinalizeRound2.analyzeMethods());
+    // DKGProfiler.start('GenerateKey.compile');
+    // await GenerateKey.compile();
+    // DKGProfiler.stop();
+    // console.log(GenerateKey.analyzeMethods());
+    // DKGProfiler.start('DeprecateKey.compile');
+    // await DeprecateKey.compile();
+    // DKGProfiler.stop();
+    // console.log(DeprecateKey.analyzeMethods());
+    // DKGProfiler.start('FinalizeRound1.compile');
+    // await FinalizeRound1.compile();
+    // DKGProfiler.stop();
+    // console.log(FinalizeRound1.analyzeMethods());
+    // DKGProfiler.start('Elgamal.compile');
+    // await Elgamal.compile();
+    // DKGProfiler.stop();
+    // console.log(Elgamal.analyzeMethods());
+    // DKGProfiler.start('BatchEncryption.compile');
+    // await BatchEncryption.compile();
+    // DKGProfiler.stop();
+    // console.log(BatchEncryption.analyzeMethods());
+    // DKGProfiler.start('FinalizeRound2.compile');
+    // await FinalizeRound2.compile();
+    // DKGProfiler.stop();
+    // console.log(FinalizeRound2.analyzeMethods());
     DKGProfiler.start('BatchDecryption.compile');
     await BatchDecryption.compile();
     DKGProfiler.stop();
