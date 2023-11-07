@@ -23,6 +23,7 @@ import {
   CommitteeMerkleWitness,
   CheckMemberInput,
   CheckConfigInput,
+  LEVEL2_TREE_HEIGHT,
 } from '../contracts/Committee.js';
 
 import fs from 'fs/promises';
@@ -38,7 +39,7 @@ node build/src/interact.js <deployAlias>
 Example: 
 node build/src/scripts/Committee.js committeeberkeley
 `);
-Error.stackTraceLimit = 1000;
+Error.stackTraceLimit = 10000000;
 
 // parse config and private key from file
 type Config = {
@@ -56,12 +57,10 @@ type Config = {
 
 const EmptyMerkleMap = new MerkleMap();
 
-const treeHeight = 6; // setting max 32 member
-// const memberMerkleTree = new MerkleTree(treeHeight);
 const memberMerkleMap = new MerkleMap();
 const settingMerkleMap = new MerkleMap();
 
-class memberMerkleTreeWitness extends MerkleWitness(treeHeight) {}
+class memberMerkleTreeWitness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
 
 const isLocal = false;
 // 0: deploy
@@ -98,6 +97,13 @@ async function main() {
       // CreateCommittee.analyzeMethods();
       Committee.analyzeMethods();
     }
+
+    // compile proof
+    console.log('compile...');
+    ActionCommitteeProfiler.start('CreateCommittee compile');
+    await CreateCommittee.compile();
+    ActionCommitteeProfiler.stop().store();
+
     console.log('deploy committeeContract...');
     let tx = await Mina.transaction(feePayer, () => {
       AccountUpdate.fundNewAccount(feePayer, 1);
@@ -109,11 +115,6 @@ async function main() {
     // create commitee consist of 2 people with thresh hold 1
     let arrayAddress = [];
     arrayAddress.push(addresses.p1, addresses.p2);
-    arrayAddress = arrayAddress.map((value) => {
-      // console.log(`address: `, value.toBase58());
-      return value.toGroup();
-    });
-    // console.log(`dkg: `, addresses.dkg.toBase58());
     let myMemberArray1 = new MemberArray(arrayAddress);
 
     console.log('committeeContract.createCommittee: ');
@@ -138,7 +139,7 @@ async function main() {
     arrayAddress.push(addresses.p3, addresses.p4, addresses.p5);
     arrayAddress = arrayAddress.map((value) => {
       // console.log(`address: `, value.toBase58());
-      return value.toGroup();
+      return value;
     });
     let myMemberArray2 = new MemberArray(arrayAddress);
 
@@ -157,12 +158,6 @@ async function main() {
       'actionState in Committee contract (account):',
       committeeContract.account.actionState.get()
     );
-
-    // compile proof
-    console.log('compile...');
-    ActionCommitteeProfiler.start('CreateCommittee compile');
-    await CreateCommittee.compile();
-    ActionCommitteeProfiler.stop().store();
 
     // create first step proof
     console.log('create proof first step...');
@@ -192,8 +187,8 @@ async function main() {
     ////// udpate data to local
 
     // memberMerkleTree.set
-    let tree = new MerkleTree(treeHeight);
-    for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+    let tree = new MerkleTree(LEVEL2_TREE_HEIGHT);
+    for (let i = 0; i < Number(myMemberArray1.length); i++) {
       tree.setLeaf(BigInt(i), MemberArray.hash(myMemberArray1.get(Field(i))));
     }
 
@@ -235,8 +230,8 @@ async function main() {
     ////// udpate data to local
 
     // memberMerkleTree.set
-    let tree2 = new MerkleTree(treeHeight);
-    for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+    let tree2 = new MerkleTree(LEVEL2_TREE_HEIGHT);
+    for (let i = 0; i < Number(myMemberArray2.length); i++) {
       tree2.setLeaf(BigInt(i), MemberArray.hash(myMemberArray2.get(Field(i))));
     }
 
@@ -258,7 +253,7 @@ async function main() {
     // check if memerber belong to committeeId
     console.log('committeeContract.checkMember p2: ');
     let checkInput = new CheckMemberInput({
-      address: addresses.p2.toGroup(),
+      address: addresses.p2,
       commiteeId: Field(0),
       memberMerkleTreeWitness: new CommitteeMerkleWitness(tree.getWitness(1n)),
       memberMerkleMapWitness: memberMerkleMap.getWitness(Field(0)),
@@ -302,9 +297,6 @@ async function main() {
     let p2Address = PublicKey.fromBase58(
       'B62qo2KEdpRTGDu9hQDc8gTRLJn5G37PKAoiAam7PUBhtyd9ZKGyrzv'
     );
-    let dkgPrivateKey = PrivateKey.fromBase58(
-      `EKF8JaLaz37toeHftZ6AGVFvdBzF5QiDZgxkmbnQxpSjEdNts7Ts`
-    );
     let dkgAddress = PublicKey.fromBase58(
       `B62qrePDizNdTqLbqhzWTAQpj4MmdSNvYrj4pwdpmZ8AApLR38cuWpX`
     );
@@ -333,14 +325,11 @@ async function main() {
     // create commitee consist of 2 people with thresh hold 1
     let arrayAddress = [];
     arrayAddress.push(p1Address, p2Address);
-    arrayAddress = arrayAddress.map((value) => {
-      return value.toGroup();
-    });
     let myMemberArray1 = new MemberArray(arrayAddress);
 
     // memberMerkleTree.set
-    let tree = new MerkleTree(treeHeight);
-    for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+    let tree = new MerkleTree(LEVEL2_TREE_HEIGHT);
+    for (let i = 0; i < Number(myMemberArray1.length); i++) {
       tree.setLeaf(BigInt(i), MemberArray.hash(myMemberArray1.get(Field(i))));
     }
 
@@ -363,7 +352,7 @@ async function main() {
         }
       );
       await tx.prove();
-      await tx.sign([feePayerKey, dkgPrivateKey]).send();
+      await tx.sign([feePayerKey]).send();
       console.log('committeeContract.createCommittee sent!...');
     }
 
@@ -403,7 +392,7 @@ async function main() {
       // check if memerber belong to committeeId
       console.log('committeeContract.checkMember p2: ');
       let checkInput = new CheckMemberInput({
-        address: p2Address.toGroup(),
+        address: p2Address,
         commiteeId: Field(0),
         memberMerkleTreeWitness: new CommitteeMerkleWitness(
           tree.getWitness(1n)
