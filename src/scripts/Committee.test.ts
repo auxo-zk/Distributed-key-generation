@@ -81,10 +81,6 @@ describe('Committee', () => {
   it('Create commitee consist of 2 people with threshhold 1, and test deploy DKG', async () => {
     let arrayAddress = [];
     arrayAddress.push(addresses.p1, addresses.p2);
-    arrayAddress = arrayAddress.map((value) => {
-      return value.toGroup();
-    });
-
     myMemberArray1 = new MemberArray(arrayAddress);
 
     let input = new CommitteeInput({
@@ -102,10 +98,6 @@ describe('Committee', () => {
   it('Create commitee consist of 3 people with threshhold 2', async () => {
     let arrayAddress = [];
     arrayAddress.push(addresses.p3, addresses.p4, addresses.p5);
-    arrayAddress = arrayAddress.map((value) => {
-      return value.toGroup();
-    });
-
     myMemberArray2 = new MemberArray(arrayAddress);
 
     let input = new CommitteeInput({
@@ -155,7 +147,7 @@ describe('Committee', () => {
 
     // memberMerkleTree.set
     tree1 = new MerkleTree(treeHeight);
-    for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+    for (let i = 0; i < Number(myMemberArray1.length); i++) {
       tree1.setLeaf(BigInt(i), MemberArray.hash(myMemberArray1.get(Field(i))));
     }
 
@@ -181,7 +173,7 @@ describe('Committee', () => {
 
     // memberMerkleTree.set
     tree2 = new MerkleTree(treeHeight);
-    for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+    for (let i = 0; i < Number(myMemberArray2.length); i++) {
       tree2.setLeaf(BigInt(i), MemberArray.hash(myMemberArray2.get(Field(i))));
     }
 
@@ -203,7 +195,7 @@ describe('Committee', () => {
   it('check if p2 belong to committee 0', async () => {
     // check if memerber belong to committeeId
     let checkInput = new CheckMemberInput({
-      address: addresses.p2.toGroup(),
+      address: addresses.p2,
       commiteeId: Field(0),
       memberMerkleTreeWitness: new CommitteeMerkleWitness(tree1.getWitness(1n)),
       memberMerkleMapWitness: memberMerkleMap.getWitness(Field(0)),
@@ -218,7 +210,7 @@ describe('Committee', () => {
   it('check if p2 belong to committee 1: to throw error', async () => {
     // check if memerber belong to committeeId
     let checkInput = new CheckMemberInput({
-      address: addresses.p2.toGroup(),
+      address: addresses.p2,
       commiteeId: Field(1),
       memberMerkleTreeWitness: new CommitteeMerkleWitness(tree1.getWitness(1n)),
       memberMerkleMapWitness: memberMerkleMap.getWitness(Field(1)),

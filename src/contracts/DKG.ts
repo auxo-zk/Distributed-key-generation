@@ -977,7 +977,7 @@ export class DKGContract extends SmartContract {
     const committeeContract = new Committee(committee.address);
     let memberId = committeeContract.checkMember(
       new CheckMemberInput({
-        address: this.sender.toGroup(),
+        address: this.sender,
         commiteeId: action.committeeId,
         memberMerkleTreeWitness: memberMerkleTreeWitness,
         memberMerkleMapWitness: memberMerkleMapWitness,

@@ -5,7 +5,6 @@ import {
   State,
   method,
   MerkleWitness,
-  Group,
   Reducer,
   MerkleTree,
   MerkleMap,
@@ -13,9 +12,11 @@ import {
   Struct,
   SelfProof,
   Poseidon,
+  Provable,
   ZkProgram,
+  PublicKey,
 } from 'o1js';
-import { GroupDynamicArray } from '@auxo-dev/auxo-libs';
+import { PublicKeyDynamicArray } from '@auxo-dev/auxo-libs';
 import { COMMITTEE_MAX_SIZE } from '../libs/Committee.js';
 import { updateOutOfSnark } from '../libs/utils.js';
 
@@ -31,7 +32,7 @@ export class FullMTWitness extends Struct({
 
 const EmptyMerkleMap = new MerkleMap();
 export class CommitteeMerkleWitness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
-export class MemberArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
+export class MemberArray extends PublicKeyDynamicArray(COMMITTEE_MAX_SIZE) {}
 
 export class CommitteeRollupState extends Struct({
   actionHash: Field,
@@ -50,7 +51,7 @@ export class CommitteeRollupState extends Struct({
 }
 
 export class CheckMemberInput extends Struct({
-  address: Group,
+  address: PublicKey,
   commiteeId: Field,
   memberMerkleTreeWitness: CommitteeMerkleWitness,
   memberMerkleMapWitness: MerkleMapWitness,
@@ -98,7 +99,12 @@ export const CreateCommittee = ZkProgram({
         preMemberRoot.assertEquals(preProof.publicOutput.memberTreeRoot);
         let tree = new MerkleTree(LEVEL2_TREE_HEIGHT);
         for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
-          tree.setLeaf(BigInt(i), MemberArray.hash(publickeys.get(Field(i))));
+          let value = Provable.if(
+            Field(i).greaterThanOrEqual(publickeys.length),
+            Field(0),
+            MemberArray.hash(publickeys.get(Field(i)))
+          );
+          tree.setLeaf(BigInt(i), value);
         }
         // update new tree of public key in to the member tree
         let [newMemberRoot] = memberWitness.computeRootAndKey(tree.getRoot());
