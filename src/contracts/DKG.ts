@@ -1080,8 +1080,8 @@ export class DKGContract extends SmartContract {
     const committeeContract = new Committee(committee.address);
     committeeContract.checkConfig(
       new CheckConfigInput({
-        n: proof.publicInput.N,
-        t: proof.publicInput.T,
+        N: proof.publicInput.N,
+        T: proof.publicInput.T,
         // FIXME - check all contribution action belongs to the same key
         commiteeId: proof.publicInput.action.committeeId,
         settingMerkleMapWitness: settingMerkleMapWitness,
@@ -1136,8 +1136,8 @@ export class DKGContract extends SmartContract {
     const committeeContract = new Committee(committee.address);
     committeeContract.checkConfig(
       new CheckConfigInput({
-        n: proof.publicInput.N,
-        t: proof.publicInput.T,
+        N: proof.publicInput.N,
+        T: proof.publicInput.T,
         // FIXME - check all contribution action belongs to the same key
         commiteeId: proof.publicInput.action.committeeId,
         settingMerkleMapWitness: settingMerkleMapWitness,
@@ -1190,8 +1190,8 @@ export class DKGContract extends SmartContract {
     const committeeContract = new Committee(committee.address);
     committeeContract.checkConfig(
       new CheckConfigInput({
-        n: proof.publicInput.N,
-        t: proof.publicInput.T,
+        N: proof.publicInput.N,
+        T: proof.publicInput.T,
         // FIXME - check all contribution action belongs to the same key
         commiteeId: proof.publicInput.action.committeeId,
         settingMerkleMapWitness: settingMerkleMapWitness,

@@ -58,8 +58,8 @@ export class CheckMemberInput extends Struct({
 }) {}
 
 export class CheckConfigInput extends Struct({
-  n: Field,
-  t: Field,
+  N: Field,
+  T: Field,
   commiteeId: Field,
   settingMerkleMapWitness: MerkleMapWitness,
 }) {}
@@ -203,7 +203,10 @@ export class Committee extends SmartContract {
     this.memberTreeRoot.set(proof.publicOutput.memberTreeRoot);
     this.settingTreeRoot.set(proof.publicOutput.settingTreeRoot);
 
-    this.emitEvent(EventEnum.COMMITTEE_CREATED, proof.publicOutput.currentCommitteeId);
+    this.emitEvent(
+      EventEnum.COMMITTEE_CREATED,
+      proof.publicOutput.currentCommitteeId
+    );
   }
   // Add memberIndex to input for checking
   @method checkMember(input: CheckMemberInput): Field {
@@ -220,9 +223,9 @@ export class Committee extends SmartContract {
   }
 
   @method checkConfig(input: CheckConfigInput) {
-    input.n.assertGreaterThanOrEqual(input.t);
-    // hash[t,n]
-    let hashSetting = Poseidon.hash([input.t, input.n]);
+    input.N.assertGreaterThanOrEqual(input.T);
+    // hash[T,N]
+    let hashSetting = Poseidon.hash([input.T, input.N]);
     let [root, _commiteeId] =
       input.settingMerkleMapWitness.computeRootAndKey(hashSetting);
     const onChainRoot = this.settingTreeRoot.getAndAssertEquals();
