@@ -1,7 +1,7 @@
 {
   "name": "dkg",
   "version": "0.1.0",
-  "description": "",
+  "description": "Auxo's DKG Module for the On-chain Funding platform on Mina blockchain",
   "author": "",
   "license": "Apache-2.0",
   "keywords": [

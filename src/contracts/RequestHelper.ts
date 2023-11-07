@@ -30,7 +30,7 @@ import { updateOutOfSnark } from '../libs/utils.js';
 
 const EmptyMerkleMap = new MerkleMap();
 export class CustomScalarArray extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
-export class GroupArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
+export class RequestVector extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 
 export class RequestHelperInput extends Struct({
   committeeId: Field,
@@ -48,8 +48,8 @@ export class RequestHelperInput extends Struct({
 
 export class RequestHelperAction extends Struct({
   requestId: Field,
-  R: GroupArray,
-  M: GroupArray,
+  R: RequestVector,
+  M: RequestVector,
 }) {
   toFields(): Field[] {
     return [this.requestId, this.R.toFields(), this.M.toFields()].flat();
@@ -132,8 +132,8 @@ class RollupStatusProof extends ZkProgram.Proof(CreateRollupStatus) {}
 
 export class RollupActionsOutput extends Struct({
   requestId: Field,
-  sum_R: GroupArray,
-  sum_M: GroupArray,
+  sum_R: RequestVector,
+  sum_M: RequestVector,
   cur_T: Field,
   initialStatusRoot: Field,
   finalStatusRoot: Field,
@@ -213,8 +213,8 @@ export const RollupActions = ZkProgram({
       ): RollupActionsOutput {
         return new RollupActionsOutput({
           requestId,
-          sum_R: GroupArray.empty(REQUEST_MAX_SIZE),
-          sum_M: GroupArray.empty(REQUEST_MAX_SIZE),
+          sum_R: RequestVector.empty(REQUEST_MAX_SIZE),
+          sum_M: RequestVector.empty(REQUEST_MAX_SIZE),
           cur_T: Field(0),
           initialStatusRoot,
           finalStatusRoot: initialStatusRoot,
@@ -249,14 +249,14 @@ export class RequestHelper extends SmartContract {
 
   @method request(requestInput: RequestHelperInput): {
     r: CustomScalarArray;
-    R: GroupArray;
-    M: GroupArray;
+    R: RequestVector;
+    M: RequestVector;
   } {
     let requestId = requestInput.requestId();
     let dimension = requestInput.secretVector.length;
     let r = new CustomScalarArray();
-    let R = new GroupArray();
-    let M = new GroupArray();
+    let R = new RequestVector();
+    let M = new RequestVector();
     for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
       let random = Scalar.random();
       r.push(CustomScalar.fromScalar(random));

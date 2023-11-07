@@ -1,3 +1,2 @@
-import { Committee } from './contracts/Committee';
-
-export { Committee };
+export * as ZkApp from './contracts/index.js';
+export * as Libs from './libs/index.js';
