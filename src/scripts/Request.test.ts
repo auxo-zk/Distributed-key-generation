@@ -18,7 +18,7 @@ import {
 import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
 import {
-  Request,
+  RequestContract,
   RequestInput,
   CreateRequest,
   RequestValue,
@@ -29,8 +29,6 @@ import {
   RequestAction,
   RequestStatusEnum,
 } from '../contracts/Request.js';
-import { Committee } from '../contracts/Committee.js';
-import { FieldDynamicArray } from '@auxo-dev/auxo-libs';
 
 const doProofs = false;
 
@@ -52,7 +50,7 @@ describe('Testing Request Contract', () => {
   );
   let feePayerKey: PrivateKey;
   let feePayer: PublicKey;
-  let requestContract: Request;
+  let requestContract: RequestContract;
   let proof: Proof<Void, RollupStateOutput>;
   let R1: RequestValue = RequestValue.from([
     addresses.R1.toGroup(),
@@ -141,7 +139,7 @@ describe('Testing Request Contract', () => {
     Mina.setActiveInstance(Local);
     feePayerKey = Local.testAccounts[0].privateKey;
     feePayer = Local.testAccounts[0].publicKey;
-    requestContract = new Request(addresses.request);
+    requestContract = new RequestContract(addresses.request);
 
     let tx = await Mina.transaction(feePayer, () => {
       AccountUpdate.fundNewAccount(feePayer, 4);
@@ -155,10 +153,10 @@ describe('Testing Request Contract', () => {
     await tx.sign([feePayerKey, keys.request]).send();
 
     if (doProofs) {
-      await Request.compile();
+      await RequestContract.compile();
     } else {
       console.log('AnalyzeMethods...');
-      Request.analyzeMethods();
+      RequestContract.analyzeMethods();
       console.log('Done analyzeMethods');
     }
   });
