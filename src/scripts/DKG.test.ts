@@ -28,6 +28,7 @@ import {
   FinalizeRound1,
   FinalizeRound2,
   GenerateKey,
+  ReduceActions,
 } from '../contracts/DKG.js';
 import {
   BatchDecryption,
@@ -89,45 +90,58 @@ describe('DKG', () => {
     // await tx.sign([feePayerKey]).send();
   });
 
-  // beforeEach(() => {});
+  // beforeEach(() => {jest.setTimeout(2000000)});
 
   it('Should compile all ZK programs', async () => {
-    // DKGProfiler.start('GenerateKey.compile');
-    // await GenerateKey.compile();
-    // DKGProfiler.stop();
-    // console.log(GenerateKey.analyzeMethods());
-    // DKGProfiler.start('DeprecateKey.compile');
-    // await DeprecateKey.compile();
-    // DKGProfiler.stop();
-    // console.log(DeprecateKey.analyzeMethods());
-    // DKGProfiler.start('FinalizeRound1.compile');
-    // await FinalizeRound1.compile();
-    // DKGProfiler.stop();
-    // console.log(FinalizeRound1.analyzeMethods());
+    console.log('Compiling ReduceActions...');
+    DKGProfiler.start('ReduceActions.compile');
+    await ReduceActions.compile();
+    DKGProfiler.stop();
+    console.log('Done!');
+    console.log('Compiling GenerateKey...');
+    DKGProfiler.start('GenerateKey.compile');
+    await GenerateKey.compile();
+    DKGProfiler.stop();
+    console.log('Done!');
+    console.log('Compiling DeprecateKey...');
+    DKGProfiler.start('DeprecateKey.compile');
+    await DeprecateKey.compile();
+    DKGProfiler.stop();
+    console.log('Done!');
+    console.log('Compiling FinalizeRound1...');
+    DKGProfiler.start('FinalizeRound1.compile');
+    await FinalizeRound1.compile();
+    DKGProfiler.stop();
+    console.log('Done!');
     // DKGProfiler.start('Elgamal.compile');
     // await Elgamal.compile();
     // DKGProfiler.stop();
-    // console.log(Elgamal.analyzeMethods());
-    // DKGProfiler.start('BatchEncryption.compile');
-    // await BatchEncryption.compile();
-    // DKGProfiler.stop();
-    // console.log(BatchEncryption.analyzeMethods());
-    // DKGProfiler.start('FinalizeRound2.compile');
-    // await FinalizeRound2.compile();
-    // DKGProfiler.stop();
-    // console.log(FinalizeRound2.analyzeMethods());
+    console.log('Compiling BatchEncryption...');
+    DKGProfiler.start('BatchEncryption.compile');
+    await BatchEncryption.compile();
+    DKGProfiler.stop();
+    console.log('Done!');
+    console.log('Compiling FinalizeRound2...');
+    DKGProfiler.start('FinalizeRound2.compile');
+    await FinalizeRound2.compile();
+    DKGProfiler.stop();
+    console.log('Done!');
+    console.log('Compiling BatchDecryption...');
     DKGProfiler.start('BatchDecryption.compile');
     await BatchDecryption.compile();
     DKGProfiler.stop();
-    console.log(BatchDecryption.analyzeMethods());
+    console.log('Done!');
+    console.log('Compiling CompleteResponse...');
     DKGProfiler.start('CompleteResponse.compile');
     await CompleteResponse.compile();
     DKGProfiler.stop();
-    console.log(CompleteResponse.analyzeMethods());
+    console.log('Done!');
+    console.log('Compiling DKGContract...');
     DKGProfiler.start('DKGContract.compile');
     await DKGContract.compile();
     DKGProfiler.stop();
-    console.log(DKGContract.analyzeMethods());
+    console.log('Done!');
+    // console.log(DKGContract.analyzeMethods());
   });
 
   afterAll(async () => {
