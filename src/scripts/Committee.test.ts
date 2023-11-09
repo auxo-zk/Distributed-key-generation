@@ -15,7 +15,7 @@ import {
 import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
 import {
-  Committee,
+  CommitteeContract,
   CommitteeInput,
   CreateCommittee,
   MemberArray,
@@ -45,7 +45,7 @@ describe('Committee', () => {
   );
   let feePayerKey: PrivateKey;
   let feePayer: PublicKey;
-  let committeeContract: Committee;
+  let committeeContract: CommitteeContract;
   let proof: Proof<CommitteeRollupState, CommitteeRollupState>;
   let myMemberArray1: MemberArray;
   let threshold1 = Field(1);
@@ -61,12 +61,12 @@ describe('Committee', () => {
     Mina.setActiveInstance(Local);
     feePayerKey = Local.testAccounts[0].privateKey;
     feePayer = Local.testAccounts[0].publicKey;
-    committeeContract = new Committee(addresses.committee);
+    committeeContract = new CommitteeContract(addresses.committee);
     if (doProofs) {
-      await Committee.compile();
+      await CommitteeContract.compile();
     } else {
       // CreateCommittee.analyzeMethods();
-      Committee.analyzeMethods();
+      CommitteeContract.analyzeMethods();
     }
 
     let tx = await Mina.transaction(feePayer, () => {

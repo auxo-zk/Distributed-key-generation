@@ -238,7 +238,7 @@ export const CreateRequest = ZkProgram({
 
 export class RequestProof extends ZkProgram.Proof(CreateRequest) {}
 
-export class Request extends SmartContract {
+export class RequestContract extends SmartContract {
   // requestId = hash(committeeId, keyId, hash(valueR))
   // -> state: enable to check if request the same data
   // state: 0: not yet requested

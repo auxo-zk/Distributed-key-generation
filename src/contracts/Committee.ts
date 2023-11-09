@@ -154,7 +154,7 @@ export enum EventEnum {
   COMMITTEE_CREATED = 'committee-created',
 }
 
-export class Committee extends SmartContract {
+export class CommitteeContract extends SmartContract {
   @state(Field) nextCommitteeId = State<Field>();
   @state(Field) memberTreeRoot = State<Field>();
   @state(Field) settingTreeRoot = State<Field>();

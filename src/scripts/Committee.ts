@@ -15,7 +15,7 @@ import {
 import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
 import {
-  Committee,
+  CommitteeContract,
   CommitteeInput,
   CreateCommittee,
   MemberArray,
@@ -88,14 +88,14 @@ async function main() {
     let feePayerKey = Local.testAccounts[0].privateKey;
     let feePayer = Local.testAccounts[0].publicKey;
     // the committeeContract account
-    let committeeContract = new Committee(addresses.committee);
+    let committeeContract = new CommitteeContract(addresses.committee);
     if (doProofs) {
       console.log('compile');
-      await Committee.compile();
+      await CommitteeContract.compile();
     } else {
       console.log('analyzeMethods...');
       // CreateCommittee.analyzeMethods();
-      Committee.analyzeMethods();
+      CommitteeContract.analyzeMethods();
     }
 
     // compile proof
@@ -284,7 +284,7 @@ async function main() {
     Mina.setActiveInstance(Network);
     let feePayer = feePayerKey.toPublicKey();
     let committeeAddress = committeeKey.toPublicKey();
-    let committeeContract = new Committee(committeeAddress);
+    let committeeContract = new CommitteeContract(committeeAddress);
     // must fetch
     await fetchAccount({ publicKey: committeeAddress });
 
@@ -303,7 +303,7 @@ async function main() {
       console.log('compile CreateCommittee...');
       await CreateCommittee.compile();
       console.log('compile Committee contract... ');
-      await Committee.compile();
+      await CommitteeContract.compile();
     }
 
     if (actionn == 0) {

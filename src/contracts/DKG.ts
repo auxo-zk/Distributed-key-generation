@@ -31,7 +31,7 @@ import { BatchEncryptionProof, BatchDecryptionProof } from './Encryption.js';
 import {
   CheckConfigInput,
   CheckMemberInput,
-  Committee,
+  CommitteeContract,
   CommitteeMerkleWitness,
 } from './Committee.js';
 import { ZkAppRef } from '../libs/ZkAppRef.js';
@@ -974,7 +974,7 @@ export class DKGContract extends SmartContract {
     zkAppKey.assertEquals(Poseidon.hash(ZK_APP.COMMITTEE));
 
     // Check if sender has the correct index in the committee
-    const committeeContract = new Committee(committee.address);
+    const committeeContract = new CommitteeContract(committee.address);
     let memberId = committeeContract.checkMember(
       new CheckMemberInput({
         address: this.sender,
@@ -1077,7 +1077,7 @@ export class DKGContract extends SmartContract {
     zkAppKey.assertEquals(Poseidon.hash(ZK_APP.COMMITTEE));
 
     // Check if the committee's setting is correct
-    const committeeContract = new Committee(committee.address);
+    const committeeContract = new CommitteeContract(committee.address);
     committeeContract.checkConfig(
       new CheckConfigInput({
         N: proof.publicInput.N,
@@ -1133,7 +1133,7 @@ export class DKGContract extends SmartContract {
     zkAppKey.assertEquals(Poseidon.hash(ZK_APP.COMMITTEE));
 
     // Check if the committee's setting is correct
-    const committeeContract = new Committee(committee.address);
+    const committeeContract = new CommitteeContract(committee.address);
     committeeContract.checkConfig(
       new CheckConfigInput({
         N: proof.publicInput.N,
@@ -1187,7 +1187,7 @@ export class DKGContract extends SmartContract {
     zkAppKey.assertEquals(Poseidon.hash(ZK_APP.COMMITTEE));
 
     // Check if the committee's setting is correct
-    const committeeContract = new Committee(committee.address);
+    const committeeContract = new CommitteeContract(committee.address);
     committeeContract.checkConfig(
       new CheckConfigInput({
         N: proof.publicInput.N,

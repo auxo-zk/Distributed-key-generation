@@ -226,7 +226,7 @@ export const RollupActions = ZkProgram({
 
 class ProofRollupAction extends ZkProgram.Proof(RollupActions) {}
 
-export class RequestHelper extends SmartContract {
+export class RequestHelperContract extends SmartContract {
   @state(Field) actionState = State<Field>();
 
   // hash(preActionState, Action) -> status
