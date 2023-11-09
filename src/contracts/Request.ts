@@ -21,14 +21,14 @@ import {
 
 import { GroupDynamicArray, BoolDynamicArray } from '@auxo-dev/auxo-libs';
 import { COMMITTEE_MAX_SIZE } from '../libs/Committee.js';
+import { REQUEST_MAX_SIZE } from '../libs/Requestor.js';
 import { updateOutOfSnark } from '../libs/utils.js';
-import { assert } from 'console';
 
 export const LEVEL2_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;
 const EmptyMerkleMap = new MerkleMap();
 export const RequestFee = Field(10 ** 9); // 1 Mina
 export const ZeroFee = Field(0); // 0 Mina
-export class RequestValue extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
+export class RequestValue extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 
 export const enum ActionEnum {
   REQUEST,
@@ -236,7 +236,7 @@ export const CreateRequest = ZkProgram({
   },
 });
 
-class RequestProof extends ZkProgram.Proof(CreateRequest) {}
+export class RequestProof extends ZkProgram.Proof(CreateRequest) {}
 
 export class Request extends SmartContract {
   // requestId = hash(committeeId, keyId, hash(valueR))
