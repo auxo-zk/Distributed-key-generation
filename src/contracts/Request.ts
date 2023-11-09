@@ -38,9 +38,9 @@ export const enum ActionEnum {
 }
 
 export const enum RequestStatusEnum {
-  NOT_YET_REQUEST,
+  NOT_YET_REQUESTED,
   REQUESTING,
-  REQUEST_COMPLETE,
+  RESOLVED,
 }
 
 export class ActionMask extends BoolDynamicArray(ActionEnum.__LENGTH) {}
@@ -145,18 +145,18 @@ export const CreateRequest = ZkProgram({
         let requestId = input.requestId();
 
         let currentState = Provable.switch(input.actionType.values, Field, [
-          Field(RequestStatusEnum.NOT_YET_REQUEST),
+          Field(RequestStatusEnum.NOT_YET_REQUESTED),
           Field(RequestStatusEnum.REQUESTING),
           Field(RequestStatusEnum.REQUESTING),
         ]);
 
-        // NOT_YET_REQUEST + REQUEST => REQUESTING
-        // REQUESTING + UNREQUEST => NOT_YET_REQUEST
-        // REQUESTING + RESOLVE => REQUEST_COMPLETE
+        // NOT_YET_REQUESTED + REQUEST => REQUESTING
+        // REQUESTING + UNREQUEST => NOT_YET_REQUESTED
+        // REQUESTING + RESOLVE => RESOLVED
         let newState = Provable.switch(input.actionType.values, Field, [
           Field(RequestStatusEnum.REQUESTING),
-          Field(RequestStatusEnum.NOT_YET_REQUEST),
-          Field(RequestStatusEnum.REQUEST_COMPLETE),
+          Field(RequestStatusEnum.NOT_YET_REQUESTED),
+          Field(RequestStatusEnum.RESOLVED),
         ]);
 
         // caculate pre request root
@@ -262,7 +262,17 @@ export class RequestContract extends SmartContract {
   @method request(requestInput: RequestInput) {
     let actionState = this.actionState.getAndAssertEquals();
     requestInput.actionType.assertLessThan(ActionEnum.__LENGTH);
+
     let actionType = createActionMask(requestInput.actionType);
+
+    // if it is resolve action then sender must be dkg
+    let sender = Provable.if(
+      actionType.get(Field(ActionEnum.RESOLVE)),
+      this.DKG_address.getAndAssertEquals(),
+      this.sender
+    );
+    this.sender.assertEquals(sender);
+
     let requestAction = new RequestAction({
       committeeId: requestInput.committeeId,
       keyId: requestInput.keyId,
