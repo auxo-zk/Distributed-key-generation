@@ -67,6 +67,6 @@ Besides the architecture design based on specified requirements, we introduce so
 
 1. **Business Model**: Implementing a payment system where requesters pay for the usage of keys generated through the DKG protocol. This can enable sustainability and incentivize participation.
 
-2. **Automation**: Exploring automation possibilities, i.e. Chainlink Automation, to streamline and enhance the efficiency of the DKG protocol. This could include automating key generation processes and interactions with the smart contract.
+2. **Automation**: Exploring automation possibilities, i.e. Chainlink Automationg, to streamline and enhance the efficiency of the DKG protocol. This could include automating key generation processes and interactions with the smart contract.
 
 In summary, Distributed Key Generation (DKG) serves as a critical component in enhancing privacy and security in various applications. Its core properties of homomorphism, verifiability, and robustness ensure the secure generation and use of cryptographic keys, enabling applications such as private voting, private funding, and social recovery to thrive while preserving user data and decision confidentiality. As DKG continues to evolve, future work can focus on establishing sustainable business models and further automating the protocol to improve its efficiency and usability.
