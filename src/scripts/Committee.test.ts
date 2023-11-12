@@ -25,6 +25,7 @@ import {
   CheckConfigInput,
 } from '../contracts/Committee.js';
 import { COMMITTEE_MAX_SIZE } from '../libs/Committee.js';
+import { IPFSHash } from '@auxo-dev/auxo-libs';
 
 const doProofs = false;
 
@@ -86,6 +87,7 @@ describe('Committee', () => {
     let input = new CommitteeInput({
       addresses: myMemberArray1,
       threshold: threshold1,
+      ipfsHash: IPFSHash.fromString('testing'),
     });
 
     let tx = await Mina.transaction(feePayer, () => {
@@ -103,6 +105,7 @@ describe('Committee', () => {
     let input = new CommitteeInput({
       addresses: myMemberArray2,
       threshold: threshold2,
+      ipfsHash: IPFSHash.fromString('testing'),
     });
 
     let tx = await Mina.transaction(feePayer, () => {

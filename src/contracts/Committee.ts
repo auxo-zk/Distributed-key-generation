@@ -16,7 +16,7 @@ import {
   ZkProgram,
   PublicKey,
 } from 'o1js';
-import { PublicKeyDynamicArray } from '@auxo-dev/auxo-libs';
+import { PublicKeyDynamicArray, IPFSHash } from '@auxo-dev/auxo-libs';
 import { COMMITTEE_MAX_SIZE } from '../libs/Committee.js';
 import { updateOutOfSnark } from '../libs/utils.js';
 
@@ -147,6 +147,12 @@ class CommitteeProof extends ZkProgram.Proof(CreateCommittee) {}
 export class CommitteeInput extends Struct({
   addresses: MemberArray,
   threshold: Field,
+  ipfsHash: IPFSHash,
+}) {}
+
+export class CommitteeAction extends Struct({
+  addresses: MemberArray,
+  threshold: Field,
 }) {}
 
 export enum EventEnum {
@@ -161,7 +167,7 @@ export class CommitteeContract extends SmartContract {
 
   @state(Field) actionState = State<Field>();
 
-  reducer = Reducer({ actionType: CommitteeInput });
+  reducer = Reducer({ actionType: CommitteeAction });
 
   events = {
     [EventEnum.CREATE_COMMITEE]: CommitteeInput,
@@ -177,7 +183,12 @@ export class CommitteeContract extends SmartContract {
 
   @method createCommittee(input: CommitteeInput) {
     input.threshold.assertLessThanOrEqual(input.addresses.length);
-    this.reducer.dispatch(input);
+    this.reducer.dispatch(
+      new CommitteeAction({
+        addresses: input.addresses,
+        threshold: input.threshold,
+      })
+    );
 
     this.emitEvent(EventEnum.CREATE_COMMITEE, input);
   }

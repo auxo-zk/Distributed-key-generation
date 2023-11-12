@@ -28,6 +28,7 @@ import {
 
 import fs from 'fs/promises';
 import { COMMITTEE_MAX_SIZE } from '../libs/Committee.js';
+import { IPFSHash } from '@auxo-dev/auxo-libs';
 
 // check command line arg
 const deployAlias = process.argv[2];
@@ -67,7 +68,7 @@ const isLocal = false;
 // 1: dispatch: add thành viên, dkg địa chỉ
 // 2: rollup: reduce ================== sever
 // 3: check ================= dựa vào check trong db
-let actionn = 1;
+let actionn = 2;
 
 async function main() {
   if (isLocal) {
@@ -94,7 +95,7 @@ async function main() {
       await CommitteeContract.compile();
     } else {
       console.log('analyzeMethods...');
-      // CreateCommittee.analyzeMethods();
+      CreateCommittee.analyzeMethods();
       CommitteeContract.analyzeMethods();
     }
 
@@ -121,6 +122,7 @@ async function main() {
     let input = new CommitteeInput({
       addresses: myMemberArray1,
       threshold: Field(1),
+      ipfsHash: IPFSHash.fromString('testing'),
     });
     tx = await Mina.transaction(feePayer, () => {
       committeeContract.createCommittee(input);
@@ -147,6 +149,7 @@ async function main() {
     input = new CommitteeInput({
       addresses: myMemberArray2,
       threshold: Field(2),
+      ipfsHash: IPFSHash.fromString('testing'),
     });
     tx = await Mina.transaction(feePayer, () => {
       committeeContract.createCommittee(input);
@@ -341,6 +344,7 @@ async function main() {
       let input = new CommitteeInput({
         addresses: myMemberArray1,
         threshold: Field(1),
+        ipfsHash: IPFSHash.fromString('testing'),
       });
       let tx = await Mina.transaction(
         { sender: feePayer, fee, nonce: currentNonce },
