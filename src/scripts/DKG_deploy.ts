@@ -100,7 +100,6 @@ async function main() {
     await DeprecateKey.compile();
     console.log('Compiling FinalizeRound1...');
     await FinalizeRound1.compile();
-    await Elgamal.compile();
     console.log('Compiling BatchEncryption...');
     await BatchEncryption.compile();
     console.log('Compiling FinalizeRound2...');

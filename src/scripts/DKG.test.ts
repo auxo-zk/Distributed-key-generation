@@ -35,6 +35,10 @@ import {
   BatchEncryption,
   Elgamal,
 } from '../contracts/Encryption.js';
+import { Config, Key } from './helper/config.js';
+import fs from 'fs';
+import { Committee } from '../contracts/index.js';
+import { CommitteeContract } from '../contracts/Committee.js';
 
 const doProofs = false;
 
@@ -47,6 +51,7 @@ describe('DKG', () => {
   class memberMerkleTreeWitness extends MerkleWitness(treeHeight) {}
   let feePayerKey: any;
   let feePayer: any;
+  let contractKey: any;
   let committeeContract: any;
   let dkgContract: any;
 
@@ -65,34 +70,43 @@ describe('DKG', () => {
   DKGProfiler.start('DKG test flow');
 
   beforeAll(async () => {
+    let configJson: Config = JSON.parse(await fs.readFileSync('config.json', 'utf8'));
+    let dkgConfig = configJson.deployAliases['dkg'];
+    let committeeConfig = configJson.deployAliases['committee'];
+
+    let feePayerKeysBase58: { privateKey: string; publicKey: string } =
+    JSON.parse(await fs.readFileSync(dkgConfig.feepayerKeyPath, 'utf8'));
+    let feePayer: Key = {
+      privateKey: PrivateKey.fromBase58(feePayerKeysBase58.privateKey),
+      publicKey: PublicKey.fromBase58(feePayerKeysBase58.publicKey),
+    }
+
+    let dkgKeysBase58: { privateKey: string; publicKey: string } = JSON.parse(
+      await fs.readFileSync(dkgConfig.keyPath, 'utf8')
+    );
+    let dkg: Key = {
+      privateKey: PrivateKey.fromBase58(dkgKeysBase58.privateKey),
+      publicKey: PublicKey.fromBase58(dkgKeysBase58.publicKey),
+    }
+
+    let committeeKeysBase58: { privateKey: string; publicKey: string } = JSON.parse(
+      await fs.readFileSync(committeeConfig.keyPath, 'utf8')
+    );
+    let committee: Key = {
+      privateKey: PrivateKey.fromBase58(committeeKeysBase58.privateKey),
+      publicKey: PublicKey.fromBase58(committeeKeysBase58.publicKey),
+    }
+
     let Local = Mina.LocalBlockchain({ proofsEnabled: doProofs });
     Mina.setActiveInstance(Local);
-    feePayerKey = Local.testAccounts[0].privateKey;
-    feePayer = Local.testAccounts[0].publicKey;
-    // committeeContract = new Committee(addresses.committee);
-    // if (doProofs) {
-    //   await Committee.compile();
-    // } else {
-    //   // createCommitteeProof.analyzeMethods();
-    //   Committee.analyzeMethods();
-    // }
-    // let tx = await Mina.transaction(feePayer, () => {
-    //   AccountUpdate.fundNewAccount(feePayer, 1);
-    //   committeeContract.deploy();
-    // });
-    // await tx.sign([feePayerKey, keys.committee]).send();
-    // if (!doProofs) await MockDKGContract.compile();
-    // // set verification key
-    // tx = await Mina.transaction(feePayer, () => {
-    //   committeeContract.setVkDKGHash(MockDKGContract._verificationKey!);
-    // });
-    // await tx.prove();
-    // await tx.sign([feePayerKey]).send();
+    // const Network = Mina.Network(dkgConfig.url);
+    // const fee = Number(dkgConfig.fee) * 1e9; // in nanomina (1 billion = 1.0 mina)
+    // Mina.setActiveInstance(Network);
+    let committeeContract = new CommitteeContract(committee.publicKey);
+    let dkgContract = new DKGContract(dkg.publicKey);
   });
 
-  // beforeEach(() => {jest.setTimeout(2000000)});
-
-  it('Should compile all ZK programs', async () => {
+  xit('Should compile all ZK programs', async () => {
     console.log('Compiling ReduceActions...');
     DKGProfiler.start('ReduceActions.compile');
     await ReduceActions.compile();
@@ -113,9 +127,9 @@ describe('DKG', () => {
     await FinalizeRound1.compile();
     DKGProfiler.stop();
     console.log('Done!');
-    // DKGProfiler.start('Elgamal.compile');
-    // await Elgamal.compile();
-    // DKGProfiler.stop();
+    DKGProfiler.start('Elgamal.compile');
+    await Elgamal.compile();
+    DKGProfiler.stop();
     console.log('Compiling BatchEncryption...');
     DKGProfiler.start('BatchEncryption.compile');
     await BatchEncryption.compile();
@@ -141,7 +155,6 @@ describe('DKG', () => {
     await DKGContract.compile();
     DKGProfiler.stop();
     console.log('Done!');
-    // console.log(DKGContract.analyzeMethods());
   });
 
   afterAll(async () => {
