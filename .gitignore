@@ -135,3 +135,6 @@ profiling.md
 
 # Never reveal your keys!
 keys
+
+# Deploy config
+config.json

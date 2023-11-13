@@ -43,10 +43,11 @@
     "lint-staged": "^11.0.1",
     "prettier": "^2.3.2",
     "ts-jest": "^27.0.7",
-    "typescript": "^4.7.2"
+    "typescript": "^4.7.2",
+    "zkapp-cli": "^0.15.0"
   },
   "dependencies": {
-    "@auxo-dev/auxo-libs": "^0.2.5",
+    "@auxo-dev/auxo-libs": "^0.2.6",
     "o1js": "^0.14.1"
   }
 }
