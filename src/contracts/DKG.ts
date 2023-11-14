@@ -86,7 +86,6 @@ export const enum ActionEnum {
 }
 
 export const enum EventEnum {
-  COMMITTEE_ACTION = 'committee-action',
   REDUCE = 'reduce-actions',
   KEY_GENERATED = 'key-generated',
   KEY_DEPRECATED = 'key-deprecated',
@@ -171,8 +170,6 @@ export class Action extends Struct({
     });
   }
 }
-
-const ActionEvent = Action;
 
 export class KeyGeneratedEvent extends Struct({
   keyIndexes: UpdatedValues,
@@ -1000,7 +997,6 @@ class ResponseProof extends ZkProgram.Proof(CompleteResponse) {}
 export class DKGContract extends SmartContract {
   reducer = Reducer({ actionType: Action });
   events = {
-    [EventEnum.COMMITTEE_ACTION]: ActionEvent,
     [EventEnum.REDUCE]: Field,
     [EventEnum.KEY_GENERATED]: KeyGeneratedEvent,
     [EventEnum.KEY_DEPRECATED]: KeyDeprecatedEvent,
@@ -1081,7 +1077,6 @@ export class DKGContract extends SmartContract {
 
     // Dispatch key generation actions
     this.reducer.dispatch(action);
-    this.emitEvent(EventEnum.COMMITTEE_ACTION, new ActionEvent(action));
   }
 
   @method reduce(proof: ReduceProof) {

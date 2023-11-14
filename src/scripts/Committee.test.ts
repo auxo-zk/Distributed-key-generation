@@ -16,7 +16,7 @@ import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
 import {
   CommitteeContract,
-  CommitteeInput,
+  CommitteeAction,
   CreateCommittee,
   MemberArray,
   CommitteeRollupState,
@@ -84,14 +84,14 @@ describe('Committee', () => {
     arrayAddress.push(addresses.p1, addresses.p2);
     myMemberArray1 = new MemberArray(arrayAddress);
 
-    let input = new CommitteeInput({
+    let action = new CommitteeAction({
       addresses: myMemberArray1,
       threshold: threshold1,
       ipfsHash: IPFSHash.fromString('testing'),
     });
 
     let tx = await Mina.transaction(feePayer, () => {
-      committeeContract.createCommittee(input);
+      committeeContract.createCommittee(action);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();
@@ -102,14 +102,14 @@ describe('Committee', () => {
     arrayAddress.push(addresses.p3, addresses.p4, addresses.p5);
     myMemberArray2 = new MemberArray(arrayAddress);
 
-    let input = new CommitteeInput({
+    let action = new CommitteeAction({
       addresses: myMemberArray2,
       threshold: threshold2,
       ipfsHash: IPFSHash.fromString('testing'),
     });
 
     let tx = await Mina.transaction(feePayer, () => {
-      committeeContract.createCommittee(input);
+      committeeContract.createCommittee(action);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();

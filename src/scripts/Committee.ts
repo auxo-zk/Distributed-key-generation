@@ -16,7 +16,7 @@ import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
 import {
   CommitteeContract,
-  CommitteeInput,
+  CommitteeAction,
   CreateCommittee,
   MemberArray,
   CommitteeRollupState,
@@ -119,13 +119,13 @@ async function main() {
     let myMemberArray1 = new MemberArray(arrayAddress);
 
     console.log('committeeContract.createCommittee: ');
-    let input = new CommitteeInput({
+    let action = new CommitteeAction({
       addresses: myMemberArray1,
       threshold: Field(1),
       ipfsHash: IPFSHash.fromString('testing'),
     });
     tx = await Mina.transaction(feePayer, () => {
-      committeeContract.createCommittee(input);
+      committeeContract.createCommittee(action);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();
@@ -146,13 +146,13 @@ async function main() {
     let myMemberArray2 = new MemberArray(arrayAddress);
 
     console.log('committeeContract.createCommittee: ');
-    input = new CommitteeInput({
+    action = new CommitteeAction({
       addresses: myMemberArray2,
       threshold: Field(2),
       ipfsHash: IPFSHash.fromString('testing'),
     });
     tx = await Mina.transaction(feePayer, () => {
-      committeeContract.createCommittee(input);
+      committeeContract.createCommittee(action);
     });
     await tx.prove();
     await tx.sign([feePayerKey]).send();
@@ -341,7 +341,7 @@ async function main() {
 
     if (actionn == 1) {
       console.log('committeeContract.createCommittee: ');
-      let input = new CommitteeInput({
+      let action = new CommitteeAction({
         addresses: myMemberArray1,
         threshold: Field(1),
         ipfsHash: IPFSHash.fromString('testing'),
@@ -349,7 +349,7 @@ async function main() {
       let tx = await Mina.transaction(
         { sender: feePayer, fee, nonce: currentNonce },
         () => {
-          committeeContract.createCommittee(input);
+          committeeContract.createCommittee(action);
         }
       );
       await tx.prove();
