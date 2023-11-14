@@ -20,10 +20,13 @@ import {
 } from 'o1js';
 import { FieldDynamicArray, GroupDynamicArray } from '@auxo-dev/auxo-libs';
 import {
+  CArray,
   COMMITTEE_MAX_SIZE,
   ResponseContribution,
   Round1Contribution,
   Round2Contribution,
+  UArray,
+  cArray,
 } from '../libs/Committee.js';
 import { DArray, REQUEST_MAX_SIZE } from '../libs/Requestor.js';
 import { updateOutOfSnark } from '../libs/utils.js';
@@ -142,31 +145,92 @@ export class Action extends Struct({
       .concat(this.responseContribution.toFields())
       .flat();
   }
+  fromFields(fields: Field[]): Action {
+    return new Action({
+      enum: fields[0],
+      committeeId: fields[1],
+      keyId: fields[2],
+      memberId: fields[3],
+      requestId: fields[4],
+      round1Contribution: new Round1Contribution({
+        C: CArray.fromFields(fields.slice(5, COMMITTEE_MAX_SIZE + 6)),
+      }),
+      round2Contribution: new Round2Contribution({
+        c: cArray.fromFields(
+          fields.slice(COMMITTEE_MAX_SIZE + 6, 2 * COMMITTEE_MAX_SIZE + 7)
+        ),
+        U: UArray.fromFields(
+          fields.slice(2 * COMMITTEE_MAX_SIZE + 7, 3 * COMMITTEE_MAX_SIZE + 8)
+        ),
+      }),
+      responseContribution: new ResponseContribution({
+        D: DArray.fromFields(
+          fields.slice(3 * COMMITTEE_MAX_SIZE + 8, 4 * COMMITTEE_MAX_SIZE + 9)
+        ),
+      }),
+    });
+  }
 }
 
 const ActionEvent = Action;
 
 export class KeyGeneratedEvent extends Struct({
   keyIndexes: UpdatedValues,
-}) {}
+}) {
+  static fromFields(fields: Field[]) {
+    return new KeyDeprecatedEvent({
+      keyIndexes: UpdatedValues.fromFields(
+        fields.slice(0, ROLLUP_MAX_SIZE + 1)
+      ),
+    });
+  }
+}
 
 export class KeyDeprecatedEvent extends Struct({
   keyIndexes: UpdatedValues,
-}) {}
+}) {
+  static fromFields(fields: Field[]) {
+    return new KeyDeprecatedEvent({
+      keyIndexes: UpdatedValues.fromFields(
+        fields.slice(0, ROLLUP_MAX_SIZE + 1)
+      ),
+    });
+  }
+}
 
 export class Round1FinalizedEvent extends Struct({
   keyIndex: Field,
   publicKey: PublicKey,
-}) {}
+}) {
+  static fromFields(fields: Field[]) {
+    return new Round1FinalizedEvent({
+      keyIndex: fields[0],
+      publicKey: PublicKey.fromFields([fields[1], fields[2]]),
+    });
+  }
+}
 
 export class Round2FinalizedEvent extends Struct({
   keyIndex: Field,
-}) {}
+}) {
+  static fromFields(fields: Field[]) {
+    return new Round2FinalizedEvent({
+      keyIndex: fields[0],
+    });
+  }
+}
 
 export class ResponseCompletedEvent extends Struct({
   requestIndex: Field,
   D: DArray,
-}) {}
+}) {
+  static fromFields(fields: Field[]) {
+    return new ResponseCompletedEvent({
+      requestIndex: fields[0],
+      D: DArray.fromFields(fields.slice(1, COMMITTEE_MAX_SIZE + 2)),
+    });
+  }
+}
 
 export class ReduceInput extends Struct({
   initialRollupState: Field,

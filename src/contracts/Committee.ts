@@ -146,19 +146,25 @@ export const CreateCommittee = ZkProgram({
 
 class CommitteeProof extends ZkProgram.Proof(CreateCommittee) {}
 
-export class CommitteeInput extends Struct({
-  addresses: MemberArray,
-  threshold: Field,
-  ipfsHash: IPFSHash,
-}) {}
-
 export class CommitteeAction extends Struct({
   addresses: MemberArray,
   threshold: Field,
-}) {}
+  ipfsHash: IPFSHash,
+}) {
+  static fromFields(fields: Field[]): CommitteeAction {
+    return new CommitteeAction({
+      addresses: MemberArray.fromFields(
+        fields.slice(0, COMMITTEE_MAX_SIZE + 1)
+      ),
+      threshold: fields[COMMITTEE_MAX_SIZE + 1],
+      ipfsHash: IPFSHash.fromFields(
+        fields.slice(COMMITTEE_MAX_SIZE + 2, COMMITTEE_MAX_SIZE + 5)
+      ),
+    });
+  }
+}
 
 export enum EventEnum {
-  CREATE_COMMITEE = 'create-committee',
   COMMITTEE_CREATED = 'committee-created',
 }
 
@@ -172,7 +178,6 @@ export class CommitteeContract extends SmartContract {
   reducer = Reducer({ actionType: CommitteeAction });
 
   events = {
-    [EventEnum.CREATE_COMMITEE]: CommitteeInput,
     [EventEnum.COMMITTEE_CREATED]: Field,
   };
 
@@ -183,16 +188,9 @@ export class CommitteeContract extends SmartContract {
     this.actionState.set(Reducer.initialActionState);
   }
 
-  @method createCommittee(input: CommitteeInput) {
-    input.threshold.assertLessThanOrEqual(input.addresses.length);
-    this.reducer.dispatch(
-      new CommitteeAction({
-        addresses: input.addresses,
-        threshold: input.threshold,
-      })
-    );
-
-    this.emitEvent(EventEnum.CREATE_COMMITEE, input);
+  @method createCommittee(action: CommitteeAction) {
+    action.threshold.assertLessThanOrEqual(action.addresses.length);
+    this.reducer.dispatch(action);
   }
 
   @method rollupIncrements(proof: CommitteeProof) {
