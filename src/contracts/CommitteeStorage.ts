@@ -1,5 +1,11 @@
-import { Field, Poseidon, PublicKey } from "o1js";
-import { Level1MT, Level1Witness, Level2MT, Level2Witness, FullMTWitness } from "./Committee.js";
+import { Field, Poseidon, PublicKey } from 'o1js';
+import {
+  Level1MT,
+  Level1Witness,
+  Level2MT,
+  Level2Witness,
+  FullMTWitness,
+} from './Committee.js';
 
 abstract class CommitteeStrorage {
   level1: Level1MT;
@@ -25,7 +31,7 @@ export class MemberStorage extends CommitteeStrorage {
   }
 
   calculateLeaf(publicKey: PublicKey): Field {
-    return Poseidon.hash(publicKey.toGroup().toFields());
+    return Poseidon.hash(publicKey.toFields());
   }
 
   calculateLevel1Index(committeeId: Field): Field {
@@ -36,12 +42,13 @@ export class MemberStorage extends CommitteeStrorage {
     return memberId;
   }
 
-  getWitness(
-    { level1Index, level2Index }: {
-      level1Index: Field,
-      level2Index: Field
-    }
-  ): FullMTWitness {
+  getWitness({
+    level1Index,
+    level2Index,
+  }: {
+    level1Index: Field;
+    level2Index: Field;
+  }): FullMTWitness {
     return new FullMTWitness({
       level1: this.level1.getWitness(level1Index) as Level1Witness,
       level2: new Level2Witness(this.level2.getWitness(level2Index.toBigInt())),
@@ -56,7 +63,7 @@ export class SettingStorage extends CommitteeStrorage {
     super(level1);
   }
 
-  calculateLeaf({ T, N }: { T: Field, N: Field }): Field {
+  calculateLeaf({ T, N }: { T: Field; N: Field }): Field {
     return Poseidon.hash([T, N]);
   }
 

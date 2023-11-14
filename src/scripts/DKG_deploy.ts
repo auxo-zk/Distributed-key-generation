@@ -80,7 +80,10 @@ async function main() {
   // set up Mina instance and contract we interact with
   const Network = Mina.Network(config.url);
   const fee = Number(config.fee) * 1e9; // in nanomina (1 billion = 1.0 mina)
+  console.log(fee);
   Mina.setActiveInstance(Network);
+  let Local = Mina.LocalBlockchain({ proofsEnabled: true });
+  Mina.setActiveInstance(Local);
   let feePayer = feePayerKey.toPublicKey();
   let contractAddress = contractKey.toPublicKey();
   let dkgContract = new DKGContract(contractAddress);

@@ -1,8 +1,6 @@
 import {
   Field,
   Group,
-  MerkleMap,
-  MerkleMapWitness,
   Poseidon,
   PrivateKey,
   PublicKey,

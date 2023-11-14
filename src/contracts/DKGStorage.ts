@@ -1,6 +1,18 @@
-import { Field, Group, Poseidon } from "o1js";
-import { Action, Level1MT, Level2MT, Level1Witness, FullMTWitness, KeyStatus, PublicKeyArray, Level2Witness } from "./DKG.js";
-import { ResponseContribution, Round1Contribution, Round2Contribution } from "../libs/Committee.js";
+import { Field, Group, Poseidon } from 'o1js';
+import {
+  Action,
+  Level1MT,
+  Level2MT,
+  Level1Witness,
+  FullMTWitness,
+  KeyStatus,
+  Level2Witness,
+} from './DKG.js';
+import {
+  ResponseContribution,
+  Round1Contribution,
+  Round2Contribution,
+} from '../libs/Committee.js';
 
 abstract class DKGStrorage {
   level1: Level1MT;
@@ -28,7 +40,13 @@ export class RollupStateStorage extends DKGStrorage {
     return action.hash();
   }
 
-  calculateLevel1Index({ committeeId, keyId, }: { committeeId: Field, keyId: Field }): Field {
+  calculateLevel1Index({
+    committeeId,
+    keyId,
+  }: {
+    committeeId: Field;
+    keyId: Field;
+  }): Field {
     return Poseidon.hash([committeeId, keyId]);
   }
 
@@ -48,7 +66,13 @@ export class KeyStatusStorage extends DKGStrorage {
     return Field(status);
   }
 
-  calculateLevel1Index({ committeeId, keyId, }: { committeeId: Field, keyId: Field }): Field {
+  calculateLevel1Index({
+    committeeId,
+    keyId,
+  }: {
+    committeeId: Field;
+    keyId: Field;
+  }): Field {
     return Poseidon.hash([committeeId, keyId]);
   }
 
@@ -69,7 +93,13 @@ export class PublicKeyStorage extends DKGStrorage {
     return Poseidon.hash(C0.toFields());
   }
 
-  calculateLevel1Index({ committeeId, keyId, }: { committeeId: Field, keyId: Field }): Field {
+  calculateLevel1Index({
+    committeeId,
+    keyId,
+  }: {
+    committeeId: Field;
+    keyId: Field;
+  }): Field {
     return Poseidon.hash([committeeId, keyId]);
   }
 
@@ -77,12 +107,13 @@ export class PublicKeyStorage extends DKGStrorage {
     return memberId;
   }
 
-  getWitness(
-    { level1Index, level2Index }: {
-      level1Index: Field,
-      level2Index: Field
-    }
-  ): FullMTWitness {
+  getWitness({
+    level1Index,
+    level2Index,
+  }: {
+    level1Index: Field;
+    level2Index: Field;
+  }): FullMTWitness {
     return new FullMTWitness({
       level1: this.level1.getWitness(level1Index) as Level1Witness,
       level2: new Level2Witness(this.level2.getWitness(level2Index.toBigInt())),
@@ -102,7 +133,13 @@ export class Round1ContributionStorage extends DKGStrorage {
     return contribution.hash();
   }
 
-  calculateLevel1Index({ committeeId, keyId, }: { committeeId: Field, keyId: Field }): Field {
+  calculateLevel1Index({
+    committeeId,
+    keyId,
+  }: {
+    committeeId: Field;
+    keyId: Field;
+  }): Field {
     return Poseidon.hash([committeeId, keyId]);
   }
 
@@ -110,12 +147,13 @@ export class Round1ContributionStorage extends DKGStrorage {
     return memberId;
   }
 
-  getWitness(
-    { level1Index, level2Index }: {
-      level1Index: Field,
-      level2Index: Field
-    }
-  ): FullMTWitness {
+  getWitness({
+    level1Index,
+    level2Index,
+  }: {
+    level1Index: Field;
+    level2Index: Field;
+  }): FullMTWitness {
     return new FullMTWitness({
       level1: this.level1.getWitness(level1Index) as Level1Witness,
       level2: new Level2Witness(this.level2.getWitness(level2Index.toBigInt())),
@@ -135,7 +173,13 @@ export class Round2ContributionStorage extends DKGStrorage {
     return contribution.hash();
   }
 
-  calculateLevel1Index({ committeeId, keyId, }: { committeeId: Field, keyId: Field }): Field {
+  calculateLevel1Index({
+    committeeId,
+    keyId,
+  }: {
+    committeeId: Field;
+    keyId: Field;
+  }): Field {
     return Poseidon.hash([committeeId, keyId]);
   }
 
@@ -143,12 +187,13 @@ export class Round2ContributionStorage extends DKGStrorage {
     return memberId;
   }
 
-  getWitness(
-    { level1Index, level2Index }: {
-      level1Index: Field,
-      level2Index: Field
-    }
-  ): FullMTWitness {
+  getWitness({
+    level1Index,
+    level2Index,
+  }: {
+    level1Index: Field;
+    level2Index: Field;
+  }): FullMTWitness {
     return new FullMTWitness({
       level1: this.level1.getWitness(level1Index) as Level1Witness,
       level2: new Level2Witness(this.level2.getWitness(level2Index.toBigInt())),
@@ -168,13 +213,15 @@ export class ResponseContributionStorage extends DKGStrorage {
     return contribution.hash();
   }
 
-  calculateLevel1Index(
-    { committeeId, keyId, requestId }: {
-      committeeId: Field,
-      keyId: Field,
-      requestId: Field,
-    }
-  ): Field {
+  calculateLevel1Index({
+    committeeId,
+    keyId,
+    requestId,
+  }: {
+    committeeId: Field;
+    keyId: Field;
+    requestId: Field;
+  }): Field {
     return Poseidon.hash([committeeId, keyId, requestId]);
   }
 
@@ -182,12 +229,13 @@ export class ResponseContributionStorage extends DKGStrorage {
     return memberId;
   }
 
-  getWitness(
-    { level1Index, level2Index }: {
-      level1Index: Field,
-      level2Index: Field
-    }
-  ): FullMTWitness {
+  getWitness({
+    level1Index,
+    level2Index,
+  }: {
+    level1Index: Field;
+    level2Index: Field;
+  }): FullMTWitness {
     return new FullMTWitness({
       level1: this.level1.getWitness(level1Index) as Level1Witness,
       level2: new Level2Witness(this.level2.getWitness(level2Index.toBigInt())),

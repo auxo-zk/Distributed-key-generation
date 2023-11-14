@@ -36,16 +36,18 @@ import {
 } from './Committee.js';
 import { ZkAppRef } from '../libs/ZkAppRef.js';
 import { RequestVector } from './RequestHelper.js';
+import { ZkAppStorage } from './ZkAppStorage.js';
 
 export const ROLLUP_MAX_SIZE = 32;
 export class PublicKeyArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
 class UpdatedValues extends FieldDynamicArray(ROLLUP_MAX_SIZE) {}
-
 export const LEVEL2_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;
 export class Level1MT extends MerkleMap {}
 export class Level1Witness extends MerkleMapWitness {}
 export class Level2MT extends MerkleTree {}
 export class Level2Witness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
+export const EMPTY_LEVEL_1_TREE = new Level1MT();
+export const EMPTY_LEVEL_2_TREE = new Level2MT(LEVEL2_TREE_HEIGHT);
 export class FullMTWitness extends Struct({
   level1: Level1Witness,
   level2: Level2Witness,
@@ -55,6 +57,7 @@ export const ZK_APP = {
   COMMITTEE: Encoding.stringToFields('committee'),
   REQUEST: Encoding.stringToFields('request'),
 };
+const zkAppStorage = new ZkAppStorage(EMPTY_LEVEL_1_TREE);
 
 export const enum KeyStatus {
   EMPTY,
@@ -959,12 +962,39 @@ export class DKGContract extends SmartContract {
   @state(Field) round2Contribution = State<Field>();
   @state(Field) responseContribution = State<Field>();
 
+  init() {
+    super.init();
+    this.zkApps.set(EMPTY_LEVEL_1_TREE.getRoot());
+    this.rollupState.set(EMPTY_LEVEL_1_TREE.getRoot());
+    this.keyStatus.set(EMPTY_LEVEL_1_TREE.getRoot());
+    this.publicKey.set(EMPTY_LEVEL_1_TREE.getRoot());
+    this.round1Contribution.set(EMPTY_LEVEL_1_TREE.getRoot());
+    this.round2Contribution.set(EMPTY_LEVEL_1_TREE.getRoot());
+    this.responseContribution.set(EMPTY_LEVEL_1_TREE.getRoot());
+  }
+
+  @method setZkAppAddress(
+    zkAppRef: ZkAppRef,
+    currZkApps: Field,
+    newZkApps: Field
+  ) {
+    let zkAppsRoot = this.zkApps.getAndAssertEquals();
+    currZkApps.assertEquals(zkAppsRoot);
+    newZkApps.assertEquals(
+      zkAppRef.witness.computeRootAndKey(
+        zkAppStorage.calculateLeaf(zkAppRef.address)
+      )[0]
+    );
+    this.zkApps.set(newZkApps);
+  }
+
   @method committeeAction(
     action: Action,
     committee: ZkAppRef,
     memberMerkleTreeWitness: CommitteeMerkleWitness,
     memberMerkleMapWitness: MerkleMapWitness
   ) {
+    Provable.log('Sender:', this.sender);
     // Check if committee address is correct
     let [zkAppRoot, zkAppKey] = committee.witness.computeRootAndKey(
       Poseidon.hash(committee.address.toFields())
