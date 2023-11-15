@@ -138,3 +138,6 @@ keys
 
 # Deploy config
 config.json
+
+# Cache data
+cache
