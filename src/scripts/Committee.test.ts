@@ -10,6 +10,7 @@ import {
   MerkleTree,
   MerkleWitness,
   Proof,
+  Void,
 } from 'o1js';
 
 import { getProfiler } from './helper/profiler.js';
@@ -19,7 +20,7 @@ import {
   CommitteeAction,
   CreateCommittee,
   MemberArray,
-  CommitteeRollupState,
+  RollupOutPut,
   CommitteeMerkleWitness,
   CheckMemberInput,
   CheckConfigInput,
@@ -47,7 +48,7 @@ describe('Committee', () => {
   let feePayerKey: PrivateKey;
   let feePayer: PublicKey;
   let committeeContract: CommitteeContract;
-  let proof: Proof<CommitteeRollupState, CommitteeRollupState>;
+  let proof: Proof<Void, RollupOutPut>;
   let myMemberArray1: MemberArray;
   let threshold1 = Field(1);
   let threshold2 = Field(2);
@@ -78,6 +79,11 @@ describe('Committee', () => {
   });
 
   // beforeEach(() => {});
+
+  it('compile proof', async () => {
+    // compile proof
+    await CreateCommittee.compile();
+  });
 
   it('Create commitee consist of 2 people with threshhold 1, and test deploy DKG', async () => {
     let arrayAddress = [];
@@ -115,36 +121,35 @@ describe('Committee', () => {
     await tx.sign([feePayerKey]).send();
   });
 
-  it('compile proof', async () => {
-    // compile proof
-    await CreateCommittee.compile();
-  });
-
   it('create proof first step...', async () => {
     // create first step proof
     proof = await CreateCommittee.firstStep(
-      new CommitteeRollupState({
-        actionHash: Reducer.initialActionState,
-        memberTreeRoot: EmptyMerkleMap.getRoot(),
-        settingTreeRoot: EmptyMerkleMap.getRoot(),
-        currentCommitteeId: committeeContract.nextCommitteeId.get(),
-      })
+      Reducer.initialActionState,
+      EmptyMerkleMap.getRoot(),
+      EmptyMerkleMap.getRoot(),
+      committeeContract.nextCommitteeId.get()
     );
-    expect(proof.publicInput.actionHash).toEqual(Reducer.initialActionState);
-    expect(proof.publicInput.currentCommitteeId).toEqual(Field(0));
+    expect(proof.publicOutput.initialActionState).toEqual(
+      Reducer.initialActionState
+    );
+    expect(proof.publicOutput.initialCommitteeId).toEqual(Field(0));
   });
 
   it('create proof next step 1...', async () => {
     proof = await CreateCommittee.nextStep(
-      proof.publicInput,
       proof,
-      myMemberArray1,
+      new CommitteeAction({
+        addresses: myMemberArray1,
+        threshold: threshold1,
+        ipfsHash: IPFSHash.fromString('testing'),
+      }),
       memberMerkleMap.getWitness(Field(0)),
-      settingMerkleMap.getWitness(Field(0)),
-      threshold1
+      settingMerkleMap.getWitness(Field(0))
     );
 
-    expect(proof.publicInput.actionHash).toEqual(Reducer.initialActionState);
+    expect(proof.publicOutput.initialActionState).toEqual(
+      Reducer.initialActionState
+    );
 
     ////// udpate data to local
 
@@ -163,15 +168,19 @@ describe('Committee', () => {
 
   it('create proof next step 2...', async () => {
     proof = await CreateCommittee.nextStep(
-      proof.publicInput,
       proof,
-      myMemberArray2,
+      new CommitteeAction({
+        addresses: myMemberArray2,
+        threshold: threshold2,
+        ipfsHash: IPFSHash.fromString('testing'),
+      }),
       memberMerkleMap.getWitness(Field(1)),
-      settingMerkleMap.getWitness(Field(1)),
-      threshold2 // threshold
+      settingMerkleMap.getWitness(Field(1))
     );
 
-    expect(proof.publicInput.actionHash).toEqual(Reducer.initialActionState);
+    expect(proof.publicOutput.initialActionState).toEqual(
+      Reducer.initialActionState
+    );
     ////// udpate data to local
 
     // memberMerkleTree.set
