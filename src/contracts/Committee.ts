@@ -25,8 +25,8 @@ export class Level1MT extends MerkleMap {}
 export class Level1Witness extends MerkleMapWitness {}
 export class Level2MT extends MerkleTree {}
 export class Level2Witness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
-export const EMPTY_LEVEL_1_TREE = new Level1MT();
-export const EMPTY_LEVEL_2_TREE = new Level2MT(LEVEL2_TREE_HEIGHT);
+export const EMPTY_LEVEL_1_TREE = () => new Level1MT();
+export const EMPTY_LEVEL_2_TREE = () => new Level2MT(LEVEL2_TREE_HEIGHT);
 export class FullMTWitness extends Struct({
   level1: Level1Witness,
   level2: Level2Witness,

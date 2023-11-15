@@ -9,11 +9,16 @@ import {
 
 abstract class CommitteeStrorage {
   level1: Level1MT;
-  level2?: Level2MT;
+  level2s: { [key: string]: Level2MT };
 
-  constructor(level1: Level1MT, level2?: Level2MT) {
+  constructor(level1: Level1MT, level2s?: Level2MT[]) {
     this.level1 = level1;
-    if (level2) this.level2 = level2;
+    this.level2s = {};
+    if (level2s) {
+      for (let i = 0; i < level2s.length; i++) {
+        this.level2s[level2s[i].getRoot().toString()] = level2s[i];
+      }
+    }
   }
 
   abstract calculateLeaf(args: any): Field;
@@ -24,10 +29,10 @@ abstract class CommitteeStrorage {
 
 export class MemberStorage extends CommitteeStrorage {
   level1: Level1MT;
-  level2: Level2MT;
+  level2s: { [key: string]: Level2MT };
 
-  constructor(level1: Level1MT, level2: Level2MT) {
-    super(level1, level2);
+  constructor(level1: Level1MT, level2s: Level2MT[]) {
+    super(level1, level2s);
   }
 
   calculateLeaf(publicKey: PublicKey): Field {
@@ -51,7 +56,11 @@ export class MemberStorage extends CommitteeStrorage {
   }): FullMTWitness {
     return new FullMTWitness({
       level1: this.level1.getWitness(level1Index) as Level1Witness,
-      level2: new Level2Witness(this.level2.getWitness(level2Index.toBigInt())),
+      level2: new Level2Witness(
+        this.level2s[this.level1.get(level1Index).toString()].getWitness(
+          level2Index.toBigInt()
+        )
+      ),
     });
   }
 }

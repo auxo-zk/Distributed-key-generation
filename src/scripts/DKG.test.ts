@@ -5,6 +5,7 @@ import {
   PrivateKey,
   PublicKey,
   Provable,
+  Reducer,
 } from 'o1js';
 
 import { getProfiler } from './helper/profiler.js';
@@ -22,6 +23,7 @@ import {
   Action,
   ReduceInput,
   ActionStatus,
+  KeyUpdateInput,
 } from '../contracts/DKG.js';
 import { BatchDecryption, BatchEncryption } from '../contracts/Encryption.js';
 import { Config, Key } from './helper/config.js';
@@ -44,7 +46,14 @@ import {
   Round2Contribution,
 } from '../libs/Committee.js';
 import { getZkAppRef } from '../libs/ZkAppRef.js';
-import { RollupStateStorage } from '../contracts/DKGStorage.js';
+import {
+  KeyStatusStorage,
+  PublicKeyStorage,
+  ResponseContributionStorage,
+  RollupStateStorage,
+  Round1ContributionStorage,
+  Round2ContributionStorage,
+} from '../contracts/DKGStorage.js';
 
 describe('DKG', () => {
   const doProofs = true;
@@ -53,14 +62,15 @@ describe('DKG', () => {
   let dkgKey: Key;
   let committeeContract: CommitteeContract;
   let dkgContract: DKGContract;
-  let memberStorage = new MemberStorage(
-    COMMITTEE_LEVEL_1_TREE,
-    COMMITTEE_LEVEL_2_TREE
-  );
-  let settingStorage = new SettingStorage(COMMITTEE_LEVEL_1_TREE);
-  let zkAppStorage = new ZkAppStorage(DKG_LEVEL_1_TREE);
-  let rollupStorage = new RollupStateStorage(DKG_LEVEL_1_TREE);
-
+  let memberStorage = new MemberStorage(COMMITTEE_LEVEL_1_TREE(), []);
+  let settingStorage = new SettingStorage(COMMITTEE_LEVEL_1_TREE());
+  let zkAppStorage = new ZkAppStorage(DKG_LEVEL_1_TREE());
+  let rollupStorage = new RollupStateStorage(DKG_LEVEL_1_TREE());
+  let keyStatusStorage = new KeyStatusStorage(DKG_LEVEL_1_TREE());
+  let publicKeyStorage = new PublicKeyStorage(DKG_LEVEL_1_TREE(), []);
+  let round1Storage = new Round1ContributionStorage(DKG_LEVEL_1_TREE(), []);
+  let round2Storage = new Round2ContributionStorage(DKG_LEVEL_1_TREE(), []);
+  let responseStorage = new ResponseContributionStorage(DKG_LEVEL_1_TREE(), []);
   let { keys, addresses } = randomAccounts(
     'user0',
     'user1',
@@ -76,8 +86,8 @@ describe('DKG', () => {
     { privateKey: keys.user4, publicKey: addresses.user4 },
   ];
   let committeeIndex = Field(0);
-  let previousActionStates: { [key: string]: Field } = {};
-  let actionStates: { [key: string]: Field } = {};
+  let actionStates: Field[] = [Reducer.initialActionState];
+  let numberOfActions = 0;
 
   const ACTIONS = {
     [ActionEnum.GENERATE_KEY]: [
@@ -225,10 +235,10 @@ describe('DKG', () => {
     await DKGContract.compile();
     // DKGProfiler.stop();
     console.log('Done!');
-  });
+  }, 1200000);
 
   it('Should deploy committee and dkg contract with mock states', async () => {
-    let memberTree = COMMITTEE_LEVEL_2_TREE;
+    let memberTree = COMMITTEE_LEVEL_2_TREE();
     for (let i = 0; i < members.length; i++) {
       memberTree.setLeaf(
         BigInt(i),
@@ -236,11 +246,12 @@ describe('DKG', () => {
       );
     }
     Provable.log('Members tree:', memberTree.getRoot());
+    memberStorage.level1.set(committeeIndex, memberTree.getRoot());
+    memberStorage.level2s[memberTree.getRoot().toString()] = memberTree;
     settingStorage.level1.set(
       committeeIndex,
       settingStorage.calculateLeaf({ T: Field(3), N: Field(5) })
     );
-    memberStorage.level1.set(committeeIndex, memberTree.getRoot());
 
     console.log('Deploy CommitteeContract...');
     Provable.log('Member storage root:', memberStorage.level1.getRoot(), '->');
@@ -305,8 +316,6 @@ describe('DKG', () => {
         level2Index: memberStorage.calculateLevel2Index(Field(i)),
       });
       Provable.log('Member:', members[i].publicKey);
-      previousActionStates[action.hash().toString()] =
-        dkgContract.account.actionState.get();
       let tx = await Mina.transaction(members[i].publicKey, () => {
         dkgContract.committeeAction(
           action,
@@ -321,8 +330,7 @@ describe('DKG', () => {
       });
       await tx.prove();
       await tx.sign([members[i].privateKey]).send();
-      actionStates[action.hash().toString()] =
-        dkgContract.account.actionState.get();
+      actionStates.push(dkgContract.account.actionState.get());
     }
 
     console.log('DKG rollup state:', initialRollupState);
@@ -344,16 +352,13 @@ describe('DKG', () => {
         }),
         reduceProof,
         rollupStorage.getWitness(
-          rollupStorage.calculateLevel1Index({
-            committeeId: action.committeeId,
-            keyId: action.keyId,
-          })
+          rollupStorage.calculateLevel1Index(actionStates[i + 1])
         )
       );
 
       rollupStorage.level1.set(
-        actionStates[action.hash().toString()],
-        Field(ActionStatus.REDUCED)
+        actionStates[i + 1],
+        rollupStorage.calculateLeaf(ActionStatus.REDUCED)
       );
     }
 
@@ -367,6 +372,46 @@ describe('DKG', () => {
   xit('Should generate new keys', async () => {
     let initialKeyStatus = dkgContract.keyStatus.get();
     let initialRollupState = dkgContract.rollupState.get();
+
+    let generateKeyProof = await GenerateKey.firstStep(
+      new KeyUpdateInput({
+        initialKeyStatus: initialKeyStatus,
+        initialRollupState: initialRollupState,
+        previousActionState: Field(0),
+        action: Action.empty(),
+      })
+    );
+
+    for (let i = 0; i < 3; i++) {
+      let action = ACTIONS[ActionEnum.GENERATE_KEY][i];
+      generateKeyProof = await GenerateKey.nextStep(
+        new KeyUpdateInput({
+          initialKeyStatus: initialKeyStatus,
+          initialRollupState: initialRollupState,
+          previousActionState: actionStates[i],
+          action: action,
+        }),
+        generateKeyProof,
+        keyStatusStorage.getWitness(
+          keyStatusStorage.calculateLevel1Index({
+            committeeId: action.committeeId,
+            keyId: action.keyId,
+          })
+        ),
+        rollupStorage.getWitness(
+          rollupStorage.calculateLevel1Index(actionStates[i + 1])
+        )
+      );
+      let tx = await Mina.transaction(feePayerKey.publicKey, () => {
+        dkgContract.generateKeys(generateKeyProof);
+      });
+      await tx.prove();
+      await tx.sign([feePayerKey.privateKey]).send();
+      rollupStorage.level1.set(
+        actionStates[i + 1],
+        rollupStorage.calculateLeaf(ActionStatus.ROLLUPED)
+      );
+    }
   });
 
   afterAll(async () => {

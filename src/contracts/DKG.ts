@@ -49,18 +49,19 @@ export class Level1MT extends MerkleMap {}
 export class Level1Witness extends MerkleMapWitness {}
 export class Level2MT extends MerkleTree {}
 export class Level2Witness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
-export const EMPTY_LEVEL_1_TREE = new Level1MT();
-export const EMPTY_LEVEL_2_TREE = new Level2MT(LEVEL2_TREE_HEIGHT);
+export const EMPTY_LEVEL_1_TREE = () => new Level1MT();
+export const EMPTY_LEVEL_2_TREE = () => new Level2MT(LEVEL2_TREE_HEIGHT);
 export class FullMTWitness extends Struct({
   level1: Level1Witness,
   level2: Level2Witness,
 }) {}
 
-export const ZK_APP = {
+const ZK_APP = {
   COMMITTEE: Encoding.stringToFields('committee'),
   REQUEST: Encoding.stringToFields('request'),
 };
-const zkAppStorage = new ZkAppStorage(EMPTY_LEVEL_1_TREE);
+const zkAppStorage = new ZkAppStorage(EMPTY_LEVEL_1_TREE());
+const DefaultRoot = EMPTY_LEVEL_1_TREE().getRoot();
 
 export const enum KeyStatus {
   EMPTY,
@@ -612,7 +613,6 @@ export const FinalizeRound1 = ZkProgram({
 
         // Compute new public key root
         let memberPublicKey = input.action.round1Contribution.C.values[0];
-        memberPublicKey.equals(Group.zero).assertFalse();
         [publicKeyRoot] = contributionWitness.level1.computeRootAndKey(
           publicKeyWitness.level2.calculateRoot(
             Poseidon.hash(memberPublicKey.toFields())
@@ -1024,13 +1024,13 @@ export class DKGContract extends SmartContract {
 
   init() {
     super.init();
-    this.zkApps.set(EMPTY_LEVEL_1_TREE.getRoot());
-    this.rollupState.set(EMPTY_LEVEL_1_TREE.getRoot());
-    this.keyStatus.set(EMPTY_LEVEL_1_TREE.getRoot());
-    this.publicKey.set(EMPTY_LEVEL_1_TREE.getRoot());
-    this.round1Contribution.set(EMPTY_LEVEL_1_TREE.getRoot());
-    this.round2Contribution.set(EMPTY_LEVEL_1_TREE.getRoot());
-    this.responseContribution.set(EMPTY_LEVEL_1_TREE.getRoot());
+    this.zkApps.set(DefaultRoot);
+    this.rollupState.set(DefaultRoot);
+    this.keyStatus.set(DefaultRoot);
+    this.publicKey.set(DefaultRoot);
+    this.round1Contribution.set(DefaultRoot);
+    this.round2Contribution.set(DefaultRoot);
+    this.responseContribution.set(DefaultRoot);
   }
 
   @method setZkAppAddress(
@@ -1054,7 +1054,6 @@ export class DKGContract extends SmartContract {
     memberMerkleTreeWitness: CommitteeMerkleWitness,
     memberMerkleMapWitness: MerkleMapWitness
   ) {
-    Provable.log('Sender:', this.sender);
     // Check if committee address is correct
     let [zkAppRoot, zkAppKey] = committee.witness.computeRootAndKey(
       Poseidon.hash(committee.address.toFields())

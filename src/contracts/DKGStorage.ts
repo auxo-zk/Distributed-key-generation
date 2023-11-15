@@ -7,6 +7,7 @@ import {
   FullMTWitness,
   KeyStatus,
   Level2Witness,
+  ActionStatus,
 } from './DKG.js';
 import {
   ResponseContribution,
@@ -16,11 +17,16 @@ import {
 
 abstract class DKGStrorage {
   level1: Level1MT;
-  level2?: Level2MT;
+  level2s: { [key: string]: Level2MT };
 
-  constructor(level1: Level1MT, level2?: Level2MT) {
+  constructor(level1: Level1MT, level2s?: Level2MT[]) {
     this.level1 = level1;
-    if (level2) this.level2 = level2;
+    this.level2s = {};
+    if (level2s) {
+      for (let i = 0; i < level2s.length; i++) {
+        this.level2s[level2s[i].getRoot().toString()] = level2s[i];
+      }
+    }
   }
 
   abstract calculateLeaf(args: any): Field;
@@ -36,18 +42,12 @@ export class RollupStateStorage extends DKGStrorage {
     super(level1);
   }
 
-  calculateLeaf(action: Action): Field {
-    return action.hash();
+  calculateLeaf(status: ActionStatus): Field {
+    return Field(status);
   }
 
-  calculateLevel1Index({
-    committeeId,
-    keyId,
-  }: {
-    committeeId: Field;
-    keyId: Field;
-  }): Field {
-    return Poseidon.hash([committeeId, keyId]);
+  calculateLevel1Index(actionState: Field): Field {
+    return actionState;
   }
 
   getWitness(level1Index: Field): Level1Witness {
@@ -83,10 +83,10 @@ export class KeyStatusStorage extends DKGStrorage {
 
 export class PublicKeyStorage extends DKGStrorage {
   level1: Level1MT;
-  level2: Level2MT;
+  level2s: { [key: string]: Level2MT };
 
-  constructor(level1: Level1MT, level2: Level2MT) {
-    super(level1, level2);
+  constructor(level1: Level1MT, level2s: Level2MT[]) {
+    super(level1, level2s);
   }
 
   calculateLeaf(C0: Group): Field {
@@ -116,17 +116,21 @@ export class PublicKeyStorage extends DKGStrorage {
   }): FullMTWitness {
     return new FullMTWitness({
       level1: this.level1.getWitness(level1Index) as Level1Witness,
-      level2: new Level2Witness(this.level2.getWitness(level2Index.toBigInt())),
+      level2: new Level2Witness(
+        this.level2s[this.level1.get(level1Index).toString()].getWitness(
+          level2Index.toBigInt()
+        )
+      ),
     });
   }
 }
 
 export class Round1ContributionStorage extends DKGStrorage {
   level1: Level1MT;
-  level2: Level2MT;
+  level2s: { [key: string]: Level2MT };
 
-  constructor(level1: Level1MT, level2: Level2MT) {
-    super(level1, level2);
+  constructor(level1: Level1MT, level2s: Level2MT[]) {
+    super(level1, level2s);
   }
 
   calculateLeaf(contribution: Round1Contribution): Field {
@@ -156,17 +160,21 @@ export class Round1ContributionStorage extends DKGStrorage {
   }): FullMTWitness {
     return new FullMTWitness({
       level1: this.level1.getWitness(level1Index) as Level1Witness,
-      level2: new Level2Witness(this.level2.getWitness(level2Index.toBigInt())),
+      level2: new Level2Witness(
+        this.level2s[this.level1.get(level1Index).toString()].getWitness(
+          level2Index.toBigInt()
+        )
+      ),
     });
   }
 }
 
 export class Round2ContributionStorage extends DKGStrorage {
   level1: Level1MT;
-  level2: Level2MT;
+  level2s: { [key: string]: Level2MT };
 
-  constructor(level1: Level1MT, level2: Level2MT) {
-    super(level1, level2);
+  constructor(level1: Level1MT, level2s: Level2MT[]) {
+    super(level1, level2s);
   }
 
   calculateLeaf(contribution: Round2Contribution): Field {
@@ -196,17 +204,21 @@ export class Round2ContributionStorage extends DKGStrorage {
   }): FullMTWitness {
     return new FullMTWitness({
       level1: this.level1.getWitness(level1Index) as Level1Witness,
-      level2: new Level2Witness(this.level2.getWitness(level2Index.toBigInt())),
+      level2: new Level2Witness(
+        this.level2s[this.level1.get(level1Index).toString()].getWitness(
+          level2Index.toBigInt()
+        )
+      ),
     });
   }
 }
 
 export class ResponseContributionStorage extends DKGStrorage {
   level1: Level1MT;
-  level2: Level2MT;
+  level2s: { [key: string]: Level2MT };
 
-  constructor(level1: Level1MT, level2: Level2MT) {
-    super(level1, level2);
+  constructor(level1: Level1MT, level2s: Level2MT[]) {
+    super(level1, level2s);
   }
 
   calculateLeaf(contribution: ResponseContribution): Field {
@@ -238,7 +250,11 @@ export class ResponseContributionStorage extends DKGStrorage {
   }): FullMTWitness {
     return new FullMTWitness({
       level1: this.level1.getWitness(level1Index) as Level1Witness,
-      level2: new Level2Witness(this.level2.getWitness(level2Index.toBigInt())),
+      level2: new Level2Witness(
+        this.level2s[this.level1.get(level1Index).toString()].getWitness(
+          level2Index.toBigInt()
+        )
+      ),
     });
   }
 }
