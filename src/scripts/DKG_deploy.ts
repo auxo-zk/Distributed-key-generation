@@ -23,10 +23,9 @@ import {
 import {
   CompleteResponse,
   DKGContract,
-  DeprecateKey,
+  UpdateKey,
   FinalizeRound1,
   FinalizeRound2,
-  GenerateKey,
   ReduceActions,
 } from '../contracts/DKG.js';
 import {
@@ -97,10 +96,8 @@ async function main() {
   if (actionn == 0 || actionn == 1 || actionn == 2) {
     console.log('Compiling ReduceActions...');
     await ReduceActions.compile();
-    console.log('Compiling GenerateKey...');
-    await GenerateKey.compile();
-    console.log('Compiling DeprecateKey...');
-    await DeprecateKey.compile();
+    console.log('Compiling UpdateKey...');
+    await UpdateKey.compile();
     console.log('Compiling FinalizeRound1...');
     await FinalizeRound1.compile();
     console.log('Compiling BatchEncryption...');

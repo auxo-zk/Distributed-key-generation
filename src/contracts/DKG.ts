@@ -88,8 +88,7 @@ export const enum ActionEnum {
 
 export const enum EventEnum {
   REDUCE = 'reduce-actions',
-  KEY_GENERATED = 'key-generated',
-  KEY_DEPRECATED = 'key-deprecated',
+  KEY_UPDATED = 'key-updated',
   ROUND_1_FINALIZED = 'round-1-finalized',
   ROUND_2_FINALIZED = 'round-2-finalized',
   RESPONSE_COMPLETED = 'response-completed',
@@ -133,17 +132,18 @@ export class Action extends Struct({
     return Poseidon.hash(this.toFields());
   }
   toFields(): Field[] {
-    return [
-      this.enum,
-      this.committeeId,
-      this.keyId,
-      this.memberId,
-      this.requestId,
-    ]
-      .concat(this.round1Contribution.toFields())
-      .concat(this.round2Contribution.toFields())
-      .concat(this.responseContribution.toFields())
-      .flat();
+    // return [
+    //   this.enum,
+    //   this.committeeId,
+    //   this.keyId,
+    //   this.memberId,
+    //   this.requestId,
+    // ]
+    //   .concat(this.round1Contribution.toFields())
+    //   .concat(this.round2Contribution.toFields())
+    //   .concat(this.responseContribution.toFields())
+    //   .flat();
+    return Action.toFields(this);
   }
   fromFields(fields: Field[]): Action {
     return new Action({
@@ -152,43 +152,24 @@ export class Action extends Struct({
       keyId: fields[2],
       memberId: fields[3],
       requestId: fields[4],
-      round1Contribution: new Round1Contribution({
-        C: CArray.fromFields(fields.slice(5, COMMITTEE_MAX_SIZE + 6)),
-      }),
-      round2Contribution: new Round2Contribution({
-        c: cArray.fromFields(
-          fields.slice(COMMITTEE_MAX_SIZE + 6, 2 * COMMITTEE_MAX_SIZE + 7)
-        ),
-        U: UArray.fromFields(
-          fields.slice(2 * COMMITTEE_MAX_SIZE + 7, 3 * COMMITTEE_MAX_SIZE + 8)
-        ),
-      }),
-      responseContribution: new ResponseContribution({
-        D: DArray.fromFields(
-          fields.slice(3 * COMMITTEE_MAX_SIZE + 8, 4 * COMMITTEE_MAX_SIZE + 9)
-        ),
-      }),
+      round1Contribution: Round1Contribution.fromFields(
+        fields.slice(5, COMMITTEE_MAX_SIZE + 6)
+      ) as Round1Contribution,
+      round2Contribution: Round2Contribution.fromFields(
+        fields.slice(COMMITTEE_MAX_SIZE + 6, 2 * COMMITTEE_MAX_SIZE + 7)
+      ) as Round2Contribution,
+      responseContribution: ResponseContribution.fromFields(
+        fields.slice(3 * COMMITTEE_MAX_SIZE + 8, 4 * COMMITTEE_MAX_SIZE + 9)
+      ) as ResponseContribution,
     });
   }
 }
 
-export class KeyGeneratedEvent extends Struct({
+export class KeyUpdatedEvent extends Struct({
   keyIndexes: UpdatedValues,
 }) {
   static fromFields(fields: Field[]) {
-    return new KeyDeprecatedEvent({
-      keyIndexes: UpdatedValues.fromFields(
-        fields.slice(0, ROLLUP_MAX_SIZE + 1)
-      ),
-    });
-  }
-}
-
-export class KeyDeprecatedEvent extends Struct({
-  keyIndexes: UpdatedValues,
-}) {
-  static fromFields(fields: Field[]) {
-    return new KeyDeprecatedEvent({
+    return new KeyUpdatedEvent({
       keyIndexes: UpdatedValues.fromFields(
         fields.slice(0, ROLLUP_MAX_SIZE + 1)
       ),
@@ -312,8 +293,8 @@ export class KeyUpdateOutput extends Struct({
   updatedKeys: UpdatedValues,
 }) {}
 
-export const GenerateKey = ZkProgram({
-  name: 'generate-key',
+export const UpdateKey = ZkProgram({
+  name: 'update-key',
   publicInput: KeyUpdateInput,
   publicOutput: KeyUpdateOutput,
   methods: {
@@ -353,21 +334,33 @@ export const GenerateKey = ZkProgram({
           earlierProof.publicInput.initialRollupState
         );
 
-        // Check if the key is empty
+        // Create switch mask
+        let checks = [
+          input.action.enum.equals(Field(ActionEnum.GENERATE_KEY)),
+          input.action.enum.equals(Field(ActionEnum.DEPRECATE_KEY)),
+        ];
+
+        let previousStatus = Provable.switch(checks, Field, [
+          Field(KeyStatus.EMPTY),
+          Field(KeyStatus.ACTIVE),
+        ]);
+        let nextStatus = Provable.switch(checks, Field, [
+          Field(KeyStatus.ROUND_1_CONTRIBUTION),
+          Field(KeyStatus.DEPRECATED),
+        ]);
+
+        // Check the key's previous status
         let keyIndex = Poseidon.hash([
           input.action.committeeId,
           input.action.keyId,
         ]);
-        let [keyStatus, keyStatusIndex] = keyStatusWitness.computeRootAndKey(
-          Field(KeyStatus.EMPTY)
-        );
+        let [keyStatus, keyStatusIndex] =
+          keyStatusWitness.computeRootAndKey(previousStatus);
         keyStatus.assertEquals(input.initialKeyStatus);
         keyStatusIndex.assertEquals(keyIndex);
 
         // Calculate the new keyStatus tree root
-        [keyStatus] = keyStatusWitness.computeRootAndKey(
-          Field(KeyStatus.ROUND_1_CONTRIBUTION)
-        );
+        [keyStatus] = keyStatusWitness.computeRootAndKey(nextStatus);
 
         // Calculate corresponding action state
         let actionState = updateOutOfSnark(input.previousActionState, [
@@ -400,97 +393,7 @@ export const GenerateKey = ZkProgram({
   },
 });
 
-class GenerateKeyProof extends ZkProgram.Proof(GenerateKey) {}
-
-export const DeprecateKey = ZkProgram({
-  name: 'deprecate-key',
-  publicInput: KeyUpdateInput,
-  publicOutput: KeyUpdateOutput,
-  methods: {
-    firstStep: {
-      privateInputs: [],
-      method(input: KeyUpdateInput) {
-        return {
-          newKeyStatus: input.initialKeyStatus,
-          newRollupState: input.initialRollupState,
-          updatedKeys: new UpdatedValues(),
-        };
-      },
-    },
-    nextStep: {
-      privateInputs: [
-        SelfProof<KeyUpdateInput, KeyUpdateOutput>,
-        MerkleMapWitness,
-        MerkleMapWitness,
-      ],
-      method(
-        input: KeyUpdateInput,
-        earlierProof: SelfProof<KeyUpdateInput, KeyUpdateOutput>,
-        keyStatusWitness: MerkleMapWitness,
-        rollupWitness: MerkleMapWitness
-      ) {
-        // Verify earlier proof
-        earlierProof.verify();
-
-        // Check correct action type
-        input.action.enum.assertEquals(Field(ActionEnum.DEPRECATE_KEY));
-
-        // Check consistency of the initial values
-        input.initialKeyStatus.assertEquals(
-          earlierProof.publicInput.initialKeyStatus
-        );
-        input.initialRollupState.assertEquals(
-          earlierProof.publicInput.initialRollupState
-        );
-
-        // Check if the key is active
-        let keyIndex = Poseidon.hash([
-          input.action.committeeId,
-          input.action.keyId,
-        ]);
-        let [keyStatus, keyStatusIndex] = keyStatusWitness.computeRootAndKey(
-          Field(KeyStatus.ACTIVE)
-        );
-        keyStatus.assertEquals(earlierProof.publicOutput.newKeyStatus);
-        keyStatusIndex.assertEquals(keyIndex);
-
-        // Calculate the new keyStatus tree root
-        [keyStatus] = keyStatusWitness.computeRootAndKey(
-          Field(KeyStatus.DEPRECATED)
-        );
-
-        // Calculate corresponding action state
-        let actionState = updateOutOfSnark(input.previousActionState, [
-          input.action.toFields(),
-        ]);
-
-        // Check if the action was reduced and is waiting for rollup
-        let [rollupRoot, rollupIndex] = rollupWitness.computeRootAndKey(
-          Field(ActionStatus.REDUCED)
-        );
-        rollupRoot.assertEquals(earlierProof.publicOutput.newRollupState);
-        rollupIndex.assertEquals(actionState);
-
-        // Calculate the new rollupState tree root
-        [rollupRoot] = rollupWitness.computeRootAndKey(
-          Field(ActionStatus.ROLLUPED)
-        );
-
-        // Add updated key
-        let updatedKeys = earlierProof.publicOutput.updatedKeys;
-        updatedKeys.push(keyIndex);
-
-        return {
-          newKeyStatus: keyStatus,
-          newRollupState: rollupRoot,
-          updatedKeys: updatedKeys,
-        };
-      },
-    },
-  },
-});
-
-class DeprecateKeyProof extends ZkProgram.Proof(DeprecateKey) {}
+class UpdateKeyProof extends ZkProgram.Proof(UpdateKey) {}
 
 export class Round1Input extends Struct({
   T: Field,
@@ -998,8 +901,7 @@ export class DKGContract extends SmartContract {
   reducer = Reducer({ actionType: Action });
   events = {
     [EventEnum.REDUCE]: Field,
-    [EventEnum.KEY_GENERATED]: KeyGeneratedEvent,
-    [EventEnum.KEY_DEPRECATED]: KeyDeprecatedEvent,
+    [EventEnum.KEY_UPDATED]: KeyUpdatedEvent,
     [EventEnum.ROUND_1_FINALIZED]: Round1FinalizedEvent,
     [EventEnum.ROUND_2_FINALIZED]: Round2FinalizedEvent,
     [EventEnum.RESPONSE_COMPLETED]: ResponseCompletedEvent,
@@ -1033,20 +935,20 @@ export class DKGContract extends SmartContract {
     this.responseContribution.set(DefaultRoot);
   }
 
-  @method setZkAppAddress(
-    zkAppRef: ZkAppRef,
-    currZkApps: Field,
-    newZkApps: Field
-  ) {
-    let zkAppsRoot = this.zkApps.getAndAssertEquals();
-    currZkApps.assertEquals(zkAppsRoot);
-    newZkApps.assertEquals(
-      zkAppRef.witness.computeRootAndKey(
-        zkAppStorage.calculateLeaf(zkAppRef.address)
-      )[0]
-    );
-    this.zkApps.set(newZkApps);
-  }
+  // @method setZkAppAddress(
+  //   zkAppRef: ZkAppRef,
+  //   currZkApps: Field,
+  //   newZkApps: Field
+  // ) {
+  //   let zkAppsRoot = this.zkApps.getAndAssertEquals();
+  //   currZkApps.assertEquals(zkAppsRoot);
+  //   newZkApps.assertEquals(
+  //     zkAppRef.witness.computeRootAndKey(
+  //       zkAppStorage.calculateLeaf(zkAppRef.address)
+  //     )[0]
+  //   );
+  //   this.zkApps.set(newZkApps);
+  // }
 
   @method committeeAction(
     action: Action,
@@ -1094,7 +996,7 @@ export class DKGContract extends SmartContract {
     this.emitEvent(EventEnum.REDUCE, actionState);
   }
 
-  @method generateKeys(proof: GenerateKeyProof) {
+  @method updateKeys(proof: UpdateKeyProof) {
     // Get current state values
     let rollupState = this.rollupState.getAndAssertEquals();
     let keyStatus = this.keyStatus.getAndAssertEquals();
@@ -1109,30 +1011,8 @@ export class DKGContract extends SmartContract {
     this.keyStatus.set(proof.publicOutput.newKeyStatus);
 
     this.emitEvent(
-      EventEnum.KEY_GENERATED,
-      new KeyGeneratedEvent({
-        keyIndexes: proof.publicOutput.updatedKeys,
-      })
-    );
-  }
-
-  @method deprecateKeys(proof: DeprecateKeyProof) {
-    // Get current state values
-    let rollupState = this.rollupState.getAndAssertEquals();
-    let keyStatus = this.keyStatus.getAndAssertEquals();
-
-    // Verify proof
-    proof.verify();
-    proof.publicInput.initialRollupState.assertEquals(rollupState);
-    proof.publicInput.initialKeyStatus.assertEquals(keyStatus);
-
-    // Set new state values
-    this.rollupState.set(proof.publicOutput.newRollupState);
-    this.keyStatus.set(proof.publicOutput.newKeyStatus);
-
-    this.emitEvent(
-      EventEnum.KEY_DEPRECATED,
-      new KeyDeprecatedEvent({
+      EventEnum.KEY_UPDATED,
+      new KeyUpdatedEvent({
         keyIndexes: proof.publicOutput.updatedKeys,
       })
     );

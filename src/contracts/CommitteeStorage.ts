@@ -11,12 +11,15 @@ abstract class CommitteeStrorage {
   level1: Level1MT;
   level2s: { [key: string]: Level2MT };
 
-  constructor(level1: Level1MT, level2s?: Level2MT[]) {
+  constructor(
+    level1: Level1MT,
+    level2s?: { index: Field; level2: Level2MT }[]
+  ) {
     this.level1 = level1;
     this.level2s = {};
     if (level2s) {
       for (let i = 0; i < level2s.length; i++) {
-        this.level2s[level2s[i].getRoot().toString()] = level2s[i];
+        this.level2s[level2s[i].index.toString()] = level2s[i].level2;
       }
     }
   }
@@ -31,7 +34,7 @@ export class MemberStorage extends CommitteeStrorage {
   level1: Level1MT;
   level2s: { [key: string]: Level2MT };
 
-  constructor(level1: Level1MT, level2s: Level2MT[]) {
+  constructor(level1: Level1MT, level2s: { index: Field; level2: Level2MT }[]) {
     super(level1, level2s);
   }
 
@@ -57,7 +60,7 @@ export class MemberStorage extends CommitteeStrorage {
     return new FullMTWitness({
       level1: this.level1.getWitness(level1Index) as Level1Witness,
       level2: new Level2Witness(
-        this.level2s[this.level1.get(level1Index).toString()].getWitness(
+        (this.level2s[level1Index.toString()] as Level2MT).getWitness(
           level2Index.toBigInt()
         )
       ),
