@@ -432,6 +432,7 @@ describe('DKG', () => {
       //   level1Index: memberStorage.calculateLevel1Index(committeeIndex),
       //   level2Index: memberStorage.calculateLevel2Index(Field(i)),
       // });
+
       let tx = await Mina.transaction(members[i].publicKey, () => {
         dkgContract.committeeAction(
           action,
@@ -442,15 +443,20 @@ describe('DKG', () => {
           ),
           new Level2Witness(memberTree.getWitness(Field(i).toBigInt())),
           memberStorage.level1.getWitness(committeeIndex) as Level1Witness
+          // memberWitness.level2,
+          // memberWitness.level1
         );
       });
+      console.log('Submit GENERATE_KEY action...');
       await tx.prove();
       await tx.sign([members[i].privateKey]).send();
+      console.log('DONE!');
       actionStates.push(dkgContract.account.actionState.get());
     }
 
     console.log('DKG rollup state:', initialRollupState);
 
+    console.log('ReduceProof.firstStep()...');
     let reduceProof = await ReduceActions.firstStep(
       new ReduceInput({
         initialRollupState: dkgContract.rollupState.get(),
@@ -461,6 +467,7 @@ describe('DKG', () => {
 
     for (let i = 0; i < 3; i++) {
       let action = actions[i];
+      console.log('ReduceProof.nextStep()...');
       reduceProof = await ReduceActions.nextStep(
         new ReduceInput({
           initialRollupState: initialRollupState,
@@ -481,8 +488,10 @@ describe('DKG', () => {
     let tx = await Mina.transaction(feePayerKey.publicKey, () => {
       dkgContract.reduce(reduceProof);
     });
+    console.log('Reduce actions...');
     await tx.prove();
     await tx.sign([feePayerKey.privateKey]).send();
+    console.log('DONE!');
   });
 
   xit('Should generate new keys', async () => {
