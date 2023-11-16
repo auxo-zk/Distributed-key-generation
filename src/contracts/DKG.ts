@@ -662,14 +662,14 @@ export const FinalizeRound2 = ZkProgram({
         // Check if members' public keys have been registered
         let publicKeyMT = new MerkleTree(LEVEL2_TREE_HEIGHT);
         for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
-          publicKeyMT.setLeaf(
-            BigInt(i),
-            Poseidon.hash(input.publicKeys.get(Field(i)).toFields())
+          let value = Provable.if(
+            Field(i).greaterThanOrEqual(input.publicKeys.length),
+            Field(0),
+            PublicKeyArray.hash(input.publicKeys.get(Field(i)))
           );
+          publicKeyMT.setLeaf(BigInt(i), value);
         }
-        let publicKeyLeaf = Provable.witness(Field, () =>
-          publicKeyMT.getRoot()
-        );
+        let publicKeyLeaf = publicKeyMT.getRoot();
         let [publicKeyRoot] = publicKeyWitness.computeRootAndKey(publicKeyLeaf);
         publicKeyRoot.assertEquals(input.publicKeyRoot);
 

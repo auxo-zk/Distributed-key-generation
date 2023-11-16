@@ -16,7 +16,7 @@ abstract class CommitteeStrorage {
     level2s?: { index: Field; level2: Level2MT }[]
   ) {
     this.level1 = level1;
-    this.level2s = {};
+    this.level2s = {} as { [key: string]: Level2MT };
     if (level2s) {
       for (let i = 0; i < level2s.length; i++) {
         this.level2s[level2s[i].index.toString()] = level2s[i].level2;
@@ -57,13 +57,12 @@ export class MemberStorage extends CommitteeStrorage {
     level1Index: Field;
     level2Index: Field;
   }): FullMTWitness {
+    let level2 = this.level2s[level1Index.toString()];
+    if (level2 == undefined)
+      throw new Error('Level 2 tree does not exist at this index');
     return new FullMTWitness({
       level1: this.level1.getWitness(level1Index) as Level1Witness,
-      level2: new Level2Witness(
-        (this.level2s[level1Index.toString()] as Level2MT).getWitness(
-          level2Index.toBigInt()
-        )
-      ),
+      level2: new Level2Witness(level2.getWitness(level2Index.toBigInt())),
     });
   }
 }

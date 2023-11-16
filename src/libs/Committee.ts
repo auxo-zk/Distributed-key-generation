@@ -17,7 +17,7 @@ import * as ElgamalECC from './Elgamal.js';
 
 /* ========== CONSTANTS, TYPES, & STRUCTS ========== */
 
-export const COMMITTEE_MAX_SIZE = 16;
+export const COMMITTEE_MAX_SIZE = 8;
 export const CArray = GroupDynamicArray(COMMITTEE_MAX_SIZE);
 export const cArray = Bit255DynamicArray(COMMITTEE_MAX_SIZE);
 export const UArray = GroupDynamicArray(COMMITTEE_MAX_SIZE);
