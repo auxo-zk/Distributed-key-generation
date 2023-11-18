@@ -1,4 +1,13 @@
-import { Field, MerkleMap, MerkleMapWitness, MerkleTree, MerkleWitness, Poseidon, PublicKey, Struct } from 'o1js';
+import {
+  Field,
+  MerkleMap,
+  MerkleMapWitness,
+  MerkleTree,
+  MerkleWitness,
+  Poseidon,
+  PublicKey,
+  Struct,
+} from 'o1js';
 import { COMMITTEE_MAX_SIZE } from '../constants.js';
 
 export const LEVEL2_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;

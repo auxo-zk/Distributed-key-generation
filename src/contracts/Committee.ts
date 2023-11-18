@@ -7,7 +7,6 @@ import {
   MerkleWitness,
   Reducer,
   MerkleTree,
-  MerkleMap,
   MerkleMapWitness,
   Struct,
   SelfProof,

@@ -55,20 +55,28 @@ export const enum EventEnum {
 
 export class ActionMask extends BoolDynamicArray(ActionEnum.__LENGTH) {}
 export const ACTION_MASK = {
-  [ActionEnum.GENERATE_KEY]: new ActionMask([...Array(ActionEnum.__LENGTH).keys()].map(
-    (e, i) => i == ActionEnum.GENERATE_KEY ? Bool(true) : Bool(false)
-  )),
-  [ActionEnum.FINALIZE_ROUND_1]: new ActionMask([...Array(ActionEnum.__LENGTH).keys()].map(
-    (e, i) => i == ActionEnum.FINALIZE_ROUND_1 ? Bool(true) : Bool(false)
-  )),
-  [ActionEnum.FINALIZE_ROUND_2]: new ActionMask([...Array(ActionEnum.__LENGTH).keys()].map(
-    (e, i) => i == ActionEnum.FINALIZE_ROUND_2 ? Bool(true) : Bool(false)
-  )),
-  [ActionEnum.DEPRECATE_KEY]: new ActionMask([...Array(ActionEnum.__LENGTH).keys()].map(
-    (e, i) => i == ActionEnum.DEPRECATE_KEY ? Bool(true) : Bool(false)
-  )),
-  [ActionEnum.__LENGTH]: new ActionMask()
-}
+  [ActionEnum.GENERATE_KEY]: new ActionMask(
+    [...Array(ActionEnum.__LENGTH).keys()].map((e, i) =>
+      i == ActionEnum.GENERATE_KEY ? Bool(true) : Bool(false)
+    )
+  ),
+  [ActionEnum.FINALIZE_ROUND_1]: new ActionMask(
+    [...Array(ActionEnum.__LENGTH).keys()].map((e, i) =>
+      i == ActionEnum.FINALIZE_ROUND_1 ? Bool(true) : Bool(false)
+    )
+  ),
+  [ActionEnum.FINALIZE_ROUND_2]: new ActionMask(
+    [...Array(ActionEnum.__LENGTH).keys()].map((e, i) =>
+      i == ActionEnum.FINALIZE_ROUND_2 ? Bool(true) : Bool(false)
+    )
+  ),
+  [ActionEnum.DEPRECATE_KEY]: new ActionMask(
+    [...Array(ActionEnum.__LENGTH).keys()].map((e, i) =>
+      i == ActionEnum.DEPRECATE_KEY ? Bool(true) : Bool(false)
+    )
+  ),
+  [ActionEnum.__LENGTH]: new ActionMask(),
+};
 
 /**
  * Class of action dispatched by users
@@ -128,7 +136,10 @@ export const UpdateKey = ZkProgram({
       },
     },
     nextStep: {
-      privateInputs: [SelfProof<UpdateKeyInput, UpdateKeyOutput>,MerkleMapWitness],
+      privateInputs: [
+        SelfProof<UpdateKeyInput, UpdateKeyOutput>,
+        MerkleMapWitness,
+      ],
       method(
         input: UpdateKeyInput,
         earlierProof: SelfProof<UpdateKeyInput, UpdateKeyOutput>,
@@ -170,9 +181,10 @@ export const UpdateKey = ZkProgram({
         [keyStatus] = keyStatusWitness.computeRootAndKey(nextStatus);
 
         // Calculate corresponding action state
-        let actionState = updateOutOfSnark(earlierProof.publicOutput.newActionState, [
-          input.action.toFields(),
-        ]);
+        let actionState = updateOutOfSnark(
+          earlierProof.publicOutput.newActionState,
+          [input.action.toFields()]
+        );
 
         return {
           newKeyStatus: keyStatus,
@@ -212,8 +224,12 @@ export class DKGContract extends SmartContract {
     id.assertEquals(index);
   }
 
-  @method 
-  verifyKeyStatus(keyIndex: Field, status: Field, witness: MerkleMapWitness): void {
+  @method
+  verifyKeyStatus(
+    keyIndex: Field,
+    status: Field,
+    witness: MerkleMapWitness
+  ): void {
     let keyStatus = this.keyStatus.getAndAssertEquals();
     let [root, index] = witness.computeRootAndKey(status);
     root.assertEquals(keyStatus);
@@ -228,29 +244,33 @@ export class DKGContract extends SmartContract {
     committee: ZkAppRef,
     memberMerkleTreeWitness: CommitteeMerkleWitness,
     memberMerkleMapWitness: MerkleMapWitness,
-    memberId: Field,
+    memberId: Field
   ) {
     // Check if sender has the correct index in the committee
-    this.verifyZkApp(committee, ZK_APP.COMMITTEE);const committeeContract = new CommitteeContract(committee.address);
-    committeeContract.checkMember(
-      new CheckMemberInput({
-        address: this.sender,
-        commiteeId: committeeId,
-        memberMerkleTreeWitness: memberMerkleTreeWitness,
-        memberMerkleMapWitness: memberMerkleMapWitness,
-      })
-    ).assertEquals(memberId);
+    this.verifyZkApp(committee, ZK_APP.COMMITTEE);
+    const committeeContract = new CommitteeContract(committee.address);
+    committeeContract
+      .checkMember(
+        new CheckMemberInput({
+          address: this.sender,
+          commiteeId: committeeId,
+          memberMerkleTreeWitness: memberMerkleTreeWitness,
+          memberMerkleMapWitness: memberMerkleMapWitness,
+        })
+      )
+      .assertEquals(memberId);
 
     // Create Action
-    actionType.equals(Field(ActionEnum.GENERATE_KEY))
-      .or(actionType.equals(Field(ActionEnum.DEPRECATE_KEY)))
+    actionType
+      .equals(Field(ActionEnum.GENERATE_KEY))
+      .or(actionType.equals(Field(ActionEnum.DEPRECATE_KEY)));
     let mask = Provable.witness(ActionMask, () => {
       return ACTION_MASK[Number(actionType) as ActionEnum];
     });
     let action = new Action({
       committeeId: committeeId,
       keyId: keyId,
-      mask: mask
+      mask: mask,
     });
 
     // Dispatch key generation actions
@@ -260,15 +280,16 @@ export class DKGContract extends SmartContract {
   @method
   publicAction(committeeId: Field, keyId: Field, actionType: Field) {
     // Create Action
-    actionType.equals(Field(ActionEnum.FINALIZE_ROUND_1))
-      .or(actionType.equals(Field(ActionEnum.FINALIZE_ROUND_2)))
+    actionType
+      .equals(Field(ActionEnum.FINALIZE_ROUND_1))
+      .or(actionType.equals(Field(ActionEnum.FINALIZE_ROUND_2)));
     let mask = Provable.witness(ActionMask, () => {
       return ACTION_MASK[Number(actionType) as ActionEnum];
     });
     let action = new Action({
       committeeId: committeeId,
       keyId: keyId,
-      mask: mask
+      mask: mask,
     });
 
     // Dispatch key generation actions

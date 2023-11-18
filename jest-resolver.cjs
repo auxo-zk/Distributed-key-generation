@@ -12,6 +12,9 @@ module.exports = (request, options) => {
       if (pkg.name === 'node-fetch') {
         return { ...pkg, main: pkg.main };
       }
+      if (pkg.name === '@auxo-dev/auxo-libs') {
+        return { ...pkg, main: pkg.exports.import }
+      }
       return {
         ...pkg,
         main: pkg.module || pkg.main,

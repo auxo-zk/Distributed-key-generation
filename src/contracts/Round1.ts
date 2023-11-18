@@ -1,16 +1,32 @@
-import { Bool, Field, Group, MerkleMapWitness, Poseidon, Provable, PublicKey, Reducer, SelfProof, SmartContract, State, Struct, ZkProgram, method, state } from "o1js";
-import { FieldDynamicArray } from "@auxo-dev/auxo-libs";
-import { Round1Contribution } from "../libs/Committee.js";
+import {
+  Field,
+  Group,
+  MerkleMapWitness,
+  Poseidon,
+  Reducer,
+  SelfProof,
+  SmartContract,
+  State,
+  Struct,
+  ZkProgram,
+  method,
+  state,
+} from 'o1js';
+import { Round1Contribution } from '../libs/Committee.js';
 import { ZkAppRef } from '../libs/ZkAppRef.js';
-import { updateOutOfSnark } from "../libs/utils.js";
-import { FullMTWitness as CommitteeWitness } from "./CommitteeStorage.js";
-import { FullMTWitness as DKGWitness } from "./DKGStorage.js";
-import { CheckConfigInput, CheckMemberInput, CommitteeContract } from "./Committee.js";
-import { ActionEnum as KeyUpdateEnum, DKGContract, KeyStatus } from "./DKG.js";
-import { ZK_APP } from "../constants.js";
+import { updateOutOfSnark } from '../libs/utils.js';
+import { FullMTWitness as CommitteeWitness } from './CommitteeStorage.js';
+import { FullMTWitness as DKGWitness } from './DKGStorage.js';
+import {
+  CheckConfigInput,
+  CheckMemberInput,
+  CommitteeContract,
+} from './Committee.js';
+import { ActionEnum as KeyUpdateEnum, DKGContract, KeyStatus } from './DKG.js';
+import { ZK_APP } from '../constants.js';
 
 export enum EventEnum {
-  CONTRIBUTIONS_REDUCED
+  CONTRIBUTIONS_REDUCED,
 }
 
 export enum ActionStatus {
@@ -23,17 +39,17 @@ export class Action extends Struct({
   keyId: Field,
   memberId: Field,
   contribution: Round1Contribution,
-}) { }
+}) {}
 
 export class ReduceInput extends Struct({
   initialReduceState: Field,
   action: Action,
-}) { }
+}) {}
 
 export class ReduceOutput extends Struct({
   newActionState: Field,
   newReduceState: Field,
-}) { }
+}) {}
 
 export const ReduceRound1 = ZkProgram({
   name: 'reduce-round-1-contribution',
@@ -45,19 +61,16 @@ export const ReduceRound1 = ZkProgram({
       method(input: ReduceInput, initialActionState: Field) {
         return new ReduceOutput({
           newActionState: initialActionState,
-          newReduceState: input.initialReduceState
+          newReduceState: input.initialReduceState,
         });
-      }
+      },
     },
     nextStep: {
-      privateInputs: [
-        SelfProof<ReduceInput, ReduceOutput>,
-        MerkleMapWitness
-      ],
+      privateInputs: [SelfProof<ReduceInput, ReduceOutput>, MerkleMapWitness],
       method(
         input: ReduceInput,
         earlierProof: SelfProof<ReduceInput, ReduceOutput>,
-        reduceWitness: MerkleMapWitness,
+        reduceWitness: MerkleMapWitness
       ) {
         // Verify earlier proof
         earlierProof.verify();
@@ -87,12 +100,12 @@ export const ReduceRound1 = ZkProgram({
           newActionState: actionState,
           newReduceState: root,
         });
-      }
-    }
-  }
+      },
+    },
+  },
 });
 
-export class ReduceRound1Proof extends ZkProgram.Proof(ReduceRound1) { }
+export class ReduceRound1Proof extends ZkProgram.Proof(ReduceRound1) {}
 
 export class Round1Input extends Struct({
   T: Field,
@@ -102,7 +115,7 @@ export class Round1Input extends Struct({
   reduceStateRoot: Field,
   previousActionState: Field,
   action: Action,
-}) { }
+}) {}
 
 export class Round1Output extends Struct({
   newContributionRoot: Field,
@@ -110,7 +123,7 @@ export class Round1Output extends Struct({
   keyIndex: Field,
   publicKey: Group,
   counter: Field,
-}) { }
+}) {}
 
 export const FinalizeRound1 = ZkProgram({
   name: 'finalize-round-1',
@@ -126,8 +139,8 @@ export const FinalizeRound1 = ZkProgram({
           keyIndex: keyIndex,
           publicKey: Group.zero,
           counter: Field(0),
-        })
-      }
+        });
+      },
     },
     nextStep: {
       privateInputs: [
@@ -141,7 +154,7 @@ export const FinalizeRound1 = ZkProgram({
         earlierProof: SelfProof<Round1Input, Round1Output>,
         contributionWitness: DKGWitness,
         publicKeyWitness: DKGWitness,
-        reduceWitness: MerkleMapWitness,
+        reduceWitness: MerkleMapWitness
       ) {
         // Verify earlier proof
         earlierProof.verify();
@@ -226,19 +239,19 @@ export const FinalizeRound1 = ZkProgram({
           keyIndex: keyIndex,
           publicKey: earlierProof.publicOutput.publicKey.add(memberPublicKey),
           counter: earlierProof.publicOutput.counter.add(Field(1)),
-        })
-      }
-    }
-  }
+        });
+      },
+    },
+  },
 });
 
-export class FinalizeRound1Proof extends ZkProgram.Proof(FinalizeRound1) { }
+export class FinalizeRound1Proof extends ZkProgram.Proof(FinalizeRound1) {}
 
 export class Round1Contract extends SmartContract {
   reducer = Reducer({ actionType: Action });
   events = {
     [EventEnum.CONTRIBUTIONS_REDUCED]: Field,
-  }
+  };
 
   @state(Field) zkApps = State<Field>();
   @state(Field) reduceState = State<Field>();
@@ -261,7 +274,7 @@ export class Round1Contract extends SmartContract {
     committee: ZkAppRef,
     memberWitness: CommitteeWitness,
     dkg: ZkAppRef,
-    keyStatusWitness: MerkleMapWitness,
+    keyStatusWitness: MerkleMapWitness
   ) {
     // Verify sender's index
     this.verifyZkApp(committee, ZK_APP.COMMITTEE);
@@ -312,7 +325,7 @@ export class Round1Contract extends SmartContract {
     proof: FinalizeRound1Proof,
     committee: ZkAppRef,
     settingWitness: MerkleMapWitness,
-    dkg: ZkAppRef,
+    dkg: ZkAppRef
   ) {
     // Get current state values
     let contributions = this.contributions.getAndAssertEquals();
@@ -341,7 +354,7 @@ export class Round1Contract extends SmartContract {
     // Set new states
     this.contributions.set(proof.publicOutput.newContributionRoot);
     this.publicKeys.set(proof.publicOutput.newPublicKeyRoot);
-    
+
     // Dispatch action in DKG contract
     this.verifyZkApp(dkg, ZK_APP.DKG);
     const dkgContract = new DKGContract(dkg.address);

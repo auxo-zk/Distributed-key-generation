@@ -1,6 +1,6 @@
 {
   "name": "@auxo-dev/dkg",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "description": "Auxo's DKG Module for the On-chain Funding platform on Mina blockchain",
   "author": "",
   "license": "Apache-2.0",
@@ -10,11 +10,10 @@
     "mina-dapp",
     "zkapp"
   ],
-  "type": "module",
-  "main": "build/src/index.js",
-  "types": "build/src/index.d.ts",
+  "main": "./build/esm/src/index.js",
+  "types": "./build/esm/src/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --build tsconfig.json tsconfig.cjs.json tsconfig.types.json",
     "scripts": "tsc && node",
     "buildw": "tsc --watch",
     "coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
@@ -24,6 +23,16 @@
     "testw": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "lint": "npx eslint src/* --fix"
   },
+  "exports": {
+    "types": "./build/types/src/index.d.ts",
+    "require": "./build/cjs/src/index.js",
+    "import": "./build/esm/src/index.js",
+    "default": "./build/esm/src/index.js"
+  },
+  "files": [
+    "build/*",
+    "build/**/*.map"
+  ],
   "lint-staged": {
     "**/*": [
       "eslint src/* --fix",
@@ -47,7 +56,7 @@
     "zkapp-cli": "^0.15.0"
   },
   "dependencies": {
-    "@auxo-dev/auxo-libs": "^0.2.10",
+    "@auxo-dev/auxo-libs": "^0.3.0",
     "o1js": "^0.14.1"
   }
 }

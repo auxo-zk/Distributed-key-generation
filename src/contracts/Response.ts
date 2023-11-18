@@ -1,17 +1,34 @@
-import { Bool, Field, Group, MerkleMapWitness, Poseidon, Provable, Reducer, SelfProof, SmartContract, State, Struct, ZkProgram, method, state } from "o1js";
-import { FieldDynamicArray } from "@auxo-dev/auxo-libs";
-import { ResponseContribution, UArray, cArray } from "../libs/Committee.js";
+import {
+  Field,
+  Group,
+  MerkleMapWitness,
+  Poseidon,
+  Provable,
+  Reducer,
+  SelfProof,
+  SmartContract,
+  State,
+  Struct,
+  ZkProgram,
+  method,
+  state,
+} from 'o1js';
+import { ResponseContribution, UArray, cArray } from '../libs/Committee.js';
 import { ZkAppRef } from '../libs/ZkAppRef.js';
-import { updateOutOfSnark } from "../libs/utils.js";
-import { FullMTWitness as CommitteeWitness } from "./CommitteeStorage.js";
-import { FullMTWitness as DKGWitness } from "./DKGStorage.js";
-import { CheckConfigInput, CheckMemberInput, CommitteeContract } from "./Committee.js";
-import { DKGContract, KeyStatus } from "./DKG.js";
-import { RequestVector } from "./RequestHelper.js";
-import { BatchDecryptionProof } from "./Encryption.js";
-import { Round1Contract } from "./Round1.js";
-import { Round2Contract } from "./Round2.js";
-import { COMMITTEE_MAX_SIZE, REQUEST_MAX_SIZE, ZK_APP } from "../constants.js";
+import { updateOutOfSnark } from '../libs/utils.js';
+import { FullMTWitness as CommitteeWitness } from './CommitteeStorage.js';
+import { FullMTWitness as DKGWitness } from './DKGStorage.js';
+import {
+  CheckConfigInput,
+  CheckMemberInput,
+  CommitteeContract,
+} from './Committee.js';
+import { DKGContract, KeyStatus } from './DKG.js';
+import { RequestVector } from './RequestHelper.js';
+import { BatchDecryptionProof } from './Encryption.js';
+import { Round1Contract } from './Round1.js';
+import { Round2Contract } from './Round2.js';
+import { COMMITTEE_MAX_SIZE, REQUEST_MAX_SIZE, ZK_APP } from '../constants.js';
 
 export enum EventEnum {
   CONTRIBUTIONS_REDUCED,
@@ -28,17 +45,17 @@ export class Action extends Struct({
   memberId: Field,
   requestId: Field,
   contribution: ResponseContribution,
-}) { }
+}) {}
 
 export class ReduceInput extends Struct({
   initialReduceState: Field,
   action: Action,
-}) { }
+}) {}
 
 export class ReduceOutput extends Struct({
   newActionState: Field,
   newReduceState: Field,
-}) { }
+}) {}
 
 export const ReduceResponse = ZkProgram({
   name: 'reduce-response-contribution',
@@ -51,18 +68,15 @@ export const ReduceResponse = ZkProgram({
         return new ReduceOutput({
           newActionState: initialActionState,
           newReduceState: input.initialReduceState,
-        })
-      }
+        });
+      },
     },
     nextStep: {
-      privateInputs: [
-        SelfProof<ReduceInput, ReduceOutput>,
-        MerkleMapWitness
-      ],
+      privateInputs: [SelfProof<ReduceInput, ReduceOutput>, MerkleMapWitness],
       method(
         input: ReduceInput,
         earlierProof: SelfProof<ReduceInput, ReduceOutput>,
-        reduceWitness: MerkleMapWitness,
+        reduceWitness: MerkleMapWitness
       ) {
         // Verify earlier proof
         earlierProof.verify();
@@ -92,12 +106,12 @@ export const ReduceResponse = ZkProgram({
           newActionState: actionState,
           newReduceState: root,
         });
-      }
-    }
-  }
+      },
+    },
+  },
 });
 
-export class ReduceResponseProof extends ZkProgram.Proof(ReduceResponse) { }
+export class ReduceResponseProof extends ZkProgram.Proof(ReduceResponse) {}
 
 export class ResponseInput extends Struct({
   T: Field,
@@ -111,14 +125,14 @@ export class ResponseInput extends Struct({
   reduceStateRoot: Field,
   previousActionState: Field,
   action: Action,
-}) { }
+}) {}
 
 export class ResponseOutput extends Struct({
   newContributionRoot: Field,
   requestId: Field,
   D: RequestVector,
   counter: Field,
-}) { }
+}) {}
 
 export const CompleteResponse = ZkProgram({
   name: 'complete-response',
@@ -133,8 +147,8 @@ export const CompleteResponse = ZkProgram({
           requestId: requestId,
           D: new RequestVector(),
           counter: Field(0),
-        })
-      }
+        });
+      },
     },
     nextStep: {
       privateInputs: [
@@ -152,7 +166,7 @@ export const CompleteResponse = ZkProgram({
         contributionWitness: DKGWitness,
         publicKeyWitness: DKGWitness,
         encryptionWitness: DKGWitness,
-        reduceWitness: MerkleMapWitness,
+        reduceWitness: MerkleMapWitness
       ) {
         // Verify earlier proof
         earlierProof.verify();
@@ -182,7 +196,9 @@ export const CompleteResponse = ZkProgram({
         ]);
 
         // Check if the actions have the same requestId
-        input.action.requestId.assertEquals(earlierProof.publicOutput.requestId);
+        input.action.requestId.assertEquals(
+          earlierProof.publicOutput.requestId
+        );
 
         // Check if decryption is correct
         decryptionProof.verify();
@@ -197,11 +213,13 @@ export const CompleteResponse = ZkProgram({
           encryptionHashChain = Provable.if(
             Field(i).greaterThanOrEqual(input.N),
             Field(0),
-            Poseidon.hash([
-              encryptionHashChain,
-              input.c.get(Field(i)).toFields(),
-              input.U.get(Field(i)).toFields(),
-            ].flat())
+            Poseidon.hash(
+              [
+                encryptionHashChain,
+                input.c.get(Field(i)).toFields(),
+                input.U.get(Field(i)).toFields(),
+              ].flat()
+            )
           );
         }
 
@@ -213,9 +231,7 @@ export const CompleteResponse = ZkProgram({
           encryptionWitness.level1.computeRootAndKey(
             encryptionWitness.level2.calculateRoot(encryptionHashChain)
           );
-        encryptionRoot.assertEquals(
-          earlierProof.publicInput.encryptionRoot
-        );
+        encryptionRoot.assertEquals(earlierProof.publicInput.encryptionRoot);
         encryptionIndex.assertEquals(input.action.requestId);
 
         // Check if this committee member has contributed yet
@@ -244,7 +260,9 @@ export const CompleteResponse = ZkProgram({
           .assertEquals(input.action.memberId);
         let [publicKeyRoot, publicKeyIndex] =
           publicKeyWitness.level1.computeRootAndKey(
-            publicKeyWitness.level2.calculateRoot(Poseidon.hash(input.publicKey.toFields()))
+            publicKeyWitness.level2.calculateRoot(
+              Poseidon.hash(input.publicKey.toFields())
+            )
           );
         publicKeyRoot.assertEquals(earlierProof.publicInput.publicKeyRoot);
         publicKeyIndex.assertEquals(keyIndex);
@@ -254,9 +272,7 @@ export const CompleteResponse = ZkProgram({
         for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
           D.set(
             Field(i),
-            D.get(Field(i)).add(
-              input.action.contribution.D.get(Field(i))
-            )
+            D.get(Field(i)).add(input.action.contribution.D.get(Field(i)))
           );
         }
 
@@ -277,19 +293,19 @@ export const CompleteResponse = ZkProgram({
           requestId: input.action.requestId,
           D: D,
           counter: earlierProof.publicOutput.counter.add(Field(1)),
-        })
-      }
-    }
-  }
+        });
+      },
+    },
+  },
 });
 
-export class CompleteResponseProof extends ZkProgram.Proof(CompleteResponse) { }
+export class CompleteResponseProof extends ZkProgram.Proof(CompleteResponse) {}
 
 export class ResponseContract extends SmartContract {
   reducer = Reducer({ actionType: Action });
   events = {
     [EventEnum.CONTRIBUTIONS_REDUCED]: Field,
-  }
+  };
 
   @state(Field) zkApps = State<Field>();
   @state(Field) reduceState = State<Field>();
@@ -313,7 +329,7 @@ export class ResponseContract extends SmartContract {
     dkg: ZkAppRef,
     keyStatusWitness: MerkleMapWitness,
     request: ZkAppRef,
-    requestStatusWitness: MerkleMapWitness,
+    requestStatusWitness: MerkleMapWitness
   ) {
     // Verify sender's index
     this.verifyZkApp(committee, ZK_APP.COMMITTEE);
@@ -339,7 +355,6 @@ export class ResponseContract extends SmartContract {
 
     // TODO - Verify request status
     this.verifyZkApp(request, ZK_APP.REQUEST);
-
 
     // Dispatch action
     this.reducer.dispatch(action);
@@ -370,7 +385,7 @@ export class ResponseContract extends SmartContract {
     round2: ZkAppRef,
     committee: ZkAppRef,
     settingWitness: MerkleMapWitness,
-    request: ZkAppRef,
+    request: ZkAppRef
   ) {
     // Get current state values
     let contributions = this.contributions.getAndAssertEquals();
@@ -412,6 +427,5 @@ export class ResponseContract extends SmartContract {
     // TODO - Dispatch action in Request contract
     // this.verifyZkApp(request, ZK_APP.REQUEST);
     // const dkgContract = new DKGContract(dkg.address);
-
   }
 }
