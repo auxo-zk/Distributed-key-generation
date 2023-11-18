@@ -1,6 +1,6 @@
 {
   "name": "@auxo-dev/dkg",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Auxo's DKG Module for the On-chain Funding platform on Mina blockchain",
   "author": "",
   "license": "Apache-2.0",
@@ -24,10 +24,18 @@
     "lint": "npx eslint src/* --fix"
   },
   "exports": {
-    "types": "./build/types/src/index.d.ts",
-    "require": "./build/cjs/src/index.js",
-    "import": "./build/esm/src/index.js",
-    "default": "./build/esm/src/index.js"
+    ".": {
+      "types": "./build/types/src/index.d.ts",
+      "require": "./build/cjs/src/index.js",
+      "import": "./build/esm/src/index.js",
+      "default": "./build/esm/src/index.js"
+    },
+    "./*": {
+      "types": "./*.d.ts",
+      "require": "./*.js",
+      "import": "./*.js",
+      "default": "./*.js"
+    }
   },
   "files": [
     "build/*",
