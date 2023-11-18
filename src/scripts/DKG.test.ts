@@ -451,26 +451,26 @@
 
 //     console.log('DKG rollup state:', initialRollupState);
 
-//     let reduceProof = await ReduceActions.firstStep(
-//       new ReduceInput({
-//         initialRollupState: dkgContract.rollupState.get(),
-//         action: Action.empty(),
-//       }),
-//       initialActionState
-//     );
+    // let reduceProof = await ReduceActions.firstStep(
+    //   new ReduceInput({
+    //     initialRollupState: dkgContract.rollupState.get(),
+    //     action: Action.empty(),
+    //   }),
+    //   initialActionState
+    // );
 
-//     for (let i = 0; i < 3; i++) {
-//       let action = actions[i];
-//       reduceProof = await ReduceActions.nextStep(
-//         new ReduceInput({
-//           initialRollupState: initialRollupState,
-//           action: action,
-//         }),
-//         reduceProof,
-//         rollupStorage.getWitness(
-//           rollupStorage.calculateLevel1Index(actionStates[i + 1])
-//         )
-//       );
+    // for (let i = 0; i < 3; i++) {
+    //   let action = actions[i];
+    //   reduceProof = await ReduceActions.nextStep(
+    //     new ReduceInput({
+    //       initialRollupState: initialRollupState,
+    //       action: action,
+    //     }),
+    //     reduceProof,
+    //     rollupStorage.getWitness(
+    //       rollupStorage.calculateLevel1Index(actionStates[i + 1])
+    //     )
+    //   );
 
 //       rollupStorage.level1.set(
 //         actionStates[i + 1],
@@ -478,12 +478,12 @@
 //       );
 //     }
 
-//     let tx = await Mina.transaction(feePayerKey.publicKey, () => {
-//       dkgContract.reduce(reduceProof);
-//     });
-//     await tx.prove();
-//     await tx.sign([feePayerKey.privateKey]).send();
-//   });
+  //   let tx = await Mina.transaction(feePayerKey.publicKey, () => {
+  //     dkgContract.reduce(reduceProof);
+  //   });
+  //   await tx.prove();
+  //   await tx.sign([feePayerKey.privateKey]).send();
+  // });
 
 //   xit('Should generate new keys', async () => {
 //     let initialKeyStatus = dkgContract.keyStatus.get();
