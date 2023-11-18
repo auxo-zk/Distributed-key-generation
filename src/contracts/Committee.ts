@@ -18,22 +18,11 @@ import {
   Void,
 } from 'o1js';
 import { PublicKeyDynamicArray, IPFSHash } from '@auxo-dev/auxo-libs';
-import { COMMITTEE_MAX_SIZE } from '../libs/Committee.js';
 import { updateOutOfSnark } from '../libs/utils.js';
+import { COMMITTEE_MAX_SIZE } from '../constants.js';
+import { EMPTY_LEVEL_1_TREE, LEVEL2_TREE_HEIGHT } from './CommitteeStorage.js';
 
-export const LEVEL2_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;
-export class Level1MT extends MerkleMap {}
-export class Level1Witness extends MerkleMapWitness {}
-export class Level2MT extends MerkleTree {}
-export class Level2Witness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
-export const EMPTY_LEVEL_1_TREE = () => new Level1MT();
-export const EMPTY_LEVEL_2_TREE = () => new Level2MT(LEVEL2_TREE_HEIGHT);
-export class FullMTWitness extends Struct({
-  level1: Level1Witness,
-  level2: Level2Witness,
-}) {}
-
-const EmptyMerkleMap = new MerkleMap();
+const DefaultRoot = EMPTY_LEVEL_1_TREE().getRoot();
 export class CommitteeMerkleWitness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
 export class MemberArray extends PublicKeyDynamicArray(COMMITTEE_MAX_SIZE) {}
 
@@ -190,8 +179,8 @@ export class CommitteeContract extends SmartContract {
 
   init() {
     super.init();
-    this.memberTreeRoot.set(EmptyMerkleMap.getRoot());
-    this.settingTreeRoot.set(EmptyMerkleMap.getRoot());
+    this.memberTreeRoot.set(DefaultRoot);
+    this.settingTreeRoot.set(DefaultRoot);
     this.actionState.set(Reducer.initialActionState);
   }
 

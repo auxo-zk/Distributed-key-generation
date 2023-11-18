@@ -19,14 +19,9 @@ import {
   CommitteeAction,
   CreateCommittee,
   MemberArray,
-  RollupOutPut,
-  CommitteeMerkleWitness,
-  LEVEL2_TREE_HEIGHT,
 } from '../contracts/Committee.js';
-
-import fs from 'fs/promises';
-import { COMMITTEE_MAX_SIZE } from '../libs/Committee.js';
 import { IPFSHash } from '@auxo-dev/auxo-libs';
+import { LEVEL2_TREE_HEIGHT } from '../contracts/CommitteeStorage.js';
 
 // check command line arg
 const deployAlias = process.argv[2];

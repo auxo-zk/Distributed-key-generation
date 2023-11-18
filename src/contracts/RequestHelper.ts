@@ -20,13 +20,12 @@ import {
 
 import {
   CustomScalar,
-  FieldDynamicArray,
   GroupDynamicArray,
   ScalarDynamicArray,
 } from '@auxo-dev/auxo-libs';
-import { REQUEST_MAX_SIZE } from '../libs/Requestor.js';
 // import { Request, RequestInput, RequestFee, ZeroFee } from './Request.js';
 import { updateOutOfSnark } from '../libs/utils.js';
+import { REQUEST_MAX_SIZE } from '../constants.js';
 
 const EmptyMerkleMap = new MerkleMap();
 export class CustomScalarArray extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}

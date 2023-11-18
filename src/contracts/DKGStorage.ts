@@ -1,19 +1,27 @@
-import { Field, Group, Poseidon } from 'o1js';
+import { Field, Group, MerkleMap, MerkleMapWitness, MerkleTree, MerkleWitness, Poseidon, Struct } from 'o1js';
 import {
   Action,
-  Level1MT,
-  Level2MT,
-  Level1Witness,
-  FullMTWitness,
-  KeyStatus,
-  Level2Witness,
   ActionStatus,
+  KeyStatus,
 } from './DKG.js';
 import {
   ResponseContribution,
   Round1Contribution,
   Round2Contribution,
 } from '../libs/Committee.js';
+import { COMMITTEE_MAX_SIZE } from '../constants.js';
+
+export const LEVEL2_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;
+export class Level1MT extends MerkleMap {}
+export class Level1Witness extends MerkleMapWitness {}
+export class Level2MT extends MerkleTree {}
+export class Level2Witness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
+export const EMPTY_LEVEL_1_TREE = () => new Level1MT();
+export const EMPTY_LEVEL_2_TREE = () => new Level2MT(LEVEL2_TREE_HEIGHT);
+export class FullMTWitness extends Struct({
+  level1: Level1Witness,
+  level2: Level2Witness,
+}) {}
 
 abstract class DKGStrorage {
   level1: Level1MT;
