@@ -4,8 +4,21 @@ import * as DKG from './DKG.js';
 import * as DKGStorage from './DKGStorage.js';
 
 import * as Encryption from './Encryption.js';
+import * as Round1 from './Round1.js';
+import * as Round2 from './Round2.js';
+import * as Response from './Response.js';
 
 import * as Request from './Request.js';
 import * as RequestHelper from './RequestHelper.js';
 
-export { Committee, DKG, DKGStorage, Encryption, Request, RequestHelper };
+export {
+  Committee,
+  DKG,
+  DKGStorage,
+  Encryption,
+  Round1,
+  Round2,
+  Response,
+  Request,
+  RequestHelper
+};

@@ -23,9 +23,7 @@ import {
   RollupOutPut,
   CommitteeMerkleWitness,
   CheckMemberInput,
-  CheckConfigInput,
 } from '../contracts/Committee.js';
-import { COMMITTEE_MAX_SIZE } from '../libs/Committee.js';
 import { IPFSHash } from '@auxo-dev/auxo-libs';
 
 const doProofs = false;

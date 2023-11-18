@@ -20,9 +20,8 @@ import {
 } from 'o1js';
 
 import { GroupDynamicArray, BoolDynamicArray } from '@auxo-dev/auxo-libs';
-import { COMMITTEE_MAX_SIZE } from '../libs/Committee.js';
-import { REQUEST_MAX_SIZE } from '../libs/Requestor.js';
 import { updateOutOfSnark } from '../libs/utils.js';
+import { COMMITTEE_MAX_SIZE, REQUEST_MAX_SIZE } from '../constants.js';
 
 export const LEVEL2_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;
 const EmptyMerkleMap = new MerkleMap();
