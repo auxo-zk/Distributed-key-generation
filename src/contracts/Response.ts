@@ -17,7 +17,10 @@ import { ResponseContribution, UArray, cArray } from '../libs/Committee.js';
 import { ZkAppRef } from '../libs/ZkAppRef.js';
 import { updateOutOfSnark } from '../libs/utils.js';
 import { FullMTWitness as CommitteeWitness } from './CommitteeStorage.js';
-import { FullMTWitness as DKGWitness } from './DKGStorage.js';
+import {
+  FullMTWitness as DKGWitness,
+  EMPTY_LEVEL_1_TREE,
+} from './DKGStorage.js';
 import {
   CheckConfigInput,
   CheckMemberInput,
@@ -31,7 +34,7 @@ import { Round2Contract } from './Round2.js';
 import { COMMITTEE_MAX_SIZE, REQUEST_MAX_SIZE, ZK_APP } from '../constants.js';
 
 export enum EventEnum {
-  CONTRIBUTIONS_REDUCED,
+  CONTRIBUTIONS_REDUCED = 'contributions-reduced',
 }
 
 export enum ActionStatus {
@@ -45,7 +48,17 @@ export class Action extends Struct({
   memberId: Field,
   requestId: Field,
   contribution: ResponseContribution,
-}) {}
+}) {
+  static empty(): Action {
+    return new Action({
+      committeeId: Field(0),
+      keyId: Field(0),
+      memberId: Field(0),
+      requestId: Field(0),
+      contribution: ResponseContribution.empty(),
+    });
+  }
+}
 
 export class ReduceInput extends Struct({
   initialReduceState: Field,
@@ -117,11 +130,8 @@ export class ResponseInput extends Struct({
   T: Field,
   N: Field,
   initialContributionRoot: Field,
-  publicKey: Group,
   publicKeyRoot: Field,
   encryptionRoot: Field,
-  c: cArray,
-  U: UArray,
   reduceStateRoot: Field,
   previousActionState: Field,
   action: Action,
@@ -186,8 +196,8 @@ export const CompleteResponse = ZkProgram({
         input.reduceStateRoot.assertEquals(
           earlierProof.publicInput.reduceStateRoot
         );
-        input.c.length.assertEquals(input.N);
-        input.U.length.assertEquals(input.N);
+        decryptionProof.publicInput.c.length.assertEquals(input.N);
+        decryptionProof.publicInput.U.length.assertEquals(input.N);
 
         // Calculate key index in MT
         let keyIndex = Poseidon.hash([
@@ -205,19 +215,16 @@ export const CompleteResponse = ZkProgram({
         decryptionProof.publicInput.memberId.assertEquals(
           input.action.memberId
         );
-        decryptionProof.publicInput.publicKey.assertEquals(input.publicKey);
         let encryptionHashChain = Field(0);
         for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
-          decryptionProof.publicInput.c.hash().assertEquals(input.c.hash());
-          decryptionProof.publicInput.U.hash().assertEquals(input.U.hash());
           encryptionHashChain = Provable.if(
             Field(i).greaterThanOrEqual(input.N),
             Field(0),
             Poseidon.hash(
               [
                 encryptionHashChain,
-                input.c.get(Field(i)).toFields(),
-                input.U.get(Field(i)).toFields(),
+                decryptionProof.publicInput.c.get(Field(i)).toFields(),
+                decryptionProof.publicInput.U.get(Field(i)).toFields(),
               ].flat()
             )
           );
@@ -261,7 +268,7 @@ export const CompleteResponse = ZkProgram({
         let [publicKeyRoot, publicKeyIndex] =
           publicKeyWitness.level1.computeRootAndKey(
             publicKeyWitness.level2.calculateRoot(
-              Poseidon.hash(input.publicKey.toFields())
+              Poseidon.hash(decryptionProof.publicInput.publicKey.toFields())
             )
           );
         publicKeyRoot.assertEquals(earlierProof.publicInput.publicKeyRoot);
@@ -301,6 +308,8 @@ export const CompleteResponse = ZkProgram({
 
 export class CompleteResponseProof extends ZkProgram.Proof(CompleteResponse) {}
 
+const DefaultRoot = EMPTY_LEVEL_1_TREE().getRoot();
+
 export class ResponseContract extends SmartContract {
   reducer = Reducer({ actionType: Action });
   events = {
@@ -310,6 +319,12 @@ export class ResponseContract extends SmartContract {
   @state(Field) zkApps = State<Field>();
   @state(Field) reduceState = State<Field>();
   @state(Field) contributions = State<Field>();
+
+  init() {
+    this.zkApps.set(DefaultRoot);
+    this.reduceState.set(DefaultRoot);
+    this.contributions.set(DefaultRoot);
+  }
 
   @method
   verifyZkApp(zkApp: ZkAppRef, index: Field) {
@@ -327,9 +342,9 @@ export class ResponseContract extends SmartContract {
     committee: ZkAppRef,
     memberWitness: CommitteeWitness,
     dkg: ZkAppRef,
-    keyStatusWitness: MerkleMapWitness,
-    request: ZkAppRef,
-    requestStatusWitness: MerkleMapWitness
+    keyStatusWitness: MerkleMapWitness
+    // request: ZkAppRef,
+    // requestStatusWitness: MerkleMapWitness
   ) {
     // Verify sender's index
     this.verifyZkApp(committee, ZK_APP.COMMITTEE);
@@ -354,7 +369,7 @@ export class ResponseContract extends SmartContract {
     );
 
     // TODO - Verify request status
-    this.verifyZkApp(request, ZK_APP.REQUEST);
+    // this.verifyZkApp(request, ZK_APP.REQUEST);
 
     // Dispatch action
     this.reducer.dispatch(action);
@@ -384,8 +399,8 @@ export class ResponseContract extends SmartContract {
     round1: ZkAppRef,
     round2: ZkAppRef,
     committee: ZkAppRef,
-    settingWitness: MerkleMapWitness,
-    request: ZkAppRef
+    settingWitness: MerkleMapWitness
+    // request: ZkAppRef
   ) {
     // Get current state values
     let contributions = this.contributions.getAndAssertEquals();

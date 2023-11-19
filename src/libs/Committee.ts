@@ -22,7 +22,9 @@ import { COMMITTEE_MAX_SIZE } from '../constants.js';
 export class CArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
 export class cArray extends Bit255DynamicArray(COMMITTEE_MAX_SIZE) {}
 export class UArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
-export class EncryptionHashArray extends FieldDynamicArray(COMMITTEE_MAX_SIZE) {}
+export class EncryptionHashArray extends FieldDynamicArray(
+  COMMITTEE_MAX_SIZE
+) {}
 
 export type SecretPolynomial = {
   a: Scalar[];
@@ -95,12 +97,12 @@ export class ResponseContribution extends Struct({
 
 export function calculatePublicKey(
   round1Contributions: Round1Contribution[]
-): PublicKey {
+): Group {
   let result = Group.zero;
   for (let i = 0; i < round1Contributions.length; i++) {
     result = result.add(round1Contributions[i].C.values[0]);
   }
-  return PublicKey.fromGroup(result);
+  return result;
 }
 
 export function calculatePolynomialValue(a: Scalar[], x: number): Scalar {

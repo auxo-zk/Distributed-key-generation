@@ -31,7 +31,7 @@ abstract class CommitteeStrorage {
     level2s?: { index: Field; level2: Level2MT }[]
   ) {
     this.level1 = level1;
-    this.level2s = {} as { [key: string]: Level2MT };
+    this.level2s = {};
     if (level2s) {
       for (let i = 0; i < level2s.length; i++) {
         this.level2s[level2s[i].index.toString()] = level2s[i].level2;
@@ -42,14 +42,61 @@ abstract class CommitteeStrorage {
   abstract calculateLeaf(args: any): Field;
   abstract calculateLevel1Index(args: any): Field;
   calculateLevel2Index?(args: any): Field;
-  abstract getWitness(args: any): Level1Witness | FullMTWitness;
+
+  getLevel1Witness(level1Index: Field): Level1Witness {
+    return this.level1.getWitness(level1Index) as Level1Witness;
+  }
+
+  getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
+    let level2 = this.level2s[level1Index.toString()];
+    if (level2 === undefined)
+      throw new Error('Level 2 MT does not exist at this index');
+    return new Level2Witness(level2.getWitness(level2Index.toBigInt()));
+  }
+
+  getWitness(
+    level1Index: Field,
+    level2Index?: Field
+  ): Level1Witness | FullMTWitness {
+    if (level2Index) {
+      return new FullMTWitness({
+        level1: this.getLevel1Witness(level1Index),
+        level2: this.getLevel2Witness(level1Index, level2Index),
+      });
+    } else {
+      return this.getLevel1Witness(level1Index);
+    }
+  }
+
+  updateInternal(level1Index: Field, level2: Level2MT) {
+    Object.assign(this.level2s, {
+      [level1Index.toString()]: level2,
+    });
+    this.level1.set(level1Index, level2.getRoot());
+  }
+
+  updateLeaf(leaf: Field, level1Index: Field, level2Index?: Field): void {
+    if (level2Index) {
+      if (Object.keys(this.level2s).length == 0)
+        throw new Error('This storage does support level 2 MT');
+
+      let level2 = this.level2s[level1Index.toString()];
+      if (level2 === undefined) level2 = EMPTY_LEVEL_2_TREE();
+
+      level2.setLeaf(level2Index.toBigInt(), leaf);
+      this.updateInternal(level1Index, level2);
+    } else this.level1.set(level1Index, leaf);
+  }
 }
 
 export class MemberStorage extends CommitteeStrorage {
   level1: Level1MT;
   level2s: { [key: string]: Level2MT };
 
-  constructor(level1: Level1MT, level2s: { index: Field; level2: Level2MT }[]) {
+  constructor(
+    level1: Level1MT,
+    level2s?: { index: Field; level2: Level2MT }[]
+  ) {
     super(level1, level2s);
   }
 
@@ -58,27 +105,15 @@ export class MemberStorage extends CommitteeStrorage {
   }
 
   calculateLevel1Index(committeeId: Field): Field {
-    return Poseidon.hash([committeeId]);
+    return committeeId;
   }
 
   calculateLevel2Index(memberId: Field): Field {
     return memberId;
   }
 
-  getWitness({
-    level1Index,
-    level2Index,
-  }: {
-    level1Index: Field;
-    level2Index: Field;
-  }): FullMTWitness {
-    let level2 = this.level2s[level1Index.toString()];
-    if (level2 == undefined)
-      throw new Error('Level 2 tree does not exist at this index');
-    return new FullMTWitness({
-      level1: this.level1.getWitness(level1Index) as Level1Witness,
-      level2: new Level2Witness(level2.getWitness(level2Index.toBigInt())),
-    });
+  getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
+    return super.getWitness(level1Index, level2Index) as FullMTWitness;
   }
 }
 
@@ -98,6 +133,6 @@ export class SettingStorage extends CommitteeStrorage {
   }
 
   getWitness(level1Index: Field): Level1Witness {
-    return this.level1.getWitness(level1Index) as Level1Witness;
+    return super.getWitness(level1Index) as Level1Witness;
   }
 }

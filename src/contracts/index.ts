@@ -1,7 +1,6 @@
 import * as Committee from './Committee.js';
 
 import * as DKG from './DKG.js';
-import * as DKGStorage from './DKGStorage.js';
 
 import * as Encryption from './Encryption.js';
 import * as Round1 from './Round1.js';
@@ -14,11 +13,10 @@ import * as RequestHelper from './RequestHelper.js';
 export {
   Committee,
   DKG,
-  DKGStorage,
   Encryption,
   Round1,
   Round2,
   Response,
   Request,
-  RequestHelper
+  RequestHelper,
 };

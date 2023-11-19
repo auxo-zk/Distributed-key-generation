@@ -1,4 +1,4 @@
-import { Group, PublicKey, Scalar } from 'o1js';
+import { Group, Scalar } from 'o1js';
 import { GroupDynamicArray } from '@auxo-dev/auxo-libs';
 import { REQUEST_MAX_SIZE } from '../constants.js';
 
@@ -6,16 +6,16 @@ export class MArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class RArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class DArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 
-export function calculatePublicKey(contributedPublicKeys: Group[]): PublicKey {
+export function calculatePublicKey(contributedPublicKeys: Group[]): Group {
   let result = Group.zero;
   for (let i = 0; i < contributedPublicKeys.length; i++) {
     result = result.add(contributedPublicKeys[i]);
   }
-  return PublicKey.fromGroup(result);
+  return result;
 }
 
 export function generateEncryption(
-  publicKey: PublicKey,
+  publicKey: Group,
   vector: bigint[]
 ): {
   r: Scalar[];
@@ -34,8 +34,8 @@ export function generateEncryption(
       vector[i] > 0n
         ? Group.generator
             .scale(Scalar.from(vector[i]))
-            .add(publicKey.toGroup().scale(random))
-        : Group.zero.add(publicKey.toGroup().scale(random));
+            .add(publicKey.scale(random))
+        : Group.zero.add(publicKey.scale(random));
   }
   return { r, R, M };
 }

@@ -28,7 +28,7 @@ describe('Committee', () => {
   let round1Contributions: Committee.Round1Contribution[] = [];
   let round2Contributions: Committee.Round2Contribution[] = [];
   let responseContributions: Committee.ResponseContribution[] = [];
-  let publicKey: PublicKey;
+  let publicKey: Group;
   let R: Group[][] = [];
   let M: Group[][] = [];
   let sumR: Group[] = [];

@@ -12,12 +12,14 @@ import {
   Struct,
   ZkProgram,
 } from 'o1js';
+import { GroupDynamicArray } from '@auxo-dev/auxo-libs';
 import { EncryptionHashArray, Round2Contribution } from '../libs/Committee.js';
 import { ZkAppRef } from '../libs/ZkAppRef.js';
 import { updateOutOfSnark } from '../libs/utils.js';
 import { FullMTWitness as CommitteeWitness } from './CommitteeStorage.js';
 import {
   FullMTWitness as DKGWitness,
+  EMPTY_LEVEL_1_TREE,
   EMPTY_LEVEL_2_TREE,
 } from './DKGStorage.js';
 import {
@@ -25,18 +27,15 @@ import {
   CheckMemberInput,
   CommitteeContract,
 } from './Committee.js';
-import {
-  ActionEnum as KeyUpdateEnum,
-  DKGContract,
-  KeyStatus,
-  PublicKeyArray,
-} from './DKG.js';
+import { ActionEnum as KeyUpdateEnum, DKGContract, KeyStatus } from './DKG.js';
 import { BatchEncryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
 import { COMMITTEE_MAX_SIZE, ZK_APP } from '../constants.js';
 
+export class PublicKeyArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
+
 export enum EventEnum {
-  CONTRIBUTIONS_REDUCED,
+  CONTRIBUTIONS_REDUCED = 'contributions-reduced',
 }
 
 export enum ActionStatus {
@@ -49,7 +48,16 @@ export class Action extends Struct({
   keyId: Field,
   memberId: Field,
   contribution: Round2Contribution,
-}) {}
+}) {
+  static empty(): Action {
+    return new Action({
+      committeeId: Field(0),
+      keyId: Field(0),
+      memberId: Field(0),
+      contribution: Round2Contribution.empty(),
+    });
+  }
+}
 
 export class ReduceInput extends Struct({
   initialReduceState: Field,
@@ -276,6 +284,8 @@ export const FinalizeRound2 = ZkProgram({
 
 export class FinalizeRound2Proof extends ZkProgram.Proof(FinalizeRound2) {}
 
+const DefaultRoot = EMPTY_LEVEL_1_TREE().getRoot();
+
 export class Round2Contract extends SmartContract {
   reducer = Reducer({ actionType: Action });
   events = {
@@ -286,6 +296,13 @@ export class Round2Contract extends SmartContract {
   @state(Field) reduceState = State<Field>();
   @state(Field) contributions = State<Field>();
   @state(Field) encryptions = State<Field>();
+
+  init() {
+    this.zkApps.set(DefaultRoot);
+    this.reduceState.set(DefaultRoot);
+    this.contributions.set(DefaultRoot);
+    this.encryptions.set(DefaultRoot);
+  }
 
   @method
   verifyZkApp(zkApp: ZkAppRef, index: Field) {
@@ -371,17 +388,22 @@ export class Round2Contract extends SmartContract {
     proof.publicOutput.counter.assertEquals(proof.publicInput.N);
 
     // Verify encryption hashes do not exist
-    let encryptionHashesMT = EMPTY_LEVEL_2_TREE();
-    for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
-      let value = Provable.if(
-        Field(i).greaterThanOrEqual(proof.publicOutput.ecryptionHashes.length),
-        Field(0),
-        EncryptionHashArray.hash(
-          proof.publicOutput.ecryptionHashes.get(Field(i))
-        )
-      );
-      encryptionHashesMT.setLeaf(BigInt(i), value);
-    }
+    let encryptionLeaf = Provable.witness(Field, () => {
+      let encryptionHashesMT = EMPTY_LEVEL_2_TREE();
+      for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+        let value = Provable.if(
+          Field(i).greaterThanOrEqual(
+            proof.publicOutput.ecryptionHashes.length
+          ),
+          Field(0),
+          EncryptionHashArray.hash(
+            proof.publicOutput.ecryptionHashes.get(Field(i))
+          )
+        );
+        encryptionHashesMT.setLeaf(BigInt(i), value);
+      }
+      return encryptionHashesMT.getRoot();
+    });
     let [encryptionRoot, encryptionIndex] = encryptionWitness.computeRootAndKey(
       Field(0)
     );
@@ -389,26 +411,25 @@ export class Round2Contract extends SmartContract {
     encryptionIndex.assertEquals(proof.publicOutput.keyIndex);
 
     // Calculate new encryptions root
-    [encryptionRoot] = encryptionWitness.computeRootAndKey(
-      encryptionHashesMT.getRoot()
-    );
+    [encryptionRoot] = encryptionWitness.computeRootAndKey(encryptionLeaf);
 
     // Verify public keys
     this.verifyZkApp(round1, ZK_APP.ROUND_1);
-    let publicKeysMT = EMPTY_LEVEL_2_TREE();
-    for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
-      let value = Provable.if(
-        Field(i).greaterThanOrEqual(proof.publicInput.publicKeys.length),
-        Field(0),
-        PublicKeyArray.hash(proof.publicInput.publicKeys.get(Field(i)))
-      );
-      publicKeysMT.setLeaf(BigInt(i), value);
-    }
+    let publicKeysLeaf = Provable.witness(Field, () => {
+      let publicKeysMT = EMPTY_LEVEL_2_TREE();
+      for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+        let value = Provable.if(
+          Field(i).greaterThanOrEqual(proof.publicInput.publicKeys.length),
+          Field(0),
+          PublicKeyArray.hash(proof.publicInput.publicKeys.get(Field(i)))
+        );
+        publicKeysMT.setLeaf(BigInt(i), value);
+      }
+      return publicKeysMT.getRoot();
+    });
     const round1Contract = new Round1Contract(round1.address);
     let publicKeysRoot = round1Contract.publicKeys.getAndAssertEquals();
-    let [root, index] = publicKeysWitness.computeRootAndKey(
-      publicKeysMT.getRoot()
-    );
+    let [root, index] = publicKeysWitness.computeRootAndKey(publicKeysLeaf);
     root.assertEquals(publicKeysRoot);
     index.assertEquals(proof.publicOutput.keyIndex);
 

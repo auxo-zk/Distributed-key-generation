@@ -22,9 +22,7 @@ import {
 } from './Committee.js';
 import { ZkAppRef } from '../libs/ZkAppRef.js';
 import { EMPTY_LEVEL_1_TREE } from './DKGStorage.js';
-import { COMMITTEE_MAX_SIZE, ZK_APP } from '../constants.js';
-
-export class PublicKeyArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
+import { ZK_APP } from '../constants.js';
 
 const DefaultRoot = EMPTY_LEVEL_1_TREE().getRoot();
 
@@ -36,11 +34,6 @@ export const enum KeyStatus {
   DEPRECATED,
 }
 
-export const enum ActionStatus {
-  NOT_EXISTED,
-  REDUCED,
-}
-
 export const enum ActionEnum {
   GENERATE_KEY,
   FINALIZE_ROUND_1,
@@ -50,7 +43,7 @@ export const enum ActionEnum {
 }
 
 export const enum EventEnum {
-  KEY_UPDATES_REDUCED,
+  KEY_UPDATES_REDUCED = 'key-updated-reduced',
 }
 
 export class ActionMask extends BoolDynamicArray(ActionEnum.__LENGTH) {}
@@ -80,18 +73,16 @@ export const ACTION_MASK = {
 
 /**
  * Class of action dispatched by users
- * @param mask Specify action type (defined with ActionEnum)
  * @param committeeId Incremental committee index
  * @param keyId Incremental key index of a committee
- * @param memberId Incremental member index of a committee
- * @param requestId Unique index of a key usage request
+ * @param mask Specify action type (defined with ActionEnum)
  * @function hash Return the action's hash to append in the action state hash chain
  * @function toFields Return the action in the form of Fields[]
  */
 export class Action extends Struct({
-  mask: ActionMask,
   committeeId: Field,
   keyId: Field,
+  mask: ActionMask,
 }) {
   static empty(): Action {
     return new Action({
@@ -174,7 +165,7 @@ export const UpdateKey = ZkProgram({
         ]);
         let [keyStatus, keyStatusIndex] =
           keyStatusWitness.computeRootAndKey(previousStatus);
-        keyStatus.assertEquals(input.initialKeyStatus);
+        keyStatus.assertEquals(earlierProof.publicOutput.newKeyStatus);
         keyStatusIndex.assertEquals(keyIndex);
 
         // Calculate the new keyStatus tree root
@@ -199,7 +190,7 @@ class UpdateKeyProof extends ZkProgram.Proof(UpdateKey) {}
 
 export class DKGContract extends SmartContract {
   reducer = Reducer({ actionType: Action });
-  event = {
+  events = {
     [EventEnum.KEY_UPDATES_REDUCED]: Field,
   };
 

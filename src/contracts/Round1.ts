@@ -3,6 +3,7 @@ import {
   Group,
   MerkleMapWitness,
   Poseidon,
+  Provable,
   Reducer,
   SelfProof,
   SmartContract,
@@ -16,7 +17,10 @@ import { Round1Contribution } from '../libs/Committee.js';
 import { ZkAppRef } from '../libs/ZkAppRef.js';
 import { updateOutOfSnark } from '../libs/utils.js';
 import { FullMTWitness as CommitteeWitness } from './CommitteeStorage.js';
-import { FullMTWitness as DKGWitness } from './DKGStorage.js';
+import {
+  FullMTWitness as DKGWitness,
+  EMPTY_LEVEL_1_TREE,
+} from './DKGStorage.js';
 import {
   CheckConfigInput,
   CheckMemberInput,
@@ -26,7 +30,7 @@ import { ActionEnum as KeyUpdateEnum, DKGContract, KeyStatus } from './DKG.js';
 import { ZK_APP } from '../constants.js';
 
 export enum EventEnum {
-  CONTRIBUTIONS_REDUCED,
+  CONTRIBUTIONS_REDUCED = 'contributions-reduced',
 }
 
 export enum ActionStatus {
@@ -39,7 +43,16 @@ export class Action extends Struct({
   keyId: Field,
   memberId: Field,
   contribution: Round1Contribution,
-}) {}
+}) {
+  static empty(): Action {
+    return new Action({
+      committeeId: Field(0),
+      keyId: Field(0),
+      memberId: Field(0),
+      contribution: Round1Contribution.empty(),
+    });
+  }
+}
 
 export class ReduceInput extends Struct({
   initialReduceState: Field,
@@ -247,6 +260,8 @@ export const FinalizeRound1 = ZkProgram({
 
 export class FinalizeRound1Proof extends ZkProgram.Proof(FinalizeRound1) {}
 
+const DefaultRoot = EMPTY_LEVEL_1_TREE().getRoot();
+
 export class Round1Contract extends SmartContract {
   reducer = Reducer({ actionType: Action });
   events = {
@@ -257,6 +272,13 @@ export class Round1Contract extends SmartContract {
   @state(Field) reduceState = State<Field>();
   @state(Field) contributions = State<Field>();
   @state(Field) publicKeys = State<Field>();
+
+  init() {
+    this.zkApps.set(DefaultRoot);
+    this.reduceState.set(DefaultRoot);
+    this.contributions.set(DefaultRoot);
+    this.publicKeys.set(DefaultRoot);
+  }
 
   @method
   verifyZkApp(zkApp: ZkAppRef, index: Field) {
