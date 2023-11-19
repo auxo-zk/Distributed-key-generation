@@ -298,6 +298,7 @@ export class Round2Contract extends SmartContract {
   @state(Field) encryptions = State<Field>();
 
   init() {
+    super.init();
     this.zkApps.set(DefaultRoot);
     this.reduceState.set(DefaultRoot);
     this.contributions.set(DefaultRoot);

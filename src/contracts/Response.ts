@@ -321,6 +321,7 @@ export class ResponseContract extends SmartContract {
   @state(Field) contributions = State<Field>();
 
   init() {
+    super.init();
     this.zkApps.set(DefaultRoot);
     this.reduceState.set(DefaultRoot);
     this.contributions.set(DefaultRoot);

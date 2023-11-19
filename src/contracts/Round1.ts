@@ -185,7 +185,7 @@ export const FinalizeRound1 = ZkProgram({
           earlierProof.publicInput.reduceStateRoot
         );
         input.action.memberId.assertEquals(earlierProof.publicOutput.counter);
-        input.action.contribution.C.length.assertEquals(input.N);
+        input.action.contribution.C.length.assertEquals(input.T);
 
         // Calculate key index in MT
         // Check if the actions have the same keyIndex
@@ -261,7 +261,6 @@ export const FinalizeRound1 = ZkProgram({
 export class FinalizeRound1Proof extends ZkProgram.Proof(FinalizeRound1) {}
 
 const DefaultRoot = EMPTY_LEVEL_1_TREE().getRoot();
-
 export class Round1Contract extends SmartContract {
   reducer = Reducer({ actionType: Action });
   events = {
@@ -274,6 +273,7 @@ export class Round1Contract extends SmartContract {
   @state(Field) publicKeys = State<Field>();
 
   init() {
+    super.init();
     this.zkApps.set(DefaultRoot);
     this.reduceState.set(DefaultRoot);
     this.contributions.set(DefaultRoot);

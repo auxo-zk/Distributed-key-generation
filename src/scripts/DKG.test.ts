@@ -71,6 +71,7 @@ import {
   SettingStorage,
 } from '../contracts/CommitteeStorage.js';
 import {
+  ActionStatus,
   EMPTY_LEVEL_1_TREE as DKG_LEVEL_1_TREE,
   EMPTY_LEVEL_2_TREE as DKG_LEVEL_2_TREE,
   FullMTWitness as DKGFullWitness,
@@ -595,6 +596,13 @@ describe('DKG', () => {
       );
       if (profiling) DKGProfiler.stop();
       console.log('DONE!');
+
+      round1ReduceStorage.updateLeaf(
+        round1ReduceStorage.calculateLeaf(ActionStatus.REDUCED),
+        round1ReduceStorage.calculateLevel1Index(
+          contracts[Contract.ROUND1].actionStates[i + 1]
+        )
+      );
     }
 
     let tx = await Mina.transaction(feePayerKey.publicKey, () => {
@@ -625,6 +633,22 @@ describe('DKG', () => {
     );
     if (profiling) DKGProfiler.stop();
     console.log('DONE!');
+
+    round1ContributionStorage.updateInternal(
+      round1ContributionStorage.calculateLevel1Index({
+        committeeId: Field(0),
+        keyId: Field(0),
+      }),
+      DKG_LEVEL_2_TREE()
+    );
+
+    publicKeyStorage.updateInternal(
+      publicKeyStorage.calculateLevel1Index({
+        committeeId: Field(0),
+        keyId: Field(0),
+      }),
+      DKG_LEVEL_2_TREE()
+    );
 
     for (let i = 0; i < N; i++) {
       let action = round1Actions[i];
@@ -661,6 +685,22 @@ describe('DKG', () => {
       );
       if (profiling) DKGProfiler.stop();
       console.log('DONE!');
+
+      round1ContributionStorage.updateLeaf(
+        round1ContributionStorage.calculateLeaf(action.contribution),
+        round1ContributionStorage.calculateLevel1Index({
+          committeeId: action.committeeId,
+          keyId: action.keyId,
+        })
+      );
+
+      publicKeyStorage.updateLeaf(
+        publicKeyStorage.calculateLeaf(action.contribution.C.get(Field(0))),
+        publicKeyStorage.calculateLevel1Index({
+          committeeId: action.committeeId,
+          keyId: action.keyId,
+        })
+      );
     }
 
     finalizeProof.publicOutput.publicKey.assertEquals(publicKeys[0]);
@@ -787,6 +827,13 @@ describe('DKG', () => {
       );
       if (profiling) DKGProfiler.stop();
       console.log('DONE!');
+
+      round2ReduceStorage.updateLeaf(
+        round2ReduceStorage.calculateLeaf(ActionStatus.REDUCED),
+        round2ReduceStorage.calculateLevel1Index(
+          contracts[Contract.ROUND2].actionStates[i + 1]
+        )
+      );
     }
 
     let tx = await Mina.transaction(feePayerKey.publicKey, () => {
@@ -857,6 +904,25 @@ describe('DKG', () => {
       );
       if (profiling) DKGProfiler.stop();
       console.log('DONE!');
+
+      round2ContributionStorage.updateLeaf(
+        round2ContributionStorage.calculateLeaf(action.contribution),
+        round2ContributionStorage.calculateLevel1Index({
+          committeeId: action.committeeId,
+          keyId: action.keyId,
+        })
+      );
+
+      encryptionStorage.updateLeaf(
+        encryptionStorage.calculateLeaf({
+          contributions: round2Actions.map((e) => e.contribution),
+          memberId: Field(i),
+        }),
+        encryptionStorage.calculateLevel1Index({
+          committeeId: action.committeeId,
+          keyId: action.keyId,
+        })
+      );
     }
     let tx = await Mina.transaction(feePayerKey.publicKey, () => {
       round2Contract.finalize(
@@ -1009,6 +1075,13 @@ describe('DKG', () => {
       );
       if (profiling) DKGProfiler.stop();
       console.log('DONE!');
+
+      responseReduceStorage.updateLeaf(
+        responseReduceStorage.calculateLeaf(ActionStatus.REDUCED),
+        responseReduceStorage.calculateLevel1Index(
+          contracts[Contract.RESPONSE].actionStates[i + 1]
+        )
+      );
     }
 
     let tx = await Mina.transaction(feePayerKey.publicKey, () => {
@@ -1090,6 +1163,11 @@ describe('DKG', () => {
       );
       if (profiling) DKGProfiler.stop();
       console.log('DONE!');
+
+      responseContributionStorage.updateLeaf(
+        responseContributionStorage.calculateLeaf(action.contribution),
+        responseContributionStorage.calculateLevel1Index(requestId)
+      );
     }
     let tx = await Mina.transaction(feePayerKey.publicKey, () => {
       responseContract.complete(
