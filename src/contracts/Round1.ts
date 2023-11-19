@@ -20,6 +20,7 @@ import { FullMTWitness as CommitteeWitness } from './CommitteeStorage.js';
 import {
   FullMTWitness as DKGWitness,
   EMPTY_LEVEL_1_TREE,
+  EMPTY_LEVEL_2_TREE,
 } from './DKGStorage.js';
 import {
   CheckConfigInput,
@@ -144,11 +145,34 @@ export const FinalizeRound1 = ZkProgram({
   publicOutput: Round1Output,
   methods: {
     firstStep: {
-      privateInputs: [Field],
-      method(input: Round1Input, keyIndex: Field) {
+      privateInputs: [Field, MerkleMapWitness, MerkleMapWitness],
+      method(
+        input: Round1Input,
+        keyIndex: Field,
+        contributionWitness: MerkleMapWitness,
+        publicKeyWitness: MerkleMapWitness
+      ) {
+        let [contributionRoot, contributionIndex] =
+          contributionWitness.computeRootAndKey(Field(0));
+        contributionRoot.assertEquals(input.initialContributionRoot);
+        contributionIndex.assertEquals(keyIndex);
+
+        [contributionRoot] = contributionWitness.computeRootAndKey(
+          EMPTY_LEVEL_2_TREE().getRoot()
+        );
+
+        let [publicKeyRoot, publicKeyIndex] =
+          publicKeyWitness.computeRootAndKey(Field(0));
+        publicKeyRoot.assertEquals(input.initialPublicKeyRoot);
+        publicKeyIndex.assertEquals(keyIndex);
+
+        [publicKeyRoot] = publicKeyWitness.computeRootAndKey(
+          EMPTY_LEVEL_2_TREE().getRoot()
+        );
+
         return new Round1Output({
-          newContributionRoot: input.initialContributionRoot,
-          newPublicKeyRoot: input.initialPublicKeyRoot,
+          newContributionRoot: contributionRoot,
+          newPublicKeyRoot: publicKeyRoot,
           keyIndex: keyIndex,
           publicKey: Group.zero,
           counter: Field(0),
@@ -260,7 +284,7 @@ export const FinalizeRound1 = ZkProgram({
 
 export class FinalizeRound1Proof extends ZkProgram.Proof(FinalizeRound1) {}
 
-const DefaultRoot = EMPTY_LEVEL_1_TREE().getRoot();
+const DefaultRoot1 = EMPTY_LEVEL_1_TREE().getRoot();
 export class Round1Contract extends SmartContract {
   reducer = Reducer({ actionType: Action });
   events = {
@@ -274,10 +298,10 @@ export class Round1Contract extends SmartContract {
 
   init() {
     super.init();
-    this.zkApps.set(DefaultRoot);
-    this.reduceState.set(DefaultRoot);
-    this.contributions.set(DefaultRoot);
-    this.publicKeys.set(DefaultRoot);
+    this.zkApps.set(DefaultRoot1);
+    this.reduceState.set(DefaultRoot1);
+    this.contributions.set(DefaultRoot1);
+    this.publicKeys.set(DefaultRoot1);
   }
 
   @method

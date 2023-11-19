@@ -148,15 +148,25 @@ export const FinalizeRound2 = ZkProgram({
   publicOutput: Round2Output,
   methods: {
     firstStep: {
-      privateInputs: [Field, EncryptionHashArray],
+      privateInputs: [Field, EncryptionHashArray, MerkleMapWitness],
       // initialHashArray must be filled with Field(0) with correct length
       method(
         input: Round2Input,
         keyIndex: Field,
-        initialHashArray: EncryptionHashArray
+        initialHashArray: EncryptionHashArray,
+        contributionWitness: MerkleMapWitness
       ) {
+        let [contributionRoot, contributionIndex] =
+          contributionWitness.computeRootAndKey(Field(0));
+        contributionRoot.assertEquals(input.initialContributionRoot);
+        contributionIndex.assertEquals(keyIndex);
+
+        [contributionRoot] = contributionWitness.computeRootAndKey(
+          EMPTY_LEVEL_2_TREE().getRoot()
+        );
+
         return new Round2Output({
-          newContributionRoot: input.initialContributionRoot,
+          newContributionRoot: contributionRoot,
           keyIndex: keyIndex,
           counter: Field(0),
           ecryptionHashes: initialHashArray,

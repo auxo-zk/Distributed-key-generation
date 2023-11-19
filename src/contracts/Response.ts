@@ -20,6 +20,7 @@ import { FullMTWitness as CommitteeWitness } from './CommitteeStorage.js';
 import {
   FullMTWitness as DKGWitness,
   EMPTY_LEVEL_1_TREE,
+  EMPTY_LEVEL_2_TREE,
 } from './DKGStorage.js';
 import {
   CheckConfigInput,
@@ -150,10 +151,23 @@ export const CompleteResponse = ZkProgram({
   publicOutput: ResponseOutput,
   methods: {
     firstStep: {
-      privateInputs: [Field],
-      method(input: ResponseInput, requestId: Field) {
+      privateInputs: [Field, MerkleMapWitness],
+      method(
+        input: ResponseInput,
+        requestId: Field,
+        contributionWitness: MerkleMapWitness
+      ) {
+        let [contributionRoot, contributionIndex] =
+          contributionWitness.computeRootAndKey(Field(0));
+        contributionRoot.assertEquals(input.initialContributionRoot);
+        contributionIndex.assertEquals(requestId);
+
+        [contributionRoot] = contributionWitness.computeRootAndKey(
+          EMPTY_LEVEL_2_TREE().getRoot()
+        );
+
         return new ResponseOutput({
-          newContributionRoot: input.initialContributionRoot,
+          newContributionRoot: contributionRoot,
           requestId: requestId,
           D: new RequestVector(),
           counter: Field(0),

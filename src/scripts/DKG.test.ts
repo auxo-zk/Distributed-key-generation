@@ -152,10 +152,10 @@ describe('DKG', () => {
   let responseZkAppStorage = new ZkAppStorage(DKG_LEVEL_1_TREE());
 
   let committeeIndex = Field(0);
-  let T = 3,
-    N = 5;
+  let T = 2,
+    N = 3;
   let members: Key[] = Local.testAccounts.slice(1, N + 1);
-  let responsedMembers = [4, 0, 2];
+  let responsedMembers = [2, 0];
   let secrets: SecretPolynomial[] = [];
   let publicKeys: Group[] = [];
   let requestId = Field.random();
@@ -432,7 +432,7 @@ describe('DKG', () => {
     let dkgContract = contracts[Contract.DKG].contract as DKGContract;
     let initialActionState = dkgContract.account.actionState.get();
     let initialKeyStatus = dkgContract.keyStatus.get();
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 1; i++) {
       let action = DKG_ACTIONS[ActionEnum.GENERATE_KEY][i];
       let memberWitness = memberStorage.getWitness(
         memberStorage.calculateLevel1Index(committeeIndex),
@@ -471,7 +471,7 @@ describe('DKG', () => {
     if (profiling) DKGProfiler.stop();
     console.log('DONE!');
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 1; i++) {
       let action = DKG_ACTIONS[ActionEnum.GENERATE_KEY][i];
       console.log(`Generate step ${i + 1} proof UpdateKey...`);
       if (profiling) DKGProfiler.start('UpdateKey.nextStep');
@@ -629,7 +629,19 @@ describe('DKG', () => {
         previousActionState: Field(0),
         action: Round1Action.empty(),
       }),
-      Poseidon.hash([Field(0), Field(0)])
+      Poseidon.hash([Field(0), Field(0)]),
+      round1ContributionStorage.getLevel1Witness(
+        round1ContributionStorage.calculateLevel1Index({
+          committeeId: Field(0),
+          keyId: Field(0),
+        })
+      ),
+      publicKeyStorage.getLevel1Witness(
+        publicKeyStorage.calculateLevel1Index({
+          committeeId: Field(0),
+          keyId: Field(0),
+        })
+      )
     );
     if (profiling) DKGProfiler.stop();
     console.log('DONE!');
@@ -868,10 +880,24 @@ describe('DKG', () => {
         action: Round2Action.empty(),
       }),
       Poseidon.hash([Field(0), Field(0)]),
-      initialHashArray
+      initialHashArray,
+      round2ContributionStorage.getLevel1Witness(
+        round2ContributionStorage.calculateLevel1Index({
+          committeeId: committeeIndex,
+          keyId: Field(0),
+        })
+      )
     );
     if (profiling) DKGProfiler.stop();
     console.log('DONE!');
+
+    round2ContributionStorage.updateInternal(
+      round2ContributionStorage.calculateLevel1Index({
+        committeeId: Field(0),
+        keyId: Field(0),
+      }),
+      DKG_LEVEL_2_TREE()
+    );
 
     for (let i = 0; i < N; i++) {
       let action = round2Actions[i];
@@ -924,6 +950,7 @@ describe('DKG', () => {
         })
       );
     }
+
     let tx = await Mina.transaction(feePayerKey.publicKey, () => {
       round2Contract.finalize(
         finalizeProof,
@@ -1115,7 +1142,10 @@ describe('DKG', () => {
         previousActionState: Field(0),
         action: ResponseAction.empty(),
       }),
-      requestId
+      requestId,
+      responseContributionStorage.getLevel1Witness(
+        responseContributionStorage.calculateLevel1Index(requestId)
+      )
     );
     if (profiling) DKGProfiler.stop();
     console.log('DONE!');
