@@ -23,7 +23,7 @@ import { GroupDynamicArray, BoolDynamicArray } from '@auxo-dev/auxo-libs';
 import { updateOutOfSnark } from '../libs/utils.js';
 import { COMMITTEE_MAX_SIZE, REQUEST_MAX_SIZE } from '../constants.js';
 
-export const LEVEL2_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;
+export const LEVEL2_TREE_HEIGHT = Math.ceil(Math.log2(COMMITTEE_MAX_SIZE)) + 1;
 const EmptyMerkleMap = new MerkleMap();
 export const RequestFee = Field(10 ** 9); // 1 Mina
 export const ZeroFee = Field(0); // 0 Mina

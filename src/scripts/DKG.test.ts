@@ -141,8 +141,8 @@ describe('DKG', () => {
   let responseZkAppStorage = new ZkAppStorage(DKG_LEVEL_1_TREE());
 
   let committeeIndex = Field(0);
-  let T = 2,
-    N = 3;
+  let T = 1,
+    N = 2;
   let members: Key[] = Local.testAccounts.slice(1, N + 1);
   let responsedMembers = [2, 0];
   let secrets: SecretPolynomial[] = [];
@@ -312,10 +312,10 @@ describe('DKG', () => {
     await compile(FinalizeRound2, 'FinalizeRound2', profiling);
     await compile(Round2Contract, 'Round2Contract', profiling);
 
-    // await compile(ReduceResponse, 'ReduceResponse', profiling);
-    // await compile(BatchDecryption, 'BatchDecryption', profiling);
-    // await compile(CompleteResponse, 'CompleteResponse', profiling);
-    // await compile(ResponseContract, 'ResponseContract', profiling);
+    await compile(ReduceResponse, 'ReduceResponse', profiling);
+    await compile(BatchDecryption, 'BatchDecryption', profiling);
+    await compile(CompleteResponse, 'CompleteResponse', profiling);
+    await compile(ResponseContract, 'ResponseContract', profiling);
   });
 
   it('Should deploy contracts successfully', async () => {
@@ -839,7 +839,7 @@ describe('DKG', () => {
     }
   });
 
-  xit('Should reduce round 2 successfully', async () => {
+  it('Should reduce round 2 successfully', async () => {
     let round2Contract = contracts[Contract.ROUND2].contract as Round2Contract;
     let initialReduceState = round2Contract.reduceState.get();
     let initialActionState = contracts[Contract.ROUND2].actionStates[0];
@@ -882,7 +882,7 @@ describe('DKG', () => {
     await proveAndSend(tx, feePayerKey, 'Round2Contract', 'reduce');
   });
 
-  xit('Should finalize round 2 and update key correctly', async () => {
+  it('Should finalize round 2 and update key correctly', async () => {
     let round2Contract = contracts[Contract.ROUND2].contract as Round2Contract;
     let initialContributionRoot = round2Contract.contributions.get();
     let reduceStateRoot = round2Contract.reduceState.get();
@@ -976,6 +976,16 @@ describe('DKG', () => {
       );
     }
 
+    let dkgContract = contracts[Contract.DKG].contract as DKGContract;
+    let initialDKGActionState = dkgContract.account.actionState.get();
+    let initialKeyStatus = dkgContract.keyStatus.get();
+    let action = new DKGAction({
+      committeeId: committeeIndex,
+      keyId: Field(0),
+      mask: ACTION_MASK[ActionEnum.FINALIZE_ROUND_2],
+    });
+    dkgActions[ActionEnum.FINALIZE_ROUND_2].push(action);
+
     let tx = await Mina.transaction(feePayerKey.publicKey, () => {
       round2Contract.finalize(
         finalizeProof,
@@ -1010,6 +1020,53 @@ describe('DKG', () => {
       );
     });
     await proveAndSend(tx, feePayerKey, 'Round2Contract', 'finalize');
+    contracts[Contract.DKG].actionStates.push(
+      dkgContract.account.actionState.get()
+    );
+
+    console.log('Generate first step proof UpdateKey...');
+    if (profiling) DKGProfiler.start('UpdateKey.firstStep');
+    let updateKeyProof = await UpdateKey.firstStep(
+      DKGAction.empty(),
+      initialKeyStatus,
+      initialDKGActionState
+    );
+    if (profiling) DKGProfiler.stop();
+    console.log('DONE!');
+
+    console.log(`Generate next step proof UpdateKey...`);
+    if (profiling) DKGProfiler.start('UpdateKey.nextStep');
+    updateKeyProof = await UpdateKey.nextStep(
+      action,
+      updateKeyProof,
+      keyStatusStorage.getWitness(
+        keyStatusStorage.calculateLevel1Index({
+          committeeId: action.committeeId,
+          keyId: action.keyId,
+        })
+      )
+    );
+    if (profiling) DKGProfiler.stop();
+    console.log('DONE!');
+
+    keyStatusStorage.updateLeaf(
+      Provable.switch(action.mask.values, Field, [
+        Field(KeyStatus.ROUND_1_CONTRIBUTION),
+        Field(KeyStatus.ROUND_2_CONTRIBUTION),
+        Field(KeyStatus.ACTIVE),
+        Field(KeyStatus.DEPRECATED),
+      ]),
+      keyStatusStorage.calculateLevel1Index({
+        committeeId: action.committeeId,
+        keyId: action.keyId,
+      })
+    );
+
+    tx = await Mina.transaction(feePayerKey.publicKey, () => {
+      dkgContract.updateKeys(updateKeyProof);
+    });
+    await proveAndSend(tx, feePayerKey, 'DKGContract', 'updateKeys');
+    dkgContract.keyStatus.get().assertEquals(keyStatusStorage.level1.getRoot());
   });
 
   xit('Should contribute response successfully', async () => {
@@ -1214,6 +1271,7 @@ describe('DKG', () => {
         responseContributionStorage.calculateLevel2Index(action.memberId)
       );
     }
+
     let tx = await Mina.transaction(feePayerKey.publicKey, () => {
       responseContract.complete(
         completeProof,

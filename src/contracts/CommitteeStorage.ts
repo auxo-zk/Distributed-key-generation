@@ -10,7 +10,7 @@ import {
 } from 'o1js';
 import { COMMITTEE_MAX_SIZE } from '../constants.js';
 
-export const LEVEL2_TREE_HEIGHT = Math.log2(COMMITTEE_MAX_SIZE) + 1;
+export const LEVEL2_TREE_HEIGHT = Math.ceil(Math.log2(COMMITTEE_MAX_SIZE)) + 1;
 export class Level1MT extends MerkleMap {}
 export class Level1Witness extends MerkleMapWitness {}
 export class Level2MT extends MerkleTree {}

@@ -1,8 +1,7 @@
 import { Encoding, Field, Poseidon } from 'o1js';
 
-export const COMMITTEE_MAX_SIZE = 8;
-export const REQUEST_MAX_SIZE = 32;
-export const REDUCE_MAX_SIZE = 32;
+export const COMMITTEE_MAX_SIZE = 5;
+export const REQUEST_MAX_SIZE = 10;
 
 const getZkAppIndex = (name: string): Field =>
   Poseidon.hash(Encoding.stringToFields(name));
