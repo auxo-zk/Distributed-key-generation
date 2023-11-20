@@ -1,9 +1,35 @@
 import { Bit255 } from '@auxo-dev/auxo-libs';
-import { Group, Poseidon, PrivateKey, Scalar } from 'o1js';
+import { Bool, Field, Group, Poseidon, Scalar } from 'o1js';
 
-export { encrypt, decrypt };
+/**
+ * Encryption
+ * - Input:
+ *   + m: Scalar => bits => Bit255,
+ *   + k: Field => bits => Bit255
+ * - Xor: Bit255 ^ Bit255 = bits ^ bits
+ * - Output:
+ *   + c: Bit255
+ *
+ * Decryption
+ * - Input:
+ *   + c: Bit255
+ *   + k: Field => bits => Bit255
+ * - Xor: Bit255 ^ Bit255 = bits ^ bits
+ * - Output:
+ *   + m: Bit255 => bits => Scalar
+ */
 
-function encrypt(
+function scalarToBigInt(s: Scalar): bigint {
+  return Field.fromBits(
+    s.toFields().map((e) => Bool.fromFields([e]))
+  ).toBigInt();
+}
+
+function fieldToBigInt(f: Field): bigint {
+  return f.toBigInt();
+}
+
+export function encrypt(
   m: Scalar,
   pbK: Group,
   b: Scalar
@@ -14,14 +40,15 @@ function encrypt(
   let U = Group.generator.scale(b);
   let V = pbK.scale(b);
   let k = Poseidon.hash(U.toFields().concat(V.toFields()));
-  let c = Bit255.xor(Bit255.fromBits(k.toBits()), Bit255.fromScalar(m));
+  let xor = fieldToBigInt(k) ^ scalarToBigInt(m);
+  let c = Bit255.fromBits(Field.fromJSON(xor.toString()).toBits());
   return { c, U };
 }
 
-function decrypt(c: Bit255, U: Group, prvK: Scalar): { m: Scalar } {
+export function decrypt(c: Bit255, U: Group, prvK: Scalar): { m: Scalar } {
   let V = U.scale(Scalar.from(prvK.toBigInt()));
   let k = Poseidon.hash(U.toFields().concat(V.toFields()));
-  let kBits = Bit255.fromBits(k.toBits());
-  let m = Bit255.xor(kBits, c).toScalar();
+  let xor = fieldToBigInt(k) ^ c.toBigInt();
+  let m = Bit255.fromBits(Field.fromJSON(xor.toString()).toBits()).toScalar();
   return { m: m };
 }

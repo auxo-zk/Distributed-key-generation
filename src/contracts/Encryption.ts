@@ -24,6 +24,7 @@ export class ElgamalInput extends Struct({
 export const Elgamal = ZkProgram({
   name: 'elgamal',
   publicInput: ElgamalInput,
+  publicOutput: Bit255,
   methods: {
     encrypt: {
       privateInputs: [Scalar, Scalar],
@@ -33,11 +34,12 @@ export const Elgamal = ZkProgram({
           .add(Group.generator)
           .scale(random)
           .sub(Group.generator.scale(random));
-        let k = Poseidon.hash(input.U.toFields().concat(V.toFields()));
+        let k = Poseidon.hash(U.toFields().concat(V.toFields()));
         let kBits = Bit255.fromBits(k.toBits());
         let plainBits = Bit255.fromScalar(plain);
         let encrypted = Bit255.xor(kBits, plainBits);
         encrypted.assertEquals(input.c);
+        return encrypted;
       },
     },
     decrypt: {
@@ -46,10 +48,11 @@ export const Elgamal = ZkProgram({
         let V = input.U.scale(prvKey);
         let k = Poseidon.hash(input.U.toFields().concat(V.toFields()));
         let kBits = Bit255.fromBits(k.toBits());
-        let decrypted = Bit255.xor(kBits, input.c).toScalar();
-        CustomScalar.fromScalar(decrypted).assertEquals(
+        let decrypted = Bit255.xor(kBits, input.c);
+        CustomScalar.fromScalar(decrypted.toScalar()).assertEquals(
           CustomScalar.fromScalar(plain)
         );
+        return decrypted;
       },
     },
   },
@@ -82,28 +85,25 @@ export const BatchEncryption = ZkProgram({
           let random = randomValues.get(iField).toScalar();
           let pubKey = input.publicKeys.get(iField);
           let cipher = input.c.get(iField);
-          let U = Provable.if(
-            input.memberId.equals(iField),
-            Group.zero,
-            Group.generator.scale(random)
-          );
-          input.U.get(iField).assertEquals(U);
+          let U = Group.generator.scale(random);
+          Provable.if(
+            input.memberId.equals(iField).or(iField.greaterThanOrEqual(length)),
+            Bool(true),
+            input.U.get(iField).equals(U)
+          ).assertTrue();
           // Avoid scaling zero point
           let V = pubKey
             .add(Group.generator)
             .scale(random)
             .sub(Group.generator.scale(random));
-          let k = Poseidon.hash(input.U.toFields().concat(V.toFields()));
+          let k = Poseidon.hash(U.toFields().concat(V.toFields()));
           let plain = polynomialValues.get(iField);
           let kBits = Bit255.fromBits(k.toBits());
-          let plainBits = Bit255.fromScalar(plain.toScalar());
-          // let plainBits = new Bit255({
-          //   head: plain.head,
-          //   tail: plain.tail,
-          // });
+          let plainBits = new Bit255({
+            head: plain.head,
+            tail: plain.tail,
+          });
           let encrypted = Bit255.xor(kBits, plainBits);
-          Provable.log('ZkProgram value:', encrypted);
-          Provable.log('Lib value:', cipher);
           Provable.if(
             input.memberId.equals(iField).or(iField.greaterThanOrEqual(length)),
             Bool(true),
@@ -143,19 +143,22 @@ export const BatchDecryption = ZkProgram({
           let iField = Field(i);
           let plain = polynomialValues.get(iField);
           let cipher = input.c.get(iField);
-          let V = input.U.get(iField).scale(privateKey);
-          let k = Poseidon.hash(input.U.toFields().concat(V.toFields()));
+          let U = input.U.get(iField);
+          // Avoid scaling zero point
+          let V = U.add(Group.generator)
+            .scale(privateKey)
+            .sub(Group.generator.scale(privateKey));
+          let k = Poseidon.hash(U.toFields().concat(V.toFields()));
           let kBits = Bit255.fromBits(k.toBits());
           let decrypted = Bit255.xor(kBits, cipher);
 
           Provable.if(
-            input.memberId.equals(iField),
+            input.memberId.equals(iField).or(iField.greaterThanOrEqual(length)),
             Bool(true),
-            CustomScalar.fromScalar(decrypted.toScalar()).equals(plain)
-            // new CustomScalar({
-            //   head: decrypted.head,
-            //   tail: decrypted.tail,
-            // }).equals(plain)
+            new CustomScalar({
+              head: decrypted.head,
+              tail: decrypted.tail,
+            }).equals(plain)
           ).assertTrue();
         }
       },

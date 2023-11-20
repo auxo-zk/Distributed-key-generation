@@ -590,7 +590,7 @@ describe('DKG', () => {
     await proveAndSend(tx, feePayerKey, 'Round1Contract', 'reduce');
   });
 
-  it('Should finalize round 1 correctly', async () => {
+  it('Should finalize round 1 and update key correctly', async () => {
     let round1Contract = contracts[Contract.ROUND1].contract as Round1Contract;
     let initialContributionRoot = round1Contract.contributions.get();
     let initialPublicKeyRoot = round1Contract.publicKeys.get();
@@ -882,7 +882,7 @@ describe('DKG', () => {
     await proveAndSend(tx, feePayerKey, 'Round2Contract', 'reduce');
   });
 
-  xit('Should finalize round 2 correctly', async () => {
+  xit('Should finalize round 2 and update key correctly', async () => {
     let round2Contract = contracts[Contract.ROUND2].contract as Round2Contract;
     let initialContributionRoot = round2Contract.contributions.get();
     let reduceStateRoot = round2Contract.reduceState.get();
