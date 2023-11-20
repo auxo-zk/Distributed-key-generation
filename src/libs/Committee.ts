@@ -140,7 +140,8 @@ export function getRound1Contribution(
 export function getRound2Contribution(
   secret: SecretPolynomial,
   index: number,
-  round1Contributions: Round1Contribution[]
+  round1Contributions: Round1Contribution[],
+  randoms: Scalar[]
 ): Round2Contribution {
   let data = new Array<Round2Data>(secret.f.length);
   let c = new Array<Bit255>(secret.f.length);
@@ -151,10 +152,11 @@ export function getRound2Contribution(
       U[i] = Group.zero;
     } else {
       let encryption = ElgamalECC.encrypt(
-        secret.f[i].toBigInt(),
-        PublicKey.fromGroup(round1Contributions[i].C.values[0])
+        secret.f[i],
+        round1Contributions[i].C.values[0],
+        randoms[i]
       );
-      c[i] = Bit255.fromBigInt(encryption.c);
+      c[i] = encryption.c;
       U[i] = encryption.U;
     }
   }
@@ -170,13 +172,7 @@ export function getResponseContribution(
   R: Group[]
 ): ResponseContribution {
   let decryptions: Scalar[] = round2Data.map((data) =>
-    Scalar.from(
-      ElgamalECC.decrypt(
-        data.c.toBigInt(),
-        data.U,
-        PrivateKey.fromBigInt(secret.a[0].toBigInt())
-      ).m
-    )
+    Scalar.from(ElgamalECC.decrypt(data.c, data.U, secret.a[0]).m)
   );
   let ski: Scalar = decryptions.reduce(
     (prev: Scalar, curr: Scalar) => prev.add(curr),

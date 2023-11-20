@@ -129,7 +129,7 @@ export class SettingStorage extends CommitteeStrorage {
   }
 
   calculateLevel1Index(commiteeId: Field): Field {
-    return Poseidon.hash([commiteeId]);
+    return commiteeId;
   }
 
   getWitness(level1Index: Field): Level1Witness {

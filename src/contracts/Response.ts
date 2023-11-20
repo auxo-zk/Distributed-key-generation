@@ -1,6 +1,5 @@
 import {
   Field,
-  Group,
   MerkleMapWitness,
   Poseidon,
   Provable,
@@ -13,7 +12,7 @@ import {
   method,
   state,
 } from 'o1js';
-import { ResponseContribution, UArray, cArray } from '../libs/Committee.js';
+import { ResponseContribution } from '../libs/Committee.js';
 import { ZkAppRef } from '../libs/ZkAppRef.js';
 import { updateOutOfSnark } from '../libs/utils.js';
 import { FullMTWitness as CommitteeWitness } from './CommitteeStorage.js';
@@ -61,49 +60,45 @@ export class Action extends Struct({
   }
 }
 
-export class ReduceInput extends Struct({
-  initialReduceState: Field,
-  action: Action,
-}) {}
-
 export class ReduceOutput extends Struct({
+  initialReduceState: Field,
   newActionState: Field,
   newReduceState: Field,
 }) {}
 
 export const ReduceResponse = ZkProgram({
   name: 'reduce-response-contribution',
-  publicInput: ReduceInput,
+  publicInput: Action,
   publicOutput: ReduceOutput,
   methods: {
     firstStep: {
-      privateInputs: [Field],
-      method(input: ReduceInput, initialActionState: Field) {
+      privateInputs: [Field, Field],
+      method(
+        input: Action,
+        initialReduceState: Field,
+        initialActionState: Field
+      ) {
         return new ReduceOutput({
+          initialReduceState: initialReduceState,
           newActionState: initialActionState,
-          newReduceState: input.initialReduceState,
+          newReduceState: initialReduceState,
         });
       },
     },
     nextStep: {
-      privateInputs: [SelfProof<ReduceInput, ReduceOutput>, MerkleMapWitness],
+      privateInputs: [SelfProof<Action, ReduceOutput>, MerkleMapWitness],
       method(
-        input: ReduceInput,
-        earlierProof: SelfProof<ReduceInput, ReduceOutput>,
+        input: Action,
+        earlierProof: SelfProof<Action, ReduceOutput>,
         reduceWitness: MerkleMapWitness
       ) {
         // Verify earlier proof
         earlierProof.verify();
 
-        // Check consistency of the initial values
-        input.initialReduceState.assertEquals(
-          earlierProof.publicInput.initialReduceState
-        );
-
         // Calculate corresponding action state
         let actionState = updateOutOfSnark(
           earlierProof.publicOutput.newActionState,
-          [Action.toFields(input.action)]
+          [Action.toFields(input)]
         );
 
         // Check the non-existence of the action
@@ -117,6 +112,7 @@ export const ReduceResponse = ZkProgram({
         [root] = reduceWitness.computeRootAndKey(Field(ActionStatus.REDUCED));
 
         return new ReduceOutput({
+          initialReduceState: earlierProof.publicOutput.initialReduceState,
           newActionState: actionState,
           newReduceState: root,
         });
@@ -128,17 +124,17 @@ export const ReduceResponse = ZkProgram({
 export class ReduceResponseProof extends ZkProgram.Proof(ReduceResponse) {}
 
 export class ResponseInput extends Struct({
+  previousActionState: Field,
+  action: Action,
+}) {}
+
+export class ResponseOutput extends Struct({
   T: Field,
   N: Field,
   initialContributionRoot: Field,
   publicKeyRoot: Field,
   encryptionRoot: Field,
   reduceStateRoot: Field,
-  previousActionState: Field,
-  action: Action,
-}) {}
-
-export class ResponseOutput extends Struct({
   newContributionRoot: Field,
   requestId: Field,
   D: RequestVector,
@@ -151,15 +147,30 @@ export const CompleteResponse = ZkProgram({
   publicOutput: ResponseOutput,
   methods: {
     firstStep: {
-      privateInputs: [Field, MerkleMapWitness],
+      privateInputs: [
+        Field,
+        Field,
+        Field,
+        Field,
+        Field,
+        Field,
+        Field,
+        MerkleMapWitness,
+      ],
       method(
         input: ResponseInput,
+        T: Field,
+        N: Field,
+        initialContributionRoot: Field,
+        publicKeyRoot: Field,
+        encryptionRoot: Field,
+        reduceStateRoot: Field,
         requestId: Field,
         contributionWitness: MerkleMapWitness
       ) {
         let [contributionRoot, contributionIndex] =
           contributionWitness.computeRootAndKey(Field(0));
-        contributionRoot.assertEquals(input.initialContributionRoot);
+        contributionRoot.assertEquals(initialContributionRoot);
         contributionIndex.assertEquals(requestId);
 
         [contributionRoot] = contributionWitness.computeRootAndKey(
@@ -167,6 +178,12 @@ export const CompleteResponse = ZkProgram({
         );
 
         return new ResponseOutput({
+          T: T,
+          N: N,
+          initialContributionRoot: initialContributionRoot,
+          publicKeyRoot: publicKeyRoot,
+          encryptionRoot: encryptionRoot,
+          reduceStateRoot: reduceStateRoot,
           newContributionRoot: contributionRoot,
           requestId: requestId,
           D: new RequestVector(),
@@ -194,24 +211,12 @@ export const CompleteResponse = ZkProgram({
       ) {
         // Verify earlier proof
         earlierProof.verify();
-
-        // Check consistency of the initial values
-        input.T.assertEquals(earlierProof.publicInput.T);
-        input.N.assertEquals(earlierProof.publicInput.N);
-        input.initialContributionRoot.assertEquals(
-          earlierProof.publicInput.initialContributionRoot
+        decryptionProof.publicInput.c.length.assertEquals(
+          earlierProof.publicOutput.N
         );
-        input.publicKeyRoot.assertEquals(
-          earlierProof.publicInput.publicKeyRoot
+        decryptionProof.publicInput.U.length.assertEquals(
+          earlierProof.publicOutput.N
         );
-        input.encryptionRoot.assertEquals(
-          earlierProof.publicInput.encryptionRoot
-        );
-        input.reduceStateRoot.assertEquals(
-          earlierProof.publicInput.reduceStateRoot
-        );
-        decryptionProof.publicInput.c.length.assertEquals(input.N);
-        decryptionProof.publicInput.U.length.assertEquals(input.N);
 
         // Calculate key index in MT
         let keyIndex = Poseidon.hash([
@@ -232,7 +237,7 @@ export const CompleteResponse = ZkProgram({
         let encryptionHashChain = Field(0);
         for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
           encryptionHashChain = Provable.if(
-            Field(i).greaterThanOrEqual(input.N),
+            Field(i).greaterThanOrEqual(earlierProof.publicOutput.N),
             Field(0),
             Poseidon.hash(
               [
@@ -252,7 +257,7 @@ export const CompleteResponse = ZkProgram({
           encryptionWitness.level1.computeRootAndKey(
             encryptionWitness.level2.calculateRoot(encryptionHashChain)
           );
-        encryptionRoot.assertEquals(earlierProof.publicInput.encryptionRoot);
+        encryptionRoot.assertEquals(earlierProof.publicOutput.encryptionRoot);
         encryptionIndex.assertEquals(input.action.requestId);
 
         // Check if this committee member has contributed yet
@@ -285,7 +290,7 @@ export const CompleteResponse = ZkProgram({
               Poseidon.hash(decryptionProof.publicInput.publicKey.toFields())
             )
           );
-        publicKeyRoot.assertEquals(earlierProof.publicInput.publicKeyRoot);
+        publicKeyRoot.assertEquals(earlierProof.publicOutput.publicKeyRoot);
         publicKeyIndex.assertEquals(keyIndex);
 
         // Calculate new D value
@@ -306,10 +311,17 @@ export const CompleteResponse = ZkProgram({
         let [root, key] = reduceWitness.computeRootAndKey(
           Field(ActionStatus.REDUCED)
         );
-        root.assertEquals(earlierProof.publicInput.reduceStateRoot);
+        root.assertEquals(earlierProof.publicOutput.reduceStateRoot);
         key.assertEquals(actionState);
 
         return new ResponseOutput({
+          T: earlierProof.publicOutput.T,
+          N: earlierProof.publicOutput.N,
+          initialContributionRoot:
+            earlierProof.publicOutput.initialContributionRoot,
+          publicKeyRoot: earlierProof.publicOutput.publicKeyRoot,
+          encryptionRoot: earlierProof.publicOutput.encryptionRoot,
+          reduceStateRoot: earlierProof.publicOutput.reduceStateRoot,
           newContributionRoot: contributionRoot,
           requestId: input.action.requestId,
           D: D,
@@ -398,7 +410,7 @@ export class ResponseContract extends SmartContract {
 
     // Verify proof
     proof.verify();
-    proof.publicInput.initialReduceState.assertEquals(reduceState);
+    proof.publicOutput.initialReduceState.assertEquals(reduceState);
     proof.publicOutput.newActionState.assertEquals(actionState);
 
     // Set new states
@@ -423,29 +435,29 @@ export class ResponseContract extends SmartContract {
 
     // Verify proof
     proof.verify();
-    proof.publicInput.initialContributionRoot.assertEquals(contributions);
-    proof.publicInput.reduceStateRoot.assertEquals(reduceState);
-    proof.publicOutput.counter.assertEquals(proof.publicInput.T);
+    proof.publicOutput.initialContributionRoot.assertEquals(contributions);
+    proof.publicOutput.reduceStateRoot.assertEquals(reduceState);
+    proof.publicOutput.counter.assertEquals(proof.publicOutput.T);
 
     // Verify public keys
     this.verifyZkApp(round1, ZK_APP.ROUND_1);
     const round1Contract = new Round1Contract(round1.address);
     let publicKeyRoot = round1Contract.publicKeys.getAndAssertEquals();
-    publicKeyRoot.assertEquals(proof.publicInput.publicKeyRoot);
+    publicKeyRoot.assertEquals(proof.publicOutput.publicKeyRoot);
 
     // Verify encryption hashes
     this.verifyZkApp(round2, ZK_APP.ROUND_2);
     const round2Contract = new Round2Contract(round2.address);
     let encryptionRoot = round2Contract.encryptions.getAndAssertEquals();
-    encryptionRoot.assertEquals(proof.publicInput.encryptionRoot);
+    encryptionRoot.assertEquals(proof.publicOutput.encryptionRoot);
 
     // Verify committee config
     this.verifyZkApp(committee, ZK_APP.COMMITTEE);
     const committeeContract = new CommitteeContract(committee.address);
     committeeContract.checkConfig(
       new CheckConfigInput({
-        N: proof.publicInput.N,
-        T: proof.publicInput.T,
+        N: proof.publicOutput.N,
+        T: proof.publicOutput.T,
         commiteeId: proof.publicInput.action.committeeId,
         settingMerkleMapWitness: settingWitness,
       })

@@ -102,56 +102,49 @@ export class Action extends Struct({
   }
 }
 
-export class UpdateKeyInput extends Struct({
-  initialKeyStatus: Field,
-  action: Action,
-}) {}
-
 export class UpdateKeyOutput extends Struct({
+  initialKeyStatus: Field,
   newKeyStatus: Field,
   newActionState: Field,
 }) {}
 
 export const UpdateKey = ZkProgram({
   name: 'update-key',
-  publicInput: UpdateKeyInput,
+  publicInput: Action,
   publicOutput: UpdateKeyOutput,
   methods: {
     firstStep: {
-      privateInputs: [Field],
-      method(input: UpdateKeyInput, initialActionState: Field) {
-        return {
-          newKeyStatus: input.initialKeyStatus,
+      privateInputs: [Field, Field],
+      method(
+        input: Action,
+        initialKeyStatus: Field,
+        initialActionState: Field
+      ) {
+        return new UpdateKeyOutput({
+          initialKeyStatus: initialKeyStatus,
+          newKeyStatus: initialKeyStatus,
           newActionState: initialActionState,
-        };
+        });
       },
     },
     nextStep: {
-      privateInputs: [
-        SelfProof<UpdateKeyInput, UpdateKeyOutput>,
-        MerkleMapWitness,
-      ],
+      privateInputs: [SelfProof<Action, UpdateKeyOutput>, MerkleMapWitness],
       method(
-        input: UpdateKeyInput,
-        earlierProof: SelfProof<UpdateKeyInput, UpdateKeyOutput>,
+        input: Action,
+        earlierProof: SelfProof<Action, UpdateKeyOutput>,
         keyStatusWitness: MerkleMapWitness
       ) {
         // Verify earlier proof
         earlierProof.verify();
 
-        // Check consistency of the initial values
-        input.initialKeyStatus.assertEquals(
-          earlierProof.publicInput.initialKeyStatus
-        );
-
-        let previousStatus = Provable.switch(input.action.mask.values, Field, [
+        let previousStatus = Provable.switch(input.mask.values, Field, [
           Field(KeyStatus.EMPTY),
           Field(KeyStatus.ROUND_1_CONTRIBUTION),
           Field(KeyStatus.ROUND_2_CONTRIBUTION),
           Field(KeyStatus.ACTIVE),
         ]);
 
-        let nextStatus = Provable.switch(input.action.mask.values, Field, [
+        let nextStatus = Provable.switch(input.mask.values, Field, [
           Field(KeyStatus.ROUND_1_CONTRIBUTION),
           Field(KeyStatus.ROUND_2_CONTRIBUTION),
           Field(KeyStatus.ACTIVE),
@@ -159,10 +152,7 @@ export const UpdateKey = ZkProgram({
         ]);
 
         // Check the key's previous status
-        let keyIndex = Poseidon.hash([
-          input.action.committeeId,
-          input.action.keyId,
-        ]);
+        let keyIndex = Poseidon.hash([input.committeeId, input.keyId]);
         let [keyStatus, keyStatusIndex] =
           keyStatusWitness.computeRootAndKey(previousStatus);
         keyStatus.assertEquals(earlierProof.publicOutput.newKeyStatus);
@@ -174,10 +164,11 @@ export const UpdateKey = ZkProgram({
         // Calculate corresponding action state
         let actionState = updateOutOfSnark(
           earlierProof.publicOutput.newActionState,
-          [input.action.toFields()]
+          [input.toFields()]
         );
 
         return {
+          initialKeyStatus: earlierProof.publicOutput.initialKeyStatus,
           newKeyStatus: keyStatus,
           newActionState: actionState,
         };
@@ -294,7 +285,7 @@ export class DKGContract extends SmartContract {
 
     // Verify proof
     proof.verify();
-    proof.publicInput.initialKeyStatus.assertEquals(keyStatus);
+    proof.publicOutput.initialKeyStatus.assertEquals(keyStatus);
     proof.publicOutput.newActionState.assertEquals(actionState);
 
     // Set new state values

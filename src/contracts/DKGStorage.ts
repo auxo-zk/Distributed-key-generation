@@ -42,9 +42,7 @@ abstract class DKGStorage {
     level2s?: { index: Field; level2: Level2MT }[]
   ) {
     this.level1 = level1;
-    this.level2s = {
-      [Field(Field.ORDER).sub(Field(1)).toString()]: EMPTY_LEVEL_2_TREE(),
-    };
+    this.level2s = {};
     if (level2s && level2s.length > 0) {
       for (let i = 0; i < level2s.length; i++) {
         this.level2s[level2s[i].index.toString()] = level2s[i].level2;
