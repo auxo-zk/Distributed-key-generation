@@ -1,5 +1,6 @@
 import {
   AccountUpdate,
+  Cache,
   Field,
   Group,
   Mina,
@@ -36,7 +37,6 @@ import {
   FinalizeRound2,
   ReduceRound2,
   Round2Contract,
-  PublicKeyArray,
   Round2Input,
 } from '../contracts/Round2.js';
 import {
@@ -57,38 +57,41 @@ import {
   RandomArray,
 } from '../contracts/Encryption.js';
 import {
-  EMPTY_LEVEL_1_TREE as COMMITTEE_LEVEL_1_TREE,
   EMPTY_LEVEL_2_TREE as COMMITTEE_LEVEL_2_TREE,
   MemberStorage,
   SettingStorage,
 } from '../contracts/CommitteeStorage.js';
 import {
-  ActionStatus,
-  EMPTY_LEVEL_1_TREE as DKG_LEVEL_1_TREE,
   EMPTY_LEVEL_2_TREE as DKG_LEVEL_2_TREE,
   EncryptionStorage,
   KeyStatusStorage,
   PublicKeyStorage,
-  ReduceStorage,
   ResponseContributionStorage,
   Round1ContributionStorage,
   Round2ContributionStorage,
 } from '../contracts/DKGStorage.js';
-import { ZkAppStorage } from '../contracts/ZkAppStorage.js';
+import {
+  ActionStatus,
+  AddressStorage,
+  ReduceStorage,
+  getZkAppRef,
+} from '../contracts/SharedStorage.js';
 import {
   CArray,
   EncryptionHashArray,
+  PublicKeyArray,
   Round2Data,
   SecretPolynomial,
   UArray,
   cArray,
 } from '../libs/Committee.js';
-import { getZkAppRef } from '../libs/ZkAppRef.js';
 import { Committee } from '../libs/index.js';
+import { ZkAppEnum } from '../constants.js';
 
 describe('DKG', () => {
   const doProofs = false;
   const profiling = false;
+  const cache = Cache.FileSystem('./caches');
   const DKGProfiler = getProfiler('Benchmark DKG');
   let Local = Mina.LocalBlockchain({ proofsEnabled: doProofs });
   let feePayerKey: Key;
@@ -109,36 +112,30 @@ describe('DKG', () => {
   }
 
   // CommitteeContract storage
-  let memberStorage = new MemberStorage(COMMITTEE_LEVEL_1_TREE());
-  let settingStorage = new SettingStorage(COMMITTEE_LEVEL_1_TREE());
-  let commmitteeZkAppStorage = new ZkAppStorage(DKG_LEVEL_1_TREE());
+  let memberStorage = new MemberStorage();
+  let settingStorage = new SettingStorage();
+  let commmitteeAddressStorage = new AddressStorage();
 
   // DKGContract storage
-  let keyStatusStorage = new KeyStatusStorage(DKG_LEVEL_1_TREE());
-  let dkgZkAppStorage = new ZkAppStorage(DKG_LEVEL_1_TREE());
+  let keyStatusStorage = new KeyStatusStorage();
+  let dkgAddressStorage = new AddressStorage();
 
   // Round1Contract storage
-  let round1ReduceStorage = new ReduceStorage(DKG_LEVEL_1_TREE());
-  let round1ContributionStorage = new Round1ContributionStorage(
-    DKG_LEVEL_1_TREE()
-  );
-  let publicKeyStorage = new PublicKeyStorage(DKG_LEVEL_1_TREE());
-  let round1ZkAppStorage = new ZkAppStorage(DKG_LEVEL_1_TREE());
+  let round1ReduceStorage = new ReduceStorage();
+  let round1ContributionStorage = new Round1ContributionStorage();
+  let publicKeyStorage = new PublicKeyStorage();
+  let round1AddressStorage = new AddressStorage();
 
   // Round2Contract storage
-  let round2ReduceStorage = new ReduceStorage(DKG_LEVEL_1_TREE());
-  let round2ContributionStorage = new Round2ContributionStorage(
-    DKG_LEVEL_1_TREE()
-  );
-  let encryptionStorage = new EncryptionStorage(DKG_LEVEL_1_TREE());
-  let round2ZkAppStorage = new ZkAppStorage(DKG_LEVEL_1_TREE());
+  let round2ReduceStorage = new ReduceStorage();
+  let round2ContributionStorage = new Round2ContributionStorage();
+  let encryptionStorage = new EncryptionStorage();
+  let round2AddressStorage = new AddressStorage();
 
   // Response storage
-  let responseReduceStorage = new ReduceStorage(DKG_LEVEL_1_TREE());
-  let responseContributionStorage = new ResponseContributionStorage(
-    DKG_LEVEL_1_TREE()
-  );
-  let responseZkAppStorage = new ZkAppStorage(DKG_LEVEL_1_TREE());
+  let responseReduceStorage = new ReduceStorage();
+  let responseContributionStorage = new ResponseContributionStorage();
+  let responseAddressStorage = new AddressStorage();
 
   let committeeIndex = Field(0);
   let T = 1,
@@ -203,7 +200,7 @@ describe('DKG', () => {
   ) => {
     console.log(`Compiling ${name}...`);
     if (profiling) DKGProfiler.start(`${name}.compile`);
-    await prg.compile();
+    await prg.compile({ cache });
     if (profiling) DKGProfiler.stop();
     console.log('Done!');
   };
@@ -297,25 +294,27 @@ describe('DKG', () => {
   });
 
   it('Should compile all ZK programs', async () => {
-    await compile(CreateCommittee, 'CreateCommittee', profiling);
-    await compile(CommitteeContract, 'CommitteeContract', profiling);
-
     await compile(UpdateKey, 'UpdateKey', profiling);
-    await compile(DKGContract, 'DKGContract', profiling);
 
     await compile(ReduceRound1, 'ReduceRound1', profiling);
     await compile(FinalizeRound1, 'FinalizeRound1', profiling);
-    await compile(Round1Contract, 'Round1Contract', profiling);
 
     await compile(ReduceRound2, 'ReduceRound2', profiling);
     await compile(BatchEncryption, 'BatchEncryption', profiling);
     await compile(FinalizeRound2, 'FinalizeRound2', profiling);
-    await compile(Round2Contract, 'Round2Contract', profiling);
 
-    await compile(ReduceResponse, 'ReduceResponse', profiling);
-    await compile(BatchDecryption, 'BatchDecryption', profiling);
-    await compile(CompleteResponse, 'CompleteResponse', profiling);
-    await compile(ResponseContract, 'ResponseContract', profiling);
+    // await compile(ReduceResponse, 'ReduceResponse', profiling);
+    // await compile(BatchDecryption, 'BatchDecryption', profiling);
+    // await compile(CompleteResponse, 'CompleteResponse', profiling);
+
+    if (doProofs) {
+      await compile(CreateCommittee, 'CreateCommittee', profiling);
+      await compile(CommitteeContract, 'CommitteeContract', profiling);
+      await compile(DKGContract, 'DKGContract', profiling);
+      await compile(Round1Contract, 'Round1Contract', profiling);
+      await compile(Round2Contract, 'Round2Contract', profiling);
+      await compile(ResponseContract, 'ResponseContract', profiling);
+    }
   });
 
   it('Should deploy contracts successfully', async () => {
@@ -339,81 +338,85 @@ describe('DKG', () => {
       ['memberTreeRoot', memberStorage.level1.getRoot()],
       ['settingTreeRoot', settingStorage.level1.getRoot()],
     ]);
-    dkgZkAppStorage.addressMap.set(
-      dkgZkAppStorage.calculateIndex(Contract.COMMITTEE),
-      dkgZkAppStorage.calculateLeaf(
+    dkgAddressStorage.addresses.setLeaf(
+      dkgAddressStorage.calculateIndex(ZkAppEnum.COMMITTEE).toBigInt(),
+      dkgAddressStorage.calculateLeaf(
         contracts[Contract.COMMITTEE].contract.address
       )
     );
-    round1ZkAppStorage.addressMap.set(
-      round1ZkAppStorage.calculateIndex(Contract.COMMITTEE),
-      round1ZkAppStorage.calculateLeaf(
+    round1AddressStorage.addresses.setLeaf(
+      round1AddressStorage.calculateIndex(ZkAppEnum.COMMITTEE).toBigInt(),
+      round1AddressStorage.calculateLeaf(
         contracts[Contract.COMMITTEE].contract.address
       )
     );
-    round2ZkAppStorage.addressMap.set(
-      round2ZkAppStorage.calculateIndex(Contract.COMMITTEE),
-      round2ZkAppStorage.calculateLeaf(
+    round2AddressStorage.addresses.setLeaf(
+      round2AddressStorage.calculateIndex(ZkAppEnum.COMMITTEE).toBigInt(),
+      round2AddressStorage.calculateLeaf(
         contracts[Contract.COMMITTEE].contract.address
       )
     );
-    responseZkAppStorage.addressMap.set(
-      responseZkAppStorage.calculateIndex(Contract.COMMITTEE),
-      responseZkAppStorage.calculateLeaf(
+    responseAddressStorage.addresses.setLeaf(
+      responseAddressStorage.calculateIndex(ZkAppEnum.COMMITTEE).toBigInt(),
+      responseAddressStorage.calculateLeaf(
         contracts[Contract.COMMITTEE].contract.address
       )
     );
 
     // Deploy dkg contract
     await deploy(feePayerKey, 'DKGContract', [
-      ['zkApps', dkgZkAppStorage.addressMap.getRoot()],
+      ['zkApps', dkgAddressStorage.addresses.getRoot()],
     ]);
-    round1ZkAppStorage.addressMap.set(
-      round1ZkAppStorage.calculateIndex(Contract.DKG),
-      round1ZkAppStorage.calculateLeaf(contracts[Contract.DKG].contract.address)
+    round1AddressStorage.addresses.setLeaf(
+      round1AddressStorage.calculateIndex(ZkAppEnum.DKG).toBigInt(),
+      round1AddressStorage.calculateLeaf(
+        contracts[Contract.DKG].contract.address
+      )
     );
-    round2ZkAppStorage.addressMap.set(
-      round2ZkAppStorage.calculateIndex(Contract.DKG),
-      round2ZkAppStorage.calculateLeaf(contracts[Contract.DKG].contract.address)
+    round2AddressStorage.addresses.setLeaf(
+      round2AddressStorage.calculateIndex(ZkAppEnum.DKG).toBigInt(),
+      round2AddressStorage.calculateLeaf(
+        contracts[Contract.DKG].contract.address
+      )
     );
-    responseZkAppStorage.addressMap.set(
-      responseZkAppStorage.calculateIndex(Contract.DKG),
-      responseZkAppStorage.calculateLeaf(
+    responseAddressStorage.addresses.setLeaf(
+      responseAddressStorage.calculateIndex(ZkAppEnum.DKG).toBigInt(),
+      responseAddressStorage.calculateLeaf(
         contracts[Contract.DKG].contract.address
       )
     );
 
     // Deploy round 1 contract
     await deploy(feePayerKey, 'Round1Contract', [
-      ['zkApps', round1ZkAppStorage.addressMap.getRoot()],
+      ['zkApps', round1AddressStorage.addresses.getRoot()],
     ]);
-    round2ZkAppStorage.addressMap.set(
-      round2ZkAppStorage.calculateIndex(Contract.ROUND1),
-      round2ZkAppStorage.calculateLeaf(
+    round2AddressStorage.addresses.setLeaf(
+      round2AddressStorage.calculateIndex(ZkAppEnum.ROUND1).toBigInt(),
+      round2AddressStorage.calculateLeaf(
         contracts[Contract.ROUND1].contract.address
       )
     );
-    responseZkAppStorage.addressMap.set(
-      responseZkAppStorage.calculateIndex(Contract.ROUND1),
-      responseZkAppStorage.calculateLeaf(
+    responseAddressStorage.addresses.setLeaf(
+      responseAddressStorage.calculateIndex(ZkAppEnum.ROUND1).toBigInt(),
+      responseAddressStorage.calculateLeaf(
         contracts[Contract.ROUND1].contract.address
       )
     );
 
     // Deploy round 2 contract
     await deploy(feePayerKey, 'Round2Contract', [
-      ['zkApps', round2ZkAppStorage.addressMap.getRoot()],
+      ['zkApps', round2AddressStorage.addresses.getRoot()],
     ]);
-    responseZkAppStorage.addressMap.set(
-      responseZkAppStorage.calculateIndex('round2'),
-      responseZkAppStorage.calculateLeaf(
+    responseAddressStorage.addresses.setLeaf(
+      responseAddressStorage.calculateIndex(ZkAppEnum.ROUND2).toBigInt(),
+      responseAddressStorage.calculateLeaf(
         contracts[Contract.ROUND2].contract.address
       )
     );
 
     // Deploy response
     // await deploy(feePayerKey, 'ResponseContract', [
-    //   ['zkApps', responseZkAppStorage.addressMap.getRoot()],
+    //   ['zkApps', responseAddressStorage.addresses.getRoot()],
     // ]);
   });
 
@@ -431,15 +434,14 @@ describe('DKG', () => {
         dkgContract.committeeAction(
           action.committeeId,
           action.keyId,
+          Field(i),
           Field(ActionEnum.GENERATE_KEY),
           getZkAppRef(
-            commmitteeZkAppStorage.addressMap,
-            'committee',
+            commmitteeAddressStorage.addresses,
+            ZkAppEnum.COMMITTEE,
             contracts[Contract.COMMITTEE].contract.address
           ),
-          memberWitness.level2,
-          memberWitness.level1,
-          Field(i)
+          memberWitness
         );
       });
       await proveAndSend(tx, members[i], 'DKGContract', 'committeeAction');
@@ -519,14 +521,14 @@ describe('DKG', () => {
         round1Contract.contribute(
           action,
           getZkAppRef(
-            round1ZkAppStorage.addressMap,
-            Contract.COMMITTEE,
+            round1AddressStorage.addresses,
+            ZkAppEnum.COMMITTEE,
             contracts[Contract.COMMITTEE].contract.address
           ),
           memberWitness,
           getZkAppRef(
-            round1ZkAppStorage.addressMap,
-            Contract.DKG,
+            round1AddressStorage.addresses,
+            ZkAppEnum.DKG,
             contracts[Contract.DKG].contract.address
           ),
           keyStatusStorage.getWitness(
@@ -577,10 +579,10 @@ describe('DKG', () => {
       console.log('DONE!');
 
       round1ReduceStorage.updateLeaf(
-        round1ReduceStorage.calculateLeaf(ActionStatus.REDUCED),
-        round1ReduceStorage.calculateLevel1Index(
+        round1ReduceStorage.calculateIndex(
           contracts[Contract.ROUND1].actionStates[i + 1]
-        )
+        ),
+        round1ReduceStorage.calculateLeaf(ActionStatus.REDUCED)
       );
     }
 
@@ -608,7 +610,10 @@ describe('DKG', () => {
       initialContributionRoot,
       initialPublicKeyRoot,
       reduceStateRoot,
-      Poseidon.hash([Field(0), Field(0)]),
+      round1ContributionStorage.calculateLevel1Index({
+        committeeId: Field(0),
+        keyId: Field(0),
+      }),
       round1ContributionStorage.getLevel1Witness(
         round1ContributionStorage.calculateLevel1Index({
           committeeId: Field(0),
@@ -707,14 +712,14 @@ describe('DKG', () => {
       round1Contract.finalize(
         finalizeProof,
         getZkAppRef(
-          round1ZkAppStorage.addressMap,
-          'committee',
+          round1AddressStorage.addresses,
+          ZkAppEnum.COMMITTEE,
           contracts[Contract.COMMITTEE].contract.address
         ),
         settingStorage.getWitness(committeeIndex),
         getZkAppRef(
-          round1ZkAppStorage.addressMap,
-          'dkg',
+          round1AddressStorage.addresses,
+          ZkAppEnum.DKG,
           contracts[Contract.DKG].contract.address
         )
       );
@@ -776,7 +781,7 @@ describe('DKG', () => {
       let round2Contribution = Committee.getRound2Contribution(
         secrets[i],
         i + 1,
-        [...Array(N).keys()].map((e) => round1Actions[e].contribution),
+        round1Actions.map((e) => e.contribution),
         randoms
       );
       let action = new Round2Action({
@@ -798,7 +803,7 @@ describe('DKG', () => {
           U: action.contribution.U,
           memberId: Field(i),
         }),
-        new PlainArray(secrets.map((e) => CustomScalar.fromScalar(e.f[0]))),
+        new PlainArray(secrets[i].f.map((e) => CustomScalar.fromScalar(e))),
         new RandomArray(randoms.map((e) => CustomScalar.fromScalar(e)))
       );
       if (profiling) DKGProfiler.stop();
@@ -814,14 +819,14 @@ describe('DKG', () => {
         round2Contract.contribute(
           action,
           getZkAppRef(
-            round2ZkAppStorage.addressMap,
-            Contract.COMMITTEE,
+            round2AddressStorage.addresses,
+            ZkAppEnum.COMMITTEE,
             contracts[Contract.COMMITTEE].contract.address
           ),
           memberWitness,
           getZkAppRef(
-            round2ZkAppStorage.addressMap,
-            Contract.DKG,
+            round2AddressStorage.addresses,
+            ZkAppEnum.DKG,
             contracts[Contract.DKG].contract.address
           ),
           keyStatusStorage.getWitness(
@@ -869,10 +874,10 @@ describe('DKG', () => {
       console.log('DONE!');
 
       round2ReduceStorage.updateLeaf(
-        round2ReduceStorage.calculateLeaf(ActionStatus.REDUCED),
-        round2ReduceStorage.calculateLevel1Index(
+        round2ReduceStorage.calculateIndex(
           contracts[Contract.ROUND2].actionStates[i + 1]
-        )
+        ),
+        round2ReduceStorage.calculateLeaf(ActionStatus.REDUCED)
       );
     }
 
@@ -907,7 +912,10 @@ describe('DKG', () => {
       initialContributionRoot,
       memberPublicKeys,
       reduceStateRoot,
-      Poseidon.hash([Field(0), Field(0)]),
+      round2ContributionStorage.calculateLevel1Index({
+        committeeId: Field(0),
+        keyId: Field(0),
+      }),
       initialHashArray,
       round2ContributionStorage.getLevel1Witness(
         round2ContributionStorage.calculateLevel1Index({
@@ -946,7 +954,7 @@ describe('DKG', () => {
           round2ContributionStorage.calculateLevel2Index(action.memberId)
         ),
         round2ReduceStorage.getWitness(
-          round2ReduceStorage.calculateLevel1Index(
+          round2ReduceStorage.calculateIndex(
             contracts[Contract.ROUND2].actionStates[i + 1]
           )
         )
@@ -996,8 +1004,8 @@ describe('DKG', () => {
           })
         ),
         getZkAppRef(
-          responseZkAppStorage.addressMap,
-          Contract.ROUND1,
+          responseAddressStorage.addresses,
+          ZkAppEnum.ROUND1,
           contracts[Contract.ROUND1].contract.address
         ),
         publicKeyStorage.getLevel1Witness(
@@ -1007,14 +1015,14 @@ describe('DKG', () => {
           })
         ),
         getZkAppRef(
-          responseZkAppStorage.addressMap,
-          Contract.COMMITTEE,
+          responseAddressStorage.addresses,
+          ZkAppEnum.COMMITTEE,
           contracts[Contract.COMMITTEE].contract.address
         ),
         settingStorage.getWitness(committeeIndex),
         getZkAppRef(
-          responseZkAppStorage.addressMap,
-          Contract.DKG,
+          responseAddressStorage.addresses,
+          ZkAppEnum.DKG,
           contracts[Contract.DKG].contract.address
         )
       );
@@ -1125,14 +1133,14 @@ describe('DKG', () => {
         responseContract.contribute(
           action,
           getZkAppRef(
-            responseZkAppStorage.addressMap,
-            Contract.COMMITTEE,
+            responseAddressStorage.addresses,
+            ZkAppEnum.COMMITTEE,
             contracts[Contract.COMMITTEE].contract.address
           ),
           memberWitness,
           getZkAppRef(
-            responseZkAppStorage.addressMap,
-            Contract.DKG,
+            responseAddressStorage.addresses,
+            ZkAppEnum.DKG,
             contracts[Contract.DKG].contract.address
           ),
           keyStatusStorage.getWitness(
@@ -1181,10 +1189,10 @@ describe('DKG', () => {
       console.log('DONE!');
 
       responseReduceStorage.updateLeaf(
-        responseReduceStorage.calculateLeaf(ActionStatus.REDUCED),
-        responseReduceStorage.calculateLevel1Index(
+        responseReduceStorage.calculateIndex(
           contracts[Contract.RESPONSE].actionStates[i + 1]
-        )
+        ),
+        responseReduceStorage.calculateLeaf(ActionStatus.REDUCED)
       );
     }
 
@@ -1257,7 +1265,7 @@ describe('DKG', () => {
           encryptionStorage.calculateLevel2Index(action.memberId)
         ),
         responseReduceStorage.getWitness(
-          responseReduceStorage.calculateLevel1Index(
+          responseReduceStorage.calculateIndex(
             contracts[Contract.RESPONSE].actionStates[i + 1]
           )
         )
@@ -1276,18 +1284,18 @@ describe('DKG', () => {
       responseContract.complete(
         completeProof,
         getZkAppRef(
-          responseZkAppStorage.addressMap,
-          Contract.ROUND1,
+          responseAddressStorage.addresses,
+          ZkAppEnum.ROUND1,
           contracts[Contract.ROUND1].contract.address
         ),
         getZkAppRef(
-          responseZkAppStorage.addressMap,
-          Contract.ROUND2,
+          responseAddressStorage.addresses,
+          ZkAppEnum.ROUND2,
           contracts[Contract.ROUND2].contract.address
         ),
         getZkAppRef(
-          responseZkAppStorage.addressMap,
-          Contract.COMMITTEE,
+          responseAddressStorage.addresses,
+          ZkAppEnum.COMMITTEE,
           contracts[Contract.COMMITTEE].contract.address
         ),
         settingStorage.getWitness(committeeIndex)

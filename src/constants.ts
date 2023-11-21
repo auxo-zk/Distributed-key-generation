@@ -1,16 +1,19 @@
 import { Encoding, Field, Poseidon } from 'o1js';
 
-export const COMMITTEE_MAX_SIZE = 5;
+export const MAIN_TREE_DEPTH = 16;
+export const COMMITTEE_MAX_SIZE = 4;
 export const REQUEST_MAX_SIZE = 10;
-
-const getZkAppIndex = (name: string): Field =>
-  Poseidon.hash(Encoding.stringToFields(name));
-
-export const ZK_APP = {
-  COMMITTEE: getZkAppIndex('committee'),
-  DKG: getZkAppIndex('dkg'),
-  ROUND_1: getZkAppIndex('round1'),
-  ROUND_2: getZkAppIndex('round2'),
-  RESPONSE: getZkAppIndex('response'),
-  REQUEST: getZkAppIndex('request'),
+export const INSTANCE_LIMITS = {
+  COMMITTEE: 2 ** 8,
+  KEY: 2 ** 8,
+  REQUEST: 2 ** 8,
 };
+
+export enum ZkAppEnum {
+  COMMITTEE,
+  DKG,
+  ROUND1,
+  ROUND2,
+  RESPONSE,
+  REQUEST,
+}

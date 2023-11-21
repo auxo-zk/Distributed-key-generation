@@ -1,6 +1,6 @@
 import {
-  Field,
   Reducer,
+  Field,
   Mina,
   PrivateKey,
   PublicKey,
@@ -11,17 +11,23 @@ import {
   MerkleWitness,
   fetchAccount,
 } from 'o1js';
-
+import { IPFSHash } from '@auxo-dev/auxo-libs';
 import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
 import {
   CommitteeContract,
   CommitteeAction,
   CreateCommittee,
-  MemberArray,
 } from '../contracts/Committee.js';
-import { IPFSHash } from '@auxo-dev/auxo-libs';
-import { LEVEL2_TREE_HEIGHT } from '../contracts/CommitteeStorage.js';
+import {
+  EMPTY_LEVEL_1_TREE,
+  EMPTY_LEVEL_2_TREE,
+  LEVEL2_TREE_HEIGHT,
+  Level1Witness,
+  MemberStorage,
+  SettingStorage,
+} from '../contracts/CommitteeStorage.js';
+import { MemberArray } from '../libs/Committee.js';
 
 // check command line arg
 const deployAlias = process.argv[2];
@@ -49,10 +55,8 @@ type Config = {
   >;
 };
 
-const EmptyMerkleMap = new MerkleMap();
-
-const memberMerkleMap = new MerkleMap();
-const settingMerkleMap = new MerkleMap();
+let memberStorage = new MemberStorage(EMPTY_LEVEL_1_TREE());
+let settingStorage = new SettingStorage(EMPTY_LEVEL_1_TREE());
 
 class memberMerkleTreeWitness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
 
@@ -158,8 +162,8 @@ async function main() {
     ActionCommitteeProfiler.start('CreateCommittee create fist step');
     let proof = await CreateCommittee.firstStep(
       Reducer.initialActionState,
-      EmptyMerkleMap.getRoot(),
-      EmptyMerkleMap.getRoot(),
+      memberStorage.level1.getRoot(),
+      settingStorage.level1.getRoot(),
       committeeContract.nextCommitteeId.get()
     );
     ActionCommitteeProfiler.stop().store();
@@ -173,23 +177,23 @@ async function main() {
         threshold: Field(1),
         ipfsHash: IPFSHash.fromString('testing'),
       }),
-      memberMerkleMap.getWitness(Field(0)),
-      settingMerkleMap.getWitness(Field(0))
+      new Level1Witness(memberStorage.level1.getWitness(Field(0).toBigInt())),
+      settingStorage.getWitness(Field(0))
     );
     ActionCommitteeProfiler.stop();
 
     ////// udpate data to local
 
     // memberMerkleTree.set
-    let tree = new MerkleTree(LEVEL2_TREE_HEIGHT);
+    let tree = EMPTY_LEVEL_2_TREE();
     for (let i = 0; i < Number(myMemberArray1.length); i++) {
       tree.setLeaf(BigInt(i), MemberArray.hash(myMemberArray1.get(Field(i))));
     }
 
-    memberMerkleMap.set(Field(0), tree.getRoot());
-    settingMerkleMap.set(
-      Field(0),
-      Poseidon.hash([Field(1), myMemberArray1.length])
+    memberStorage.updateInternal(Field(0), tree);
+    settingStorage.updateLeaf(
+      Poseidon.hash([Field(1), myMemberArray1.length]),
+      Field(0)
     );
 
     console.log('create proof next step again...');
@@ -201,8 +205,8 @@ async function main() {
         threshold: Field(2),
         ipfsHash: IPFSHash.fromString('testing'),
       }),
-      memberMerkleMap.getWitness(Field(1)),
-      settingMerkleMap.getWitness(Field(1))
+      new Level1Witness(memberStorage.level1.getWitness(Field(1).toBigInt())),
+      settingStorage.getWitness(Field(1))
     );
     ActionCommitteeProfiler.stop();
 

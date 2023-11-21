@@ -1,5 +1,5 @@
-import { Bit255 } from '@auxo-dev/auxo-libs';
-import { Bool, Field, Group, Poseidon, Scalar } from 'o1js';
+import { Bit255, CustomScalar } from '@auxo-dev/auxo-libs';
+import { Bool, Field, Group, Poseidon, Provable, Scalar } from 'o1js';
 
 /**
  * Encryption

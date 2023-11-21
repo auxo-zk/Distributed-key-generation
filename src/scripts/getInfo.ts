@@ -59,7 +59,7 @@ const DEPENDENCIES = {
   RequestHelperContract: [],
 };
 
-async function query(constraints: boolean = false, cacheFiles: boolean = true) {
+async function query(constraints: boolean = true, cacheFiles: boolean = false) {
   if (constraints) {
     // TODO - Log table
     console.log('Constraints list:');

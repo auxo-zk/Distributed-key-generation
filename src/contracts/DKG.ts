@@ -1,7 +1,6 @@
 import {
   Field,
   method,
-  MerkleMapWitness,
   Poseidon,
   Provable,
   Reducer,
@@ -13,16 +12,13 @@ import {
   ZkProgram,
   Bool,
 } from 'o1js';
-import { BoolDynamicArray, GroupDynamicArray } from '@auxo-dev/auxo-libs';
+import { BoolDynamicArray } from '@auxo-dev/auxo-libs';
 import { updateOutOfSnark } from '../libs/utils.js';
-import {
-  CheckMemberInput,
-  CommitteeContract,
-  CommitteeMerkleWitness,
-} from './Committee.js';
-import { ZkAppRef } from '../libs/ZkAppRef.js';
-import { EMPTY_LEVEL_1_TREE } from './DKGStorage.js';
-import { ZK_APP } from '../constants.js';
+import { CheckMemberInput, CommitteeContract } from './Committee.js';
+import { ZkAppRef } from './SharedStorage.js';
+import { FullMTWitness as CommitteeFullWitness } from './CommitteeStorage.js';
+import { EMPTY_LEVEL_1_TREE, Level1Witness } from './DKGStorage.js';
+import { INSTANCE_LIMITS, ZkAppEnum } from '../constants.js';
 
 const DefaultRoot = EMPTY_LEVEL_1_TREE().getRoot();
 
@@ -95,10 +91,7 @@ export class Action extends Struct({
     return super.fromFields(fields) as Action;
   }
   hash(): Field {
-    return Poseidon.hash(this.toFields());
-  }
-  toFields(): Field[] {
-    return Action.toFields(this);
+    return Poseidon.hash(Action.toFields(this));
   }
 }
 
@@ -128,11 +121,11 @@ export const UpdateKey = ZkProgram({
       },
     },
     nextStep: {
-      privateInputs: [SelfProof<Action, UpdateKeyOutput>, MerkleMapWitness],
+      privateInputs: [SelfProof<Action, UpdateKeyOutput>, Level1Witness],
       method(
         input: Action,
         earlierProof: SelfProof<Action, UpdateKeyOutput>,
-        keyStatusWitness: MerkleMapWitness
+        keyStatusWitness: Level1Witness
       ) {
         // Verify earlier proof
         earlierProof.verify();
@@ -152,19 +145,21 @@ export const UpdateKey = ZkProgram({
         ]);
 
         // Check the key's previous status
-        let keyIndex = Poseidon.hash([input.committeeId, input.keyId]);
-        let [keyStatus, keyStatusIndex] =
-          keyStatusWitness.computeRootAndKey(previousStatus);
+        let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))
+          .mul(input.committeeId)
+          .add(input.keyId);
+        let keyStatus = keyStatusWitness.calculateRoot(previousStatus);
+        let keyStatusIndex = keyStatusWitness.calculateIndex();
         keyStatus.assertEquals(earlierProof.publicOutput.newKeyStatus);
         keyStatusIndex.assertEquals(keyIndex);
 
         // Calculate the new keyStatus tree root
-        [keyStatus] = keyStatusWitness.computeRootAndKey(nextStatus);
+        keyStatus = keyStatusWitness.calculateRoot(nextStatus);
 
         // Calculate corresponding action state
         let actionState = updateOutOfSnark(
           earlierProof.publicOutput.newActionState,
-          [input.toFields()]
+          [Action.toFields(input)]
         );
 
         return {
@@ -199,9 +194,10 @@ export class DKGContract extends SmartContract {
   @method
   verifyZkApp(zkApp: ZkAppRef, index: Field) {
     let zkApps = this.zkApps.getAndAssertEquals();
-    let [root, id] = zkApp.witness.computeRootAndKey(
+    let root = zkApp.witness.calculateRoot(
       Poseidon.hash(zkApp.address.toFields())
     );
+    let id = zkApp.witness.calculateIndex();
     root.assertEquals(zkApps);
     id.assertEquals(index);
   }
@@ -210,10 +206,11 @@ export class DKGContract extends SmartContract {
   verifyKeyStatus(
     keyIndex: Field,
     status: Field,
-    witness: MerkleMapWitness
+    witness: Level1Witness
   ): void {
     let keyStatus = this.keyStatus.getAndAssertEquals();
-    let [root, index] = witness.computeRootAndKey(status);
+    let root = witness.calculateRoot(status);
+    let index = witness.calculateIndex();
     root.assertEquals(keyStatus);
     index.assertEquals(keyIndex);
   }
@@ -222,22 +219,20 @@ export class DKGContract extends SmartContract {
   committeeAction(
     committeeId: Field,
     keyId: Field,
+    memberId: Field,
     actionType: Field,
     committee: ZkAppRef,
-    memberMerkleTreeWitness: CommitteeMerkleWitness,
-    memberMerkleMapWitness: MerkleMapWitness,
-    memberId: Field
+    memberWitness: CommitteeFullWitness
   ) {
     // Check if sender has the correct index in the committee
-    this.verifyZkApp(committee, ZK_APP.COMMITTEE);
+    this.verifyZkApp(committee, Field(ZkAppEnum.COMMITTEE));
     const committeeContract = new CommitteeContract(committee.address);
     committeeContract
       .checkMember(
         new CheckMemberInput({
           address: this.sender,
           commiteeId: committeeId,
-          memberMerkleTreeWitness: memberMerkleTreeWitness,
-          memberMerkleMapWitness: memberMerkleMapWitness,
+          memberWitness: memberWitness,
         })
       )
       .assertEquals(memberId);
