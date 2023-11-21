@@ -294,6 +294,8 @@ export const FinalizeRound2 = ZkProgram({
         root.assertEquals(earlierProof.publicOutput.reduceStateRoot);
         key.assertEquals(actionState);
 
+        Provable.log('Inside-proof logic is correct!');
+
         return new Round2Output({
           T: earlierProof.publicOutput.T,
           N: earlierProof.publicOutput.N,
