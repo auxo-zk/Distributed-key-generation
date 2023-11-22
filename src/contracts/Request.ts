@@ -27,7 +27,7 @@ export const LEVEL2_TREE_HEIGHT = Math.ceil(Math.log2(COMMITTEE_MAX_SIZE)) + 1;
 const EmptyMerkleMap = new MerkleMap();
 export const RequestFee = Field(10 ** 9); // 1 Mina
 export const ZeroFee = Field(0); // 0 Mina
-export class RequestValue extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
+export class RequestVector extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 
 export const enum ActionEnum {
   REQUEST,
@@ -39,7 +39,7 @@ export const enum ActionEnum {
 export const enum RequestStatusEnum {
   NOT_YET_REQUESTED,
   REQUESTING,
-  RESOLVED,
+  // RESOLVED, this will be hash of request vector D: H(length + values)
 }
 
 export class ActionMask extends BoolDynamicArray(ActionEnum.__LENGTH) {}
@@ -54,7 +54,8 @@ export class RequestAction extends Struct({
   committeeId: Field,
   keyId: Field,
   requester: PublicKey,
-  R: RequestValue, // request value
+  R: RequestVector, // request value
+  D: RequestVector, // resolve value
   actionType: ActionMask,
 }) {
   static empty(): RequestAction {
@@ -62,9 +63,14 @@ export class RequestAction extends Struct({
       committeeId: Field(0),
       keyId: Field(0),
       requester: PublicKey.fromFields([Field(0), Field(0)]),
-      R: RequestValue.empty(),
+      R: RequestVector.empty(),
+      D: RequestVector.empty(),
       actionType: ActionMask.empty(),
     });
+  }
+
+  static fromFields(input: Field[]): RequestAction {
+    return super.fromFields(input) as RequestAction;
   }
 
   // using this id to check if value R is requested with keyId and committeeId
@@ -74,20 +80,8 @@ export class RequestAction extends Struct({
     );
   }
 
-  toFields(): Field[] {
-    return [
-      this.committeeId,
-      this.keyId,
-      this.requester.toFields(),
-      this.R.length,
-      this.R.toFields(),
-      this.actionType.length,
-      this.actionType.toFields(),
-    ].flat();
-  }
-
   hash(): Field {
-    return Poseidon.hash(this.toFields());
+    return Poseidon.hash(RequestAction.toFields(this));
   }
 }
 
@@ -95,7 +89,7 @@ export class RequestInput extends Struct({
   committeeId: Field,
   keyId: Field,
   requester: PublicKey,
-  R: RequestValue,
+  R: RequestVector,
   actionType: Field,
 }) {}
 
@@ -135,7 +129,7 @@ export const CreateRequest = ZkProgram({
       method(
         preProof: SelfProof<Void, RollupStateOutput>,
         input: RequestAction,
-        requestStateWitness: MerkleMapWitness,
+        requestStatusWitness: MerkleMapWitness,
         requesterWitness: MerkleMapWitness
       ): RollupStateOutput {
         preProof.verify();
@@ -155,12 +149,12 @@ export const CreateRequest = ZkProgram({
         let newState = Provable.switch(input.actionType.values, Field, [
           Field(RequestStatusEnum.REQUESTING),
           Field(RequestStatusEnum.NOT_YET_REQUESTED),
-          Field(RequestStatusEnum.RESOLVED),
+          Field(Poseidon.hash(RequestVector.toFields(input.D))), // hash of request vector D
         ]);
 
         // caculate pre request root
         let [preRequestStatusRoot, caculateRequestId] =
-          requestStateWitness.computeRootAndKey(currentState);
+          requestStatusWitness.computeRootAndKey(currentState);
 
         caculateRequestId.assertEquals(requestId);
 
@@ -170,7 +164,7 @@ export const CreateRequest = ZkProgram({
 
         // caculate new request state root
         let [newRequestStatusRoot] =
-          requestStateWitness.computeRootAndKey(newState);
+          requestStatusWitness.computeRootAndKey(newState);
 
         ////// caculate requesterWitess
 
@@ -207,7 +201,7 @@ export const CreateRequest = ZkProgram({
           initialRequesterRoot: preProof.publicOutput.initialRequesterRoot,
           finalActionState: updateOutOfSnark(
             preProof.publicOutput.finalActionState,
-            [input.toFields()]
+            [RequestAction.toFields(input)]
           ),
           finalRequestStatusRoot: newRequestStatusRoot,
           finalRequesterRoot: newRequesterRoot,
@@ -240,9 +234,6 @@ export class RequestProof extends ZkProgram.Proof(CreateRequest) {}
 export class RequestContract extends SmartContract {
   // requestId = hash(committeeId, keyId, hash(valueR))
   // -> state: enable to check if request the same data
-  // state: 0: not yet requested
-  // state: 1: requesting
-  // state: !0 and !=1 -> which is hash(D): request complete
   @state(Field) requestStatusRoot = State<Field>();
   // request id -> requester
   @state(Field) requesterRoot = State<Field>();
@@ -258,37 +249,30 @@ export class RequestContract extends SmartContract {
     this.actionState.set(Reducer.initialActionState);
   }
 
-  @method request(requestInput: RequestInput) {
+  @method requestOrUnrequest(requestInput: RequestInput) {
     let actionState = this.actionState.getAndAssertEquals();
     requestInput.actionType.assertLessThan(ActionEnum.__LENGTH);
 
     let actionType = createActionMask(requestInput.actionType);
-
-    // if it is resolve action then sender must be dkg
-    let sender = Provable.if(
-      actionType.get(Field(ActionEnum.RESOLVE)),
-      this.DKG_address.getAndAssertEquals(),
-      this.sender
-    );
-    this.sender.assertEquals(sender);
 
     let requestAction = new RequestAction({
       committeeId: requestInput.committeeId,
       keyId: requestInput.keyId,
       requester: requestInput.requester,
       R: requestInput.R, // request value
+      D: RequestVector.empty(),
       actionType,
     });
 
-    let requestInputHash = requestAction.hash();
-    // checking if the request already exists within the accumulator
+    let requestInputId = requestAction.requestId();
+    // checking if the request have the same id already exists within the accumulator
     let { state: exists } = this.reducer.reduce(
       this.reducer.getActions({
         fromActionState: actionState,
       }),
       Bool,
       (state: Bool, action: RequestAction) => {
-        return action.hash().equals(requestInputHash).or(state);
+        return action.requestId().equals(requestInputId).or(state);
       },
       // initial state
       { state: Bool(false), actionState: actionState }
@@ -297,14 +281,9 @@ export class RequestContract extends SmartContract {
     // if exists then don't dispatch any more
     exists.assertEquals(Bool(false));
 
-    /*
-    we cant really branch the control flow - we will always have to emit an event no matter what, 
-    so we emit an empty event if the RequestAction already exists
-    it the RequestAction doesn't exist, emit the "real" RequestAction
-    */
-    let toEmit = Provable.if(exists, RequestAction.empty(), requestAction);
+    this.reducer.dispatch(requestAction);
 
-    this.reducer.dispatch(toEmit);
+    let requester = AccountUpdate.createSigned(requestInput.requester);
 
     // take fee if it is request
     let sendAmount = Provable.if(
@@ -312,8 +291,55 @@ export class RequestContract extends SmartContract {
       RequestFee,
       ZeroFee
     );
-    let requester = AccountUpdate.createSigned(this.sender);
     requester.send({ to: this, amount: UInt64.from(sendAmount) });
+
+    // refund if it is un-request
+    let refundAmount = Provable.if(
+      actionType.get(Field(ActionEnum.UNREQUEST)),
+      RequestFee,
+      ZeroFee
+    );
+    this.send({ to: requester, amount: UInt64.from(refundAmount) });
+  }
+
+  @method resolveRequest(requestInput: RequestInput) {
+    let actionState = this.actionState.getAndAssertEquals();
+    requestInput.actionType.assertEquals(ActionEnum.RESOLVE);
+
+    let actionType = createActionMask(requestInput.actionType);
+
+    // if it is resolve action then sender must be dkg
+    let DKG_address = this.DKG_address.getAndAssertEquals();
+
+    let requestAction = new RequestAction({
+      committeeId: requestInput.committeeId,
+      keyId: requestInput.keyId,
+      requester: requestInput.requester,
+      R: requestInput.R, // request value
+      D: RequestVector.empty(),
+      actionType,
+    });
+
+    let requestInputId = requestAction.requestId();
+    // checking if the request have the same id already exists within the accumulator
+    let { state: exists } = this.reducer.reduce(
+      this.reducer.getActions({
+        fromActionState: actionState,
+      }),
+      Bool,
+      (state: Bool, action: RequestAction) => {
+        return action.requestId().equals(requestInputId).or(state);
+      },
+      // initial state
+      { state: Bool(false), actionState: actionState }
+    );
+
+    // if exists then don't dispatch any more
+    exists.assertEquals(Bool(false));
+
+    this.reducer.dispatch(requestAction);
+
+    this.send({ to: DKG_address, amount: UInt64.from(RequestFee) });
   }
 
   @method rollupRequest(proof: RequestProof) {
@@ -326,57 +352,11 @@ export class RequestContract extends SmartContract {
     requestStatusRoot.assertEquals(proof.publicOutput.initialRequestStatusRoot);
     requesterRoot.assertEquals(proof.publicOutput.initialRequesterRoot);
 
-    let pendingActions = this.reducer.getActions({
-      fromActionState: actionState,
-    });
-
-    let { state: finalState, actionState: newActionState } =
-      this.reducer.reduce(
-        pendingActions,
-        // state type
-        Field,
-        // function that says how to apply an action
-        (state: Field, action: RequestAction) => {
-          // do this to check if this action is dummy
-          // since dummy action will have actionType mask = [False, False, False]
-          let sendAmount = Provable.if(
-            action.actionType.length.equals(Field(0)),
-            ZeroFee,
-            RequestFee
-          );
-
-          // refund
-          let amountToRequester = Provable.if(
-            action.actionType.get(Field(ActionEnum.UNREQUEST)),
-            sendAmount,
-            ZeroFee
-          );
-
-          // reward to DKG
-          let amountToDKG = Provable.if(
-            action.actionType.get(Field(ActionEnum.RESOLVE)),
-            sendAmount,
-            ZeroFee
-          );
-
-          this.send({
-            to: action.requester,
-            amount: UInt64.from(amountToRequester),
-          });
-
-          this.send({
-            to: this.DKG_address.getAndAssertEquals(),
-            amount: UInt64.from(amountToDKG),
-          });
-          return Field(0);
-        },
-        { state: Field(0), actionState: actionState }
-      );
-
-    newActionState.assertEquals(proof.publicOutput.finalActionState);
+    let lastActionState = this.account.actionState.getAndAssertEquals();
+    lastActionState.assertEquals(proof.publicOutput.finalActionState);
 
     // update on-chain state
-    this.actionState.set(newActionState);
+    this.actionState.set(proof.publicOutput.finalActionState);
     this.requestStatusRoot.set(proof.publicOutput.finalRequestStatusRoot);
     this.requesterRoot.set(proof.publicOutput.finalRequesterRoot);
   }
