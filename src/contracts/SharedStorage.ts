@@ -9,11 +9,12 @@ import {
   PublicKey,
   Struct,
 } from 'o1js';
-import { MAIN_TREE_DEPTH, ZkAppEnum } from '../constants.js';
+import { ADDRESS_MAX_SIZE, ZkAppEnum } from '../constants.js';
 
+export const ADDRESS_TREE_HEIGHT = Math.ceil(Math.log2(ADDRESS_MAX_SIZE)) + 1;
 export class AddressMT extends MerkleTree {}
-export class AddressWitness extends MerkleWitness(MAIN_TREE_DEPTH) {}
-export const EMPTY_ADDRESS_MT = () => new AddressMT(MAIN_TREE_DEPTH);
+export class AddressWitness extends MerkleWitness(ADDRESS_TREE_HEIGHT) {}
+export const EMPTY_ADDRESS_MT = () => new AddressMT(ADDRESS_TREE_HEIGHT);
 export class ReduceWitness extends MerkleMapWitness {}
 export const EMPTY_REDUCE_MT = () => new MerkleMap();
 

@@ -1,12 +1,10 @@
-import { Encoding, Field, Poseidon } from 'o1js';
-
-export const MAIN_TREE_DEPTH = 16;
-export const COMMITTEE_MAX_SIZE = 4;
-export const REQUEST_MAX_SIZE = 10;
+export const ADDRESS_MAX_SIZE = 8;
+export const COMMITTEE_MAX_SIZE = 15;
+export const REQUEST_MAX_SIZE = 30;
 export const INSTANCE_LIMITS = {
-  COMMITTEE: 2 ** 8,
-  KEY: 2 ** 8,
-  REQUEST: 2 ** 8,
+  COMMITTEE: 2 ** 16,
+  KEY: 2 ** 16,
+  REQUEST: 2 ** 16,
 };
 
 export enum ZkAppEnum {

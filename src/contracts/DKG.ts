@@ -215,6 +215,12 @@ export class DKGContract extends SmartContract {
     index.assertEquals(keyIndex);
   }
 
+  // FIXME - Action reducer failed when duplicated keyId actions for key generation were dispatched
+  // Consideration
+  // - Option 1: using nextKeyId for key generation --TRADE-OFF--> hard to implement
+  // - Option 2: allowing bypassing actions in reducer --TRADE-OFF--> vulnerable for censoring
+  // - Option 3: adding a KeyGeneration zkApp to reduce key generation request of each committee to keep track of nextKeyId
+  // - Option 4: using the previous reduce-rollup mechanism
   @method
   committeeAction(
     committeeId: Field,

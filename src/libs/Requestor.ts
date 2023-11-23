@@ -1,10 +1,11 @@
 import { Group, Scalar } from 'o1js';
-import { GroupDynamicArray } from '@auxo-dev/auxo-libs';
+import { GroupDynamicArray, ScalarDynamicArray } from '@auxo-dev/auxo-libs';
 import { REQUEST_MAX_SIZE } from '../constants.js';
 
 export class MArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class RArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class DArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
+export class skArray extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
 
 export function calculatePublicKey(contributedPublicKeys: Group[]): Group {
   let result = Group.zero;

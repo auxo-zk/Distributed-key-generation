@@ -141,3 +141,5 @@ config.json
 
 # Cache data
 caches
+
+.DS_Store

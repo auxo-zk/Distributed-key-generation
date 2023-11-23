@@ -24,29 +24,29 @@ import {
 } from '../contracts/Round2.js';
 
 const PROGRAMS = {
-  CreateCommittee,
-  UpdateKey,
-  ReduceRound1,
-  FinalizeRound1,
-  ReduceRound2,
-  BatchEncryption,
+  // BatchEncryption,
+  // BatchDecryption,
+  // CreateCommittee,
+  // UpdateKey,
+  // ReduceRound1,
+  // FinalizeRound1,
+  // ReduceRound2,
   FinalizeRound2,
-  ReduceResponse,
-  BatchDecryption,
-  CompleteResponse,
-  CreateRequest,
-  CreateRollupStatus,
-  RollupActions,
+  // ReduceResponse,
+  // CompleteResponse,
+  // CreateRequest,
+  // CreateRollupStatus,
+  // RollupActions,
 };
 
 const CONTRACTS = {
-  CommitteeContract,
-  DKGContract,
-  Round1Contract,
+  // CommitteeContract,
+  // DKGContract,
+  // Round1Contract,
   Round2Contract,
-  ResponseContract,
-  RequestContract,
-  RequestHelperContract,
+  // ResponseContract,
+  // RequestContract,
+  // RequestHelperContract,
 };
 
 const DEPENDENCIES = {

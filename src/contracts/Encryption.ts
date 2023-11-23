@@ -34,7 +34,7 @@ export const Elgamal = ZkProgram({
           .add(Group.generator)
           .scale(random)
           .sub(Group.generator.scale(random));
-        let k = Poseidon.hash(U.toFields().concat(V.toFields()));
+        let k = Poseidon.hash([U.toFields(), V.toFields()].flat());
         let kBits = Bit255.fromBits(k.toBits());
         let plainBits = Bit255.fromScalar(plain);
         let encrypted = Bit255.xor(kBits, plainBits);
@@ -86,17 +86,12 @@ export const BatchEncryption = ZkProgram({
           let pubKey = input.publicKeys.get(iField);
           let cipher = input.c.get(iField);
           let U = Group.generator.scale(random);
-          Provable.if(
-            input.memberId.equals(iField).or(iField.greaterThanOrEqual(length)),
-            Bool(true),
-            input.U.get(iField).equals(U)
-          ).assertTrue();
           // Avoid scaling zero point
           let V = pubKey
             .add(Group.generator)
             .scale(random)
             .sub(Group.generator.scale(random));
-          let k = Poseidon.hash(U.toFields().concat(V.toFields()));
+          let k = Poseidon.hash([U.toFields(), V.toFields()].flat());
           let plain = polynomialValues.get(iField);
           let kBits = Bit255.fromBits(k.toBits());
           let plainBits = new Bit255({
@@ -107,7 +102,7 @@ export const BatchEncryption = ZkProgram({
           Provable.if(
             input.memberId.equals(iField).or(iField.greaterThanOrEqual(length)),
             Bool(true),
-            encrypted.equals(cipher)
+            input.U.get(iField).equals(U).and(encrypted.equals(cipher))
           ).assertTrue();
         }
       },
@@ -148,7 +143,7 @@ export const BatchDecryption = ZkProgram({
           let V = U.add(Group.generator)
             .scale(privateKey)
             .sub(Group.generator.scale(privateKey));
-          let k = Poseidon.hash(U.toFields().concat(V.toFields()));
+          let k = Poseidon.hash([U.toFields(), V.toFields()].flat());
           let kBits = Bit255.fromBits(k.toBits());
           let decrypted = Bit255.xor(kBits, cipher);
 
