@@ -31,7 +31,7 @@ import {
   CommitteeContract,
 } from './Committee.js';
 import { DKGContract, KeyStatus } from './DKG.js';
-import { RequestVector } from './RequestHelper.js';
+import { RequestVector, ResolveInput, RequestContract } from './Request.js';
 import { BatchDecryptionProof, PlainArray } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
 import { Round2Contract } from './Round2.js';
@@ -486,9 +486,8 @@ export class ResponseContract extends SmartContract {
     proof: CompleteResponseProof,
     round2: ZkAppRef,
     committee: ZkAppRef,
-    settingWitness: CommitteeLevel1Witness
-    // request: ZkAppRef,
-    // requestStatusWitness: MerkleMapWitness
+    settingWitness: CommitteeLevel1Witness,
+    request: ZkAppRef
   ) {
     // Get current state values
     let contributions = this.contributions.getAndAssertEquals();
@@ -521,8 +520,15 @@ export class ResponseContract extends SmartContract {
     // Set new states
     this.contributions.set(proof.publicOutput.newContributionRoot);
 
-    // TODO - Dispatch action in Request contract
-    // this.verifyZkApp(request, ZK_APP.REQUEST);
-    // const dkgContract = new DKGContract(dkg.address);
+    this.verifyZkApp(request, Field(ZkAppEnum.REQUEST));
+    const requestContract = new RequestContract(request.address);
+    requestContract.resolveRequest(
+      new ResolveInput({
+        requestId: proof.publicOutput.requestId,
+        D: proof.publicOutput.D,
+      })
+    );
   }
+
+  // TODO - Distribute earned fee
 }
