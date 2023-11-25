@@ -11,7 +11,7 @@ import {
   method,
   state,
 } from 'o1js';
-import { Round1Contribution } from '../libs/Committee.js';
+import { CArray, Round1Contribution } from '../libs/Committee.js';
 import { updateOutOfSnark } from '../libs/utils.js';
 import {
   FullMTWitness as CommitteeFullWitness,
@@ -125,6 +125,9 @@ export class Round1Input extends Struct({
   action: Action,
 }) {}
 
+/**
+ *
+ */
 export class Round1Output extends Struct({
   T: Field,
   N: Field,
@@ -315,49 +318,55 @@ export class Round1Contract extends SmartContract {
     this.publicKeys.set(DefaultRoot1);
   }
 
-  @method
-  verifyZkApp(zkApp: ZkAppRef, index: Field) {
-    let zkApps = this.zkApps.getAndAssertEquals();
-    let root = zkApp.witness.calculateRoot(
-      Poseidon.hash(zkApp.address.toFields())
-    );
-    let id = zkApp.witness.calculateIndex();
-    root.assertEquals(zkApps);
-    id.assertEquals(index);
-  }
-
+  /**
+   * Submit round 1 contribution for key generation
+   * - Verify zkApp references
+   * - Verify committee member
+   * - Verify contribution
+   * - Create & dispatch action
+   * @param action
+   * @param committee
+   * @param memberWitness
+   */
   @method
   contribute(
-    action: Action,
+    committeeId: Field,
+    keyId: Field,
+    C: CArray,
     committee: ZkAppRef,
-    memberWitness: CommitteeFullWitness,
-    dkg: ZkAppRef,
-    keyStatusWitness: Level1Witness
+    memberWitness: CommitteeFullWitness
   ) {
-    // Verify sender's index
-    this.verifyZkApp(committee, Field(ZkAppEnum.COMMITTEE));
+    // Verify zkApp references
+    let zkApps = this.zkApps.getAndAssertEquals();
+
+    // CommitteeContract
+    zkApps.assertEquals(
+      committee.witness.calculateRoot(
+        Poseidon.hash(committee.address.toFields())
+      )
+    );
+    Field(ZkAppEnum.COMMITTEE).assertEquals(committee.witness.calculateIndex());
+
     const committeeContract = new CommitteeContract(committee.address);
+
+    // Verify committee member - FIXME check if using this.sender is secure
     let memberId = committeeContract.checkMember(
       new CheckMemberInput({
         address: this.sender,
-        commiteeId: action.committeeId,
+        commiteeId: committeeId,
         memberWitness: memberWitness,
       })
     );
-    memberId.assertEquals(action.memberId);
 
-    // Verify key status
-    this.verifyZkApp(dkg, Field(ZkAppEnum.DKG));
-    const dkgContract = new DKGContract(dkg.address);
-    dkgContract.verifyKeyStatus(
-      Field.from(BigInt(INSTANCE_LIMITS.KEY))
-        .mul(action.committeeId)
-        .add(action.keyId),
-      Field(KeyStatus.ROUND_1_CONTRIBUTION),
-      keyStatusWitness
-    );
-
-    // Dispatch action
+    // Create & dispatch action to DKGContract
+    let action = new Action({
+      committeeId: committeeId,
+      keyId: keyId,
+      memberId: memberId,
+      contribution: new Round1Contribution({
+        C: C,
+      }),
+    });
     this.reducer.dispatch(action);
   }
 
@@ -379,19 +388,54 @@ export class Round1Contract extends SmartContract {
     this.emitEvent(EventEnum.CONTRIBUTIONS_REDUCED, actionState);
   }
 
+  /**
+   * Finalize round 2 with N members' contribution
+   * - Get current state values
+   * - Verify zkApp references
+   * - Verify finalize proof
+   * - Verify committee config
+   * - Verify key status
+   * - Set new states
+   * - Create & dispatch action to DKGContract
+   * @param proof
+   * @param committee
+   * @param settingWitness
+   * @param dkg
+   * @param keyStatusWitness
+   */
   @method
   finalize(
     proof: FinalizeRound1Proof,
     committee: ZkAppRef,
     settingWitness: CommitteeLevel1Witness,
-    dkg: ZkAppRef
+    dkg: ZkAppRef,
+    keyStatusWitness: Level1Witness
   ) {
     // Get current state values
+    let zkApps = this.zkApps.getAndAssertEquals();
     let contributions = this.contributions.getAndAssertEquals();
     let publicKeys = this.publicKeys.getAndAssertEquals();
     let reduceState = this.reduceState.getAndAssertEquals();
 
-    // Verify proof
+    // Verify zkApp references
+    // CommitteeContract
+    zkApps.assertEquals(
+      committee.witness.calculateRoot(
+        Poseidon.hash(committee.address.toFields())
+      )
+    );
+    Field(ZkAppEnum.COMMITTEE).assertEquals(committee.witness.calculateIndex());
+
+    // DKGContract
+    zkApps.assertEquals(
+      dkg.witness.calculateRoot(Poseidon.hash(dkg.address.toFields()))
+    );
+    Field(ZkAppEnum.DKG).assertEquals(dkg.witness.calculateIndex());
+
+    const committeeContract = new CommitteeContract(committee.address);
+    const dkgContract = new DKGContract(dkg.address);
+
+    // Verify finalize proof
     proof.verify();
     proof.publicOutput.initialContributionRoot.assertEquals(contributions);
     proof.publicOutput.initialPublicKeyRoot.assertEquals(publicKeys);
@@ -399,8 +443,6 @@ export class Round1Contract extends SmartContract {
     proof.publicOutput.counter.assertEquals(proof.publicOutput.N);
 
     // Verify committee config
-    this.verifyZkApp(committee, Field(ZkAppEnum.COMMITTEE));
-    const committeeContract = new CommitteeContract(committee.address);
     committeeContract.checkConfig(
       new CheckConfigInput({
         N: proof.publicOutput.N,
@@ -410,13 +452,22 @@ export class Round1Contract extends SmartContract {
       })
     );
 
+    // Verify key status
+    let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))
+      .mul(proof.publicInput.action.committeeId)
+      .add(proof.publicInput.action.keyId);
+    dkgContract.keyStatus
+      .getAndAssertEquals()
+      .assertEquals(
+        keyStatusWitness.calculateRoot(Field(KeyStatus.ROUND_1_CONTRIBUTION))
+      );
+    keyIndex.assertEquals(keyStatusWitness.calculateIndex());
+
     // Set new states
     this.contributions.set(proof.publicOutput.newContributionRoot);
     this.publicKeys.set(proof.publicOutput.newPublicKeyRoot);
 
-    // Dispatch action in DKG contract
-    this.verifyZkApp(dkg, Field(ZkAppEnum.DKG));
-    const dkgContract = new DKGContract(dkg.address);
+    // Create & dispatch action to DKGContract
     dkgContract.publicAction(
       proof.publicInput.action.committeeId,
       proof.publicInput.action.keyId,

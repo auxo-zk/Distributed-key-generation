@@ -122,6 +122,7 @@ export class BatchDecryptionInput extends Struct({
 export const BatchDecryption = ZkProgram({
   name: 'batch-decryption',
   publicInput: BatchDecryptionInput,
+  publicOutput: Group,
   methods: {
     decrypt: {
       privateInputs: [PlainArray, Scalar],
@@ -133,6 +134,7 @@ export const BatchDecryption = ZkProgram({
         let length = input.c.length;
         input.U.length.assertEquals(length);
         Group.generator.scale(privateKey).assertEquals(input.publicKey);
+        let ski = Group.generator.scale(Scalar.from(0n));
 
         for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
           let iField = Field(i);
@@ -155,7 +157,10 @@ export const BatchDecryption = ZkProgram({
               tail: decrypted.tail,
             }).equals(plain)
           ).assertTrue();
+
+          ski.add(Group.generator.scale(decrypted.toScalar()));
         }
+        return ski;
       },
     },
   },

@@ -1,10 +1,10 @@
 export const ADDRESS_MAX_SIZE = 8;
-export const COMMITTEE_MAX_SIZE = 15;
-export const REQUEST_MAX_SIZE = 30;
+export const COMMITTEE_MAX_SIZE = 8;
+export const REQUEST_MAX_SIZE = 16;
 export const INSTANCE_LIMITS = {
-  COMMITTEE: 2 ** 16,
-  KEY: 2 ** 16,
-  REQUEST: 2 ** 16,
+  COMMITTEE: 2 ** 5,
+  KEY: 2 ** 5,
+  REQUEST: 2 ** 5,
 };
 
 export enum ZkAppEnum {

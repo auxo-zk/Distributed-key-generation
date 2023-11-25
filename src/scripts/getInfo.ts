@@ -24,27 +24,27 @@ import {
 } from '../contracts/Round2.js';
 
 const PROGRAMS = {
-  // BatchEncryption,
-  // BatchDecryption,
-  // CreateCommittee,
-  // UpdateKey,
-  // ReduceRound1,
-  // FinalizeRound1,
-  // ReduceRound2,
+  BatchEncryption,
+  BatchDecryption,
+  CreateCommittee,
+  UpdateKey,
+  ReduceRound1,
+  FinalizeRound1,
+  ReduceRound2,
   FinalizeRound2,
-  // ReduceResponse,
-  // CompleteResponse,
+  ReduceResponse,
+  CompleteResponse,
   // CreateRequest,
   // CreateRollupStatus,
   // RollupActions,
 };
 
 const CONTRACTS = {
-  // CommitteeContract,
-  // DKGContract,
-  // Round1Contract,
+  CommitteeContract,
+  DKGContract,
+  Round1Contract,
   Round2Contract,
-  // ResponseContract,
+  ResponseContract,
   // RequestContract,
   // RequestHelperContract,
 };

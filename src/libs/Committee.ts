@@ -173,7 +173,7 @@ export function getResponseContribution(
   index: number,
   round2Data: Round2Data[],
   R: Group[]
-): ResponseContribution {
+): [ResponseContribution, Scalar] {
   let decryptions: Scalar[] = round2Data.map((data) =>
     Scalar.from(ElgamalECC.decrypt(data.c, data.U, secret.a[0]).m)
   );
@@ -186,7 +186,7 @@ export function getResponseContribution(
   for (let i = 0; i < R.length; i++) {
     D[i] = R[i].scale(ski);
   }
-  return new ResponseContribution({ D: DArray.from(D) });
+  return [new ResponseContribution({ D: DArray.from(D) }), ski];
 }
 
 export function getLagrangeCoefficient(listIndex: number[]): Scalar[] {
