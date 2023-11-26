@@ -1362,11 +1362,11 @@ describe('DKG', () => {
           ZkAppEnum.DKG,
           contracts[Contract.DKG].contract.address
         ),
-        getZkAppRef(
-          responseAddressStorage.addresses,
-          ZkAppEnum.REQUEST,
-          contracts[Contract.REQUEST].contract.address
-        ),
+        // getZkAppRef(
+        //   responseAddressStorage.addresses,
+        //   ZkAppEnum.REQUEST,
+        //   contracts[Contract.REQUEST].contract.address
+        // ),
         settingStorage.getWitness(committeeIndex),
         keyStatusStorage.getWitness(
           keyStatusStorage.calculateLevel1Index({
