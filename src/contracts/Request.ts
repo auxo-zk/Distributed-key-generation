@@ -21,9 +21,8 @@ import {
 
 import { GroupDynamicArray, BoolDynamicArray } from '@auxo-dev/auxo-libs';
 import { updateOutOfSnark } from '../libs/utils.js';
-import { COMMITTEE_MAX_SIZE, REQUEST_MAX_SIZE } from '../constants.js';
+import { REQUEST_MAX_SIZE } from '../constants.js';
 
-export const LEVEL2_TREE_HEIGHT = Math.ceil(Math.log2(COMMITTEE_MAX_SIZE)) + 1;
 const EmptyMerkleMap = new MerkleMap();
 export const RequestFee = Field(10 ** 9); // 1 Mina
 export const ZeroFee = Field(0); // 0 Mina
@@ -74,6 +73,10 @@ export class RequestAction extends Struct({
 
   hash(): Field {
     return Poseidon.hash(RequestAction.toFields(this));
+  }
+
+  hashD(): Field {
+    return Poseidon.hash(RequestVector.toFields(this.D));
   }
 }
 
@@ -159,7 +162,7 @@ export const CreateRequest = ZkProgram({
         let newState = Provable.switch(input.actionType.values, Field, [
           Field(RequestStatusEnum.REQUESTING),
           Field(RequestStatusEnum.NOT_YET_REQUESTED),
-          Field(Poseidon.hash(RequestVector.toFields(input.D))), // hash of request vector D
+          input.hashD(), // hash of request vector D
         ]);
 
         // caculate pre request root
@@ -329,7 +332,7 @@ export class RequestContract extends SmartContract {
         Poseidon.hash(PublicKey.toFields(unRequestInput.currentRequester))
       );
     requesterRoot.assertEquals(this.requesterRoot.getAndAssertEquals());
-      
+
     // Check bot have the same ID
     requestStatusId.assertEquals(requesterId);
 
@@ -432,4 +435,17 @@ export class RequestContract extends SmartContract {
   }
 
   // to-do: after finished request, committee can take fee (maybe using another contract)
+}
+
+export class MockResponeContract extends SmartContract {
+  @method
+  resolve(address: PublicKey, resolveInput: ResolveInput) {
+    const requestContract = new RequestContract(address);
+    requestContract.resolveRequest(
+      new ResolveInput({
+        requestId: resolveInput.requestId,
+        D: resolveInput.D,
+      })
+    );
+  }
 }
