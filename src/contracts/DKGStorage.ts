@@ -4,6 +4,7 @@ import {
   MerkleTree,
   MerkleWitness,
   Poseidon,
+  Provable,
   Struct,
 } from 'o1js';
 import { KeyStatus } from './DKG.js';

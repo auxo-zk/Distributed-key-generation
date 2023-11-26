@@ -407,8 +407,8 @@ export class Round1Contract extends SmartContract {
   finalize(
     proof: FinalizeRound1Proof,
     committee: ZkAppRef,
-    settingWitness: CommitteeLevel1Witness,
     dkg: ZkAppRef,
+    settingWitness: CommitteeLevel1Witness,
     keyStatusWitness: Level1Witness
   ) {
     // Get current state values

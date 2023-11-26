@@ -520,9 +520,7 @@ export class Round2Contract extends SmartContract {
             proof.publicOutput.ecryptionHashes.length
           ),
           Field(0),
-          EncryptionHashArray.hash(
-            proof.publicOutput.ecryptionHashes.get(Field(i))
-          )
+          proof.publicOutput.ecryptionHashes.get(Field(i))
         );
         encryptionHashesMT.setLeaf(BigInt(i), value);
       }

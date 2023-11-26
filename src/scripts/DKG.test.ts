@@ -58,6 +58,7 @@ import {
 } from '../contracts/Encryption.js';
 import {
   EMPTY_LEVEL_2_TREE as COMMITTEE_LEVEL_2_TREE,
+  KeyCounterStorage,
   MemberStorage,
   SettingStorage,
 } from '../contracts/CommitteeStorage.js';
@@ -100,6 +101,7 @@ import {
 describe('DKG', () => {
   const doProofs = false;
   const profiling = true;
+  const logMemory = true;
   const cache = Cache.FileSystem('./caches');
   const DKGProfiler = getProfiler('Benchmark DKG');
   let Local = Mina.LocalBlockchain({ proofsEnabled: doProofs });
@@ -121,12 +123,31 @@ describe('DKG', () => {
     REQUEST = 'request',
   }
 
+  let committeeIndex = Field(0);
+  let T = 2,
+    N = 3;
+  let members: Key[] = Local.testAccounts.slice(1, N + 1);
+  let responsedMembers = [2, 0];
+  let secrets: SecretPolynomial[] = [];
+  let publicKeys: Group[] = [];
+  let requestId = Field(0);
+  let mockRequests = [
+    [1000n, 2000n, 3000n],
+    [4000n, 3000n, 2000n],
+  ];
+  let R: Group[][] = [];
+  let M: Group[][] = [];
+  let sumR: Group[] = [];
+  let sumM: Group[] = [];
+  let D: Group[][] = [];
+
   // CommitteeContract storage
   let memberStorage = new MemberStorage();
   let settingStorage = new SettingStorage();
   let commmitteeAddressStorage = new AddressStorage();
 
   // DKGContract storage
+  let keyCounterStorage = new KeyCounterStorage();
   let keyStatusStorage = new KeyStatusStorage();
   let dkgAddressStorage = new AddressStorage();
 
@@ -147,39 +168,21 @@ describe('DKG', () => {
   let responseContributionStorage = new ResponseContributionStorage();
   let responseAddressStorage = new AddressStorage();
 
-  let committeeIndex = Field(0);
-  let T = 1,
-    N = 2;
-  let members: Key[] = Local.testAccounts.slice(1, N + 1);
-  let responsedMembers = [2, 0];
-  let secrets: SecretPolynomial[] = [];
-  let publicKeys: Group[] = [];
-  let requestId = Field.random();
-  let mockRequests = [
-    [1000n, 2000n, 3000n],
-    [4000n, 3000n, 2000n],
-  ];
-  let R: Group[][] = [];
-  let M: Group[][] = [];
-  let sumR: Group[] = [];
-  let sumM: Group[] = [];
-  let D: Group[][] = [];
-
   let dkgActions = {
     [ActionEnum.GENERATE_KEY]: [
       new DKGAction({
-        committeeId: Field(0),
-        keyId: Field(0),
+        committeeId: committeeIndex,
+        keyId: Field(-1),
         mask: ACTION_MASK[ActionEnum.GENERATE_KEY],
       }),
       new DKGAction({
-        committeeId: Field(0),
-        keyId: Field(1),
+        committeeId: committeeIndex,
+        keyId: Field(-1),
         mask: ACTION_MASK[ActionEnum.GENERATE_KEY],
       }),
       new DKGAction({
-        committeeId: Field(0),
-        keyId: Field(2),
+        committeeId: committeeIndex,
+        keyId: Field(-1),
         mask: ACTION_MASK[ActionEnum.GENERATE_KEY],
       }),
     ],
@@ -212,11 +215,20 @@ describe('DKG', () => {
   let responseActions: ResponseAction[] = [];
   let decryptionProofs: BatchDecryptionProof[] = [];
 
+  const logMemUsage = () => {
+    console.log(
+      'Current memory usage:',
+      Math.floor(process.memoryUsage().rss / 1024 / 1024),
+      'MB'
+    );
+  };
+
   const compile = async (
     prg: any,
     name: string,
     profiling: boolean = false
   ) => {
+    if (logMemory) logMemUsage();
     console.log(`Compiling ${name}...`);
     if (profiling) DKGProfiler.start(`${name}.compile`);
     await prg.compile({ cache });
@@ -253,6 +265,7 @@ describe('DKG', () => {
     methodName: string,
     profiling: boolean = true
   ) => {
+    if (logMemory) logMemUsage();
     console.log(
       `Generate proof and submit tx for ${contractName}.${methodName}()...`
     );
@@ -441,6 +454,7 @@ describe('DKG', () => {
   it('Should reduce dkg actions and generate new keys', async () => {
     let dkgContract = contracts[Contract.DKG].contract as DKGContract;
     let initialActionState = dkgContract.account.actionState.get();
+    let initialKeyCounter = dkgContract.keyCounter.get();
     let initialKeyStatus = dkgContract.keyStatus.get();
     for (let i = 0; i < 1; i++) {
       let action = dkgActions[ActionEnum.GENERATE_KEY][i];
@@ -472,6 +486,7 @@ describe('DKG', () => {
     if (profiling) DKGProfiler.start('UpdateKey.firstStep');
     let updateKeyProof = await UpdateKey.firstStep(
       DKGAction.empty(),
+      initialKeyCounter,
       initialKeyStatus,
       initialActionState
     );
@@ -481,19 +496,28 @@ describe('DKG', () => {
     for (let i = 0; i < 1; i++) {
       let action = dkgActions[ActionEnum.GENERATE_KEY][i];
       console.log(`Generate step ${i + 1} proof UpdateKey...`);
-      if (profiling) DKGProfiler.start('UpdateKey.nextStep');
-      updateKeyProof = await UpdateKey.nextStep(
+      if (profiling) DKGProfiler.start('UpdateKey.nextStepGeneration');
+      updateKeyProof = await UpdateKey.nextStepGeneration(
         action,
         updateKeyProof,
+        Field(i),
+        keyCounterStorage.getWitness(
+          keyCounterStorage.calculateLevel1Index(action.committeeId)
+        ),
         keyStatusStorage.getWitness(
           keyStatusStorage.calculateLevel1Index({
             committeeId: action.committeeId,
-            keyId: action.keyId,
+            keyId: Field(i),
           })
         )
       );
       if (profiling) DKGProfiler.stop();
       console.log('DONE!');
+
+      keyCounterStorage.updateLeaf(
+        keyCounterStorage.calculateLeaf(Field(i + 1)),
+        keyCounterStorage.calculateLevel1Index(action.committeeId)
+      );
 
       keyStatusStorage.updateLeaf(
         Provable.switch(action.mask.values, Field, [
@@ -504,7 +528,7 @@ describe('DKG', () => {
         ]),
         keyStatusStorage.calculateLevel1Index({
           committeeId: action.committeeId,
-          keyId: action.keyId,
+          keyId: Field(i),
         })
       );
     }
@@ -537,24 +561,15 @@ describe('DKG', () => {
 
       let tx = await Mina.transaction(members[i].publicKey, () => {
         round1Contract.contribute(
-          action,
+          action.committeeId,
+          action.keyId,
+          contribution.C,
           getZkAppRef(
             round1AddressStorage.addresses,
             ZkAppEnum.COMMITTEE,
             contracts[Contract.COMMITTEE].contract.address
           ),
-          memberWitness,
-          getZkAppRef(
-            round1AddressStorage.addresses,
-            ZkAppEnum.DKG,
-            contracts[Contract.DKG].contract.address
-          ),
-          keyStatusStorage.getWitness(
-            keyStatusStorage.calculateLevel1Index({
-              committeeId: Field(0),
-              keyId: Field(0),
-            })
-          )
+          memberWitness
         );
       });
       await proveAndSend(tx, members[i], 'Round1Contract', 'contribute');
@@ -718,6 +733,7 @@ describe('DKG', () => {
 
     let dkgContract = contracts[Contract.DKG].contract as DKGContract;
     let initialDKGActionState = dkgContract.account.actionState.get();
+    let initialKeyCounter = dkgContract.keyCounter.get();
     let initialKeyStatus = dkgContract.keyStatus.get();
     let action = new DKGAction({
       committeeId: committeeIndex,
@@ -734,11 +750,17 @@ describe('DKG', () => {
           ZkAppEnum.COMMITTEE,
           contracts[Contract.COMMITTEE].contract.address
         ),
-        settingStorage.getWitness(committeeIndex),
         getZkAppRef(
           round1AddressStorage.addresses,
           ZkAppEnum.DKG,
           contracts[Contract.DKG].contract.address
+        ),
+        settingStorage.getWitness(committeeIndex),
+        keyStatusStorage.getWitness(
+          keyStatusStorage.calculateLevel1Index({
+            committeeId: Field(0),
+            keyId: Field(0),
+          })
         )
       );
     });
@@ -751,6 +773,7 @@ describe('DKG', () => {
     if (profiling) DKGProfiler.start('UpdateKey.firstStep');
     let updateKeyProof = await UpdateKey.firstStep(
       DKGAction.empty(),
+      initialKeyCounter,
       initialKeyStatus,
       initialDKGActionState
     );
@@ -964,11 +987,6 @@ describe('DKG', () => {
 
     for (let i = 0; i < N; i++) {
       let action = round2Actions[i];
-      console.log(
-        'Current memory usage:',
-        Math.floor(process.memoryUsage().rss / 1024 / 1024),
-        'MB'
-      );
       console.log(`Generate step ${i + 1} proof FinalizeRound2...`);
       if (profiling) DKGProfiler.start('FinalizeRound2.nextStep');
       finalizeProof = await FinalizeRound2.nextStep(
@@ -1005,7 +1023,7 @@ describe('DKG', () => {
       encryptionStorage.updateLeaf(
         encryptionStorage.calculateLeaf({
           contributions: round2Actions.map((e) => e.contribution),
-          memberId: Field(i),
+          memberId: action.memberId,
         }),
         encryptionStorage.calculateLevel1Index({
           committeeId: action.committeeId,
@@ -1017,6 +1035,7 @@ describe('DKG', () => {
 
     let dkgContract = contracts[Contract.DKG].contract as DKGContract;
     let initialDKGActionState = dkgContract.account.actionState.get();
+    let initialKeyCounter = dkgContract.keyCounter.get();
     let initialKeyStatus = dkgContract.keyStatus.get();
     let action = new DKGAction({
       committeeId: committeeIndex,
@@ -1062,6 +1081,7 @@ describe('DKG', () => {
     if (profiling) DKGProfiler.start('UpdateKey.firstStep');
     let updateKeyProof = await UpdateKey.firstStep(
       DKGAction.empty(),
+      initialKeyCounter,
       initialKeyStatus,
       initialDKGActionState
     );
@@ -1119,7 +1139,6 @@ describe('DKG', () => {
     sumR = accumulatedEncryption.sumR;
     sumM = accumulatedEncryption.sumM;
 
-    Provable.log('Secrets:', secrets);
     for (let i = 0; i < T; i++) {
       let memberId = responsedMembers[i];
       let [contribution, ski] = getResponseContribution(
@@ -1156,7 +1175,9 @@ describe('DKG', () => {
           ),
           memberId: Field(memberId),
         }),
-        new PlainArray(secrets.map((e) => CustomScalar.fromScalar(e.a[0]))),
+        new PlainArray(
+          secrets.map((e) => CustomScalar.fromScalar(e.f[memberId]))
+        ),
         secrets[memberId].a[0]
       );
       if (profiling) DKGProfiler.stop();
@@ -1168,47 +1189,55 @@ describe('DKG', () => {
         memberStorage.calculateLevel2Index(Field(memberId))
       );
 
-      let tx = await Mina.transaction(members[i].publicKey, () => {
-        responseContract.contribute(
-          action.committeeId,
-          action.keyId,
-          action.requestId,
-          decryptionProof,
-          new RArray(sumR),
-          ski,
-          getZkAppRef(
-            responseAddressStorage.addresses,
-            ZkAppEnum.COMMITTEE,
-            contracts[Contract.COMMITTEE].contract.address
-          ),
-          getZkAppRef(
-            responseAddressStorage.addresses,
-            ZkAppEnum.ROUND1,
-            contracts[Contract.ROUND1].contract.address
-          ),
-          getZkAppRef(
-            responseAddressStorage.addresses,
-            ZkAppEnum.ROUND2,
-            contracts[Contract.ROUND2].contract.address
-          ),
-          memberWitness,
-          publicKeyStorage.getWitness(
-            publicKeyStorage.calculateLevel1Index({
-              committeeId: action.committeeId,
-              keyId: action.keyId,
-            }),
-            publicKeyStorage.calculateLevel2Index(action.memberId)
-          ),
-          encryptionStorage.getWitness(
-            encryptionStorage.calculateLevel1Index({
-              committeeId: action.committeeId,
-              keyId: action.keyId,
-            }),
-            encryptionStorage.calculateLevel2Index(action.memberId)
-          )
-        );
-      });
-      await proveAndSend(tx, members[i], 'ResponseContract', 'contribute');
+      let tx = await Mina.transaction(
+        members[responsedMembers[i]].publicKey,
+        () => {
+          responseContract.contribute(
+            action.committeeId,
+            action.keyId,
+            action.requestId,
+            decryptionProof,
+            new RArray(sumR),
+            ski,
+            getZkAppRef(
+              responseAddressStorage.addresses,
+              ZkAppEnum.COMMITTEE,
+              contracts[Contract.COMMITTEE].contract.address
+            ),
+            getZkAppRef(
+              responseAddressStorage.addresses,
+              ZkAppEnum.ROUND1,
+              contracts[Contract.ROUND1].contract.address
+            ),
+            getZkAppRef(
+              responseAddressStorage.addresses,
+              ZkAppEnum.ROUND2,
+              contracts[Contract.ROUND2].contract.address
+            ),
+            memberWitness,
+            publicKeyStorage.getWitness(
+              publicKeyStorage.calculateLevel1Index({
+                committeeId: action.committeeId,
+                keyId: action.keyId,
+              }),
+              publicKeyStorage.calculateLevel2Index(action.memberId)
+            ),
+            encryptionStorage.getWitness(
+              encryptionStorage.calculateLevel1Index({
+                committeeId: action.committeeId,
+                keyId: action.keyId,
+              }),
+              encryptionStorage.calculateLevel2Index(action.memberId)
+            )
+          );
+        }
+      );
+      await proveAndSend(
+        tx,
+        members[responsedMembers[i]],
+        'ResponseContract',
+        'contribute'
+      );
       contracts[Contract.RESPONSE].actionStates.push(
         responseContract.account.actionState.get()
       );
@@ -1231,7 +1260,7 @@ describe('DKG', () => {
     if (profiling) DKGProfiler.stop();
     console.log('DONE!');
 
-    for (let i = 0; i < N; i++) {
+    for (let i = 0; i < T; i++) {
       let action = responseActions[i];
       console.log(`Generate step ${i + 1} proof ReduceResponse...`);
       if (profiling) DKGProfiler.start('ReduceResponse.nextStep');
@@ -1265,12 +1294,6 @@ describe('DKG', () => {
     let initialContributionRoot = responseContract.contributions.get();
     let reduceStateRoot = responseContract.reduceState.get();
 
-    let round1Contract = contracts[Contract.ROUND1].contract as Round1Contract;
-    let publicKeyRoot = round1Contract.publicKeys.get();
-
-    let round2Contract = contracts[Contract.ROUND2].contract as Round2Contract;
-    let encryptionRoot = round2Contract.encryptions.get();
-
     console.log('Generate first step proof CompleteResponse...');
     if (profiling) DKGProfiler.start('CompleteResponse.firstStep');
     let completeProof = await CompleteResponse.firstStep(
@@ -1290,7 +1313,13 @@ describe('DKG', () => {
     if (profiling) DKGProfiler.stop();
     console.log('DONE!');
 
+    responseContributionStorage.updateInternal(
+      responseContributionStorage.calculateLevel1Index(requestId),
+      DKG_LEVEL_2_TREE()
+    );
+
     for (let i = 0; i < T; i++) {
+      logMemUsage();
       let action = responseActions[i];
       console.log(`Generate step ${i + 1} proof CompleteResponse...`);
       if (profiling) DKGProfiler.start('CompleteResponse.nextStep');
@@ -1332,6 +1361,11 @@ describe('DKG', () => {
           responseAddressStorage.addresses,
           ZkAppEnum.DKG,
           contracts[Contract.DKG].contract.address
+        ),
+        getZkAppRef(
+          responseAddressStorage.addresses,
+          ZkAppEnum.REQUEST,
+          contracts[Contract.REQUEST].contract.address
         ),
         settingStorage.getWitness(committeeIndex),
         keyStatusStorage.getWitness(

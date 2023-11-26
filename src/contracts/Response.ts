@@ -32,8 +32,8 @@ import {
   CommitteeContract,
 } from './Committee.js';
 import { DKGContract, KeyStatus } from './DKG.js';
-import { RequestVector } from './RequestHelper.js';
-import { BatchDecryptionProof } from './Encryption.js';
+import { RequestContract, RequestVector, ResolveInput } from './Request.js';
+import { BatchDecryptionProof, PlainArray } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
 import { Round2Contract } from './Round2.js';
 import {
@@ -311,6 +311,7 @@ export class ResponseContract extends SmartContract {
    * - Verify round 2 encryptions (hashes)
    * - Compute response
    * - Create & dispatch action to DKGContract
+   * - TODO - Distribute earned fee
    * @param committeeId
    * @param keyId
    * @param requestId
@@ -399,7 +400,7 @@ export class ResponseContract extends SmartContract {
     for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
       encryptionHashChain = Provable.if(
         Field(i).greaterThanOrEqual(decryptionProof.publicInput.c.length),
-        Field(0),
+        encryptionHashChain,
         Poseidon.hash(
           [
             encryptionHashChain,
@@ -420,7 +421,9 @@ export class ResponseContract extends SmartContract {
     memberId.assertEquals(encryptionWitness.level2.calculateIndex());
 
     // Compute response
-    let D = new DArray(R.values);
+    let D = Provable.witness(DArray, () => {
+      return new DArray(R.values.slice(0, Number(R.length)));
+    });
     for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
       let Ri = R.get(Field(i));
       Group.generator.scale(ski).equals(decryptionProof.publicOutput);
@@ -486,10 +489,9 @@ export class ResponseContract extends SmartContract {
     proof: CompleteResponseProof,
     committee: ZkAppRef,
     dkg: ZkAppRef,
+    request: ZkAppRef,
     settingWitness: CommitteeLevel1Witness,
     keyStatusWitness: Level1Witness
-    // request: ZkAppRef,
-    // requestStatusWitness: MerkleMapWitness
   ) {
     // Get current state values
     let zkApps = this.zkApps.getAndAssertEquals();
@@ -510,6 +512,12 @@ export class ResponseContract extends SmartContract {
       dkg.witness.calculateRoot(Poseidon.hash(dkg.address.toFields()))
     );
     Field(ZkAppEnum.DKG).assertEquals(dkg.witness.calculateIndex());
+
+    // RequestContract
+    zkApps.assertEquals(
+      request.witness.calculateRoot(Poseidon.hash(request.address.toFields()))
+    );
+    Field(ZkAppEnum.REQUEST).assertEquals(request.witness.calculateIndex());
 
     const committeeContract = new CommitteeContract(committee.address);
     const dkgContract = new DKGContract(dkg.address);
@@ -542,8 +550,15 @@ export class ResponseContract extends SmartContract {
     // Set new states
     this.contributions.set(proof.publicOutput.newContributionRoot);
 
-    // TODO - Create & dispatch action to RequestContract
-    // this.verifyZkApp(request, ZK_APP.REQUEST);
-    // const dkgContract = new DKGContract(dkg.address);
+    // Create & dispatch action to RequestContract
+    // const requestContract = new RequestContract(request.address);
+    // requestContract.resolveRequest(
+    //   new ResolveInput({
+    //     requestId: proof.publicOutput.requestId,
+    //     D: proof.publicOutput.D,
+    //   })
+    // );
   }
+
+  // TODO - Distribute earned fee
 }

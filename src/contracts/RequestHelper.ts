@@ -26,10 +26,10 @@ import {
 // import { Request, RequestInput, RequestFee, ZeroFee } from './Request.js';
 import { updateOutOfSnark } from '../libs/utils.js';
 import { REQUEST_MAX_SIZE } from '../constants.js';
+import { RequestVector } from './Request.js';
 
 const EmptyMerkleMap = new MerkleMap();
 export class CustomScalarArray extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
-export class RequestVector extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 
 export class RequestHelperInput extends Struct({
   committeeId: Field,
