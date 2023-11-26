@@ -91,9 +91,9 @@ export class RequestInput extends Struct({
 }
 
 export class UnRequestInput extends Struct({
-  requestId: Field,
   currentRequester: PublicKey,
-  requesterWitness: MerkleMapWitness,
+  requesterWitness: MerkleMapWitness, // requestId is the index of this witness
+  requestStatusWitness: MerkleMapWitness, // requestId is the index of this witness
 }) {}
 
 export class ResolveInput extends Struct({
@@ -253,7 +253,7 @@ export class RequestContract extends SmartContract {
   reducer = Reducer({ actionType: RequestAction });
 
   events = {
-    [EventEnum.CREATE_REQUEST]: Field,
+    [EventEnum.CREATE_REQUEST]: CreateRequestEvent,
   };
 
   init() {
@@ -277,6 +277,7 @@ export class RequestContract extends SmartContract {
       actionType,
     });
 
+    // TODO: not really able to do this, check again. If both of them send at the same block
     // checking if the request have the same id already exists within the accumulator
     let { state: exists } = this.reducer.reduce(
       this.reducer.getActions({
@@ -299,23 +300,44 @@ export class RequestContract extends SmartContract {
 
     // take fee
     requester.send({ to: this, amount: UInt64.from(RequestFee) });
+
+    this.emitEvent(
+      EventEnum.CREATE_REQUEST,
+      new CreateRequestEvent({
+        requestId: requestInputId,
+        committeeId: requestInput.committeeId,
+        keyId: requestInput.keyId,
+        R: requestInput.R,
+      })
+    );
   }
 
   @method unrequest(unRequestInput: UnRequestInput) {
     let actionState = this.actionState.getAndAssertEquals();
     let actionType = createActionMask(Field(ActionEnum.UNREQUEST));
 
-    // check requesterRoot and sender is requester
-    let [root] = unRequestInput.requesterWitness.computeRootAndKey(
-      Poseidon.hash(PublicKey.toFields(unRequestInput.currentRequester))
-    );
-    root.assertEquals(this.requesterRoot.getAndAssertEquals());
+    // Check current state if it is requesting
+    let [requestStatusRoot, requestStatusId] =
+      unRequestInput.requestStatusWitness.computeRootAndKey(
+        Field(RequestStatusEnum.REQUESTING)
+      );
+    requestStatusRoot.assertEquals(this.requestStatusRoot.getAndAssertEquals());
+
+    // Check requesterRoot and sender is requester
+    let [requesterRoot, requesterId] =
+      unRequestInput.requesterWitness.computeRootAndKey(
+        Poseidon.hash(PublicKey.toFields(unRequestInput.currentRequester))
+      );
+    requesterRoot.assertEquals(this.requesterRoot.getAndAssertEquals());
+      
+    // Check bot have the same ID
+    requestStatusId.assertEquals(requesterId);
+
+    // only requester can unrequest their request
     this.sender.assertEquals(unRequestInput.currentRequester);
 
-    let unRequestInputId = unRequestInput.requestId;
-
     let requestAction = new RequestAction({
-      requestId: unRequestInputId,
+      requestId: requestStatusId,
       newRequester: PublicKey.empty(),
       R: RequestVector.empty(),
       D: RequestVector.empty(),
@@ -329,7 +351,7 @@ export class RequestContract extends SmartContract {
       }),
       Bool,
       (state: Bool, action: RequestAction) => {
-        return action.requestId.equals(unRequestInputId).or(state);
+        return action.requestId.equals(requestStatusId).or(state);
       },
       // initial state
       { state: Bool(false), actionState: actionState }
