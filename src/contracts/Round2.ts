@@ -388,6 +388,7 @@ export class Round2Contract extends SmartContract {
     let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))
       .mul(committeeId)
       .add(keyId);
+    // TODO: Remove Provable.witness or adding assertion
     let publicKeysLeaf = Provable.witness(Field, () => {
       let publicKeysMT = EMPTY_LEVEL_2_TREE();
       for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
@@ -512,6 +513,7 @@ export class Round2Contract extends SmartContract {
     keyIndex.assertEquals(keyStatusWitness.calculateIndex());
 
     // Verify encryption witness
+    // TODO: Remove Provable.witness or adding assertion
     let encryptionLeaf = Provable.witness(Field, () => {
       let encryptionHashesMT = EMPTY_LEVEL_2_TREE();
       for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {

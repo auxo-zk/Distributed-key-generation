@@ -311,7 +311,6 @@ export class ResponseContract extends SmartContract {
    * - Verify round 2 encryptions (hashes)
    * - Compute response
    * - Create & dispatch action to DKGContract
-   * - TODO - Distribute earned fee
    * @param committeeId
    * @param keyId
    * @param requestId
@@ -421,6 +420,7 @@ export class ResponseContract extends SmartContract {
     memberId.assertEquals(encryptionWitness.level2.calculateIndex());
 
     // Compute response
+    // TODO: Remove Provable.witness or adding assertion
     let D = Provable.witness(DArray, () => {
       return new DArray(R.values.slice(0, Number(R.length)));
     });
@@ -476,7 +476,6 @@ export class ResponseContract extends SmartContract {
    * - Verify committee config
    * - Verify key status
    * - Set new states
-   * - [TODO] Create & dispatch action to RequestContract
    *
    * @param proof
    * @param committee

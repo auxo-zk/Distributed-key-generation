@@ -339,6 +339,7 @@ export class DKGContract extends SmartContract {
         Field(-1),
         keyId
       ),
+      // TODO: Remove Provable.witness or adding assertion
       mask: Provable.witness(ActionMask, () => {
         return ACTION_MASK[Number(actionType) as ActionEnum];
       }),
@@ -365,6 +366,7 @@ export class DKGContract extends SmartContract {
     let action = new Action({
       committeeId: committeeId,
       keyId: keyId,
+      // TODO: Remove Provable.witness or adding assertion
       mask: Provable.witness(ActionMask, () => {
         return ACTION_MASK[Number(actionType) as ActionEnum];
       }),

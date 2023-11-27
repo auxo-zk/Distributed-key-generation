@@ -15,3 +15,12 @@ export enum ZkAppEnum {
   RESPONSE,
   REQUEST,
 }
+
+export enum Contract {
+  COMMITTEE = 'committee',
+  DKG = 'dkg',
+  ROUND1 = 'round1',
+  ROUND2 = 'round2',
+  RESPONSE = 'response',
+  REQUEST = 'request',
+}

@@ -28,7 +28,14 @@ import { updateOutOfSnark } from '../libs/utils.js';
 import { REQUEST_MAX_SIZE } from '../constants.js';
 import { RequestVector } from './Request.js';
 
-const EmptyMerkleMap = new MerkleMap();
+const DefaultEmptyMerkleMapRoot = new MerkleMap().getRoot();
+
+export const enum ActionStatus {
+  NOT_EXISTED,
+  REDUCED,
+  ROLL_UPED,
+}
+
 export class CustomScalarArray extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
 
 export class RequestHelperInput extends Struct({
@@ -59,46 +66,46 @@ export class RequestHelperAction extends Struct({
   }
 }
 
-export class RollupStatusOutput extends Struct({
-  // Actually don't need initialActionState, since we check initialRollupStatusRoot and finalActionState on-chain
+export class ReduceOutput extends Struct({
+  // Actually don't need initialActionState, since we check initialActionStatus and finalActionState on-chain
   // Do this to increase security: from finding x,y that hash(x,y) = Z to finding x that hash(x,Y) = Z
   initialActionState: Field,
-  initialRollupStatusRoot: Field,
+  initialActionStatus: Field,
   finalActionState: Field,
-  finalRollupStatusRoot: Field,
+  finalActionStatus: Field,
 }) {}
 
-export const CreateRollupStatus = ZkProgram({
+export const CreateReduceProof = ZkProgram({
   name: 'create-rollup-status',
-  publicOutput: RollupStatusOutput,
+  publicOutput: ReduceOutput,
   methods: {
     // First action to rollup
     firstStep: {
       privateInputs: [Field, Field],
       method(
         initialActionState: Field,
-        initialRollupStatusRoot: Field
-      ): RollupStatusOutput {
-        return new RollupStatusOutput({
+        initialActionStatus: Field
+      ): ReduceOutput {
+        return new ReduceOutput({
           initialActionState,
-          initialRollupStatusRoot,
+          initialActionStatus,
           finalActionState: initialActionState,
-          finalRollupStatusRoot: initialRollupStatusRoot,
+          finalActionStatus: initialActionStatus,
         });
       },
     },
     // Next actions to rollup
     nextStep: {
       privateInputs: [
-        SelfProof<Void, RollupStatusOutput>,
+        SelfProof<Void, ReduceOutput>,
         RequestHelperAction,
         MerkleMapWitness,
       ],
       method(
-        earlierProof: SelfProof<Void, RollupStatusOutput>,
+        earlierProof: SelfProof<Void, ReduceOutput>,
         action: RequestHelperAction,
         rollupStatusWitness: MerkleMapWitness
-      ): RollupStatusOutput {
+      ): ReduceOutput {
         // Verify earlier proof
         earlierProof.verify();
 
@@ -108,26 +115,29 @@ export const CreateRollupStatus = ZkProgram({
           [action.toFields()]
         );
 
-        // Current value of the action hash should be 0
-        let [root, key] = rollupStatusWitness.computeRootAndKey(Field(0));
+        // Current value of the action hash should be NOT_EXISTED
+        let [root, key] = rollupStatusWitness.computeRootAndKey(
+          Field(ActionStatus.NOT_EXISTED)
+        );
         key.assertEquals(newActionState);
-        root.assertEquals(earlierProof.publicOutput.finalRollupStatusRoot);
+        root.assertEquals(earlierProof.publicOutput.finalActionStatus);
 
-        // New value of the action hash = 1
-        [root] = rollupStatusWitness.computeRootAndKey(Field(1));
+        // New value of the action hash = REDUCED
+        [root] = rollupStatusWitness.computeRootAndKey(
+          Field(ActionStatus.REDUCED)
+        );
 
-        return new RollupStatusOutput({
+        return new ReduceOutput({
           initialActionState: earlierProof.publicOutput.initialActionState,
-          initialRollupStatusRoot:
-            earlierProof.publicOutput.initialRollupStatusRoot,
+          initialActionStatus: earlierProof.publicOutput.initialActionStatus,
           finalActionState: newActionState,
-          finalRollupStatusRoot: root,
+          finalActionStatus: root,
         });
       },
     },
   },
 });
-class RollupStatusProof extends ZkProgram.Proof(CreateRollupStatus) {}
+class ReduceProof extends ZkProgram.Proof(CreateReduceProof) {}
 
 export class RollupActionsOutput extends Struct({
   requestId: Field,
@@ -175,13 +185,17 @@ export const RollupActions = ZkProgram({
 
         let actionState = updateOutOfSnark(preActionState, [action.toFields()]);
 
-        // It's status has to be 1
-        let [root, key] = rollupStatusWitness.computeRootAndKey(Field(1));
+        // It's status has to be REDUCED
+        let [root, key] = rollupStatusWitness.computeRootAndKey(
+          Field(ActionStatus.REDUCED)
+        );
         key.assertEquals(actionState);
         root.assertEquals(preProof.publicOutput.finalStatusRoot);
 
-        // Update satus to 2
-        let [newRoot] = rollupStatusWitness.computeRootAndKey(Field(2));
+        // Update satus to ROLL_UPED
+        let [newRoot] = rollupStatusWitness.computeRootAndKey(
+          Field(ActionStatus.ROLL_UPED)
+        );
 
         let sum_R = preProof.publicOutput.sum_R;
         let sum_M = preProof.publicOutput.sum_M;
@@ -227,12 +241,7 @@ class ProofRollupAction extends ZkProgram.Proof(RollupActions) {}
 
 export class RequestHelperContract extends SmartContract {
   @state(Field) actionState = State<Field>();
-
-  // hash(preActionState, Action) -> status
-  // 0 : action not valid
-  // 1 : action valid
-  // 2 : action rolled up
-  @state(Field) rollupStatusRoot = State<Field>();
+  @state(Field) actionStatus = State<Field>();
   @state(Field) R_Root = State<Field>(); // hash(committeeId, keyId, requestTime) -> sum R
   @state(Field) M_Root = State<Field>(); // hash(committeeId, keyId, requestTime) -> sum M
 
@@ -241,9 +250,9 @@ export class RequestHelperContract extends SmartContract {
   init() {
     super.init();
     this.actionState.set(Reducer.initialActionState);
-    this.rollupStatusRoot.set(EmptyMerkleMap.getRoot());
-    this.R_Root.set(EmptyMerkleMap.getRoot());
-    this.M_Root.set(EmptyMerkleMap.getRoot());
+    this.actionStatus.set(DefaultEmptyMerkleMapRoot);
+    this.R_Root.set(DefaultEmptyMerkleMapRoot);
+    this.M_Root.set(DefaultEmptyMerkleMapRoot);
   }
 
   @method request(requestInput: RequestHelperInput): {
@@ -287,7 +296,7 @@ export class RequestHelperContract extends SmartContract {
     return { r, R, M };
   }
 
-  @method rollupActionsState(proof: RollupStatusProof) {
+  @method rollupActionsState(proof: ReduceProof) {
     // Verify proof
     proof.verify();
 
@@ -295,16 +304,16 @@ export class RequestHelperContract extends SmartContract {
     let actionState = this.actionState.getAndAssertEquals();
     proof.publicOutput.initialActionState.assertEquals(actionState);
 
-    // assert initialRollupStatusRoot
-    let rollupStatusRoot = this.rollupStatusRoot.getAndAssertEquals();
-    proof.publicOutput.initialRollupStatusRoot.assertEquals(rollupStatusRoot);
+    // assert initialActionStatus
+    let actionStatus = this.actionStatus.getAndAssertEquals();
+    proof.publicOutput.initialActionStatus.assertEquals(actionStatus);
 
     // assert finalActionState
     let lastActionState = this.account.actionState.getAndAssertEquals();
     lastActionState.assertEquals(proof.publicOutput.finalActionState);
 
     this.actionState.set(lastActionState);
-    this.rollupStatusRoot.set(proof.publicOutput.finalRollupStatusRoot);
+    this.actionStatus.set(proof.publicOutput.finalActionStatus);
   }
 
   // to-do: adding N, T to check REQUEST_MAX_SIZE by interact with Committee contract
@@ -318,9 +327,9 @@ export class RequestHelperContract extends SmartContract {
 
     let R_Root = this.R_Root.getAndAssertEquals();
     let M_Root = this.M_Root.getAndAssertEquals();
-    let rollupStatusRoot = this.rollupStatusRoot.getAndAssertEquals();
+    let actionStatus = this.actionStatus.getAndAssertEquals();
 
-    rollupStatusRoot.assertEquals(proof.publicOutput.initialStatusRoot);
+    actionStatus.assertEquals(proof.publicOutput.initialStatusRoot);
     let [old_R_root, R_key] = R_wintess.computeRootAndKey(Field(0));
     let [old_M_root, M_key] = M_wintess.computeRootAndKey(Field(0));
 
@@ -341,11 +350,9 @@ export class RequestHelperContract extends SmartContract {
     // update on-chain state
     this.R_Root.set(new_R_root);
     this.M_Root.set(new_M_root);
-    this.rollupStatusRoot.set(proof.publicOutput.finalStatusRoot);
+    this.actionStatus.set(proof.publicOutput.finalStatusRoot);
 
     // to-do: request to Request contract
     //...
   }
-
-  // to-do: after finished request, committee can take fee (maybe using another contract)
 }

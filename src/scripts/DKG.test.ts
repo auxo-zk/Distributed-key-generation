@@ -91,7 +91,7 @@ import {
   getRound1Contribution,
   getRound2Contribution,
 } from '../libs/Committee.js';
-import { ZkAppEnum } from '../constants.js';
+import { ZkAppEnum, Contract } from '../constants.js';
 import {
   RArray,
   accumulateEncryption,
@@ -115,14 +115,6 @@ describe('DKG', () => {
       actionStates: Field[];
     };
   } = {};
-  enum Contract {
-    COMMITTEE = 'committee',
-    DKG = 'dkg',
-    ROUND1 = 'round1',
-    ROUND2 = 'round2',
-    RESPONSE = 'response',
-    REQUEST = 'request',
-  }
 
   let committeeIndex = Field(0);
   let T = 2,
