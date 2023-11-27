@@ -97,10 +97,11 @@ import {
   accumulateEncryption,
   generateEncryption,
 } from '../libs/Requestor.js';
+import { RequestContract } from '../contracts/Request.js';
 
 describe('DKG', () => {
   const doProofs = false;
-  const profiling = true;
+  const profiling = false;
   const logMemory = true;
   const cache = Cache.FileSystem('./caches');
   const DKGProfiler = getProfiler('Benchmark DKG');
@@ -312,6 +313,8 @@ describe('DKG', () => {
               return new Round2Contract(key.publicKey);
             case Contract.RESPONSE:
               return new ResponseContract(key.publicKey);
+            case Contract.REQUEST:
+              return new RequestContract(key.publicKey);
             default:
               return new SmartContract(key.publicKey);
           }
@@ -338,8 +341,8 @@ describe('DKG', () => {
     await compile(BatchDecryption, 'BatchDecryption', profiling);
     await compile(CompleteResponse, 'CompleteResponse', profiling);
 
+    await compile(CreateCommittee, 'CreateCommittee', profiling);
     if (doProofs) {
-      await compile(CreateCommittee, 'CreateCommittee', profiling);
       await compile(CommitteeContract, 'CommitteeContract', profiling);
       await compile(DKGContract, 'DKGContract', profiling);
       await compile(Round1Contract, 'Round1Contract', profiling);
@@ -445,10 +448,39 @@ describe('DKG', () => {
       )
     );
 
+    responseAddressStorage.addresses.setLeaf(
+      responseAddressStorage.calculateIndex(ZkAppEnum.REQUEST).toBigInt(),
+      responseAddressStorage.calculateLeaf(
+        contracts[Contract.REQUEST].contract.address
+      )
+    );
+
     // Deploy response contract
     await deploy(feePayerKey, 'ResponseContract', [
       ['zkApps', responseAddressStorage.addresses.getRoot()],
     ]);
+
+    let requestContract = contracts[Contract.REQUEST]
+      .contract as RequestContract;
+
+    let tx = await Mina.transaction(feePayerKey.publicKey, () => {
+      AccountUpdate.fundNewAccount(feePayerKey.publicKey);
+      requestContract.deploy();
+      requestContract.responeContractAddress.set(
+        contracts[Contract.REQUEST].contract.address
+      );
+      let feePayerAccount = AccountUpdate.createSigned(feePayerKey.publicKey);
+      feePayerAccount.send({
+        to: contracts[Contract.REQUEST].contract,
+        amount: 10 * 10 ** 9,
+      }); // 10 Mina
+    });
+    await tx
+      .sign([
+        feePayerKey.privateKey,
+        contracts[Contract.REQUEST].key.privateKey,
+      ])
+      .send();
   });
 
   it('Should reduce dkg actions and generate new keys', async () => {
@@ -1362,11 +1394,11 @@ describe('DKG', () => {
           ZkAppEnum.DKG,
           contracts[Contract.DKG].contract.address
         ),
-        // getZkAppRef(
-        //   responseAddressStorage.addresses,
-        //   ZkAppEnum.REQUEST,
-        //   contracts[Contract.REQUEST].contract.address
-        // ),
+        getZkAppRef(
+          responseAddressStorage.addresses,
+          ZkAppEnum.REQUEST,
+          contracts[Contract.REQUEST].contract.address
+        ),
         settingStorage.getWitness(committeeIndex),
         keyStatusStorage.getWitness(
           keyStatusStorage.calculateLevel1Index({

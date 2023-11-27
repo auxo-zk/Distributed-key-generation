@@ -102,11 +102,6 @@ describe('Testing Request Contract', () => {
   const ActionRequestProfiler = getProfiler('Testing request');
 
   beforeAll(async () => {
-    const cache = Cache.FileSystem('./caches');
-    ActionRequestProfiler.start('CreateRequest.compile');
-    await CreateRequest.compile({ cache });
-    ActionRequestProfiler.stop().store();
-
     let Local = Mina.LocalBlockchain({ proofsEnabled: doProofs });
     Mina.setActiveInstance(Local);
     feePayerKey = Local.testAccounts[0].privateKey;
@@ -136,10 +131,10 @@ describe('Testing Request Contract', () => {
   beforeEach(() => {});
 
   it('compile proof', async () => {
-    // const cache = Cache.FileSystem('./caches');
-    // ActionRequestProfiler.start('CreateRequest.compile');
-    // await CreateRequest.compile({ cache });
-    // ActionRequestProfiler.stop().store();
+    const cache = Cache.FileSystem('./caches');
+    ActionRequestProfiler.start('CreateRequest.compile');
+    await CreateRequest.compile({ cache });
+    ActionRequestProfiler.stop().store();
   });
 
   it('Requester1 requestInput1', async () => {

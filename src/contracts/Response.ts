@@ -489,7 +489,7 @@ export class ResponseContract extends SmartContract {
     proof: CompleteResponseProof,
     committee: ZkAppRef,
     dkg: ZkAppRef,
-    // request: ZkAppRef,
+    request: ZkAppRef,
     settingWitness: CommitteeLevel1Witness,
     keyStatusWitness: Level1Witness
   ) {
@@ -514,10 +514,10 @@ export class ResponseContract extends SmartContract {
     Field(ZkAppEnum.DKG).assertEquals(dkg.witness.calculateIndex());
 
     // RequestContract
-    // zkApps.assertEquals(
-    //   request.witness.calculateRoot(Poseidon.hash(request.address.toFields()))
-    // );
-    // Field(ZkAppEnum.REQUEST).assertEquals(request.witness.calculateIndex());
+    zkApps.assertEquals(
+      request.witness.calculateRoot(Poseidon.hash(request.address.toFields()))
+    );
+    Field(ZkAppEnum.REQUEST).assertEquals(request.witness.calculateIndex());
 
     const committeeContract = new CommitteeContract(committee.address);
     const dkgContract = new DKGContract(dkg.address);
@@ -551,13 +551,13 @@ export class ResponseContract extends SmartContract {
     this.contributions.set(proof.publicOutput.newContributionRoot);
 
     // Create & dispatch action to RequestContract
-    // const requestContract = new RequestContract(request.address);
-    // requestContract.resolveRequest(
-    //   new ResolveInput({
-    //     requestId: proof.publicOutput.requestId,
-    //     D: proof.publicOutput.D,
-    //   })
-    // );
+    const requestContract = new RequestContract(request.address);
+    requestContract.resolveRequest(
+      new ResolveInput({
+        requestId: proof.publicOutput.requestId,
+        D: proof.publicOutput.D,
+      })
+    );
   }
 
   // TODO - Distribute earned fee
