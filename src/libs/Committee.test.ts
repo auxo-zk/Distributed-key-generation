@@ -125,8 +125,7 @@ describe('Committee', () => {
         committees[listIndex[i] - 1].index - 1,
         round2Data,
         sumR
-      );
-      Provable.runAndCheck(() => responseContribution);
+      )[0];
       committees[listIndex[i] - 1].responseContribution = responseContribution;
       responseContributions.push(responseContribution);
       D.push(responseContribution.D.values.slice(0, T));

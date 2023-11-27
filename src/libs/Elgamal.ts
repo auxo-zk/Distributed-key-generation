@@ -1,5 +1,5 @@
-import { Bit255 } from '@auxo-dev/auxo-libs';
-import { Bool, Field, Group, Poseidon, Scalar } from 'o1js';
+import { Bit255, CustomScalar } from '@auxo-dev/auxo-libs';
+import { Bool, Field, Group, Poseidon, Provable, Scalar } from 'o1js';
 
 /**
  * Encryption
@@ -38,7 +38,7 @@ export function encrypt(
   U: Group;
 } {
   let U = Group.generator.scale(b);
-  let V = pbK.scale(b);
+  let V = pbK.add(Group.generator).scale(b).sub(Group.generator.scale(b));
   let k = Poseidon.hash(U.toFields().concat(V.toFields()));
   let xor = fieldToBigInt(k) ^ scalarToBigInt(m);
   let c = Bit255.fromBits(Field.fromJSON(xor.toString()).toBits());
@@ -46,7 +46,7 @@ export function encrypt(
 }
 
 export function decrypt(c: Bit255, U: Group, prvK: Scalar): { m: Scalar } {
-  let V = U.scale(Scalar.from(prvK.toBigInt()));
+  let V = U.add(Group.generator).scale(prvK).sub(Group.generator.scale(prvK));
   let k = Poseidon.hash(U.toFields().concat(V.toFields()));
   let xor = fieldToBigInt(k) ^ c.toBigInt();
   let m = Bit255.fromBits(Field.fromJSON(xor.toString()).toBits()).toScalar();

@@ -12,6 +12,7 @@ import {
   Bit255DynamicArray,
   FieldDynamicArray,
   GroupDynamicArray,
+  PublicKeyDynamicArray,
 } from '@auxo-dev/auxo-libs';
 import { DArray } from './Requestor.js';
 import * as ElgamalECC from './Elgamal.js';
@@ -19,9 +20,11 @@ import { COMMITTEE_MAX_SIZE } from '../constants.js';
 
 /* ========== CONSTANTS, TYPES, & STRUCTS ========== */
 
+export class MemberArray extends PublicKeyDynamicArray(COMMITTEE_MAX_SIZE) {}
 export class CArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
 export class cArray extends Bit255DynamicArray(COMMITTEE_MAX_SIZE) {}
 export class UArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
+export class PublicKeyArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
 export class EncryptionHashArray extends FieldDynamicArray(
   COMMITTEE_MAX_SIZE
 ) {}
@@ -170,7 +173,7 @@ export function getResponseContribution(
   index: number,
   round2Data: Round2Data[],
   R: Group[]
-): ResponseContribution {
+): [ResponseContribution, Scalar] {
   let decryptions: Scalar[] = round2Data.map((data) =>
     Scalar.from(ElgamalECC.decrypt(data.c, data.U, secret.a[0]).m)
   );
@@ -183,7 +186,7 @@ export function getResponseContribution(
   for (let i = 0; i < R.length; i++) {
     D[i] = R[i].scale(ski);
   }
-  return new ResponseContribution({ D: DArray.from(D) });
+  return [new ResponseContribution({ D: DArray.from(D) }), ski];
 }
 
 export function getLagrangeCoefficient(listIndex: number[]): Scalar[] {

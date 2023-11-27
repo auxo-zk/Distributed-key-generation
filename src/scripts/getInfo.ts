@@ -24,19 +24,19 @@ import {
 } from '../contracts/Round2.js';
 
 const PROGRAMS = {
+  BatchEncryption,
+  BatchDecryption,
   CreateCommittee,
   UpdateKey,
   ReduceRound1,
   FinalizeRound1,
   ReduceRound2,
-  BatchEncryption,
   FinalizeRound2,
   ReduceResponse,
-  BatchDecryption,
   CompleteResponse,
-  CreateRequest,
-  CreateRollupStatus,
-  RollupActions,
+  // CreateRequest,
+  // CreateRollupStatus,
+  // RollupActions,
 };
 
 const CONTRACTS = {
@@ -45,8 +45,8 @@ const CONTRACTS = {
   Round1Contract,
   Round2Contract,
   ResponseContract,
-  RequestContract,
-  RequestHelperContract,
+  // RequestContract,
+  // RequestHelperContract,
 };
 
 const DEPENDENCIES = {
@@ -59,7 +59,7 @@ const DEPENDENCIES = {
   RequestHelperContract: [],
 };
 
-async function query(constraints: boolean = false, cacheFiles: boolean = true) {
+async function query(constraints: boolean = true, cacheFiles: boolean = false) {
   if (constraints) {
     // TODO - Log table
     console.log('Constraints list:');

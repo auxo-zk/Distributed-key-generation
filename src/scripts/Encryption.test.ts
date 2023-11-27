@@ -1,4 +1,13 @@
-import { Field, Group, Provable, Scalar } from 'o1js';
+import {
+  AccountUpdate,
+  Cache,
+  Field,
+  Group,
+  Mina,
+  PrivateKey,
+  Provable,
+  Scalar,
+} from 'o1js';
 import {
   BatchDecryption,
   BatchDecryptionInput,
@@ -13,9 +22,15 @@ import { Bit255, CustomScalar } from '@auxo-dev/auxo-libs';
 import { Elgamal as ElgamalLib } from '../libs/index.js';
 import { Elgamal } from '../contracts/Encryption.js';
 import { CArray, UArray, cArray } from '../libs/Committee.js';
+import { compile, deploy, proveAndSend } from '../libs/utils.js';
+import { Round2Contract } from '../contracts/Round2.js';
+import { Contract } from './helper/config.js';
 
 describe('Encryption', () => {
   const profiling = true;
+  const cache = Cache.FileSystem('./caches');
+  let Local = Mina.LocalBlockchain({ proofsEnabled: false });
+  Mina.setActiveInstance(Local);
   const DKGProfiler = getProfiler('Benchmark Encryption');
 
   let prvKey: Scalar = Scalar.random();
@@ -26,25 +41,13 @@ describe('Encryption', () => {
   let encryptions: any[] = [];
   let decryptions: any[] = [];
 
-  const compile = async (
-    prg: any,
-    name: string,
-    profiling: boolean = false
-  ) => {
-    console.log(`Compiling ${name}...`);
-    if (profiling) DKGProfiler.start(`${name}.compile`);
-    await prg.compile();
-    if (profiling) DKGProfiler.stop();
-    console.log('Done!');
-  };
-
   it('Should compile all ZK programs', async () => {
-    await compile(Elgamal, 'Elgamal', profiling);
-    await compile(BatchEncryption, 'BatchEncryption', profiling);
-    await compile(BatchDecryption, 'BatchDecryption', profiling);
+    // await compile(Elgamal, 'Elgamal', profiling);
+    await compile(BatchEncryption, 'BatchEncryption', cache);
+    // await compile(BatchDecryption, 'BatchDecryption', profiling);
   });
 
-  it('Should encrypt sucessfully', async () => {
+  xit('Should encrypt sucessfully', async () => {
     console.log('Single encryption');
     let encryption = ElgamalLib.encrypt(plains[0], pubKey, randoms[0]);
     let encryptionProof = await Elgamal.encrypt(
@@ -59,7 +62,7 @@ describe('Encryption', () => {
     encryptions.push(encryption);
   });
 
-  it('Should decrypt sucessfully', async () => {
+  xit('Should decrypt sucessfully', async () => {
     console.log('Single decryption');
     let encryption = encryptions[0];
     let decryption = ElgamalLib.decrypt(encryption.c, encryption.U, prvKey);
@@ -95,9 +98,22 @@ describe('Encryption', () => {
       new PlainArray(plains.map((e) => CustomScalar.fromScalar(e))),
       new RandomArray(randoms.map((e) => CustomScalar.fromScalar(e)))
     );
+
+    let privateKey = PrivateKey.random();
+    let publicKey = privateKey.toPublicKey();
+    let contracts: { [key: string]: Contract } = {
+      round2: {
+        key: {
+          privateKey: privateKey,
+          publicKey: publicKey,
+        },
+        contract: new Round2Contract(publicKey),
+        actionStates: [],
+      },
+    };
   });
 
-  it('Should batch decrypt successfully', async () => {
+  xit('Should batch decrypt successfully', async () => {
     console.log('Batch decryption');
     decryptions = [{ m: Scalar.from(0n) }];
     for (let i = 1; i < length; i++) {

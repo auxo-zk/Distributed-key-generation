@@ -1,7 +1,6 @@
 import {
   Field,
   method,
-  MerkleMapWitness,
   Poseidon,
   Provable,
   Reducer,
@@ -13,18 +12,20 @@ import {
   ZkProgram,
   Bool,
 } from 'o1js';
-import { BoolDynamicArray, GroupDynamicArray } from '@auxo-dev/auxo-libs';
+import { BoolDynamicArray } from '@auxo-dev/auxo-libs';
 import { updateOutOfSnark } from '../libs/utils.js';
+import { CheckMemberInput, CommitteeContract } from './Committee.js';
+import { EMPTY_ADDRESS_MT, ZkAppRef } from './SharedStorage.js';
 import {
-  CheckMemberInput,
-  CommitteeContract,
-  CommitteeMerkleWitness,
-} from './Committee.js';
-import { ZkAppRef } from '../libs/ZkAppRef.js';
-import { EMPTY_LEVEL_1_TREE } from './DKGStorage.js';
-import { ZK_APP } from '../constants.js';
-
-const DefaultRoot = EMPTY_LEVEL_1_TREE().getRoot();
+  EMPTY_LEVEL_1_TREE as COMMITTEE_LEVEL_1_TREE,
+  FullMTWitness as CommitteeFullWitness,
+  Level1Witness as CommitteeLevel1Witness,
+} from './CommitteeStorage.js';
+import {
+  EMPTY_LEVEL_1_TREE as DKG_LEVEL_1_TREE,
+  Level1Witness,
+} from './DKGStorage.js';
+import { INSTANCE_LIMITS, ZkAppEnum } from '../constants.js';
 
 export const enum KeyStatus {
   EMPTY,
@@ -95,15 +96,14 @@ export class Action extends Struct({
     return super.fromFields(fields) as Action;
   }
   hash(): Field {
-    return Poseidon.hash(this.toFields());
-  }
-  toFields(): Field[] {
-    return Action.toFields(this);
+    return Poseidon.hash(Action.toFields(this));
   }
 }
 
 export class UpdateKeyOutput extends Struct({
+  initialKeyCounter: Field,
   initialKeyStatus: Field,
+  newKeyCounter: Field,
   newKeyStatus: Field,
   newActionState: Field,
 }) {}
@@ -114,25 +114,28 @@ export const UpdateKey = ZkProgram({
   publicOutput: UpdateKeyOutput,
   methods: {
     firstStep: {
-      privateInputs: [Field, Field],
+      privateInputs: [Field, Field, Field],
       method(
         input: Action,
+        initialKeyCounter: Field,
         initialKeyStatus: Field,
         initialActionState: Field
       ) {
         return new UpdateKeyOutput({
+          initialKeyCounter: initialKeyCounter,
           initialKeyStatus: initialKeyStatus,
+          newKeyCounter: initialKeyCounter,
           newKeyStatus: initialKeyStatus,
           newActionState: initialActionState,
         });
       },
     },
     nextStep: {
-      privateInputs: [SelfProof<Action, UpdateKeyOutput>, MerkleMapWitness],
+      privateInputs: [SelfProof<Action, UpdateKeyOutput>, Level1Witness],
       method(
         input: Action,
         earlierProof: SelfProof<Action, UpdateKeyOutput>,
-        keyStatusWitness: MerkleMapWitness
+        keyStatusWitness: Level1Witness
       ) {
         // Verify earlier proof
         earlierProof.verify();
@@ -152,24 +155,102 @@ export const UpdateKey = ZkProgram({
         ]);
 
         // Check the key's previous status
-        let keyIndex = Poseidon.hash([input.committeeId, input.keyId]);
-        let [keyStatus, keyStatusIndex] =
-          keyStatusWitness.computeRootAndKey(previousStatus);
-        keyStatus.assertEquals(earlierProof.publicOutput.newKeyStatus);
-        keyStatusIndex.assertEquals(keyIndex);
+        let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))
+          .mul(input.committeeId)
+          .add(input.keyId);
+        earlierProof.publicOutput.newKeyStatus.assertEquals(
+          keyStatusWitness.calculateRoot(previousStatus)
+        );
+        keyIndex.assertEquals(keyStatusWitness.calculateIndex());
 
         // Calculate the new keyStatus tree root
-        [keyStatus] = keyStatusWitness.computeRootAndKey(nextStatus);
+        let newKeyStatus = keyStatusWitness.calculateRoot(nextStatus);
 
         // Calculate corresponding action state
         let actionState = updateOutOfSnark(
           earlierProof.publicOutput.newActionState,
-          [input.toFields()]
+          [Action.toFields(input)]
         );
 
         return {
+          initialKeyCounter: earlierProof.publicOutput.initialKeyCounter,
           initialKeyStatus: earlierProof.publicOutput.initialKeyStatus,
-          newKeyStatus: keyStatus,
+          newKeyCounter: earlierProof.publicOutput.newKeyCounter,
+          newKeyStatus: newKeyStatus,
+          newActionState: actionState,
+        };
+      },
+    },
+    nextStepGeneration: {
+      privateInputs: [
+        SelfProof<Action, UpdateKeyOutput>,
+        Field,
+        CommitteeLevel1Witness,
+        Level1Witness,
+      ],
+      method(
+        input: Action,
+        earlierProof: SelfProof<Action, UpdateKeyOutput>,
+        currKeyId: Field,
+        keyCounterWitness: CommitteeLevel1Witness,
+        keyStatusWitness: Level1Witness
+      ) {
+        // Verify earlier proof
+        earlierProof.verify();
+
+        let previousStatus = Provable.switch(input.mask.values, Field, [
+          Field(KeyStatus.EMPTY),
+          Field(KeyStatus.ROUND_1_CONTRIBUTION),
+          Field(KeyStatus.ROUND_2_CONTRIBUTION),
+          Field(KeyStatus.ACTIVE),
+        ]);
+
+        let nextStatus = Provable.switch(input.mask.values, Field, [
+          Field(KeyStatus.ROUND_1_CONTRIBUTION),
+          Field(KeyStatus.ROUND_2_CONTRIBUTION),
+          Field(KeyStatus.ACTIVE),
+          Field(KeyStatus.DEPRECATED),
+        ]);
+
+        // Check the key's previous index
+        earlierProof.publicOutput.newKeyCounter.assertEquals(
+          keyCounterWitness.calculateRoot(currKeyId)
+        );
+        input.committeeId.assertEquals(keyCounterWitness.calculateIndex());
+        let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))
+          .mul(input.committeeId)
+          .add(currKeyId);
+        keyIndex.assertLessThan(
+          Field.from(BigInt(INSTANCE_LIMITS.KEY)).mul(
+            input.committeeId.add(Field(1))
+          )
+        );
+
+        // Calculate new keyCounter root
+        let newKeyCounter = keyCounterWitness.calculateRoot(
+          currKeyId.add(Field(1))
+        );
+
+        // Check the key's previous status
+        earlierProof.publicOutput.newKeyStatus.assertEquals(
+          keyStatusWitness.calculateRoot(previousStatus)
+        );
+        keyIndex.assertEquals(keyStatusWitness.calculateIndex());
+
+        // Calculate the new keyStatus tree root
+        let newKeyStatus = keyStatusWitness.calculateRoot(nextStatus);
+
+        // Calculate corresponding action state
+        let actionState = updateOutOfSnark(
+          earlierProof.publicOutput.newActionState,
+          [Action.toFields(input)]
+        );
+
+        return {
+          initialKeyCounter: earlierProof.publicOutput.initialKeyCounter,
+          initialKeyStatus: earlierProof.publicOutput.initialKeyStatus,
+          newKeyCounter: newKeyCounter,
+          newKeyStatus: newKeyStatus,
           newActionState: actionState,
         };
       },
@@ -185,110 +266,126 @@ export class DKGContract extends SmartContract {
     [EventEnum.KEY_UPDATES_REDUCED]: Field,
   };
 
-  // Merkle tree of other zkApp address
+  // MT of other zkApp address
   @state(Field) zkApps = State<Field>();
-  // Merkle tree of all keys' status
+  // MT of next keyId for all committees
+  @state(Field) keyCounter = State<Field>();
+  // MT of all keys' status
   @state(Field) keyStatus = State<Field>();
 
   init() {
     super.init();
-    this.zkApps.set(DefaultRoot);
-    this.keyStatus.set(DefaultRoot);
+    this.zkApps.set(EMPTY_ADDRESS_MT().getRoot());
+    this.keyCounter.set(COMMITTEE_LEVEL_1_TREE().getRoot());
+    this.keyStatus.set(DKG_LEVEL_1_TREE().getRoot());
   }
 
-  @method
-  verifyZkApp(zkApp: ZkAppRef, index: Field) {
-    let zkApps = this.zkApps.getAndAssertEquals();
-    let [root, id] = zkApp.witness.computeRootAndKey(
-      Poseidon.hash(zkApp.address.toFields())
-    );
-    root.assertEquals(zkApps);
-    id.assertEquals(index);
-  }
-
-  @method
-  verifyKeyStatus(
-    keyIndex: Field,
-    status: Field,
-    witness: MerkleMapWitness
-  ): void {
-    let keyStatus = this.keyStatus.getAndAssertEquals();
-    let [root, index] = witness.computeRootAndKey(status);
-    root.assertEquals(keyStatus);
-    index.assertEquals(keyIndex);
-  }
-
+  /**
+   * Generate a new key or deprecate an existed key
+   * - Verify zkApp references
+   * - Verify committee member
+   * - Verify action type
+   * - Create & dispatch action
+   * @param committeeId
+   * @param keyId
+   * @param memberId
+   * @param actionType
+   * @param committee
+   * @param memberWitness
+   */
   @method
   committeeAction(
     committeeId: Field,
     keyId: Field,
+    memberId: Field,
     actionType: Field,
     committee: ZkAppRef,
-    memberMerkleTreeWitness: CommitteeMerkleWitness,
-    memberMerkleMapWitness: MerkleMapWitness,
-    memberId: Field
+    memberWitness: CommitteeFullWitness
   ) {
-    // Check if sender has the correct index in the committee
-    this.verifyZkApp(committee, ZK_APP.COMMITTEE);
+    // Verify zkApp references
+    let zkApps = this.zkApps.getAndAssertEquals();
+
+    // CommitteeContract
+    zkApps.assertEquals(
+      committee.witness.calculateRoot(
+        Poseidon.hash(committee.address.toFields())
+      )
+    );
+    Field(ZkAppEnum.COMMITTEE).assertEquals(committee.witness.calculateIndex());
+
     const committeeContract = new CommitteeContract(committee.address);
+
+    // Verify committee member - FIXME check if using this.sender is secure
     committeeContract
       .checkMember(
         new CheckMemberInput({
           address: this.sender,
           commiteeId: committeeId,
-          memberMerkleTreeWitness: memberMerkleTreeWitness,
-          memberMerkleMapWitness: memberMerkleMapWitness,
+          memberWitness: memberWitness,
         })
       )
       .assertEquals(memberId);
 
-    // Create Action
+    // Verify action type
     actionType
       .equals(Field(ActionEnum.GENERATE_KEY))
       .or(actionType.equals(Field(ActionEnum.DEPRECATE_KEY)));
-    let mask = Provable.witness(ActionMask, () => {
-      return ACTION_MASK[Number(actionType) as ActionEnum];
-    });
+
+    // Create & dispatch action
     let action = new Action({
       committeeId: committeeId,
-      keyId: keyId,
-      mask: mask,
+      keyId: Provable.if(
+        actionType.equals(ActionEnum.GENERATE_KEY),
+        Field(-1),
+        keyId
+      ),
+      mask: Provable.witness(ActionMask, () => {
+        return ACTION_MASK[Number(actionType) as ActionEnum];
+      }),
     });
-
-    // Dispatch key generation actions
     this.reducer.dispatch(action);
   }
 
+  /**
+   * Finalize contributions of round 1 or 2
+   * - Verify action type
+   * - Create & dispatch action
+   * @param committeeId
+   * @param keyId
+   * @param actionType
+   */
   @method
   publicAction(committeeId: Field, keyId: Field, actionType: Field) {
-    // Create Action
+    // Verify action type
     actionType
       .equals(Field(ActionEnum.FINALIZE_ROUND_1))
       .or(actionType.equals(Field(ActionEnum.FINALIZE_ROUND_2)));
-    let mask = Provable.witness(ActionMask, () => {
-      return ACTION_MASK[Number(actionType) as ActionEnum];
-    });
+
+    // Create & dispatch action
     let action = new Action({
       committeeId: committeeId,
       keyId: keyId,
-      mask: mask,
+      mask: Provable.witness(ActionMask, () => {
+        return ACTION_MASK[Number(actionType) as ActionEnum];
+      }),
     });
-
-    // Dispatch key generation actions
     this.reducer.dispatch(action);
   }
 
   @method updateKeys(proof: UpdateKeyProof) {
     // Get current state values
+    let keyCounter = this.keyCounter.getAndAssertEquals();
     let keyStatus = this.keyStatus.getAndAssertEquals();
     let actionState = this.account.actionState.getAndAssertEquals();
 
     // Verify proof
     proof.verify();
+    proof.publicOutput.initialKeyCounter.assertEquals(keyCounter);
     proof.publicOutput.initialKeyStatus.assertEquals(keyStatus);
     proof.publicOutput.newActionState.assertEquals(actionState);
 
     // Set new state values
+    this.keyCounter.set(proof.publicOutput.newKeyCounter);
     this.keyStatus.set(proof.publicOutput.newKeyStatus);
 
     // Emit events

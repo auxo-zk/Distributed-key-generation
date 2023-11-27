@@ -1,6 +1,7 @@
 import {
+  Bool,
   Field,
-  MerkleMapWitness,
+  Group,
   method,
   Poseidon,
   Provable,
@@ -12,15 +13,22 @@ import {
   Struct,
   ZkProgram,
 } from 'o1js';
-import { GroupDynamicArray } from '@auxo-dev/auxo-libs';
-import { EncryptionHashArray, Round2Contribution } from '../libs/Committee.js';
-import { ZkAppRef } from '../libs/ZkAppRef.js';
+import {
+  CArray,
+  EncryptionHashArray,
+  PublicKeyArray,
+  Round2Contribution,
+} from '../libs/Committee.js';
 import { updateOutOfSnark } from '../libs/utils.js';
-import { FullMTWitness as CommitteeWitness } from './CommitteeStorage.js';
+import {
+  FullMTWitness as CommitteeFullWitness,
+  Level1Witness as CommitteeLevel1Witness,
+} from './CommitteeStorage.js';
 import {
   FullMTWitness as DKGWitness,
   EMPTY_LEVEL_1_TREE,
   EMPTY_LEVEL_2_TREE,
+  Level1Witness,
 } from './DKGStorage.js';
 import {
   CheckConfigInput,
@@ -28,11 +36,20 @@ import {
   CommitteeContract,
 } from './Committee.js';
 import { ActionEnum as KeyUpdateEnum, DKGContract, KeyStatus } from './DKG.js';
-import { BatchEncryptionProof } from './Encryption.js';
+import { BatchEncryptionProof, PlainArray, RandomArray } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
-import { COMMITTEE_MAX_SIZE, ZK_APP } from '../constants.js';
-
-export class PublicKeyArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
+import {
+  COMMITTEE_MAX_SIZE,
+  INSTANCE_LIMITS,
+  ZkAppEnum,
+} from '../constants.js';
+import {
+  EMPTY_ADDRESS_MT,
+  EMPTY_REDUCE_MT,
+  ReduceWitness,
+  ZkAppRef,
+} from './SharedStorage.js';
+import { Bit255 } from '@auxo-dev/auxo-libs';
 
 export enum EventEnum {
   CONTRIBUTIONS_REDUCED = 'contributions-reduced',
@@ -85,11 +102,11 @@ export const ReduceRound2 = ZkProgram({
       },
     },
     nextStep: {
-      privateInputs: [SelfProof<Action, ReduceOutput>, MerkleMapWitness],
+      privateInputs: [SelfProof<Action, ReduceOutput>, ReduceWitness],
       method(
         input: Action,
         earlierProof: SelfProof<Action, ReduceOutput>,
-        reduceWitness: MerkleMapWitness
+        reduceWitness: ReduceWitness
       ) {
         // Verify earlier proof
         earlierProof.verify();
@@ -131,7 +148,6 @@ export class Round2Output extends Struct({
   T: Field,
   N: Field,
   initialContributionRoot: Field,
-  publicKeys: PublicKeyArray,
   reduceStateRoot: Field,
   newContributionRoot: Field,
   keyIndex: Field,
@@ -139,6 +155,19 @@ export class Round2Output extends Struct({
   ecryptionHashes: EncryptionHashArray,
 }) {}
 
+/**
+ * First step:
+ * - Verify there is no recorded contribution for the request
+ * - Record an empty level 2 tree
+ *
+ * Next steps:
+ * - Verify earlier proof
+ * - Verify contributions using the same keyIndex
+ * - Verify the member's contribution witness
+ * - Compute new contribution root
+ * - Compute new encryption hash array
+ * - Verify the action has been reduced
+ */
 export const FinalizeRound2 = ZkProgram({
   name: 'finalize-round-2',
   publicInput: Round2Input,
@@ -149,11 +178,10 @@ export const FinalizeRound2 = ZkProgram({
         Field,
         Field,
         Field,
-        PublicKeyArray,
         Field,
         Field,
         EncryptionHashArray,
-        MerkleMapWitness,
+        Level1Witness,
       ],
       // initialHashArray must be filled with Field(0) with correct length
       method(
@@ -161,18 +189,19 @@ export const FinalizeRound2 = ZkProgram({
         T: Field,
         N: Field,
         initialContributionRoot: Field,
-        publicKeys: PublicKeyArray,
         reduceStateRoot: Field,
         keyIndex: Field,
-        initialHashArray: EncryptionHashArray,
-        contributionWitness: MerkleMapWitness
+        initialEncryptionHashes: EncryptionHashArray,
+        contributionWitness: Level1Witness
       ) {
-        let [contributionRoot, contributionIndex] =
-          contributionWitness.computeRootAndKey(Field(0));
-        contributionRoot.assertEquals(initialContributionRoot);
-        contributionIndex.assertEquals(keyIndex);
+        // Verify there is no recorded contribution for the request
+        initialContributionRoot.assertEquals(
+          contributionWitness.calculateRoot(Field(0))
+        );
+        keyIndex.assertEquals(contributionWitness.calculateIndex());
 
-        [contributionRoot] = contributionWitness.computeRootAndKey(
+        // Record an empty level 2 tree
+        let newContributionRoot = contributionWitness.calculateRoot(
           EMPTY_LEVEL_2_TREE().getRoot()
         );
 
@@ -180,28 +209,25 @@ export const FinalizeRound2 = ZkProgram({
           T: T,
           N: N,
           initialContributionRoot: initialContributionRoot,
-          publicKeys: publicKeys,
           reduceStateRoot: reduceStateRoot,
-          newContributionRoot: contributionRoot,
+          newContributionRoot: newContributionRoot,
           keyIndex: keyIndex,
           counter: Field(0),
-          ecryptionHashes: initialHashArray,
+          ecryptionHashes: initialEncryptionHashes,
         });
       },
     },
     nextStep: {
       privateInputs: [
         SelfProof<Round2Input, Round2Output>,
-        BatchEncryptionProof,
         DKGWitness,
-        MerkleMapWitness,
+        ReduceWitness,
       ],
       method(
         input: Round2Input,
         earlierProof: SelfProof<Round2Input, Round2Output>,
-        encryptionProof: BatchEncryptionProof,
         contributionWitness: DKGWitness,
-        reduceWitness: MerkleMapWitness
+        reduceWitness: ReduceWitness
       ) {
         // Verify earlier proof
         earlierProof.verify();
@@ -209,53 +235,32 @@ export const FinalizeRound2 = ZkProgram({
         input.action.contribution.c.length.assertEquals(
           earlierProof.publicOutput.N
         );
-        input.action.contribution.U.length.assertEquals(
-          earlierProof.publicOutput.N
-        );
 
-        // Check if the actions have the same keyIndex
-        let keyIndex = Poseidon.hash([
-          input.action.committeeId,
-          input.action.keyId,
-        ]);
+        // Verify contributions using the same keyIndex
+        let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))
+          .mul(input.action.committeeId)
+          .add(input.action.keyId);
         keyIndex.assertEquals(earlierProof.publicOutput.keyIndex);
 
-        // Check if encryption is correct
-        encryptionProof.verify();
-        encryptionProof.publicInput.memberId.assertEquals(
-          input.action.memberId
-        );
-        encryptionProof.publicInput.publicKeys
-          .hash()
-          .assertEquals(earlierProof.publicOutput.publicKeys.hash());
-        encryptionProof.publicInput.c
-          .hash()
-          .assertEquals(input.action.contribution.c.hash());
-        encryptionProof.publicInput.U.hash().assertEquals(
-          input.action.contribution.U.hash()
-        );
-
-        // Check if this committee member has contributed yet
-        contributionWitness.level2
-          .calculateIndex()
-          .assertEquals(input.action.memberId);
-        let [contributionRoot, contributionIndex] =
-          contributionWitness.level1.computeRootAndKey(
+        // Verify the member's contribution witness
+        earlierProof.publicOutput.newContributionRoot.assertEquals(
+          contributionWitness.level1.calculateRoot(
             contributionWitness.level2.calculateRoot(Field(0))
-          );
-        contributionRoot.assertEquals(
-          earlierProof.publicOutput.newContributionRoot
+          )
         );
-        contributionIndex.assertEquals(keyIndex);
+        keyIndex.assertEquals(contributionWitness.level1.calculateIndex());
+        input.action.memberId.assertEquals(
+          contributionWitness.level2.calculateIndex()
+        );
 
         // Compute new contribution root
-        [contributionRoot] = contributionWitness.level1.computeRootAndKey(
+        let newContributionRoot = contributionWitness.level1.calculateRoot(
           contributionWitness.level2.calculateRoot(
             input.action.contribution.hash()
           )
         );
 
-        // Update encryption hash array
+        // Compute new encryption hash array
         let encryptionHashes = earlierProof.publicOutput.ecryptionHashes;
         for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
           let hashChain = encryptionHashes.get(Field(i));
@@ -275,26 +280,23 @@ export const FinalizeRound2 = ZkProgram({
           encryptionHashes.set(Field(i), hashChain);
         }
 
-        // Calculate corresponding action state
+        // Verify the action has been reduced
         let actionState = updateOutOfSnark(input.previousActionState, [
           Action.toFields(input.action),
         ]);
-
-        // Current value of the action hash should be 1
-        let [root, key] = reduceWitness.computeRootAndKey(
+        let [reduceRoot, reduceIndex] = reduceWitness.computeRootAndKey(
           Field(ActionStatus.REDUCED)
         );
-        root.assertEquals(earlierProof.publicOutput.reduceStateRoot);
-        key.assertEquals(actionState);
+        reduceRoot.assertEquals(earlierProof.publicOutput.reduceStateRoot);
+        reduceIndex.assertEquals(actionState);
 
         return new Round2Output({
           T: earlierProof.publicOutput.T,
           N: earlierProof.publicOutput.N,
           initialContributionRoot:
             earlierProof.publicOutput.initialContributionRoot,
-          publicKeys: earlierProof.publicOutput.publicKeys,
           reduceStateRoot: earlierProof.publicOutput.reduceStateRoot,
-          newContributionRoot: contributionRoot,
+          newContributionRoot: newContributionRoot,
           keyIndex: keyIndex,
           counter: earlierProof.publicOutput.counter.add(Field(1)),
           ecryptionHashes: encryptionHashes,
@@ -305,8 +307,6 @@ export const FinalizeRound2 = ZkProgram({
 });
 
 export class FinalizeRound2Proof extends ZkProgram.Proof(FinalizeRound2) {}
-
-const DefaultRoot = EMPTY_LEVEL_1_TREE().getRoot();
 
 export class Round2Contract extends SmartContract {
   reducer = Reducer({ actionType: Action });
@@ -321,53 +321,100 @@ export class Round2Contract extends SmartContract {
 
   init() {
     super.init();
-    this.zkApps.set(DefaultRoot);
-    this.reduceState.set(DefaultRoot);
-    this.contributions.set(DefaultRoot);
-    this.encryptions.set(DefaultRoot);
+    this.zkApps.set(EMPTY_ADDRESS_MT().getRoot());
+    this.reduceState.set(EMPTY_REDUCE_MT().getRoot());
+    this.contributions.set(EMPTY_LEVEL_1_TREE().getRoot());
+    this.encryptions.set(EMPTY_LEVEL_1_TREE().getRoot());
   }
 
-  @method
-  verifyZkApp(zkApp: ZkAppRef, index: Field) {
-    let zkApps = this.zkApps.getAndAssertEquals();
-    let [root, id] = zkApp.witness.computeRootAndKey(
-      Poseidon.hash(zkApp.address.toFields())
-    );
-    root.assertEquals(zkApps);
-    id.assertEquals(index);
-  }
-
+  /**
+   * Submit round 2 contribution for key generation
+   * - Verify zkApp references
+   * - Verify encryption proof
+   * - Verify committee member
+   * - Verify round 1 public keys (C0[]])
+   * - Create & dispatch action
+   * @param committeeId
+   * @param keyId
+   * @param proof
+   * @param committee
+   * @param round1
+   * @param memberWitness
+   * @param publicKeysWitness
+   */
   @method
   contribute(
-    action: Action,
+    committeeId: Field,
+    keyId: Field,
+    proof: BatchEncryptionProof,
     committee: ZkAppRef,
-    memberWitness: CommitteeWitness,
-    dkg: ZkAppRef,
-    keyStatusWitness: MerkleMapWitness
+    round1: ZkAppRef,
+    memberWitness: CommitteeFullWitness,
+    publicKeysWitness: Level1Witness
   ) {
-    // Verify sender's index
-    this.verifyZkApp(committee, ZK_APP.COMMITTEE);
+    // Verify zkApp references
+    let zkApps = this.zkApps.getAndAssertEquals();
+
+    // CommitteeContract
+    zkApps.assertEquals(
+      committee.witness.calculateRoot(
+        Poseidon.hash(committee.address.toFields())
+      )
+    );
+    Field(ZkAppEnum.COMMITTEE).assertEquals(committee.witness.calculateIndex());
+
+    // Round1Contract
+    zkApps.assertEquals(
+      round1.witness.calculateRoot(Poseidon.hash(round1.address.toFields()))
+    );
+
     const committeeContract = new CommitteeContract(committee.address);
+    const round1Contract = new Round1Contract(round1.address);
+
+    // Verify encryption proof
+    proof.verify();
+
+    // Verify committee member - FIXME check if using this.sender is secure
     let memberId = committeeContract.checkMember(
       new CheckMemberInput({
         address: this.sender,
-        commiteeId: action.committeeId,
-        memberMerkleTreeWitness: memberWitness.level2,
-        memberMerkleMapWitness: memberWitness.level1,
+        commiteeId: committeeId,
+        memberWitness: memberWitness,
       })
     );
-    memberId.assertEquals(action.memberId);
+    memberId.assertEquals(proof.publicInput.memberId);
 
-    // Verify key status
-    this.verifyZkApp(dkg, ZK_APP.DKG);
-    const dkgContract = new DKGContract(dkg.address);
-    dkgContract.verifyKeyStatus(
-      Poseidon.hash([action.committeeId, action.keyId]),
-      Field(KeyStatus.ROUND_2_CONTRIBUTION),
-      keyStatusWitness
-    );
+    // Verify round 1 public keys (C0[]])
+    let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))
+      .mul(committeeId)
+      .add(keyId);
+    let publicKeysLeaf = Provable.witness(Field, () => {
+      let publicKeysMT = EMPTY_LEVEL_2_TREE();
+      for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+        let value = Provable.if(
+          Field(i).greaterThanOrEqual(proof.publicInput.publicKeys.length),
+          Field(0),
+          PublicKeyArray.hash(proof.publicInput.publicKeys.get(Field(i)))
+        );
+        publicKeysMT.setLeaf(BigInt(i), value);
+      }
+      return publicKeysMT.getRoot();
+    });
+    round1Contract.publicKeys
+      .getAndAssertEquals()
+      .assertEquals(publicKeysWitness.calculateRoot(publicKeysLeaf));
+    keyIndex.assertEquals(publicKeysWitness.calculateIndex());
 
-    // Dispatch action
+    // Create & dispatch action to DKGContract
+    let action = new Action({
+      committeeId: committeeId,
+      keyId: keyId,
+      memberId: memberId,
+      contribution: new Round2Contribution({
+        c: proof.publicInput.c,
+        U: proof.publicInput.U,
+      }),
+    });
     this.reducer.dispatch(action);
   }
 
@@ -389,20 +436,55 @@ export class Round2Contract extends SmartContract {
     this.emitEvent(EventEnum.CONTRIBUTIONS_REDUCED, actionState);
   }
 
+  /**
+   * Finalize round 2 with N members' contribution
+   * - Get current state values
+   * - Verify zkApp references
+   * - Verify finalize proof
+   * - Verify committee config
+   * - Verify key status
+   * - Verify encryption witness
+   * - Set new states
+   * - Create & dispatch action to DKGContract
+   * @param proof
+   * @param encryptionWitness
+   * @param committee
+   * @param dkg
+   * @param settingWitness
+   * @param keyStatusWitness
+   */
   @method
   finalize(
     proof: FinalizeRound2Proof,
-    encryptionWitness: MerkleMapWitness,
-    round1: ZkAppRef,
-    publicKeysWitness: MerkleMapWitness,
+    encryptionWitness: Level1Witness,
     committee: ZkAppRef,
-    settingWitness: MerkleMapWitness,
-    dkg: ZkAppRef
+    dkg: ZkAppRef,
+    settingWitness: CommitteeLevel1Witness,
+    keyStatusWitness: Level1Witness
   ) {
     // Get current state values
+    let zkApps = this.zkApps.getAndAssertEquals();
     let contributions = this.contributions.getAndAssertEquals();
     let encryptions = this.encryptions.getAndAssertEquals();
     let reduceState = this.reduceState.getAndAssertEquals();
+
+    // Verify zkApp references
+    // CommitteeContract
+    zkApps.assertEquals(
+      committee.witness.calculateRoot(
+        Poseidon.hash(committee.address.toFields())
+      )
+    );
+    Field(ZkAppEnum.COMMITTEE).assertEquals(committee.witness.calculateIndex());
+
+    // DKGContract
+    zkApps.assertEquals(
+      dkg.witness.calculateRoot(Poseidon.hash(dkg.address.toFields()))
+    );
+    Field(ZkAppEnum.DKG).assertEquals(dkg.witness.calculateIndex());
+
+    const committeeContract = new CommitteeContract(committee.address);
+    const dkgContract = new DKGContract(dkg.address);
 
     // Verify proof
     proof.verify();
@@ -410,7 +492,26 @@ export class Round2Contract extends SmartContract {
     proof.publicOutput.reduceStateRoot.assertEquals(reduceState);
     proof.publicOutput.counter.assertEquals(proof.publicOutput.N);
 
-    // Verify encryption hashes do not exist
+    // Verify committee config
+    committeeContract.checkConfig(
+      new CheckConfigInput({
+        N: proof.publicOutput.N,
+        T: proof.publicOutput.T,
+        commiteeId: proof.publicInput.action.committeeId,
+        settingWitness: settingWitness,
+      })
+    );
+
+    // Verify key status
+    let keyIndex = proof.publicOutput.keyIndex;
+    dkgContract.keyStatus
+      .getAndAssertEquals()
+      .assertEquals(
+        keyStatusWitness.calculateRoot(Field(KeyStatus.ROUND_2_CONTRIBUTION))
+      );
+    keyIndex.assertEquals(keyStatusWitness.calculateIndex());
+
+    // Verify encryption witness
     let encryptionLeaf = Provable.witness(Field, () => {
       let encryptionHashesMT = EMPTY_LEVEL_2_TREE();
       for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
@@ -419,62 +520,20 @@ export class Round2Contract extends SmartContract {
             proof.publicOutput.ecryptionHashes.length
           ),
           Field(0),
-          EncryptionHashArray.hash(
-            proof.publicOutput.ecryptionHashes.get(Field(i))
-          )
+          proof.publicOutput.ecryptionHashes.get(Field(i))
         );
         encryptionHashesMT.setLeaf(BigInt(i), value);
       }
       return encryptionHashesMT.getRoot();
     });
-    let [encryptionRoot, encryptionIndex] = encryptionWitness.computeRootAndKey(
-      Field(0)
-    );
-    encryptionRoot.assertEquals(encryptions);
-    encryptionIndex.assertEquals(proof.publicOutput.keyIndex);
-
-    // Calculate new encryptions root
-    [encryptionRoot] = encryptionWitness.computeRootAndKey(encryptionLeaf);
-
-    // Verify public keys
-    this.verifyZkApp(round1, ZK_APP.ROUND_1);
-    let publicKeysLeaf = Provable.witness(Field, () => {
-      let publicKeysMT = EMPTY_LEVEL_2_TREE();
-      for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
-        let value = Provable.if(
-          Field(i).greaterThanOrEqual(proof.publicOutput.publicKeys.length),
-          Field(0),
-          PublicKeyArray.hash(proof.publicOutput.publicKeys.get(Field(i)))
-        );
-        publicKeysMT.setLeaf(BigInt(i), value);
-      }
-      return publicKeysMT.getRoot();
-    });
-    const round1Contract = new Round1Contract(round1.address);
-    let publicKeysRoot = round1Contract.publicKeys.getAndAssertEquals();
-    let [root, index] = publicKeysWitness.computeRootAndKey(publicKeysLeaf);
-    root.assertEquals(publicKeysRoot);
-    index.assertEquals(proof.publicOutput.keyIndex);
-
-    // Verify committee config
-    this.verifyZkApp(committee, ZK_APP.COMMITTEE);
-    const committeeContract = new CommitteeContract(committee.address);
-    committeeContract.checkConfig(
-      new CheckConfigInput({
-        N: proof.publicOutput.N,
-        T: proof.publicOutput.T,
-        commiteeId: proof.publicInput.action.committeeId,
-        settingMerkleMapWitness: settingWitness,
-      })
-    );
+    encryptions.assertEquals(encryptionWitness.calculateRoot(Field(0)));
+    keyIndex.assertEquals(encryptionWitness.calculateIndex());
 
     // Set new states
     this.contributions.set(proof.publicOutput.newContributionRoot);
-    this.encryptions.set(encryptionRoot);
+    this.encryptions.set(encryptionWitness.calculateRoot(encryptionLeaf));
 
-    // Dispatch action in DKG contract
-    this.verifyZkApp(dkg, ZK_APP.DKG);
-    const dkgContract = new DKGContract(dkg.address);
+    // Create & dispatch action to DKGContract
     dkgContract.publicAction(
       proof.publicInput.action.committeeId,
       proof.publicInput.action.keyId,

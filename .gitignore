@@ -140,4 +140,6 @@ keys
 config.json
 
 # Cache data
-cache
+caches
+
+.DS_Store

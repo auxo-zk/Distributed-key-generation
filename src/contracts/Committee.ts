@@ -4,10 +4,7 @@ import {
   state,
   State,
   method,
-  MerkleWitness,
   Reducer,
-  MerkleTree,
-  MerkleMapWitness,
   Struct,
   SelfProof,
   Poseidon,
@@ -16,29 +13,18 @@ import {
   PublicKey,
   Void,
 } from 'o1js';
-import { PublicKeyDynamicArray, IPFSHash } from '@auxo-dev/auxo-libs';
+import { IPFSHash } from '@auxo-dev/auxo-libs';
 import { updateOutOfSnark } from '../libs/utils.js';
 import { COMMITTEE_MAX_SIZE } from '../constants.js';
-import { EMPTY_LEVEL_1_TREE, LEVEL2_TREE_HEIGHT } from './CommitteeStorage.js';
+import {
+  EMPTY_LEVEL_1_TREE,
+  EMPTY_LEVEL_2_TREE,
+  Level1Witness,
+  FullMTWitness,
+} from './CommitteeStorage.js';
+import { MemberArray } from '../libs/Committee.js';
 
 const DefaultRoot = EMPTY_LEVEL_1_TREE().getRoot();
-export class CommitteeMerkleWitness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
-export class MemberArray extends PublicKeyDynamicArray(COMMITTEE_MAX_SIZE) {}
-
-export class RollupOutPut extends Struct({
-  initialActionState: Field,
-  initialMemberTreeRoot: Field,
-  initialSettingTreeRoot: Field,
-  initialCommitteeId: Field,
-  finalActionState: Field,
-  finalMemberTreeRoot: Field,
-  finalSettingTreeRoot: Field,
-  finalCommitteeId: Field,
-}) {
-  hash(): Field {
-    return Poseidon.hash(RollupOutPut.toFields(this));
-  }
-}
 
 export class CommitteeAction extends Struct({
   addresses: MemberArray,
@@ -53,46 +39,78 @@ export class CommitteeAction extends Struct({
 export class CheckMemberInput extends Struct({
   address: PublicKey,
   commiteeId: Field,
-  memberMerkleTreeWitness: CommitteeMerkleWitness,
-  memberMerkleMapWitness: MerkleMapWitness,
+  memberWitness: FullMTWitness,
 }) {}
 
 export class CheckConfigInput extends Struct({
   N: Field,
   T: Field,
   commiteeId: Field,
-  settingMerkleMapWitness: MerkleMapWitness,
+  settingWitness: Level1Witness,
 }) {}
+
+export class CreateCommitteeOutput extends Struct({
+  initialActionState: Field,
+  initialMemberTreeRoot: Field,
+  initialSettingTreeRoot: Field,
+  initialCommitteeId: Field,
+  finalActionState: Field,
+  finalMemberTreeRoot: Field,
+  finalSettingTreeRoot: Field,
+  finalCommitteeId: Field,
+}) {
+  hash(): Field {
+    return Poseidon.hash(CreateCommitteeOutput.toFields(this));
+  }
+}
 
 export const CreateCommittee = ZkProgram({
   name: 'create-committee',
-  publicOutput: RollupOutPut,
-
+  publicOutput: CreateCommitteeOutput,
   methods: {
+    firstStep: {
+      privateInputs: [Field, Field, Field, Field],
+      method(
+        initialActionState: Field,
+        initialMemberTreeRoot: Field,
+        initialSettingTreeRoot: Field,
+        initialCommitteeId: Field
+      ): CreateCommitteeOutput {
+        return new CreateCommitteeOutput({
+          initialActionState,
+          initialMemberTreeRoot,
+          initialSettingTreeRoot,
+          initialCommitteeId,
+          finalActionState: initialActionState,
+          finalMemberTreeRoot: initialMemberTreeRoot,
+          finalSettingTreeRoot: initialSettingTreeRoot,
+          finalCommitteeId: initialCommitteeId,
+        });
+      },
+    },
     nextStep: {
       privateInputs: [
-        SelfProof<Void, RollupOutPut>,
+        SelfProof<Void, CreateCommitteeOutput>,
         CommitteeAction,
-        MerkleMapWitness,
-        MerkleMapWitness,
+        Level1Witness,
+        Level1Witness,
       ],
-
       method(
-        preProof: SelfProof<Void, RollupOutPut>,
+        preProof: SelfProof<Void, CreateCommitteeOutput>,
         input: CommitteeAction,
-        memberWitness: MerkleMapWitness,
-        settingWitess: MerkleMapWitness
-      ): RollupOutPut {
+        memberWitness: Level1Witness,
+        settingWitess: Level1Witness
+      ): CreateCommitteeOutput {
         preProof.verify();
 
         ////// caculate new memberTreeRoot
-        let [preMemberRoot, nextCommitteeId] = memberWitness.computeRootAndKey(
-          Field(0)
-        );
+        let preMemberRoot = memberWitness.calculateRoot(Field(0));
+        let nextCommitteeId = memberWitness.calculateIndex();
 
         nextCommitteeId.assertEquals(preProof.publicOutput.finalCommitteeId);
         preMemberRoot.assertEquals(preProof.publicOutput.finalMemberTreeRoot);
-        let tree = new MerkleTree(LEVEL2_TREE_HEIGHT);
+
+        let tree = EMPTY_LEVEL_2_TREE();
         for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
           let value = Provable.if(
             Field(i).greaterThanOrEqual(input.addresses.length),
@@ -103,21 +121,19 @@ export const CreateCommittee = ZkProgram({
         }
 
         // update new tree of public key in to the member tree
-        let [newMemberRoot] = memberWitness.computeRootAndKey(tree.getRoot());
+        let newMemberRoot = memberWitness.calculateRoot(tree.getRoot());
 
         ////// caculate new settingTreeRoot
-        let [preSettingRoot, settingKey] = settingWitess.computeRootAndKey(
-          Field(0)
-        );
+        let preSettingRoot = settingWitess.calculateRoot(Field(0));
+        let settingKey = settingWitess.calculateIndex();
         settingKey.assertEquals(nextCommitteeId);
         preSettingRoot.assertEquals(preProof.publicOutput.finalSettingTreeRoot);
-        // update new tree of public key in to the member tree
-        let [newSettingRoot] = settingWitess.computeRootAndKey(
-          // hash [t,n]
+        // update setting tree with hash [t,n]
+        let newSettingRoot = settingWitess.calculateRoot(
           Poseidon.hash([input.threshold, input.addresses.length])
         );
 
-        return new RollupOutPut({
+        return new CreateCommitteeOutput({
           initialActionState: preProof.publicOutput.initialActionState,
           initialMemberTreeRoot: preProof.publicOutput.initialMemberTreeRoot,
           initialSettingTreeRoot: preProof.publicOutput.initialSettingTreeRoot,
@@ -129,28 +145,6 @@ export const CreateCommittee = ZkProgram({
           finalMemberTreeRoot: newMemberRoot,
           finalSettingTreeRoot: newSettingRoot,
           finalCommitteeId: nextCommitteeId.add(Field(1)),
-        });
-      },
-    },
-
-    firstStep: {
-      privateInputs: [Field, Field, Field, Field],
-
-      method(
-        initialActionState: Field,
-        initialMemberTreeRoot: Field,
-        initialSettingTreeRoot: Field,
-        initialCommitteeId: Field
-      ): RollupOutPut {
-        return new RollupOutPut({
-          initialActionState,
-          initialMemberTreeRoot,
-          initialSettingTreeRoot,
-          initialCommitteeId,
-          finalActionState: initialActionState,
-          finalMemberTreeRoot: initialMemberTreeRoot,
-          finalSettingTreeRoot: initialSettingTreeRoot,
-          finalCommitteeId: initialCommitteeId,
         });
       },
     },
@@ -217,12 +211,14 @@ export class CommitteeContract extends SmartContract {
 
   // Add memberIndex to input for checking
   @method checkMember(input: CheckMemberInput): Field {
-    let leaf = input.memberMerkleTreeWitness.calculateRoot(
+    let leaf = input.memberWitness.level2.calculateRoot(
       MemberArray.hash(input.address)
     );
-    let memberId = input.memberMerkleTreeWitness.calculateIndex();
-    let [root, _commiteeId] =
-      input.memberMerkleMapWitness.computeRootAndKey(leaf);
+    let memberId = input.memberWitness.level2.calculateIndex();
+
+    let root = input.memberWitness.level1.calculateRoot(leaf);
+    let _commiteeId = input.memberWitness.level1.calculateIndex();
+
     const onChainRoot = this.memberTreeRoot.getAndAssertEquals();
     root.assertEquals(onChainRoot);
     input.commiteeId.assertEquals(_commiteeId);
@@ -233,8 +229,8 @@ export class CommitteeContract extends SmartContract {
     input.N.assertGreaterThanOrEqual(input.T);
     // hash[T,N]
     let hashSetting = Poseidon.hash([input.T, input.N]);
-    let [root, _commiteeId] =
-      input.settingMerkleMapWitness.computeRootAndKey(hashSetting);
+    let root = input.settingWitness.calculateRoot(hashSetting);
+    let _commiteeId = input.settingWitness.calculateIndex();
     const onChainRoot = this.settingTreeRoot.getAndAssertEquals();
     root.assertEquals(onChainRoot);
     input.commiteeId.assertEquals(_commiteeId);
