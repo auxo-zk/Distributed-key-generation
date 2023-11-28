@@ -5,7 +5,6 @@ import { CreateRequest, RequestContract } from '../contracts/Request.js';
 import {
   CreateReduceProof,
   RequestHelperContract,
-  RollupActions,
 } from '../contracts/RequestHelper.js';
 import {
   CompleteResponse,

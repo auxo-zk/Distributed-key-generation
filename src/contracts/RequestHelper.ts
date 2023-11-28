@@ -45,7 +45,8 @@ export class RequestHelperInput extends Struct({
   committeePublicKey: PublicKey,
   // to-do wintess to check if it the right publickey
   secretVector: CustomScalarArray,
-  //   settingMerkleMapWitness: MerkleMapWitness,
+  r: CustomScalarArray,
+  // settingMerkleMapWitness: MerkleMapWitness,
 }) {
   requestId(): Field {
     return Poseidon.hash([this.committeeId, this.keyId, this.requetsTime]);
@@ -63,6 +64,10 @@ export class RequestHelperAction extends Struct({
 
   hash(): Field {
     return Poseidon.hash(this.toFields());
+  }
+
+  static fromFields(action: Field[]): RequestHelperAction {
+    return super.fromFields(action) as RequestHelperAction;
   }
 }
 
@@ -137,7 +142,7 @@ export const CreateReduceProof = ZkProgram({
     },
   },
 });
-class ReduceProof extends ZkProgram.Proof(CreateReduceProof) {}
+export class ReduceProof extends ZkProgram.Proof(CreateReduceProof) {}
 
 export class RollupActionsOutput extends Struct({
   requestId: Field,
@@ -161,7 +166,7 @@ export class RollupActionsOutput extends Struct({
   }
 }
 
-export const RollupActions = ZkProgram({
+export const CreateRollupProof = ZkProgram({
   name: 'rollup-actions',
   publicOutput: RollupActionsOutput,
   methods: {
@@ -237,7 +242,7 @@ export const RollupActions = ZkProgram({
   },
 });
 
-class ProofRollupAction extends ZkProgram.Proof(RollupActions) {}
+class ProofRollupAction extends ZkProgram.Proof(CreateRollupProof) {}
 
 export class RequestHelperContract extends SmartContract {
   @state(Field) actionState = State<Field>();
@@ -256,18 +261,15 @@ export class RequestHelperContract extends SmartContract {
   }
 
   @method request(requestInput: RequestHelperInput): {
-    r: CustomScalarArray;
     R: RequestVector;
     M: RequestVector;
   } {
     let requestId = requestInput.requestId();
     let dimension = requestInput.secretVector.length;
-    let r = new CustomScalarArray();
     let R = new RequestVector();
     let M = new RequestVector();
     for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
-      let random = Scalar.random();
-      r.push(CustomScalar.fromScalar(random));
+      let random = requestInput.r.get(Field(i)).toScalar();
       R.push(Group.generator.scale(random));
       let M_i = Provable.if(
         Poseidon.hash(
@@ -281,7 +283,6 @@ export class RequestHelperContract extends SmartContract {
       M.push(M_i);
     }
     let dercementAmount = Field(REQUEST_MAX_SIZE).sub(dimension);
-    r.decrementLength(dercementAmount);
     R.decrementLength(dercementAmount);
     M.decrementLength(dercementAmount);
 
@@ -293,7 +294,7 @@ export class RequestHelperContract extends SmartContract {
       })
     );
 
-    return { r, R, M };
+    return { R, M };
   }
 
   @method rollupActionsState(proof: ReduceProof) {

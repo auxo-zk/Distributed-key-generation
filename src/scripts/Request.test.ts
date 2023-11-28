@@ -114,7 +114,7 @@ describe('Testing Request Contract', () => {
       responeContract.deploy();
       requestContract.responeContractAddress.set(addresses.respone);
       let feePayerAccount = AccountUpdate.createSigned(feePayer);
-      feePayerAccount.send({ to: addresses.rqter1, amount: 10 * 10 ** 9 }); // 11 Mina
+      feePayerAccount.send({ to: addresses.rqter1, amount: 10 * 10 ** 9 }); // 10 Mina
     });
     await tx.sign([feePayerKey, keys.request, keys.respone]).send();
     if (doProofs) {
