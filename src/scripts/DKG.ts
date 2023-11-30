@@ -194,6 +194,16 @@ async function main() {
       await fs.readFile(configJson.deployAliases['dkg'].feepayerKeyPath, 'utf8')
     );
 
+  let acc1: { privateKey: string; publicKey: string } = JSON.parse(
+    await fs.readFile(configJson.deployAliases['acc1'].keyPath, 'utf8')
+  );
+  let acc2: { privateKey: string; publicKey: string } = JSON.parse(
+    await fs.readFile(configJson.deployAliases['acc1'].keyPath, 'utf8')
+  );
+  let acc3: { privateKey: string; publicKey: string } = JSON.parse(
+    await fs.readFile(configJson.deployAliases['acc1'].keyPath, 'utf8')
+  );
+
   feePayerKey = {
     privateKey: PrivateKey.fromBase58(feepayerKeysBase58.privateKey),
     publicKey: PrivateKey.fromBase58(
@@ -221,7 +231,20 @@ async function main() {
   let T = 2,
     N = 3;
 
-  let members: Key[] = Local.testAccounts.slice(1, N + 1);
+  let members: Key[] = [
+    {
+      privateKey: PrivateKey.fromBase58(acc1.privateKey),
+      publicKey: PublicKey.fromBase58(acc1.publicKey),
+    },
+    {
+      privateKey: PrivateKey.fromBase58(acc2.privateKey),
+      publicKey: PublicKey.fromBase58(acc2.publicKey),
+    },
+    {
+      privateKey: PrivateKey.fromBase58(acc3.privateKey),
+      publicKey: PublicKey.fromBase58(acc3.publicKey),
+    },
+  ];
   let responsedMembers = [2, 0];
   let secrets: SecretPolynomial[] = [];
   let publicKeys: Group[] = [];
@@ -522,6 +545,42 @@ async function main() {
         contracts[Contract.REQUEST].key.privateKey,
       ])
       .send();
+  }
+
+  if (action == 0.5) {
+    for (let i = 0; i < 1; i++) {
+      let tx = await Mina.transaction(members[i].publicKey, () => {});
+      // await tx.sign([feePayerKey]).send();
+    }
+  }
+
+  if (action == 1) {
+    let dkgContract = contracts[Contract.DKG].contract as DKGContract;
+    for (let i = 0; i < 1; i++) {
+      let action = dkgActions[ActionEnum.GENERATE_KEY][i];
+      let memberWitness = memberStorage.getWitness(
+        memberStorage.calculateLevel1Index(committeeIndex),
+        memberStorage.calculateLevel2Index(Field(i))
+      );
+      let tx = await Mina.transaction(members[i].publicKey, () => {
+        dkgContract.committeeAction(
+          action.committeeId,
+          action.keyId,
+          Field(i),
+          Field(ActionEnum.GENERATE_KEY),
+          getZkAppRef(
+            commmitteeAddressStorage.addresses,
+            ZkAppEnum.COMMITTEE,
+            contracts[Contract.COMMITTEE].contract.address
+          ),
+          memberWitness
+        );
+      });
+      await proveAndSend(tx, members[i], 'DKGContract', 'committeeAction');
+      contracts[Contract.DKG].actionStates.push(
+        dkgContract.account.actionState.get()
+      );
+    }
   }
 
   if (profiling) DKGProfiler.store();
