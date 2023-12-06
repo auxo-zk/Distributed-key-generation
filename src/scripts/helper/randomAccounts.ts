@@ -16,13 +16,15 @@ export default function randomAccounts<K extends string>(
 }
 
 // function main() {
-//   let { keys, addresses } = randomAccounts('dkg1', 'p1', 'p2');
-//   console.log('dkg1 privatekey: ', keys.dkg1.toBase58());
-//   console.log('dkg1 publickey: ', addresses.dkg1.toBase58());
-//   console.log('p1 publickey: ', addresses.dkg1.toBase58());
-//   console.log('p2 publickey: ', addresses.dkg1.toBase58());
+//   for (let i = 0; i < 4; i++) {
+//     let { keys, addresses } = randomAccounts('dkg1', 'p1', 'p2');
+//     console.log('privatekey: ', keys.dkg1.toBase58());
+//     console.log('publickey: ', addresses.dkg1.toBase58());
+//     console.log('===========================');
+//   }
 // }
 
+// main();
 // if (require.main === module) {
 //   main();
 // }

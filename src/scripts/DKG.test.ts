@@ -100,7 +100,7 @@ import {
 import { RequestContract } from '../contracts/Request.js';
 
 describe('DKG', () => {
-  const doProofs = false;
+  const doProofs = true;
   const profiling = false;
   const logMemory = true;
   const cache = Cache.FileSystem('./caches');
@@ -117,10 +117,10 @@ describe('DKG', () => {
   } = {};
 
   let committeeIndex = Field(0);
-  let T = 2,
-    N = 3;
+  let T = 1,
+    N = 2;
   let members: Key[] = Local.testAccounts.slice(1, N + 1);
-  let responsedMembers = [2, 0];
+  let responsedMembers = [0];
   let secrets: SecretPolynomial[] = [];
   let publicKeys: Group[] = [];
   let requestId = Field(0);
@@ -281,42 +281,44 @@ describe('DKG', () => {
       publicKey: Local.testAccounts[0].publicKey,
     };
 
-    Object.keys(Contract)
-      .filter((item) => isNaN(Number(item)))
-      .map(async (e) => {
-        let config = configJson.deployAliases[e.toLowerCase()];
-        // console.log(config);
-        let keyBase58: { privateKey: string; publicKey: string } = JSON.parse(
-          await fs.readFileSync(config.keyPath, 'utf8')
-        );
-        let key = {
-          privateKey: PrivateKey.fromBase58(keyBase58.privateKey),
-          publicKey: PublicKey.fromBase58(keyBase58.publicKey),
-        };
-        let contract = (() => {
-          switch (e.toLowerCase()) {
-            case Contract.COMMITTEE:
-              return new CommitteeContract(key.publicKey);
-            case Contract.DKG:
-              return new DKGContract(key.publicKey);
-            case Contract.ROUND1:
-              return new Round1Contract(key.publicKey);
-            case Contract.ROUND2:
-              return new Round2Contract(key.publicKey);
-            case Contract.RESPONSE:
-              return new ResponseContract(key.publicKey);
-            case Contract.REQUEST:
-              return new RequestContract(key.publicKey);
-            default:
-              return new SmartContract(key.publicKey);
-          }
-        })();
-        contracts[e.toLowerCase()] = {
-          key: key,
-          contract: contract,
-          actionStates: [Reducer.initialActionState],
-        };
-      });
+    await Promise.all(
+      Object.keys(Contract)
+        .filter((item) => isNaN(Number(item)))
+        .map(async (e) => {
+          let config = configJson.deployAliases[e.toLowerCase()];
+          // console.log(config);
+          let keyBase58: { privateKey: string; publicKey: string } = JSON.parse(
+            await fs.readFileSync(config.keyPath, 'utf8')
+          );
+          let key = {
+            privateKey: PrivateKey.fromBase58(keyBase58.privateKey),
+            publicKey: PublicKey.fromBase58(keyBase58.publicKey),
+          };
+          let contract = (() => {
+            switch (e.toLowerCase()) {
+              case Contract.COMMITTEE:
+                return new CommitteeContract(key.publicKey);
+              case Contract.DKG:
+                return new DKGContract(key.publicKey);
+              case Contract.ROUND1:
+                return new Round1Contract(key.publicKey);
+              case Contract.ROUND2:
+                return new Round2Contract(key.publicKey);
+              case Contract.RESPONSE:
+                return new ResponseContract(key.publicKey);
+              case Contract.REQUEST:
+                return new RequestContract(key.publicKey);
+              default:
+                return new SmartContract(key.publicKey);
+            }
+          })();
+          contracts[e.toLowerCase()] = {
+            key: key,
+            contract: contract,
+            actionStates: [Reducer.initialActionState],
+          };
+        })
+    );
   });
 
   it('Should compile all ZK programs', async () => {
