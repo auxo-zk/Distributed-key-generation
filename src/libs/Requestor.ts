@@ -41,6 +41,30 @@ export function generateEncryption(
   return { r, R, M };
 }
 
+export function generateEncryptionWithRandomInput(
+  r: Scalar[],
+  publicKey: Group,
+  vector: bigint[]
+): {
+  R: Group[];
+  M: Group[];
+} {
+  let dimension = vector.length;
+  let R = new Array<Group>(dimension);
+  let M = new Array<Group>(dimension);
+  for (let i = 0; i < dimension; i++) {
+    let random = r[i];
+    R[i] = Group.generator.scale(random);
+    M[i] =
+      vector[i] > 0n
+        ? Group.generator
+            .scale(Scalar.from(vector[i]))
+            .add(publicKey.scale(random))
+        : Group.zero.add(publicKey.scale(random));
+  }
+  return { R, M };
+}
+
 export function accumulateEncryption(
   R: Group[][],
   M: Group[][]

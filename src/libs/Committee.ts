@@ -133,6 +133,22 @@ export function generateRandomPolynomial(
   return { a, C, f };
 }
 
+export function generateRandomPolynomialWithInputRandom(
+  a: Scalar[],
+  T: number,
+  N: number
+): SecretPolynomial {
+  let C = new Array<Group>(T);
+  for (let i = 0; i < T; i++) {
+    C[i] = Group.generator.scale(a[i]);
+  }
+  let f = new Array<Scalar>(N);
+  for (let i = 0; i < N; i++) {
+    f[i] = calculatePolynomialValue(a, i + 1);
+  }
+  return { a, C, f };
+}
+
 export function getRound1Contribution(
   secret: SecretPolynomial
 ): Round1Contribution {
