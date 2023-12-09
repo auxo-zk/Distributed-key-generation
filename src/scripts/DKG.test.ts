@@ -97,11 +97,11 @@ import {
   accumulateEncryption,
   generateEncryption,
 } from '../libs/Requestor.js';
-import { RequestContract } from '../contracts/Request.js';
+import { CreateRequest, RequestContract } from '../contracts/Request.js';
 
 describe('DKG', () => {
   const doProofs = true;
-  const profiling = false;
+  const profiling = true;
   const logMemory = true;
   const cache = Cache.FileSystem('./caches');
   const DKGProfiler = getProfiler('Benchmark DKG');
@@ -120,7 +120,7 @@ describe('DKG', () => {
   let T = 1,
     N = 2;
   let members: Key[] = Local.testAccounts.slice(1, N + 1);
-  let responsedMembers = [0];
+  let responsedMembers = [1, 0];
   let secrets: SecretPolynomial[] = [];
   let publicKeys: Group[] = [];
   let requestId = Field(0);
@@ -336,12 +336,16 @@ describe('DKG', () => {
     await compile(CompleteResponse, 'CompleteResponse', profiling);
 
     await compile(CreateCommittee, 'CreateCommittee', profiling);
+
+    await compile(CreateRequest, 'CreateRequest', profiling);
+
     if (doProofs) {
       await compile(CommitteeContract, 'CommitteeContract', profiling);
       await compile(DKGContract, 'DKGContract', profiling);
       await compile(Round1Contract, 'Round1Contract', profiling);
       await compile(Round2Contract, 'Round2Contract', profiling);
       await compile(ResponseContract, 'ResponseContract', profiling);
+      await compile(RequestContract, 'RequestContract', profiling);
     }
   });
 

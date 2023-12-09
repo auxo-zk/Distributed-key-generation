@@ -16,6 +16,7 @@ import {
 import {
   CArray,
   EncryptionHashArray,
+  MemberArray,
   PublicKeyArray,
   Round2Contribution,
 } from '../libs/Committee.js';
@@ -73,6 +74,12 @@ export class Action extends Struct({
       memberId: Field(0),
       contribution: Round2Contribution.empty(),
     });
+  }
+  static fromFields(fields: Field[]): Action {
+    return super.fromFields(fields) as Action;
+  }
+  hash(): Field {
+    return Poseidon.hash(Action.toFields(this));
   }
 }
 
@@ -375,13 +382,15 @@ export class Round2Contract extends SmartContract {
     proof.verify();
 
     // Verify committee member - FIXME check if using this.sender is secure
-    let memberId = committeeContract.checkMember(
-      new CheckMemberInput({
-        address: this.sender,
-        commiteeId: committeeId,
-        memberWitness: memberWitness,
-      })
-    );
+    committeeContract.memberTreeRoot
+      .getAndAssertEquals()
+      .assertEquals(
+        memberWitness.level1.calculateRoot(
+          memberWitness.level2.calculateRoot(MemberArray.hash(this.sender))
+        )
+      );
+    committeeId.assertEquals(memberWitness.level1.calculateIndex());
+    let memberId = memberWitness.level2.calculateIndex();
     memberId.assertEquals(proof.publicInput.memberId);
 
     // Verify round 1 public keys (C0[]])
@@ -410,7 +419,7 @@ export class Round2Contract extends SmartContract {
     let action = new Action({
       committeeId: committeeId,
       keyId: keyId,
-      memberId: memberId,
+      memberId: proof.publicInput.memberId,
       contribution: new Round2Contribution({
         c: proof.publicInput.c,
         U: proof.publicInput.U,
@@ -494,14 +503,14 @@ export class Round2Contract extends SmartContract {
     proof.publicOutput.counter.assertEquals(proof.publicOutput.N);
 
     // Verify committee config
-    committeeContract.checkConfig(
-      new CheckConfigInput({
-        N: proof.publicOutput.N,
-        T: proof.publicOutput.T,
-        commiteeId: proof.publicInput.action.committeeId,
-        settingWitness: settingWitness,
-      })
-    );
+    proof.publicOutput.N.assertGreaterThanOrEqual(proof.publicOutput.T);
+    committeeContract.settingTreeRoot
+      .getAndAssertEquals()
+      .assertEquals(
+        settingWitness.calculateRoot(
+          Poseidon.hash([proof.publicOutput.N, proof.publicOutput.T])
+        )
+      );
 
     // Verify key status
     let keyIndex = proof.publicOutput.keyIndex;

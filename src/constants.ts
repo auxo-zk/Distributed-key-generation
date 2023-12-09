@@ -1,5 +1,5 @@
 export const ADDRESS_MAX_SIZE = 8;
-export const COMMITTEE_MAX_SIZE = 4;
+export const COMMITTEE_MAX_SIZE = 3;
 export const REQUEST_MAX_SIZE = 5;
 export const INSTANCE_LIMITS = {
   COMMITTEE: 2 ** 3,

@@ -55,6 +55,12 @@ export class Action extends Struct({
       contribution: Round1Contribution.empty(),
     });
   }
+  static fromFields(fields: Field[]): Action {
+    return super.fromFields(fields) as Action;
+  }
+  hash(): Field {
+    return Poseidon.hash(Action.toFields(this));
+  }
 }
 
 export class ReduceOutput extends Struct({
