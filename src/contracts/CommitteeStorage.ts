@@ -22,7 +22,7 @@ export class FullMTWitness extends Struct({
   level2: Level2Witness,
 }) {}
 
-abstract class CommitteeStrorage {
+export abstract class CommitteeStrorage {
   level1: Level1MT;
   level2s: { [key: string]: Level2MT };
 

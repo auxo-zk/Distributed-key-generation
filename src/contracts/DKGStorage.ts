@@ -29,7 +29,7 @@ export class FullMTWitness extends Struct({
   level2: Level2Witness,
 }) {}
 
-abstract class DKGStorage {
+export abstract class DKGStorage {
   level1: Level1MT;
   level2s: { [key: string]: Level2MT };
 
