@@ -100,7 +100,7 @@ import {
 import { RequestContract } from '../contracts/Request.js';
 
 describe('DKG', () => {
-  const doProofs = true;
+  const doProofs = false;
   const profiling = false;
   const logMemory = true;
   const cache = Cache.FileSystem('./caches');

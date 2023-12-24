@@ -340,7 +340,7 @@ export class ResponseContract extends SmartContract {
     encryptionWitness: DKGWitness
   ) {
     // Verify zkApp references
-    let zkApps = this.zkApps.getAndAssertEquals();
+    let zkApps = this.zkApps.getAndRequireEquals();
 
     // CommitteeContract
     zkApps.assertEquals(
@@ -383,7 +383,7 @@ export class ResponseContract extends SmartContract {
       .mul(committeeId)
       .add(keyId);
     round1Contract.publicKeys
-      .getAndAssertEquals()
+      .getAndRequireEquals()
       .assertEquals(
         publicKeyWitness.level1.calculateRoot(
           publicKeyWitness.level2.calculateRoot(
@@ -410,7 +410,7 @@ export class ResponseContract extends SmartContract {
       );
     }
     round2Contract.encryptions
-      .getAndAssertEquals()
+      .getAndRequireEquals()
       .assertEquals(
         encryptionWitness.level1.calculateRoot(
           encryptionWitness.level2.calculateRoot(encryptionHashChain)
@@ -453,8 +453,8 @@ export class ResponseContract extends SmartContract {
   @method
   reduce(proof: ReduceResponseProof) {
     // Get current state values
-    let reduceState = this.reduceState.getAndAssertEquals();
-    let actionState = this.account.actionState.getAndAssertEquals();
+    let reduceState = this.reduceState.getAndRequireEquals();
+    let actionState = this.account.actionState.getAndRequireEquals();
 
     // Verify proof
     proof.verify();
@@ -493,9 +493,9 @@ export class ResponseContract extends SmartContract {
     keyStatusWitness: Level1Witness
   ) {
     // Get current state values
-    let zkApps = this.zkApps.getAndAssertEquals();
-    let contributions = this.contributions.getAndAssertEquals();
-    let reduceState = this.reduceState.getAndAssertEquals();
+    let zkApps = this.zkApps.getAndRequireEquals();
+    let contributions = this.contributions.getAndRequireEquals();
+    let reduceState = this.reduceState.getAndRequireEquals();
 
     // Verify zkApp references
     // CommitteeContract
@@ -542,7 +542,7 @@ export class ResponseContract extends SmartContract {
       .mul(proof.publicInput.action.committeeId)
       .add(proof.publicInput.action.keyId);
     dkgContract.keyStatus
-      .getAndAssertEquals()
+      .getAndRequireEquals()
       .assertEquals(keyStatusWitness.calculateRoot(Field(KeyStatus.ACTIVE)));
     keyIndex.assertEquals(keyStatusWitness.calculateIndex());
 

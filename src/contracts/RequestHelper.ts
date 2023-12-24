@@ -302,15 +302,15 @@ export class RequestHelperContract extends SmartContract {
     proof.verify();
 
     // assert initialActionState
-    let actionState = this.actionState.getAndAssertEquals();
+    let actionState = this.actionState.getAndRequireEquals();
     proof.publicOutput.initialActionState.assertEquals(actionState);
 
     // assert initialActionStatus
-    let actionStatus = this.actionStatus.getAndAssertEquals();
+    let actionStatus = this.actionStatus.getAndRequireEquals();
     proof.publicOutput.initialActionStatus.assertEquals(actionStatus);
 
     // assert finalActionState
-    let lastActionState = this.account.actionState.getAndAssertEquals();
+    let lastActionState = this.account.actionState.getAndRequireEquals();
     lastActionState.assertEquals(proof.publicOutput.finalActionState);
 
     this.actionState.set(lastActionState);
@@ -326,9 +326,9 @@ export class RequestHelperContract extends SmartContract {
   ) {
     proof.verify();
 
-    let R_Root = this.R_Root.getAndAssertEquals();
-    let M_Root = this.M_Root.getAndAssertEquals();
-    let actionStatus = this.actionStatus.getAndAssertEquals();
+    let R_Root = this.R_Root.getAndRequireEquals();
+    let M_Root = this.M_Root.getAndRequireEquals();
+    let actionStatus = this.actionStatus.getAndRequireEquals();
 
     actionStatus.assertEquals(proof.publicOutput.initialStatusRoot);
     let [old_R_root, R_key] = R_wintess.computeRootAndKey(Field(0));

@@ -184,17 +184,17 @@ export class CommitteeContract extends SmartContract {
 
   @method rollupIncrements(proof: CommitteeProof) {
     proof.verify();
-    let curActionState = this.actionState.getAndAssertEquals();
-    let nextCommitteeId = this.nextCommitteeId.getAndAssertEquals();
-    let memberTreeRoot = this.memberTreeRoot.getAndAssertEquals();
-    let settingTreeRoot = this.settingTreeRoot.getAndAssertEquals();
+    let curActionState = this.actionState.getAndRequireEquals();
+    let nextCommitteeId = this.nextCommitteeId.getAndRequireEquals();
+    let memberTreeRoot = this.memberTreeRoot.getAndRequireEquals();
+    let settingTreeRoot = this.settingTreeRoot.getAndRequireEquals();
 
     curActionState.assertEquals(proof.publicOutput.initialActionState);
     nextCommitteeId.assertEquals(proof.publicOutput.initialCommitteeId);
     memberTreeRoot.assertEquals(proof.publicOutput.initialMemberTreeRoot);
     settingTreeRoot.assertEquals(proof.publicOutput.initialSettingTreeRoot);
 
-    let lastActionState = this.account.actionState.getAndAssertEquals();
+    let lastActionState = this.account.actionState.getAndRequireEquals();
     lastActionState.assertEquals(proof.publicOutput.finalActionState);
 
     // update on-chain state
@@ -219,7 +219,7 @@ export class CommitteeContract extends SmartContract {
     let root = input.memberWitness.level1.calculateRoot(leaf);
     let _commiteeId = input.memberWitness.level1.calculateIndex();
 
-    const onChainRoot = this.memberTreeRoot.getAndAssertEquals();
+    const onChainRoot = this.memberTreeRoot.getAndRequireEquals();
     root.assertEquals(onChainRoot);
     input.commiteeId.assertEquals(_commiteeId);
     return memberId;
@@ -231,7 +231,7 @@ export class CommitteeContract extends SmartContract {
     let hashSetting = Poseidon.hash([input.T, input.N]);
     let root = input.settingWitness.calculateRoot(hashSetting);
     let _commiteeId = input.settingWitness.calculateIndex();
-    const onChainRoot = this.settingTreeRoot.getAndAssertEquals();
+    const onChainRoot = this.settingTreeRoot.getAndRequireEquals();
     root.assertEquals(onChainRoot);
     input.commiteeId.assertEquals(_commiteeId);
   }

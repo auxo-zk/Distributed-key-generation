@@ -337,7 +337,7 @@ export class Round1Contract extends SmartContract {
     memberWitness: CommitteeFullWitness
   ) {
     // Verify zkApp references
-    let zkApps = this.zkApps.getAndAssertEquals();
+    let zkApps = this.zkApps.getAndRequireEquals();
 
     // CommitteeContract
     zkApps.assertEquals(
@@ -373,8 +373,8 @@ export class Round1Contract extends SmartContract {
   @method
   reduce(proof: ReduceRound1Proof) {
     // Get current state values
-    let reduceState = this.reduceState.getAndAssertEquals();
-    let actionState = this.account.actionState.getAndAssertEquals();
+    let reduceState = this.reduceState.getAndRequireEquals();
+    let actionState = this.account.actionState.getAndRequireEquals();
 
     // Verify proof
     proof.verify();
@@ -412,10 +412,10 @@ export class Round1Contract extends SmartContract {
     keyStatusWitness: Level1Witness
   ) {
     // Get current state values
-    let zkApps = this.zkApps.getAndAssertEquals();
-    let contributions = this.contributions.getAndAssertEquals();
-    let publicKeys = this.publicKeys.getAndAssertEquals();
-    let reduceState = this.reduceState.getAndAssertEquals();
+    let zkApps = this.zkApps.getAndRequireEquals();
+    let contributions = this.contributions.getAndRequireEquals();
+    let publicKeys = this.publicKeys.getAndRequireEquals();
+    let reduceState = this.reduceState.getAndRequireEquals();
 
     // Verify zkApp references
     // CommitteeContract
@@ -457,7 +457,7 @@ export class Round1Contract extends SmartContract {
       .mul(proof.publicInput.action.committeeId)
       .add(proof.publicInput.action.keyId);
     dkgContract.keyStatus
-      .getAndAssertEquals()
+      .getAndRequireEquals()
       .assertEquals(
         keyStatusWitness.calculateRoot(Field(KeyStatus.ROUND_1_CONTRIBUTION))
       );

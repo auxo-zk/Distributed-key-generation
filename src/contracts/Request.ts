@@ -267,7 +267,7 @@ export class RequestContract extends SmartContract {
   }
 
   @method request(requestInput: RequestInput) {
-    let actionState = this.actionState.getAndAssertEquals();
+    let actionState = this.actionState.getAndRequireEquals();
     let actionType = createActionMask(Field(ActionEnum.REQUEST));
 
     let requestInputId = requestInput.requestId();
@@ -316,7 +316,7 @@ export class RequestContract extends SmartContract {
   }
 
   @method unrequest(unRequestInput: UnRequestInput) {
-    let actionState = this.actionState.getAndAssertEquals();
+    let actionState = this.actionState.getAndRequireEquals();
     let actionType = createActionMask(Field(ActionEnum.UNREQUEST));
 
     // Check current state if it is requesting
@@ -324,14 +324,16 @@ export class RequestContract extends SmartContract {
       unRequestInput.requestStatusWitness.computeRootAndKey(
         Field(RequestStatusEnum.REQUESTING)
       );
-    requestStatusRoot.assertEquals(this.requestStatusRoot.getAndAssertEquals());
+    requestStatusRoot.assertEquals(
+      this.requestStatusRoot.getAndRequireEquals()
+    );
 
     // Check requesterRoot and sender is requester
     let [requesterRoot, requesterId] =
       unRequestInput.requesterWitness.computeRootAndKey(
         Poseidon.hash(PublicKey.toFields(unRequestInput.currentRequester))
       );
-    requesterRoot.assertEquals(this.requesterRoot.getAndAssertEquals());
+    requesterRoot.assertEquals(this.requesterRoot.getAndRequireEquals());
 
     // Check bot have the same ID
     requestStatusId.assertEquals(requesterId);
@@ -370,13 +372,13 @@ export class RequestContract extends SmartContract {
   }
 
   @method resolveRequest(resolveInput: ResolveInput) {
-    let actionState = this.actionState.getAndAssertEquals();
+    let actionState = this.actionState.getAndRequireEquals();
 
     let actionType = createActionMask(Field(ActionEnum.RESOLVE));
 
     // Do this so that only respone contract can called function
     let responeContractAddress =
-      this.responeContractAddress.getAndAssertEquals();
+      this.responeContractAddress.getAndRequireEquals();
     let update = AccountUpdate.create(responeContractAddress);
     update.body.mayUseToken = AccountUpdate.MayUseToken.InheritFromParent;
 
@@ -417,15 +419,15 @@ export class RequestContract extends SmartContract {
 
   @method rollupRequest(proof: RequestProof) {
     proof.verify();
-    let actionState = this.actionState.getAndAssertEquals();
-    let requestStatusRoot = this.requestStatusRoot.getAndAssertEquals();
-    let requesterRoot = this.requesterRoot.getAndAssertEquals();
+    let actionState = this.actionState.getAndRequireEquals();
+    let requestStatusRoot = this.requestStatusRoot.getAndRequireEquals();
+    let requesterRoot = this.requesterRoot.getAndRequireEquals();
 
     actionState.assertEquals(proof.publicOutput.initialActionState);
     requestStatusRoot.assertEquals(proof.publicOutput.initialRequestStatusRoot);
     requesterRoot.assertEquals(proof.publicOutput.initialRequesterRoot);
 
-    let lastActionState = this.account.actionState.getAndAssertEquals();
+    let lastActionState = this.account.actionState.getAndRequireEquals();
     lastActionState.assertEquals(proof.publicOutput.finalActionState);
 
     // update on-chain state

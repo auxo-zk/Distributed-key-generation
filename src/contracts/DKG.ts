@@ -303,7 +303,7 @@ export class DKGContract extends SmartContract {
     memberWitness: CommitteeFullWitness
   ) {
     // Verify zkApp references
-    let zkApps = this.zkApps.getAndAssertEquals();
+    let zkApps = this.zkApps.getAndRequireEquals();
 
     // CommitteeContract
     zkApps.assertEquals(
@@ -376,9 +376,9 @@ export class DKGContract extends SmartContract {
 
   @method updateKeys(proof: UpdateKeyProof) {
     // Get current state values
-    let keyCounter = this.keyCounter.getAndAssertEquals();
-    let keyStatus = this.keyStatus.getAndAssertEquals();
-    let actionState = this.account.actionState.getAndAssertEquals();
+    let keyCounter = this.keyCounter.getAndRequireEquals();
+    let keyStatus = this.keyStatus.getAndRequireEquals();
+    let actionState = this.account.actionState.getAndRequireEquals();
 
     // Verify proof
     proof.verify();

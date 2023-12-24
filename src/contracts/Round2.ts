@@ -353,7 +353,7 @@ export class Round2Contract extends SmartContract {
     publicKeysWitness: Level1Witness
   ) {
     // Verify zkApp references
-    let zkApps = this.zkApps.getAndAssertEquals();
+    let zkApps = this.zkApps.getAndRequireEquals();
 
     // CommitteeContract
     zkApps.assertEquals(
@@ -402,7 +402,7 @@ export class Round2Contract extends SmartContract {
       return publicKeysMT.getRoot();
     });
     round1Contract.publicKeys
-      .getAndAssertEquals()
+      .getAndRequireEquals()
       .assertEquals(publicKeysWitness.calculateRoot(publicKeysLeaf));
     keyIndex.assertEquals(publicKeysWitness.calculateIndex());
 
@@ -422,8 +422,8 @@ export class Round2Contract extends SmartContract {
   @method
   reduce(proof: ReduceRound2Proof) {
     // Get current state values
-    let reduceState = this.reduceState.getAndAssertEquals();
-    let actionState = this.account.actionState.getAndAssertEquals();
+    let reduceState = this.reduceState.getAndRequireEquals();
+    let actionState = this.account.actionState.getAndRequireEquals();
 
     // Verify proof
     proof.verify();
@@ -464,10 +464,10 @@ export class Round2Contract extends SmartContract {
     keyStatusWitness: Level1Witness
   ) {
     // Get current state values
-    let zkApps = this.zkApps.getAndAssertEquals();
-    let contributions = this.contributions.getAndAssertEquals();
-    let encryptions = this.encryptions.getAndAssertEquals();
-    let reduceState = this.reduceState.getAndAssertEquals();
+    let zkApps = this.zkApps.getAndRequireEquals();
+    let contributions = this.contributions.getAndRequireEquals();
+    let encryptions = this.encryptions.getAndRequireEquals();
+    let reduceState = this.reduceState.getAndRequireEquals();
 
     // Verify zkApp references
     // CommitteeContract
@@ -506,7 +506,7 @@ export class Round2Contract extends SmartContract {
     // Verify key status
     let keyIndex = proof.publicOutput.keyIndex;
     dkgContract.keyStatus
-      .getAndAssertEquals()
+      .getAndRequireEquals()
       .assertEquals(
         keyStatusWitness.calculateRoot(Field(KeyStatus.ROUND_2_CONTRIBUTION))
       );
