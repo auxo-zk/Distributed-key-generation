@@ -205,7 +205,7 @@ export class CommitteeContract extends SmartContract {
 
     this.emitEvent(
       EventEnum.COMMITTEE_CREATED,
-      proof.publicOutput.finalCommitteeId
+      proof.publicOutput.finalCommitteeId.sub(Field(1))
     );
   }
 
