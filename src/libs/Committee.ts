@@ -1,12 +1,4 @@
-import {
-  Field,
-  Group,
-  Poseidon,
-  PrivateKey,
-  PublicKey,
-  Scalar,
-  Struct,
-} from 'o1js';
+import { Field, Group, Poseidon, Scalar, Struct } from 'o1js';
 import {
   Bit255,
   Bit255DynamicArray,
@@ -25,6 +17,7 @@ export class CArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
 export class cArray extends Bit255DynamicArray(COMMITTEE_MAX_SIZE) {}
 export class UArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
 export class PublicKeyArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
+export class IndexArray extends FieldDynamicArray(COMMITTEE_MAX_SIZE) {}
 export class EncryptionHashArray extends FieldDynamicArray(
   COMMITTEE_MAX_SIZE
 ) {}

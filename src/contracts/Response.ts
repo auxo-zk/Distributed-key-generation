@@ -1,5 +1,4 @@
 import {
-  Bool,
   Field,
   Group,
   Poseidon,
@@ -14,7 +13,7 @@ import {
   method,
   state,
 } from 'o1js';
-import { ResponseContribution } from '../libs/Committee.js';
+import { IndexArray, ResponseContribution } from '../libs/Committee.js';
 import { updateOutOfSnark } from '../libs/utils.js';
 import {
   FullMTWitness as CommitteeFullWitness,
@@ -33,7 +32,7 @@ import {
 } from './Committee.js';
 import { DKGContract, KeyStatus } from './DKG.js';
 import { RequestContract, RequestVector, ResolveInput } from './Request.js';
-import { BatchDecryptionProof, PlainArray } from './Encryption.js';
+import { BatchDecryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
 import { Round2Contract } from './Round2.js';
 import {
@@ -160,6 +159,7 @@ export class ResponseOutput extends Struct({
   requestId: Field,
   D: RequestVector,
   counter: Field,
+  indexList: IndexArray,
 }) {}
 
 /**
@@ -181,7 +181,15 @@ export const CompleteResponse = ZkProgram({
   publicOutput: ResponseOutput,
   methods: {
     firstStep: {
-      privateInputs: [Field, Field, Field, Field, Field, Level1Witness],
+      privateInputs: [
+        Field,
+        Field,
+        Field,
+        Field,
+        Field,
+        Level1Witness,
+        IndexArray,
+      ],
       method(
         input: ResponseInput,
         T: Field,
@@ -189,7 +197,8 @@ export const CompleteResponse = ZkProgram({
         initialContributionRoot: Field,
         reduceStateRoot: Field,
         requestId: Field,
-        contributionWitness: Level1Witness
+        contributionWitness: Level1Witness,
+        indexList: IndexArray
       ) {
         // Verify there is no recorded contribution for the request
         initialContributionRoot.assertEquals(
@@ -211,6 +220,7 @@ export const CompleteResponse = ZkProgram({
           requestId: requestId,
           D: new RequestVector(),
           counter: Field(0),
+          indexList: indexList,
         });
       },
     },
@@ -254,12 +264,33 @@ export const CompleteResponse = ZkProgram({
           )
         );
 
+        // Compute Lagrange coefficient
+        let lagrangeCoefficient: Scalar = Scalar.from(1n);
+        for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+          let j = earlierProof.publicOutput.indexList.get(Field(i));
+          lagrangeCoefficient = Provable.if(
+            Field(i)
+              .greaterThanOrEqual(earlierProof.publicOutput.T)
+              .or(j.equals(input.action.memberId.add(1))),
+            lagrangeCoefficient,
+            Provable.witness(Scalar, () => {
+              return Scalar.from(j.toBigInt()).div(
+                Scalar.from(j.sub(i).toBigInt())
+              );
+            })
+          );
+        }
+
         // Compute D values
         let D = earlierProof.publicOutput.D;
         for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
           D.set(
             Field(i),
-            D.get(Field(i)).add(input.action.contribution.D.get(Field(i)))
+            D.get(Field(i)).add(
+              input.action.contribution.D.get(Field(i)).scale(
+                lagrangeCoefficient
+              )
+            )
           );
         }
 
@@ -283,6 +314,7 @@ export const CompleteResponse = ZkProgram({
           requestId: input.action.requestId,
           D: D,
           counter: earlierProof.publicOutput.counter.add(Field(1)),
+          indexList: earlierProof.publicOutput.indexList,
         });
       },
     },
