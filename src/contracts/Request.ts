@@ -43,6 +43,7 @@ export const enum RequestStatusEnum {
 
 export enum EventEnum {
   CREATE_REQUEST = 'create-request',
+  ACTION_REDUCED = 'action-reduced',
 }
 
 export class ActionMask extends BoolDynamicArray(ActionEnum.__LENGTH) {}
@@ -257,6 +258,7 @@ export class RequestContract extends SmartContract {
 
   events = {
     [EventEnum.CREATE_REQUEST]: CreateRequestEvent,
+    [EventEnum.ACTION_REDUCED]: Field,
   };
 
   init() {
@@ -434,6 +436,8 @@ export class RequestContract extends SmartContract {
     this.actionState.set(proof.publicOutput.finalActionState);
     this.requestStatusRoot.set(proof.publicOutput.finalRequestStatusRoot);
     this.requesterRoot.set(proof.publicOutput.finalRequesterRoot);
+
+    this.emitEvent(EventEnum.ACTION_REDUCED, lastActionState);
   }
 
   // to-do: after finished request, committee can take fee (maybe using another contract)
