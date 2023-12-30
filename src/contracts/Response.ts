@@ -13,7 +13,7 @@ import {
   method,
   state,
 } from 'o1js';
-import { IndexArray, ResponseContribution } from '../libs/Committee.js';
+import { ResponseContribution } from '../libs/Committee.js';
 import { updateOutOfSnark } from '../libs/utils.js';
 import {
   FullMTWitness as CommitteeFullWitness,
