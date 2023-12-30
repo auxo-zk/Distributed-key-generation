@@ -186,7 +186,16 @@ export const CompleteResponse = ZkProgram({
   publicOutput: ResponseOutput,
   methods: {
     firstStep: {
-      privateInputs: [Field, Field, Field, Field, Field, Level1Witness, Field],
+      privateInputs: [
+        Field,
+        Field,
+        Field,
+        Field,
+        Field,
+        Field,
+        Field,
+        Level1Witness,
+      ],
       method(
         input: ResponseInput,
         T: Field,
@@ -194,8 +203,9 @@ export const CompleteResponse = ZkProgram({
         initialContributionRoot: Field,
         reduceStateRoot: Field,
         requestId: Field,
-        contributionWitness: Level1Witness,
-        indexList: Field
+        requestDim: Field,
+        indexList: Field,
+        contributionWitness: Level1Witness
       ) {
         // Verify there is no recorded contribution for the request
         initialContributionRoot.assertEquals(
@@ -208,6 +218,17 @@ export const CompleteResponse = ZkProgram({
           EMPTY_LEVEL_2_TREE().getRoot()
         );
 
+        // Initialize dynamic vector D
+        let D = Provable.witness(
+          RequestVector,
+          () =>
+            new RequestVector(
+              [...Array(Number(requestDim)).keys()].map((e) => Group.zero)
+            )
+        );
+        D.length.assertEquals(requestDim);
+        for (let i = 0; i < REQUEST_MAX_SIZE; i++) D.set(Field(i), Group.zero);
+
         return new ResponseOutput({
           T: T,
           N: N,
@@ -215,7 +236,7 @@ export const CompleteResponse = ZkProgram({
           reduceStateRoot: reduceStateRoot,
           newContributionRoot: newContributionRoot,
           requestId: requestId,
-          D: new RequestVector(),
+          D: D,
           counter: Field(0),
           indexList: indexList,
         });
@@ -474,10 +495,10 @@ export class ResponseContract extends SmartContract {
     memberId.assertEquals(encryptionWitness.level2.calculateIndex());
 
     // Compute response
-    // TODO: Remove Provable.witness or adding assertion
     let D = Provable.witness(DArray, () => {
       return new DArray(R.values.slice(0, Number(R.length)));
     });
+    D.length.assertEquals(R.length);
     for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
       let Ri = R.get(Field(i));
       Group.generator.scale(ski).equals(decryptionProof.publicOutput);

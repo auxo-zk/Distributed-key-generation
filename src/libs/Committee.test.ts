@@ -2,9 +2,7 @@ import {
   Field,
   Group,
   method,
-  Provable,
   PrivateKey,
-  PublicKey,
   Scalar,
   SmartContract,
   state,
@@ -13,13 +11,14 @@ import {
 } from 'o1js';
 import * as Committee from './Committee.js';
 import * as Requestor from './Requestor.js';
+import { Bit255 } from '@auxo-dev/auxo-libs';
 
 describe('Committee', () => {
   let T = 3;
   let N = 5;
   let committees: {
     privateKey: PrivateKey;
-    index: number;
+    memberId: number;
     secretPolynomial: Committee.SecretPolynomial;
     round1Contribution?: Committee.Round1Contribution;
     round2Contribution?: Committee.Round2Contribution;
@@ -34,15 +33,12 @@ describe('Committee', () => {
   let sumR: Group[] = [];
   let sumM: Group[] = [];
   let D: Group[][] = [];
-  let listIndex = [1, 4, 5];
+  let responsedMembers = [0, 2, 4];
   const plainVectors = [
-    [1000n, 0n, 0n],
-    [0n, 1000n, 0n],
-    [0n, 0n, 1000n],
-    [2000n, 0n, 0n],
-    [2000n, 0n, 0n],
+    [1000n, 1000n, 1000n],
+    [4000n, 3000n, 2000n],
   ];
-  let result = [5000n, 1000n, 1000n];
+  let result = [5000n, 4000n, 3000n];
 
   beforeAll(async () => {
     for (let i = 0; i < N; i++) {
@@ -50,7 +46,7 @@ describe('Committee', () => {
       let secretPolynomial = Committee.generateRandomPolynomial(T, N);
       committees.push({
         privateKey: privateKey,
-        index: i + 1,
+        memberId: i,
         secretPolynomial: secretPolynomial,
         round1Contribution: undefined,
         round2Contribution: undefined,
@@ -65,27 +61,21 @@ describe('Committee', () => {
       );
       committees[i].round1Contribution = round1Contribution;
       round1Contributions.push(round1Contribution);
-      Provable.runAndCheck(() => round1Contribution);
     }
     publicKey = Committee.calculatePublicKey(round1Contributions);
-    // Provable.log(publicKey);
-    // Provable.log(round1Contributions);
   });
 
   it('Should generate round 2 contribution', async () => {
     for (let i = 0; i < N; i++) {
       let round2Contribution = Committee.getRound2Contribution(
         committees[i].secretPolynomial,
-        committees[i].index,
+        committees[i].memberId,
         round1Contributions,
         [...Array(N).keys()].map((e) => Scalar.random())
       );
       committees[i].round2Contribution = round2Contribution;
       round2Contributions.push(round2Contribution);
-      Provable.runAndCheck(() => round2Contribution);
     }
-    // Provable.log(round2Contributions);
-    // round2Contributions.map((e) => console.log(e.data));
   });
 
   it('Should accumulate encryption', async () => {
@@ -101,46 +91,38 @@ describe('Committee', () => {
     let accumulatedEncryption = Requestor.accumulateEncryption(R, M);
     sumR = accumulatedEncryption.sumR;
     sumM = accumulatedEncryption.sumM;
-    // Provable.log(sumR, sumM);
   });
 
   it('Should generate response contribution', async () => {
     for (let i = 0; i < T; i++) {
-      let round2Data: Committee.Round2Data[] = [];
-      round2Contributions.reduce(
-        (prev, curr, index) =>
-          index == committees[listIndex[i] - 1].index - 1
-            ? prev
-            : round2Data.push(
-                {
-                  c: curr.c.values[committees[listIndex[i] - 1].index - 1],
-                  U: curr.U.values[committees[listIndex[i] - 1].index - 1],
-                }
-                //   curr.data[committees[listIndex[i] - 1].index - 1]
-              ),
+      let member = committees[responsedMembers[i]];
+      let round2Data: Committee.Round2Data[] = round2Contributions.map(
+        (contribution, index) =>
+          index == committees[responsedMembers[i]].memberId
+            ? { c: Bit255.fromBigInt(0n), U: Group.zero }
+            : {
+                c: contribution.c.values[member.memberId],
+                U: contribution.U.values[member.memberId],
+              },
         {}
       );
       let responseContribution = Committee.getResponseContribution(
-        committees[listIndex[i] - 1].secretPolynomial,
-        committees[listIndex[i] - 1].index - 1,
+        committees[responsedMembers[i]].secretPolynomial,
+        committees[responsedMembers[i]].memberId,
         round2Data,
         sumR
       )[0];
-      committees[listIndex[i] - 1].responseContribution = responseContribution;
+      committees[responsedMembers[i]].responseContribution =
+        responseContribution;
       responseContributions.push(responseContribution);
-      D.push(responseContribution.D.values.slice(0, T));
+      D.push(responseContribution.D.values);
     }
-    // Provable.log(responseContributions);
-    // responseContributions.map((e) => Provable.log(e.D));
   });
 
   it('Should calculate result vector', async () => {
-    // console.log(D.length);
-    let resultVector = Committee.getResultVector(listIndex, D, sumM);
-    // Provable.log('Result vector: ', resultVector);
+    let resultVector = Committee.getResultVector(responsedMembers, D, sumM);
     for (let i = 0; i < result.length; i++) {
       let point = Group.generator.scale(Scalar.from(result[i]));
-      // Provable.log(point);
       expect(resultVector[i].x).toEqual(point.x);
       expect(resultVector[i].y).toEqual(point.y);
     }

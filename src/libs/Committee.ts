@@ -1,4 +1,4 @@
-import { Field, Group, Poseidon, Scalar, Struct } from 'o1js';
+import { Field, Group, Poseidon, Provable, Scalar, Struct } from 'o1js';
 import {
   Bit255,
   Bit255DynamicArray,
@@ -17,7 +17,6 @@ export class CArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
 export class cArray extends Bit255DynamicArray(COMMITTEE_MAX_SIZE) {}
 export class UArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
 export class PublicKeyArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
-export class IndexArray extends FieldDynamicArray(COMMITTEE_MAX_SIZE) {}
 export class EncryptionHashArray extends FieldDynamicArray(
   COMMITTEE_MAX_SIZE
 ) {}
@@ -151,7 +150,7 @@ export function getRound1Contribution(
 
 export function getRound2Contribution(
   secret: SecretPolynomial,
-  index: number,
+  memberId: number,
   round1Contributions: Round1Contribution[],
   randoms: Scalar[]
 ): Round2Contribution {
@@ -159,7 +158,7 @@ export function getRound2Contribution(
   let c = new Array<Bit255>(secret.f.length);
   let U = new Array<Group>(secret.f.length);
   for (let i = 0; i < data.length; i++) {
-    if (i + 1 == index) {
+    if (i == memberId) {
       c[i] = Bit255.fromBigInt(0n);
       U[i] = Group.zero;
     } else {
@@ -179,16 +178,18 @@ export function getRound2Contribution(
 
 export function getResponseContribution(
   secret: SecretPolynomial,
-  index: number,
+  memberId: number,
   round2Data: Round2Data[],
   R: Group[]
 ): [ResponseContribution, Scalar] {
-  let decryptions: Scalar[] = round2Data.map((data) =>
-    Scalar.from(ElgamalECC.decrypt(data.c, data.U, secret.a[0]).m)
+  let decryptions: Scalar[] = round2Data.map((data, id) =>
+    id == memberId
+      ? secret.f[memberId]
+      : Scalar.from(ElgamalECC.decrypt(data.c, data.U, secret.a[0]).m)
   );
   let ski: Scalar = decryptions.reduce(
     (prev: Scalar, curr: Scalar) => prev.add(curr),
-    secret.f[index]
+    Scalar.from(0n)
   );
 
   let D = new Array<Group>(R.length);
@@ -198,19 +199,18 @@ export function getResponseContribution(
   return [new ResponseContribution({ D: DArray.from(D) }), ski];
 }
 
-export function getLagrangeCoefficient(listIndex: number[]): Scalar[] {
-  const threshold = listIndex.length;
+export function getLagrangeCoefficient(memberIds: number[]): Scalar[] {
+  const threshold = memberIds.length;
   let lagrangeCoefficient = new Array<Scalar>(threshold);
   for (let i = 0; i < threshold; i++) {
-    let indexI = listIndex[i];
+    let indexI = memberIds[i] + 1;
     let numerator = Scalar.from(1);
     let denominator = Scalar.from(1);
     for (let j = 0; j < threshold; j++) {
-      let indexJ = listIndex[j];
-      if (indexI != indexJ) {
-        numerator = numerator.mul(Scalar.from(indexJ));
-        denominator = denominator.mul(Scalar.from(indexJ - indexI));
-      }
+      let indexJ = memberIds[j] + 1;
+      if (indexI == indexJ) continue;
+      numerator = numerator.mul(Scalar.from(indexJ));
+      denominator = denominator.mul(Scalar.from(indexJ - indexI));
     }
     lagrangeCoefficient[i] = numerator.div(denominator);
   }
@@ -218,12 +218,12 @@ export function getLagrangeCoefficient(listIndex: number[]): Scalar[] {
 }
 
 export function getResultVector(
-  listIndex: number[],
+  memberIds: number[],
   D: Group[][],
   M: Group[]
 ): Group[] {
-  let lagrangeCoefficient = getLagrangeCoefficient(listIndex);
-  let threshold = listIndex.length;
+  let lagrangeCoefficient = getLagrangeCoefficient(memberIds);
+  let threshold = memberIds.length;
   let sumD = Array<Group>(M.length);
   sumD.fill(Group.zero);
   for (let i = 0; i < threshold; i++) {
@@ -231,7 +231,6 @@ export function getResultVector(
       sumD[j] = sumD[j].add(D[i][j].scale(lagrangeCoefficient[i]));
     }
   }
-  // console.log(sumD);
   let result = Array<Group>(M.length);
   for (let i = 0; i < result.length; i++) {
     result[i] = M[i].sub(sumD[i]);

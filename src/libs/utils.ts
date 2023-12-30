@@ -1,5 +1,6 @@
 import { AccountUpdate, Cache, Field, Mina } from 'o1js';
 import { Contract, Key } from '../scripts/helper/config.js';
+import { INDEX_SIZE } from '../constants.js';
 
 export function updateOutOfSnark(state: Field, action: Field[][]) {
   let actionsHash = AccountUpdate.Actions.hash(action);
@@ -59,4 +60,10 @@ export async function proveAndSend(
   if (profiler) profiler.stop();
   console.log('DONE!');
   await tx.sign([feePayer.privateKey]).send();
+}
+
+export function packIndexArray(memberIds: number[]): Field {
+  return Field.fromBits(
+    memberIds.map((e) => Field(e).toBits(INDEX_SIZE)).flat()
+  );
 }

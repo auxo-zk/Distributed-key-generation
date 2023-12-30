@@ -4,7 +4,6 @@ import {
   Field,
   Group,
   Mina,
-  Poseidon,
   PrivateKey,
   Provable,
   PublicKey,
@@ -12,7 +11,6 @@ import {
   Scalar,
   SmartContract,
   fetchAccount,
-  provable,
 } from 'o1js';
 import { CustomScalar } from '@auxo-dev/auxo-libs';
 import fs from 'fs/promises';
@@ -82,14 +80,11 @@ import {
 import {
   CArray,
   EncryptionHashArray,
-  IndexArray,
-  PublicKeyArray,
   Round2Data,
   SecretPolynomial,
   UArray,
   cArray,
   calculatePublicKey,
-  generateRandomPolynomial,
   generateRandomPolynomialWithInputRandom,
   getResponseContribution,
   getRound1Contribution,
@@ -99,28 +94,11 @@ import { ZkAppEnum, Contract } from '../constants.js';
 import {
   RArray,
   accumulateEncryption,
-  generateEncryption,
   generateEncryptionWithRandomInput,
 } from '../libs/Requestor.js';
-
-import {
-  RequestContract,
-  RequestInput,
-  UnRequestInput,
-  ResolveInput,
-  CreateRequest,
-  RequestVector,
-  RequestFee,
-  RollupStateOutput,
-  createActionMask,
-  RequestAction,
-  RequestStatusEnum,
-  RequestProof,
-  MockResponeContract,
-} from '../contracts/Request.js';
-import randomAccounts from './helper/randomAccounts.js';
-import { fetchActions, fetchMissingData } from 'o1js/dist/node/lib/fetch.js';
+import { RequestContract, CreateRequest } from '../contracts/Request.js';
 import { EMPTY_LEVEL_1_TREE } from '../contracts/CommitteeStorage.js';
+import { packIndexArray } from '../libs/utils.js';
 
 const waitTime = 8 * 60 * 1000; // 7m
 
@@ -386,6 +364,7 @@ async function main() {
     [1000n, 2000n, 3000n],
     [4000n, 3000n, 2000n],
   ];
+  let mockResult = [5000n, 5000n, 5000n];
   let randomForGenerateEncyption = [
     [Scalar.from(100), Scalar.from(200), Scalar.from(300)],
     [Scalar.from(400), Scalar.from(500), Scalar.from(600)],
@@ -1600,10 +1579,11 @@ async function main() {
     initialContributionRoot,
     reduceStateRoot,
     requestId,
+    Field(mockResult.length),
+    packIndexArray(responsedMembers),
     responseContributionStorage.getLevel1Witness(
       responseContributionStorage.calculateLevel1Index(requestId)
-    ),
-    Field.fromBits(responsedMembers.map((e) => Field(e).toBits(6)).flat())
+    )
   );
   if (profiling) DKGProfiler.stop();
   console.log('DONE!');

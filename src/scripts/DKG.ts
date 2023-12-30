@@ -4,7 +4,6 @@ import {
   Field,
   Group,
   Mina,
-  Poseidon,
   PrivateKey,
   Provable,
   PublicKey,
@@ -12,7 +11,6 @@ import {
   Scalar,
   SmartContract,
   fetchAccount,
-  provable,
 } from 'o1js';
 import { CustomScalar } from '@auxo-dev/auxo-libs';
 import fs from 'fs/promises';
@@ -32,14 +30,12 @@ import {
   FinalizeRound1,
   ReduceRound1,
   Round1Contract,
-  Round1Input,
 } from '../contracts/Round1.js';
 import {
   Action as Round2Action,
   FinalizeRound2,
   ReduceRound2,
   Round2Contract,
-  Round2Input,
 } from '../contracts/Round2.js';
 import {
   Action as ResponseAction,
@@ -82,14 +78,11 @@ import {
 import {
   CArray,
   EncryptionHashArray,
-  IndexArray,
-  PublicKeyArray,
   Round2Data,
   SecretPolynomial,
   UArray,
   cArray,
   calculatePublicKey,
-  generateRandomPolynomial,
   generateRandomPolynomialWithInputRandom,
   getResponseContribution,
   getRound1Contribution,
@@ -99,28 +92,12 @@ import { ZkAppEnum, Contract } from '../constants.js';
 import {
   RArray,
   accumulateEncryption,
-  generateEncryption,
   generateEncryptionWithRandomInput,
 } from '../libs/Requestor.js';
 
-import {
-  RequestContract,
-  RequestInput,
-  UnRequestInput,
-  ResolveInput,
-  CreateRequest,
-  RequestVector,
-  RequestFee,
-  RollupStateOutput,
-  createActionMask,
-  RequestAction,
-  RequestStatusEnum,
-  RequestProof,
-  MockResponeContract,
-} from '../contracts/Request.js';
-import randomAccounts from './helper/randomAccounts.js';
-import { fetchActions, fetchMissingData } from 'o1js/dist/node/lib/fetch.js';
+import { RequestContract, CreateRequest } from '../contracts/Request.js';
 import { EMPTY_LEVEL_1_TREE } from '../contracts/CommitteeStorage.js';
+import { packIndexArray } from '../libs/utils.js';
 
 const waitTime = 8 * 60 * 1000; // 7m
 
@@ -392,6 +369,7 @@ async function main() {
     [1000n, 2000n, 3000n],
     [4000n, 3000n, 2000n],
   ];
+  let mockResult = [5000n, 5000n, 5000n];
   let randomForGenerateEncyption = [
     [Scalar.from(1), Scalar.from(2), Scalar.from(3)],
     [Scalar.from(4), Scalar.from(5), Scalar.from(6)],
@@ -1625,10 +1603,11 @@ async function main() {
     initialContributionRoot,
     reduceStateRoot,
     requestId,
+    Field(mockResult.length),
+    packIndexArray(responsedMembers),
     responseContributionStorage.getLevel1Witness(
       responseContributionStorage.calculateLevel1Index(requestId)
-    ),
-    Field.fromBits(responsedMembers.map((e) => Field(e).toBits(6)).flat())
+    )
   );
   if (profiling) DKGProfiler.stop();
   console.log('DONE!');

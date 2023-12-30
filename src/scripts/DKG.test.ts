@@ -4,7 +4,6 @@ import {
   Field,
   Group,
   Mina,
-  Poseidon,
   PrivateKey,
   Provable,
   PublicKey,
@@ -80,7 +79,6 @@ import {
 import {
   CArray,
   EncryptionHashArray,
-  IndexArray,
   PublicKeyArray,
   Round2Data,
   SecretPolynomial,
@@ -88,7 +86,6 @@ import {
   cArray,
   calculatePublicKey,
   generateRandomPolynomial,
-  getLagrangeCoefficient,
   getResponseContribution,
   getResultVector,
   getRound1Contribution,
@@ -101,6 +98,7 @@ import {
   generateEncryption,
 } from '../libs/Requestor.js';
 import { CreateRequest, RequestContract } from '../contracts/Request.js';
+import { packIndexArray } from '../libs/utils.js';
 
 describe('DKG', () => {
   const doProofs = false;
@@ -123,15 +121,15 @@ describe('DKG', () => {
   let T = 1,
     N = 2;
   let members: Key[] = Local.testAccounts.slice(1, N + 1);
-  let responsedMembers = [1];
+  let responsedMembers = [0];
   let secrets: SecretPolynomial[] = [];
   let publicKeys: Group[] = [];
   let requestId = Field(0);
   let mockRequests = [
-    [1000n, 2000n, 3000n],
+    [1000n, 1000n, 1000n],
     [4000n, 3000n, 2000n],
   ];
-  let mockResult = [5000n, 5000n, 5000n];
+  let mockResult = [5000n, 4000n, 5000n];
   let R: Group[][] = [];
   let M: Group[][] = [];
   let sumR: Group[] = [];
@@ -221,10 +219,10 @@ describe('DKG', () => {
   };
 
   const compile = async (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     prg: any,
     name: string,
-    // eslint-disable-next-line @typescript-eslint/no-inferrable-types
-    profiling: boolean = false
+    profiling = false
   ) => {
     if (logMemory) logMemUsage();
     console.log(`Compiling ${name}...`);
@@ -246,6 +244,7 @@ describe('DKG', () => {
       AccountUpdate.fundNewAccount(feePayer.publicKey, 1);
       contract.deploy();
       for (let i = 0; i < initArgs.length; i++) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (contract as any)[initArgs[i][0]].set(initArgs[i][1]);
       }
     });
@@ -261,8 +260,7 @@ describe('DKG', () => {
     feePayer: Key,
     contractName: string,
     methodName: string,
-    // eslint-disable-next-line @typescript-eslint/no-inferrable-types
-    profiling: boolean = true
+    profiling = true
   ) => {
     if (logMemory) logMemUsage();
     console.log(
@@ -854,10 +852,10 @@ describe('DKG', () => {
   it('Should contribute round 2 successfully', async () => {
     let round2Contract = contracts[Contract.ROUND2].contract as Round2Contract;
     for (let i = 0; i < N; i++) {
-      let randoms = [...Array(N).keys()].map((e) => Scalar.random());
+      let randoms = [...Array(N).keys()].map(() => Scalar.random());
       let round2Contribution = getRound2Contribution(
         secrets[i],
-        i + 1,
+        i,
         round1Actions.map((e) => e.contribution),
         randoms
       );
@@ -970,13 +968,8 @@ describe('DKG', () => {
     let round2Contract = contracts[Contract.ROUND2].contract as Round2Contract;
     let initialContributionRoot = round2Contract.contributions.get();
     let reduceStateRoot = round2Contract.reduceState.get();
-    let memberPublicKeys = new PublicKeyArray(
-      [...Array(N).keys()].map((e) =>
-        round1Actions[e].contribution.C.get(Field(0))
-      )
-    );
     let initialHashArray = new EncryptionHashArray(
-      [...Array(N).keys()].map((e) => Field(0))
+      [...Array(N).keys()].map(() => Field(0))
     );
 
     console.log('Generate first step proof FinalizeRound2...');
@@ -1198,6 +1191,8 @@ describe('DKG', () => {
       });
       responseActions.push(action);
 
+      D.push(contribution.D.values);
+
       console.log(`Generate proof BatchDecryption...`);
       if (profiling) DKGProfiler.start('BatchDecryption.decrypt');
       let decryptionProof = await BatchDecryption.decrypt(
@@ -1342,10 +1337,11 @@ describe('DKG', () => {
       initialContributionRoot,
       reduceStateRoot,
       requestId,
+      Field(mockResult.length),
+      packIndexArray(responsedMembers),
       responseContributionStorage.getLevel1Witness(
         responseContributionStorage.calculateLevel1Index(requestId)
-      ),
-      Field.fromBits(responsedMembers.map((e) => Field(e).toBits(6)).flat())
+      )
     );
     if (profiling) DKGProfiler.stop();
     console.log('DONE!');
@@ -1415,11 +1411,11 @@ describe('DKG', () => {
     });
     await proveAndSend(tx, feePayerKey, 'ResponseContract', 'complete');
 
+    let resultVector = getResultVector(responsedMembers, D, sumM);
     let result = Array<Group>(mockResult.length);
     for (let i = 0; i < result.length; i++) {
       result[i] = sumM[i].sub(completeProof.publicOutput.D.get(Field(i)));
-      Provable.log(result[i], ' --- ', Group.generator.scale(mockResult[i]));
-      result[i].assertEquals(Group.generator.scale(mockResult[i]));
+      result[i].assertEquals(resultVector[i]);
     }
   });
 
