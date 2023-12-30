@@ -1,7 +1,5 @@
 import {
-  Bool,
   Field,
-  Group,
   method,
   Poseidon,
   Provable,
@@ -14,7 +12,6 @@ import {
   ZkProgram,
 } from 'o1js';
 import {
-  CArray,
   EncryptionHashArray,
   PublicKeyArray,
   Round2Contribution,
@@ -36,7 +33,7 @@ import {
   CommitteeContract,
 } from './Committee.js';
 import { ActionEnum as KeyUpdateEnum, DKGContract, KeyStatus } from './DKG.js';
-import { BatchEncryptionProof, PlainArray, RandomArray } from './Encryption.js';
+import { BatchEncryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
 import {
   COMMITTEE_MAX_SIZE,
@@ -49,7 +46,6 @@ import {
   ReduceWitness,
   ZkAppRef,
 } from './SharedStorage.js';
-import { Bit255 } from '@auxo-dev/auxo-libs';
 
 export enum EventEnum {
   CONTRIBUTIONS_REDUCED = 'contributions-reduced',

@@ -3,7 +3,7 @@ import { DKGContract, UpdateKey } from '../contracts/DKG.js';
 import { BatchDecryption, BatchEncryption } from '../contracts/Encryption.js';
 import { CreateRequest, RequestContract } from '../contracts/Request.js';
 import {
-  CreateReduceProof,
+  CreateReduce,
   RequestHelperContract,
 } from '../contracts/RequestHelper.js';
 import {

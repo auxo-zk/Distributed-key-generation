@@ -258,7 +258,7 @@ export const UpdateKey = ZkProgram({
   },
 });
 
-class UpdateKeyProof extends ZkProgram.Proof(UpdateKey) {}
+export class UpdateKeyProof extends ZkProgram.Proof(UpdateKey) {}
 
 export class DKGContract extends SmartContract {
   reducer = Reducer({ actionType: Action });

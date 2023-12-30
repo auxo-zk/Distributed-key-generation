@@ -27,11 +27,11 @@ import randomAccounts from './helper/randomAccounts.js';
 import {
   RequestHelperContract,
   RequestHelperInput,
+  CreateReduce,
   CreateReduceProof,
-  ReduceProof,
   CustomScalarArray,
   RequestHelperAction,
-  CreateRollupProof,
+  CreateRollup,
 } from '../contracts/RequestHelper.js';
 
 import { CustomScalar } from '@auxo-dev/auxo-libs';
@@ -70,7 +70,7 @@ describe('RequestHelper', () => {
   let feePayer = Local.testAccounts[0].publicKey;
 
   let requestHelperContract: RequestHelperContract;
-  let proof: ReduceProof;
+  let proof: CreateReduceProof;
 
   let length = 3;
   let randoms1: CustomScalar[] = [...Array(length).keys()].map((e) =>
@@ -124,20 +124,20 @@ describe('RequestHelper', () => {
 
   let userInfor;
 
-  beforeAll(async () => {});
+  // beforeAll(async () => {});
 
   // beforeEach(() => {});
 
   it('compile proof and contract', async () => {
-    console.time('CreateReduceProof.compile');
-    console.log('CreateReduceProof.compile');
-    await CreateReduceProof.compile();
-    console.timeEnd('CreateReduceProof.compile');
+    console.time('CreateReduce.compile');
+    console.log('CreateReduce.compile');
+    await CreateReduce.compile();
+    console.timeEnd('CreateReduce.compile');
 
-    console.time('CreateRollupProof.compile');
-    console.log('CreateRollupProof.compile');
-    await CreateRollupProof.compile();
-    console.timeEnd('CreateRollupProof.compile');
+    console.time('CreateRollup.compile');
+    console.log('CreateRollup.compile');
+    await CreateRollup.compile();
+    console.timeEnd('CreateRollup.compile');
 
     if (doProofs) {
       console.time('RequestHelperContract.compile');
@@ -194,7 +194,7 @@ describe('RequestHelper', () => {
   xit('reduce 3 tx', async () => {
     // console.log('Create RequestHelper.firstStep...');
     // RequestHelperProfile.start('RequestHelper.firstStep');
-    // proof = await CreateReduceProof.firstStep(
+    // proof = await CreateReduce.firstStep(
     //   requestHelperContract.actionState.get(),
     //   requestHelperContract.actionStatus.get()
     // );
@@ -204,7 +204,7 @@ describe('RequestHelper', () => {
     // );
     // for (let i = 0; i < actionsVip.length; i++) {}
     // RequestHelperProfile.start('RequestHelper.nextstep');
-    // proof = await CreateReduceProof.firstStep(
+    // proof = await CreateReduce.firstStep(
     //   requestHelperContract.actionState.get(),
     //   requestHelperContract.actionStatus.get()
     // );

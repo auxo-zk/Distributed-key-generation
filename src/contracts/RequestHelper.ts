@@ -14,16 +14,9 @@ import {
   Poseidon,
   Provable,
   Void,
-  Scalar,
   ZkProgram,
 } from 'o1js';
-
-import {
-  CustomScalar,
-  GroupDynamicArray,
-  ScalarDynamicArray,
-} from '@auxo-dev/auxo-libs';
-// import { Request, RequestInput, RequestFee, ZeroFee } from './Request.js';
+import { ScalarDynamicArray } from '@auxo-dev/auxo-libs';
 import { updateOutOfSnark } from '../libs/utils.js';
 import { REQUEST_MAX_SIZE } from '../constants.js';
 import { RequestVector } from './Request.js';
@@ -80,7 +73,7 @@ export class ReduceOutput extends Struct({
   finalActionStatus: Field,
 }) {}
 
-export const CreateReduceProof = ZkProgram({
+export const CreateReduce = ZkProgram({
   name: 'create-rollup-status',
   publicOutput: ReduceOutput,
   methods: {
@@ -142,7 +135,7 @@ export const CreateReduceProof = ZkProgram({
     },
   },
 });
-export class ReduceProof extends ZkProgram.Proof(CreateReduceProof) {}
+export class CreateReduceProof extends ZkProgram.Proof(CreateReduce) {}
 
 export class RollupActionsOutput extends Struct({
   requestId: Field,
@@ -166,7 +159,7 @@ export class RollupActionsOutput extends Struct({
   }
 }
 
-export const CreateRollupProof = ZkProgram({
+export const CreateRollup = ZkProgram({
   name: 'rollup-actions',
   publicOutput: RollupActionsOutput,
   methods: {
@@ -242,7 +235,7 @@ export const CreateRollupProof = ZkProgram({
   },
 });
 
-class ProofRollupAction extends ZkProgram.Proof(CreateRollupProof) {}
+export class CreateRollupProof extends ZkProgram.Proof(CreateRollup) {}
 
 export class RequestHelperContract extends SmartContract {
   @state(Field) actionState = State<Field>();
@@ -297,7 +290,7 @@ export class RequestHelperContract extends SmartContract {
     return { R, M };
   }
 
-  @method rollupActionsState(proof: ReduceProof) {
+  @method rollupActionsState(proof: CreateReduceProof) {
     // Verify proof
     proof.verify();
 
@@ -320,7 +313,7 @@ export class RequestHelperContract extends SmartContract {
   // to-do: adding N, T to check REQUEST_MAX_SIZE by interact with Committee contract
   // to-do: request to Request contract
   @method rollupRequest(
-    proof: ProofRollupAction,
+    proof: CreateRollupProof,
     R_wintess: MerkleMapWitness,
     M_wintess: MerkleMapWitness
   ) {

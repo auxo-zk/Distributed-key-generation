@@ -1,5 +1,4 @@
 import {
-  Encoding,
   Field,
   MerkleMap,
   MerkleMapWitness,

@@ -24,8 +24,6 @@ import {
 } from './CommitteeStorage.js';
 import { MemberArray } from '../libs/Committee.js';
 
-const DefaultRoot = EMPTY_LEVEL_1_TREE().getRoot();
-
 export class CommitteeAction extends Struct({
   addresses: MemberArray,
   threshold: Field,
@@ -151,7 +149,7 @@ export const CreateCommittee = ZkProgram({
   },
 });
 
-class CommitteeProof extends ZkProgram.Proof(CreateCommittee) {}
+export class CommitteeProof extends ZkProgram.Proof(CreateCommittee) {}
 
 export enum EventEnum {
   COMMITTEE_CREATED = 'committee-created',
@@ -172,8 +170,8 @@ export class CommitteeContract extends SmartContract {
 
   init() {
     super.init();
-    this.memberTreeRoot.set(DefaultRoot);
-    this.settingTreeRoot.set(DefaultRoot);
+    this.memberTreeRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
+    this.settingTreeRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
     this.actionState.set(Reducer.initialActionState);
   }
 

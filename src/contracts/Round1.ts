@@ -30,7 +30,12 @@ import {
 } from './Committee.js';
 import { ActionEnum as KeyUpdateEnum, DKGContract, KeyStatus } from './DKG.js';
 import { INSTANCE_LIMITS, ZkAppEnum } from '../constants.js';
-import { EMPTY_REDUCE_MT, ReduceWitness, ZkAppRef } from './SharedStorage.js';
+import {
+  EMPTY_ADDRESS_MT,
+  EMPTY_REDUCE_MT,
+  ReduceWitness,
+  ZkAppRef,
+} from './SharedStorage.js';
 
 export enum EventEnum {
   CONTRIBUTIONS_REDUCED = 'contributions-reduced',
@@ -303,8 +308,6 @@ export const FinalizeRound1 = ZkProgram({
 
 export class FinalizeRound1Proof extends ZkProgram.Proof(FinalizeRound1) {}
 
-const DefaultRoot1 = EMPTY_LEVEL_1_TREE().getRoot();
-const DefaultReduceRoot = EMPTY_REDUCE_MT().getRoot();
 export class Round1Contract extends SmartContract {
   reducer = Reducer({ actionType: Action });
   events = {
@@ -318,10 +321,10 @@ export class Round1Contract extends SmartContract {
 
   init() {
     super.init();
-    this.zkApps.set(DefaultRoot1);
-    this.reduceState.set(DefaultReduceRoot);
-    this.contributions.set(DefaultRoot1);
-    this.publicKeys.set(DefaultRoot1);
+    this.zkApps.set(EMPTY_ADDRESS_MT().getRoot());
+    this.reduceState.set(EMPTY_REDUCE_MT().getRoot());
+    this.contributions.set(EMPTY_LEVEL_1_TREE().getRoot());
+    this.publicKeys.set(EMPTY_LEVEL_1_TREE().getRoot());
   }
 
   /**
