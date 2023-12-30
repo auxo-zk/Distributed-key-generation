@@ -82,6 +82,7 @@ import {
 import {
   CArray,
   EncryptionHashArray,
+  IndexArray,
   PublicKeyArray,
   Round2Data,
   SecretPolynomial,
@@ -145,11 +146,7 @@ async function main() {
     );
   };
 
-  const compile = async (
-    prg: any,
-    name: string,
-    profiling: boolean = false
-  ) => {
+  const compile = async (prg: any, name: string, profiling = false) => {
     if (logMemory) logMemUsage();
     console.log(`Compiling ${name}...`);
     if (profiling) DKGProfiler.start(`${name}.compile`);
@@ -193,7 +190,7 @@ async function main() {
     feePayer: Key,
     contractName: string,
     methodName: string,
-    profiling: boolean = true
+    profiling = true
   ) => {
     if (logMemory) logMemUsage();
     console.log(
@@ -1605,7 +1602,8 @@ async function main() {
     requestId,
     responseContributionStorage.getLevel1Witness(
       responseContributionStorage.calculateLevel1Index(requestId)
-    )
+    ),
+    Field.fromBits(responsedMembers.map((e) => Field(e).toBits(6)).flat())
   );
   if (profiling) DKGProfiler.stop();
   console.log('DONE!');

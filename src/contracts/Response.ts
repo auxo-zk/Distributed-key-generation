@@ -159,7 +159,12 @@ export class ResponseOutput extends Struct({
   requestId: Field,
   D: RequestVector,
   counter: Field,
-  indexList: IndexArray,
+  indexList: Field,
+}) {}
+
+class LagrangeCoefficientMul extends Struct({
+  mul2: Scalar,
+  mul3: Scalar,
 }) {}
 
 /**
@@ -181,15 +186,7 @@ export const CompleteResponse = ZkProgram({
   publicOutput: ResponseOutput,
   methods: {
     firstStep: {
-      privateInputs: [
-        Field,
-        Field,
-        Field,
-        Field,
-        Field,
-        Level1Witness,
-        IndexArray,
-      ],
+      privateInputs: [Field, Field, Field, Field, Field, Level1Witness, Field],
       method(
         input: ResponseInput,
         T: Field,
@@ -198,7 +195,7 @@ export const CompleteResponse = ZkProgram({
         reduceStateRoot: Field,
         requestId: Field,
         contributionWitness: Level1Witness,
-        indexList: IndexArray
+        indexList: Field
       ) {
         // Verify there is no recorded contribution for the request
         initialContributionRoot.assertEquals(
@@ -265,33 +262,52 @@ export const CompleteResponse = ZkProgram({
         );
 
         // Compute Lagrange coefficient
-        let lagrangeCoefficient: Scalar = Scalar.from(1n);
-        for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
-          let j = earlierProof.publicOutput.indexList.get(Field(i));
-          lagrangeCoefficient = Provable.if(
-            Field(i)
-              .greaterThanOrEqual(earlierProof.publicOutput.T)
-              .or(j.equals(input.action.memberId.add(1))),
-            lagrangeCoefficient,
-            Provable.witness(Scalar, () => {
-              return Scalar.from(j.toBigInt()).div(
-                Scalar.from(j.sub(i).toBigInt())
+        let lagrangeCoefficientMul = Provable.witness(
+          LagrangeCoefficientMul,
+          () => {
+            let result = Scalar.from(1n);
+            let indexI = input.action.memberId.add(1);
+            let T = Number(earlierProof.publicOutput.T.toBigInt());
+            for (let j = 0; j < T; j++) {
+              let indexJ = Field.fromBits(
+                earlierProof.publicOutput.indexList
+                  .toBits()
+                  .slice(6 * j, 6 * (j + 1))
+              ).add(1);
+              if (indexJ.equals(indexI).toBoolean()) continue;
+              result = result.mul(
+                Scalar.from(indexJ.toBigInt()).div(
+                  Scalar.from(indexJ.sub(indexI).toBigInt())
+                )
               );
-            })
-          );
-        }
+            }
+            return new LagrangeCoefficientMul({
+              mul2: result.mul(Scalar.from(2n)),
+              mul3: result.mul(Scalar.from(3n)),
+            });
+          }
+        );
 
         // Compute D values
         let D = earlierProof.publicOutput.D;
         for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
-          D.set(
-            Field(i),
-            D.get(Field(i)).add(
-              input.action.contribution.D.get(Field(i)).scale(
-                lagrangeCoefficient
+          let Di = D.get(Field(i));
+          let di = input.action.contribution.D.get(Field(i));
+          di = Provable.if(
+            di.equals(Group.zero).or(Field(i).greaterThanOrEqual(D.length)),
+            di,
+            di
+              .add(Group.generator)
+              .scale(lagrangeCoefficientMul.mul3)
+              .sub(Group.generator.scale(lagrangeCoefficientMul.mul3))
+              .sub(
+                di
+                  .add(Group.generator)
+                  .scale(lagrangeCoefficientMul.mul2)
+                  .sub(Group.generator.scale(lagrangeCoefficientMul.mul2))
               )
-            )
           );
+          D.set(Field(i), Di.add(di));
         }
 
         // Verify the action has been reduced

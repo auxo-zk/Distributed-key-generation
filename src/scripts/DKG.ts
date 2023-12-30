@@ -82,6 +82,7 @@ import {
 import {
   CArray,
   EncryptionHashArray,
+  IndexArray,
   PublicKeyArray,
   Round2Data,
   SecretPolynomial,
@@ -148,6 +149,7 @@ async function main() {
   const compile = async (
     prg: any,
     name: string,
+    // eslint-disable-next-line @typescript-eslint/no-inferrable-types
     profiling: boolean = false
   ) => {
     if (logMemory) logMemUsage();
@@ -193,6 +195,7 @@ async function main() {
     feePayer: Key,
     contractName: string,
     methodName: string,
+    // eslint-disable-next-line @typescript-eslint/no-inferrable-types
     profiling: boolean = true
   ) => {
     if (logMemory) logMemUsage();
@@ -1624,7 +1627,8 @@ async function main() {
     requestId,
     responseContributionStorage.getLevel1Witness(
       responseContributionStorage.calculateLevel1Index(requestId)
-    )
+    ),
+    Field.fromBits(responsedMembers.map((e) => Field(e).toBits(6)).flat())
   );
   if (profiling) DKGProfiler.stop();
   console.log('DONE!');

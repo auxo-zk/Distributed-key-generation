@@ -80,6 +80,7 @@ import {
 import {
   CArray,
   EncryptionHashArray,
+  IndexArray,
   PublicKeyArray,
   Round2Data,
   SecretPolynomial,
@@ -87,7 +88,9 @@ import {
   cArray,
   calculatePublicKey,
   generateRandomPolynomial,
+  getLagrangeCoefficient,
   getResponseContribution,
+  getResultVector,
   getRound1Contribution,
   getRound2Contribution,
 } from '../libs/Committee.js';
@@ -120,7 +123,7 @@ describe('DKG', () => {
   let T = 1,
     N = 2;
   let members: Key[] = Local.testAccounts.slice(1, N + 1);
-  let responsedMembers = [0];
+  let responsedMembers = [1];
   let secrets: SecretPolynomial[] = [];
   let publicKeys: Group[] = [];
   let requestId = Field(0);
@@ -128,6 +131,7 @@ describe('DKG', () => {
     [1000n, 2000n, 3000n],
     [4000n, 3000n, 2000n],
   ];
+  let mockResult = [5000n, 5000n, 5000n];
   let R: Group[][] = [];
   let M: Group[][] = [];
   let sumR: Group[] = [];
@@ -219,6 +223,7 @@ describe('DKG', () => {
   const compile = async (
     prg: any,
     name: string,
+    // eslint-disable-next-line @typescript-eslint/no-inferrable-types
     profiling: boolean = false
   ) => {
     if (logMemory) logMemUsage();
@@ -256,6 +261,7 @@ describe('DKG', () => {
     feePayer: Key,
     contractName: string,
     methodName: string,
+    // eslint-disable-next-line @typescript-eslint/no-inferrable-types
     profiling: boolean = true
   ) => {
     if (logMemory) logMemUsage();
@@ -1338,7 +1344,8 @@ describe('DKG', () => {
       requestId,
       responseContributionStorage.getLevel1Witness(
         responseContributionStorage.calculateLevel1Index(requestId)
-      )
+      ),
+      Field.fromBits(responsedMembers.map((e) => Field(e).toBits(6)).flat())
     );
     if (profiling) DKGProfiler.stop();
     console.log('DONE!');
@@ -1406,7 +1413,14 @@ describe('DKG', () => {
         )
       );
     });
-    await proveAndSend(tx, feePayerKey, 'ResponseContract', 'contribute');
+    await proveAndSend(tx, feePayerKey, 'ResponseContract', 'complete');
+
+    let result = Array<Group>(mockResult.length);
+    for (let i = 0; i < result.length; i++) {
+      result[i] = sumM[i].sub(completeProof.publicOutput.D.get(Field(i)));
+      Provable.log(result[i], ' --- ', Group.generator.scale(mockResult[i]));
+      result[i].assertEquals(Group.generator.scale(mockResult[i]));
+    }
   });
 
   afterAll(async () => {
