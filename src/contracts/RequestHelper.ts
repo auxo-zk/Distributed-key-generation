@@ -38,7 +38,7 @@ export class RequestHelperInput extends Struct({
   committeePublicKey: PublicKey,
   // to-do wintess to check if it the right publickey
   secretVector: CustomScalarArray,
-  r: CustomScalarArray,
+  random: CustomScalarArray,
   // settingMerkleMapWitness: MerkleMapWitness,
 }) {
   requestId(): Field {
@@ -262,16 +262,27 @@ export class RequestHelperContract extends SmartContract {
     let R = new RequestVector();
     let M = new RequestVector();
     for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
-      let random = requestInput.r.get(Field(i)).toScalar();
-      R.push(Group.generator.scale(random));
+      let random = requestInput.random.get(Field(i)).toScalar();
+      R.push(
+        Provable.if(
+          Field(i).greaterThanOrEqual(dimension),
+          Group.fromFields([Field(0), Field(0)]),
+          Group.generator.scale(random)
+        )
+      );
       let M_i = Provable.if(
         Poseidon.hash(
           requestInput.secretVector.get(Field(i)).toFields()
         ).equals(Poseidon.hash([Field(0), Field(0)])),
+        Group.zero.add(requestInput.committeePublicKey.toGroup().scale(random)),
         Group.generator
           .scale(requestInput.secretVector.get(Field(i)).toScalar())
-          .add(requestInput.committeePublicKey.toGroup().scale(random)),
-        Group.zero.add(requestInput.committeePublicKey.toGroup().scale(random))
+          .add(requestInput.committeePublicKey.toGroup().scale(random))
+      );
+      M_i = Provable.if(
+        Field(i).greaterThanOrEqual(dimension),
+        Group.fromFields([Field(0), Field(0)]),
+        M_i
       );
       M.push(M_i);
     }
