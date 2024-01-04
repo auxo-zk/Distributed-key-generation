@@ -97,10 +97,11 @@ import {
   generateEncryptionWithRandomInput,
 } from '../libs/Requestor.js';
 import { RequestContract, CreateRequest } from '../contracts/Request.js';
-import { EMPTY_LEVEL_1_TREE } from '../contracts/CommitteeStorage.js';
+import { EMPTY_LEVEL_1_TREE as EMPTY_LEVEL_1_TREE_COMMITEE } from '../contracts/CommitteeStorage.js';
+import { EMPTY_LEVEL_1_TREE as EMPTY_LEVEL_1_TREE_DKG } from '../contracts/DKGStorage.js';
 import { packIndexArray } from '../libs/utils.js';
 
-const waitTime = 8 * 60 * 1000; // 7m
+const waitTime = 5 * 60 * 1000; // 5m
 
 const sendMoney = false;
 
@@ -281,10 +282,10 @@ async function main() {
 
   feePayerKey = {
     privateKey: PrivateKey.fromBase58(
-      'EKFM6UX4RTsCfXmSjdqUkLxVrHi5mDPmJBt9oh5gQ7KhJpw6t56E'
+      'EKDqREVeRymQB8LZuEgNLCSW8LZ1hY9xKAaxid1KNhsozddHJJFY'
     ),
     publicKey: PublicKey.fromBase58(
-      'B62qrr1aGjDr4mRmTvaB3dYLyEhrMgLtcNffcHNELmbVXDG93YcdZx4'
+      'B62qiz7EZnE93PVCdKeJX35YKr6nyZsyC7bSHT7khtqgC6JnMUVr1ra'
     ),
   };
 
@@ -307,8 +308,14 @@ async function main() {
   // const MINAURL = 'https://network.auxo.fund/graphql';
   // const ARCHIVEURL = 'https://network.auxo.fund/archive';
 
-  const MINAURL = 'https://api.minascan.io/node/berkeley/v1/graphql';
-  const ARCHIVEURL = 'https://api.minascan.io/archive/berkeley/v1/graphql/';
+  // const MINAURL = 'https://api.minascan.io/node/berkeley/v1/graphql';
+  // const ARCHIVEURL = 'https://api.minascan.io/archive/berkeley/v1/graphql/';
+
+  // const MINAURL = 'https://api.minascan.io/node/berkeley/v1/graphql';
+  // const ARCHIVEURL = 'https://api.minascan.io/archive/berkeley/v1/graphql/';
+
+  const MINAURL = 'http://46.250.228.67:8080/graphql';
+  const ARCHIVEURL = 'http://46.250.228.67:8282';
 
   const network = Mina.Network({
     mina: MINAURL,
@@ -316,8 +323,18 @@ async function main() {
   });
   Mina.setActiveInstance(network);
 
-  let sender = await fetchAccount({ publicKey: feePayerKey.publicKey });
-  let feePayerNonce = Number(sender.account?.nonce) - 1;
+  let feePayerNonce;
+  let dk = false;
+
+  do {
+    let sender = await fetchAccount({ publicKey: feePayerKey.publicKey });
+    feePayerNonce = Number(sender.account?.nonce) - 1;
+    if (feePayerNonce) dk = true;
+    console.log('fetch nonce');
+    await waitConfig(1000); // 1s
+  } while (!dk);
+
+  console.log('Nonce: ', feePayerNonce);
 
   let committeeIndex = Field(0);
   let T = 1,
@@ -351,7 +368,7 @@ async function main() {
   let responsedMembers = [0];
   let secrets: SecretPolynomial[] = [];
   let randomInputs: Scalar[][] = [];
-  randomInputs = [[Scalar.from(1)], [Scalar.from(2)]];
+  randomInputs = [[Scalar.from(100)], [Scalar.from(200)]];
 
   let randoms: Scalar[][] = [
     [Scalar.from(69), Scalar.from(70)],
@@ -361,10 +378,10 @@ async function main() {
   let publicKeys: Group[] = [];
   let requestId = Field(0);
   let mockRequests = [
-    [1000n, 2000n, 3000n],
+    [1000n, 1000n, 1000n],
     [4000n, 3000n, 2000n],
   ];
-  let mockResult = [5000n, 5000n, 5000n];
+  let mockResult = [5000n, 4000n, 3000n];
   let randomForGenerateEncyption = [
     [Scalar.from(100), Scalar.from(200), Scalar.from(300)],
     [Scalar.from(400), Scalar.from(500), Scalar.from(600)],
@@ -685,8 +702,8 @@ async function main() {
   await fetchAllContract(contracts);
   let dkgContract = contracts[Contract.DKG].contract as DKGContract;
   let initialActionState = Reducer.initialActionState;
-  let initialKeyCounter = EMPTY_LEVEL_1_TREE().getRoot();
-  let initialKeyStatus = EMPTY_LEVEL_1_TREE().getRoot();
+  let initialKeyCounter = EMPTY_LEVEL_1_TREE_COMMITEE().getRoot();
+  let initialKeyStatus = EMPTY_LEVEL_1_TREE_DKG().getRoot();
 
   for (let i = 0; i < 1; i++) {
     let action = dkgActions[ActionEnum.GENERATE_KEY][i];
@@ -1080,7 +1097,7 @@ async function main() {
     // let randoms = [...Array(N).keys()].map((e) => Scalar.random());
     let round2Contribution = getRound2Contribution(
       secrets[i],
-      i + 1,
+      i,
       round1Actions.map((e) => e.contribution),
       randoms[i]
     );
@@ -1655,7 +1672,7 @@ async function main() {
     }
   );
   await proveAndSend(tx, feePayerKey, 'ResponseContract', 'contribute');
-  console.log('DONE ALLLLLLLLLLLLLLLLLLLLLL');
+  console.log('DONE ALLLLLLLLLLLLLLLLLLL');
   console.timeEnd('runTime');
 }
 
