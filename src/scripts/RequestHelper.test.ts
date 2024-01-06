@@ -100,7 +100,7 @@ describe('RequestHelper', () => {
       requetsTime: Field(1),
       committeePublicKey: addresses.publickey,
       secretVector: CustomScalarArray.from(randoms1),
-      r: CustomScalarArray.from(r1),
+      random: CustomScalarArray.from(r1),
     }),
     new RequestHelperInput({
       committeeId: Field(1),
@@ -108,7 +108,7 @@ describe('RequestHelper', () => {
       requetsTime: Field(1),
       committeePublicKey: addresses.publickey,
       secretVector: CustomScalarArray.from(randoms2),
-      r: CustomScalarArray.from(r2),
+      random: CustomScalarArray.from(r2),
     }),
     new RequestHelperInput({
       committeeId: Field(1),
@@ -116,7 +116,7 @@ describe('RequestHelper', () => {
       requetsTime: Field(1),
       committeePublicKey: addresses.publickey,
       secretVector: CustomScalarArray.from(randoms3),
-      r: CustomScalarArray.from(r3),
+      random: CustomScalarArray.from(r3),
     }),
   ];
 
