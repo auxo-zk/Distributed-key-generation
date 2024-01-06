@@ -101,7 +101,7 @@ import { EMPTY_LEVEL_1_TREE as EMPTY_LEVEL_1_TREE_COMMITEE } from '../contracts/
 import { EMPTY_LEVEL_1_TREE as EMPTY_LEVEL_1_TREE_DKG } from '../contracts/DKGStorage.js';
 import { packIndexArray } from '../libs/utils.js';
 
-const waitTime = 5 * 60 * 1000; // 5m
+const waitTime = 10 * 60 * 1000; // 10m
 
 const sendMoney = false;
 
@@ -280,12 +280,21 @@ async function main() {
   //   ).toPublicKey(),
   // };
 
+  // feePayerKey = {
+  //   privateKey: PrivateKey.fromBase58(
+  //     'EKFHnSyh64YapbwD97tAh2SEFUjfQx9EBNNpiW2tzitKWthSzJ5e'
+  //   ),
+  //   publicKey: PublicKey.fromBase58(
+  //     'B62qkw1F7B1qSyJ4Z2w71oxVKR3hhuqEdQBgfwkcfeKyDXoHFgTaNY8'
+  //   ),
+  // };
+
   feePayerKey = {
     privateKey: PrivateKey.fromBase58(
-      'EKDqREVeRymQB8LZuEgNLCSW8LZ1hY9xKAaxid1KNhsozddHJJFY'
+      'EKEosAyM6Y6TnPVwUaWhE7iUS3v6mwVW7uDnWes7FkYVwQoUwyMR'
     ),
     publicKey: PublicKey.fromBase58(
-      'B62qiz7EZnE93PVCdKeJX35YKr6nyZsyC7bSHT7khtqgC6JnMUVr1ra'
+      'B62qmtfTkHLzmvoKYcTLPeqvuVatnB6wtnXsP6jrEi6i2eUEjcxWauH'
     ),
   };
 
@@ -299,8 +308,8 @@ async function main() {
 
   const fee = 0.101 * 1e9; // in nanomina (1 billion = 1.0 mina)
 
-  // const MINAURL = 'https://proxy.berkeley.minaexplorer.com/graphql';
-  // const ARCHIVEURL = 'https://archive.berkeley.minaexplorer.com';
+  const MINAURL = 'https://proxy.berkeley.minaexplorer.com/graphql';
+  const ARCHIVEURL = 'https://archive.berkeley.minaexplorer.com';
 
   // const MINAURL = 'http://35.215.131.117:8080/graphql';
   // const ARCHIVEURL = 'http://35.215.131.117:8282';
@@ -311,11 +320,11 @@ async function main() {
   // const MINAURL = 'https://api.minascan.io/node/berkeley/v1/graphql';
   // const ARCHIVEURL = 'https://api.minascan.io/archive/berkeley/v1/graphql/';
 
-  // const MINAURL = 'https://api.minascan.io/node/berkeley/v1/graphql';
-  // const ARCHIVEURL = 'https://api.minascan.io/archive/berkeley/v1/graphql/';
+  // const MINAURL = 'https://proxy.testworld.minaexplorer.com/graphql';
+  // const ARCHIVEURL = 'https://archive.testworld.minaexplorer.com/';
 
-  const MINAURL = 'http://46.250.228.67:8080/graphql';
-  const ARCHIVEURL = 'http://46.250.228.67:8282';
+  // const MINAURL = 'http://46.250.228.67:8080/graphql';
+  // const ARCHIVEURL = 'http://46.250.228.67:8282';
 
   const network = Mina.Network({
     mina: MINAURL,
@@ -501,7 +510,7 @@ async function main() {
   };
 
   await fetchAllContract(contracts);
-  Provable.log('action: ', contracts[Contract.ROUND1].actionStates);
+  Provable.log('action: ', contracts[Contract.DKG].actionStates);
 
   if (sendMoney) {
     let tx = await Mina.transaction(
@@ -683,7 +692,7 @@ async function main() {
       AccountUpdate.fundNewAccount(feePayerKey.publicKey);
       requestContract.deploy();
       requestContract.responeContractAddress.set(
-        contracts[Contract.REQUEST].contract.address
+        contracts[Contract.REQUEST].contract.addresss
       );
       let feePayerAccount = AccountUpdate.createSigned(feePayerKey.publicKey);
       feePayerAccount.send({
@@ -1034,7 +1043,7 @@ async function main() {
       );
     }
   );
-  /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  
   await proveAndSend(tx, feePayerKey, 'Round1Contract', 'finalize');
 
   await wait();
@@ -1088,7 +1097,6 @@ async function main() {
   );
   await proveAndSend(tx, feePayerKey, 'DKGContract', 'updateKeys');
   await wait();
-  ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   await fetchAllContract(contracts);
 
   console.log('Should contribute round 2 successfully');
@@ -1166,8 +1174,7 @@ async function main() {
 
   console.log('Should reduce round 2 successfully');
   round2Contract = contracts[Contract.ROUND2].contract as Round2Contract;
-  await fetchAllContract(contracts);
-  initialReduceState = round2Contract.reduceState.get();
+  let initialReduceState = round2Contract.reduceState.get();
   initialActionState = contracts[Contract.ROUND2].actionStates[0];
 
   console.log('Generate first step proof ReduceRound2...');
@@ -1362,7 +1369,7 @@ async function main() {
 
   console.log('Generate first step proof UpdateKey...');
   if (profiling) DKGProfiler.start('UpdateKey.firstStep');
-  updateKeyProof = await UpdateKey.firstStep(
+  let updateKeyProof = await UpdateKey.firstStep(
     DKGAction.empty(),
     initialKeyCounter,
     initialKeyStatus,
@@ -1409,7 +1416,6 @@ async function main() {
   await proveAndSend(tx, feePayerKey, 'DKGContract', 'updateKeys');
   await wait();
   await fetchAllContract(contracts);
-  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   console.log('Should contribute response successfully');
   let responseContract = contracts[Contract.RESPONSE]

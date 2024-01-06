@@ -5,7 +5,7 @@ const path = require('path');
 const directoryPath = './caches';
 
 // Function to check if 'pk' is not in the file name
-const is_valid_file = (fileName) => !fileName.includes('pk');
+const is_valid_file = (fileName) => !(fileName.includes('pk') || fileName.includes('header'));
 
 // Read all files from the directory and filter based on the condition
 fs.readdir(directoryPath, (err, files) => {
