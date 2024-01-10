@@ -1,11 +1,18 @@
 import { time } from 'console';
 import fs from 'fs';
 
-export { getProfiler };
+export { getProfiler, Profiler };
+
+type Profiler = {
+  times: Record<string, any>;
+  start: (lable: string) => void;
+  stop: () => Profiler;
+  store: () => void;
+};
 
 const round = (x: number) => Math.round(x * 100) / 100;
 
-function getProfiler(name: string) {
+function getProfiler(name: string): Profiler {
   let times: Record<string, any> = {};
   let label: string;
 

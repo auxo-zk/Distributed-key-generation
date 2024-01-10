@@ -65,6 +65,7 @@
   },
   "dependencies": {
     "@auxo-dev/auxo-libs": "^0.3.5",
+    "axios": "^1.6.5",
     "o1js": "0.15.1"
   }
 }

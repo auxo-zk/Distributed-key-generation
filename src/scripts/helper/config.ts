@@ -14,6 +14,11 @@ export type Config = {
   >;
 };
 
+export type JSONKey = {
+  privateKey: string;
+  publicKey: string;
+};
+
 export type Key = {
   privateKey: PrivateKey;
   publicKey: PublicKey;
