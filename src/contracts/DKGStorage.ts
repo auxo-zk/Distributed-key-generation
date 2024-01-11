@@ -4,15 +4,10 @@ import {
   MerkleTree,
   MerkleWitness,
   Poseidon,
-  Provable,
   Struct,
 } from 'o1js';
 import { KeyStatus } from './DKG.js';
-import {
-  ResponseContribution,
-  Round1Contribution,
-  Round2Contribution,
-} from '../libs/Committee.js';
+import { Round1Contribution, Round2Contribution } from '../libs/Committee.js';
 import { COMMITTEE_MAX_SIZE, INSTANCE_LIMITS } from '../constants.js';
 
 export const LEVEL1_TREE_HEIGHT =
@@ -46,8 +41,11 @@ export abstract class DKGStorage {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   abstract calculateLeaf(args: any): Field;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   abstract calculateLevel1Index(args: any): Field;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   calculateLevel2Index?(args: any): Field;
 
   getLevel1Witness(level1Index: Field): Level1Witness {
@@ -103,11 +101,15 @@ export class KeyStatusStorage extends DKGStorage {
     super(level1);
   }
 
-  calculateLeaf(status: KeyStatus): Field {
+  static calculateLeaf(status: KeyStatus): Field {
     return Field(status);
   }
 
-  calculateLevel1Index({
+  calculateLeaf(status: KeyStatus): Field {
+    return KeyStatusStorage.calculateLeaf(status);
+  }
+
+  static calculateLevel1Index({
     committeeId,
     keyId,
   }: {
@@ -117,6 +119,19 @@ export class KeyStatusStorage extends DKGStorage {
     return Field.from(
       committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) + keyId.toBigInt()
     );
+  }
+
+  calculateLevel1Index({
+    committeeId,
+    keyId,
+  }: {
+    committeeId: Field;
+    keyId: Field;
+  }): Field {
+    return KeyStatusStorage.calculateLevel1Index({
+      committeeId,
+      keyId,
+    });
   }
 
   getWitness(level1Index: Field): Level1Witness {
@@ -139,11 +154,15 @@ export class Round1ContributionStorage extends DKGStorage {
     super(level1, level2s);
   }
 
-  calculateLeaf(contribution: Round1Contribution): Field {
+  static calculateLeaf(contribution: Round1Contribution): Field {
     return contribution.hash();
   }
 
-  calculateLevel1Index({
+  calculateLeaf(contribution: Round1Contribution): Field {
+    return Round1ContributionStorage.calculateLeaf(contribution);
+  }
+
+  static calculateLevel1Index({
     committeeId,
     keyId,
   }: {
@@ -155,8 +174,25 @@ export class Round1ContributionStorage extends DKGStorage {
     );
   }
 
-  calculateLevel2Index(memberId: Field): Field {
+  calculateLevel1Index({
+    committeeId,
+    keyId,
+  }: {
+    committeeId: Field;
+    keyId: Field;
+  }): Field {
+    return Round1ContributionStorage.calculateLevel1Index({
+      committeeId,
+      keyId,
+    });
+  }
+
+  static calculateLevel2Index(memberId: Field): Field {
     return memberId;
+  }
+
+  calculateLevel2Index(memberId: Field): Field {
+    return Round1ContributionStorage.calculateLevel2Index(memberId);
   }
 
   getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
@@ -179,11 +215,15 @@ export class PublicKeyStorage extends DKGStorage {
     super(level1, level2s);
   }
 
-  calculateLeaf(C0: Group): Field {
+  static calculateLeaf(C0: Group): Field {
     return Poseidon.hash(C0.toFields());
   }
 
-  calculateLevel1Index({
+  calculateLeaf(C0: Group): Field {
+    return PublicKeyStorage.calculateLeaf(C0);
+  }
+
+  static calculateLevel1Index({
     committeeId,
     keyId,
   }: {
@@ -195,8 +235,25 @@ export class PublicKeyStorage extends DKGStorage {
     );
   }
 
-  calculateLevel2Index(memberId: Field): Field {
+  calculateLevel1Index({
+    committeeId,
+    keyId,
+  }: {
+    committeeId: Field;
+    keyId: Field;
+  }): Field {
+    return PublicKeyStorage.calculateLevel1Index({
+      committeeId,
+      keyId,
+    });
+  }
+
+  static calculateLevel2Index(memberId: Field): Field {
     return memberId;
+  }
+
+  calculateLevel2Index(memberId: Field): Field {
+    return PublicKeyStorage.calculateLevel2Index(memberId);
   }
 
   getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
@@ -219,11 +276,15 @@ export class Round2ContributionStorage extends DKGStorage {
     super(level1, level2s);
   }
 
-  calculateLeaf(contribution: Round2Contribution): Field {
+  static calculateLeaf(contribution: Round2Contribution): Field {
     return contribution.hash();
   }
 
-  calculateLevel1Index({
+  calculateLeaf(contribution: Round2Contribution): Field {
+    return Round2ContributionStorage.calculateLeaf(contribution);
+  }
+
+  static calculateLevel1Index({
     committeeId,
     keyId,
   }: {
@@ -235,8 +296,25 @@ export class Round2ContributionStorage extends DKGStorage {
     );
   }
 
-  calculateLevel2Index(memberId: Field): Field {
+  calculateLevel1Index({
+    committeeId,
+    keyId,
+  }: {
+    committeeId: Field;
+    keyId: Field;
+  }): Field {
+    return Round2ContributionStorage.calculateLevel1Index({
+      committeeId,
+      keyId,
+    });
+  }
+
+  static calculateLevel2Index(memberId: Field): Field {
     return memberId;
+  }
+
+  calculateLevel2Index(memberId: Field): Field {
+    return Round2ContributionStorage.calculateLevel2Index(memberId);
   }
 
   getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
@@ -259,7 +337,7 @@ export class EncryptionStorage extends DKGStorage {
     super(level1, level2s);
   }
 
-  calculateLeaf({
+  static calculateLeaf({
     contributions,
     memberId,
   }: {
@@ -279,7 +357,20 @@ export class EncryptionStorage extends DKGStorage {
     return hashChain;
   }
 
-  calculateLevel1Index({
+  calculateLeaf({
+    contributions,
+    memberId,
+  }: {
+    contributions: Round2Contribution[];
+    memberId: Field;
+  }): Field {
+    return EncryptionStorage.calculateLeaf({
+      contributions,
+      memberId,
+    });
+  }
+
+  static calculateLevel1Index({
     committeeId,
     keyId,
   }: {
@@ -291,40 +382,25 @@ export class EncryptionStorage extends DKGStorage {
     );
   }
 
-  calculateLevel2Index(memberId: Field): Field {
+  calculateLevel1Index({
+    committeeId,
+    keyId,
+  }: {
+    committeeId: Field;
+    keyId: Field;
+  }): Field {
+    return EncryptionStorage.calculateLevel1Index({
+      committeeId,
+      keyId,
+    });
+  }
+
+  static calculateLevel2Index(memberId: Field): Field {
     return memberId;
   }
 
-  getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
-    return super.getWitness(level1Index, level2Index) as FullMTWitness;
-  }
-
-  updateLeaf(leaf: Field, level1Index: Field, level2Index: Field): void {
-    super.updateLeaf(leaf, level1Index, level2Index);
-  }
-}
-
-export class ResponseContributionStorage extends DKGStorage {
-  level1: Level1MT;
-  level2s: { [key: string]: Level2MT };
-
-  constructor(
-    level1?: Level1MT,
-    level2s?: { index: Field; level2: Level2MT }[]
-  ) {
-    super(level1, level2s);
-  }
-
-  calculateLeaf(contribution: ResponseContribution): Field {
-    return contribution.hash();
-  }
-
-  calculateLevel1Index(requestId: Field): Field {
-    return requestId;
-  }
-
   calculateLevel2Index(memberId: Field): Field {
-    return memberId;
+    return EncryptionStorage.calculateLevel2Index(memberId);
   }
 
   getWitness(level1Index: Field, level2Index: Field): FullMTWitness {

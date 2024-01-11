@@ -26,6 +26,10 @@ import {
   Level1Witness,
 } from './DKGStorage.js';
 import {
+  FullMTWitness as RequestWitness,
+  Level1Witness as RequestLevel1Witness,
+} from './RequestStorage.js';
+import {
   CheckConfigInput,
   CheckMemberInput,
   CommitteeContract,
@@ -194,7 +198,7 @@ export const CompleteResponse = ZkProgram({
         Field,
         Field,
         Field,
-        Level1Witness,
+        RequestLevel1Witness,
       ],
       method(
         input: ResponseInput,
@@ -205,25 +209,25 @@ export const CompleteResponse = ZkProgram({
         requestId: Field,
         requestDim: Field,
         indexList: Field,
-        contributionWitness: Level1Witness
+        contributionWitness: RequestLevel1Witness
       ) {
         // Verify there is no recorded contribution for the request
-        initialContributionRoot.assertEquals(
-          contributionWitness.calculateRoot(Field(0))
-        );
-        requestId.assertEquals(contributionWitness.calculateIndex());
+        let [contributionRoot, contributionKey] =
+          contributionWitness.computeRootAndKey(Field(0));
+        initialContributionRoot.assertEquals(contributionRoot);
+        requestId.assertEquals(contributionKey);
 
         // Record an empty level 2 tree
-        let newContributionRoot = contributionWitness.calculateRoot(
+        let newContributionRoot = contributionWitness.computeRootAndKey(
           EMPTY_LEVEL_2_TREE().getRoot()
-        );
+        )[0];
 
         // Initialize dynamic vector D
         let D = Provable.witness(
           RequestVector,
           () =>
             new RequestVector(
-              [...Array(Number(requestDim)).keys()].map((e) => Group.zero)
+              [...Array(Number(requestDim)).keys()].map(() => Group.zero)
             )
         );
         D.length.assertEquals(requestDim);
@@ -245,13 +249,13 @@ export const CompleteResponse = ZkProgram({
     nextStep: {
       privateInputs: [
         SelfProof<ResponseInput, ResponseOutput>,
-        DKGWitness,
+        RequestWitness,
         ReduceWitness,
       ],
       method(
         input: ResponseInput,
         earlierProof: SelfProof<ResponseInput, ResponseOutput>,
-        contributionWitness: DKGWitness,
+        contributionWitness: RequestWitness,
         reduceWitness: ReduceWitness
       ) {
         // Verify earlier proof
@@ -263,24 +267,24 @@ export const CompleteResponse = ZkProgram({
         );
 
         // Verify the member's contribution witness
-        earlierProof.publicOutput.newContributionRoot.assertEquals(
-          contributionWitness.level1.calculateRoot(
+        let [contributionRoot, contributionKey] =
+          contributionWitness.level1.computeRootAndKey(
             contributionWitness.level2.calculateRoot(Field(0))
-          )
+          );
+        earlierProof.publicOutput.newContributionRoot.assertEquals(
+          contributionRoot
         );
-        input.action.requestId.assertEquals(
-          contributionWitness.level1.calculateIndex()
-        );
+        input.action.requestId.assertEquals(contributionKey);
         input.action.memberId.assertEquals(
           contributionWitness.level2.calculateIndex()
         );
 
         // Compute new contribution root
-        let newContributionRoot = contributionWitness.level1.calculateRoot(
+        let newContributionRoot = contributionWitness.level1.computeRootAndKey(
           contributionWitness.level2.calculateRoot(
             input.action.contribution.hash()
           )
-        );
+        )[0];
 
         // Compute Lagrange coefficient
         let lagrangeCoefficientMul = Provable.witness(

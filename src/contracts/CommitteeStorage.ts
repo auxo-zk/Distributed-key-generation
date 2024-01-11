@@ -39,8 +39,11 @@ export abstract class CommitteeStrorage {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   abstract calculateLeaf(args: any): Field;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   abstract calculateLevel1Index(args: any): Field;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   calculateLevel2Index?(args: any): Field;
 
   getLevel1Witness(level1Index: Field): Level1Witness {
@@ -100,16 +103,28 @@ export class MemberStorage extends CommitteeStrorage {
     super(level1, level2s);
   }
 
-  calculateLeaf(publicKey: PublicKey): Field {
+  static calculateLeaf(publicKey: PublicKey): Field {
     return Poseidon.hash(publicKey.toFields());
   }
 
-  calculateLevel1Index(committeeId: Field): Field {
+  calculateLeaf(publicKey: PublicKey): Field {
+    return MemberStorage.calculateLeaf(publicKey);
+  }
+
+  static calculateLevel1Index(committeeId: Field): Field {
     return committeeId;
   }
 
-  calculateLevel2Index(memberId: Field): Field {
+  calculateLevel1Index(committeeId: Field): Field {
+    return MemberStorage.calculateLevel1Index(committeeId);
+  }
+
+  static calculateLevel2Index(memberId: Field): Field {
     return memberId;
+  }
+
+  calculateLevel2Index(memberId: Field): Field {
+    return MemberStorage.calculateLevel2Index(memberId);
   }
 
   getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
@@ -128,12 +143,20 @@ export class SettingStorage extends CommitteeStrorage {
     super(level1);
   }
 
-  calculateLeaf({ T, N }: { T: Field; N: Field }): Field {
+  static calculateLeaf({ T, N }: { T: Field; N: Field }): Field {
     return Poseidon.hash([T, N]);
   }
 
-  calculateLevel1Index(commiteeId: Field): Field {
+  calculateLeaf({ T, N }: { T: Field; N: Field }): Field {
+    return SettingStorage.calculateLeaf({ T, N });
+  }
+
+  static calculateLevel1Index(commiteeId: Field): Field {
     return commiteeId;
+  }
+
+  calculateLevel1Index(commiteeId: Field): Field {
+    return SettingStorage.calculateLevel1Index(commiteeId);
   }
 
   getWitness(level1Index: Field): Level1Witness {
@@ -152,12 +175,20 @@ export class KeyCounterStorage extends CommitteeStrorage {
     super(level1);
   }
 
-  calculateLeaf(nextKeyId: Field): Field {
+  static calculateLeaf(nextKeyId: Field): Field {
     return nextKeyId;
   }
 
-  calculateLevel1Index(committeeId: Field): Field {
+  calculateLeaf(nextKeyId: Field): Field {
+    return KeyCounterStorage.calculateLeaf(nextKeyId);
+  }
+
+  static calculateLevel1Index(committeeId: Field): Field {
     return committeeId;
+  }
+
+  calculateLevel1Index(committeeId: Field): Field {
+    return KeyCounterStorage.calculateLevel1Index(committeeId);
   }
 
   getWitness(level1Index: Field): Level1Witness {

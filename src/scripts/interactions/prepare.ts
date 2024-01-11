@@ -1,11 +1,22 @@
 import fs from 'fs';
+import { Cache, Mina, PrivateKey, PublicKey, fetchAccount } from 'o1js';
 import { Config, JSONKey, Key } from '../helper/config.js';
-import { ContractList } from '../helper/deploy.js';
+import { ContractList, wait } from '../helper/deploy.js';
 
-async function prepare() {
-  let feePayerKey: Key;
-  let contracts: ContractList;
+export async function prepare() {
+  // Cache folder
+  const cache = Cache.FileSystem('./caches');
 
+  // Network configuration
+  const MINAURL = 'https://proxy.berkeley.minaexplorer.com/graphql';
+  const ARCHIVEURL = 'https://archive.berkeley.minaexplorer.com';
+  const network = Mina.Network({
+    mina: MINAURL,
+    archive: ARCHIVEURL,
+  });
+  Mina.setActiveInstance(network);
+
+  // Accounts configuration
   let configJson: Config = JSON.parse(fs.readFileSync('config.json', 'utf8'));
   let acc1: JSONKey = JSON.parse(
     fs.readFileSync(configJson.deployAliases['acc1'].keyPath, 'utf8')
@@ -20,5 +31,25 @@ async function prepare() {
     fs.readFileSync(configJson.deployAliases['acc3'].keyPath, 'utf8')
   );
 
-  return;
+  let feePayerKey: Key;
+  feePayerKey = {
+    privateKey: PrivateKey.fromBase58(acc1.privateKey),
+    publicKey: PublicKey.fromBase58(acc1.publicKey),
+  };
+  let sender, feePayerNonce;
+  do {
+    console.log('Fetch nonce...');
+    sender = await fetchAccount({ publicKey: feePayerKey.publicKey });
+    feePayerNonce = Number(sender.account?.nonce);
+    if (!isNaN(feePayerNonce)) break;
+    await wait(1000); // 1s
+  } while (true);
+
+  return {
+    feePayer: {
+      key: feePayerKey,
+      nonce: feePayerNonce,
+    },
+    cache,
+  };
 }

@@ -155,15 +155,20 @@ export function logMemUsage() {
   );
 }
 
-export async function fetchActions<T>(
+export interface FetchedActions {
+  actions: string[][];
+  hash: string;
+}
+
+export async function fetchActions(
   publicKey: string,
   fromActionState?: Field,
   endActionState?: Field
-): Promise<T[]> {
+): Promise<FetchedActions[]> {
   return (await Mina.fetchActions(PublicKey.fromBase58(publicKey), {
     fromActionState: fromActionState,
     endActionState: endActionState,
-  })) as T[];
+  })) as FetchedActions[];
 }
 
 export async function fetchZkAppState(

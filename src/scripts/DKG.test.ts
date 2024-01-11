@@ -66,7 +66,6 @@ import {
   EncryptionStorage,
   KeyStatusStorage,
   PublicKeyStorage,
-  ResponseContributionStorage,
   Round1ContributionStorage,
   Round2ContributionStorage,
 } from '../contracts/DKGStorage.js';
@@ -79,7 +78,6 @@ import {
 import {
   CArray,
   EncryptionHashArray,
-  PublicKeyArray,
   Round2Data,
   SecretPolynomial,
   UArray,
@@ -99,6 +97,7 @@ import {
 } from '../libs/Requestor.js';
 import { CreateRequest, RequestContract } from '../contracts/Request.js';
 import { packIndexArray } from '../libs/utils.js';
+import { ResponseContributionStorage } from '../contracts/RequestStorage.js';
 
 describe('DKG', () => {
   const doProofs = false;
