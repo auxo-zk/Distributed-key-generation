@@ -1,16 +1,5 @@
-import fs from 'fs';
-import {
-  Cache,
-  Field,
-  Mina,
-  PrivateKey,
-  Provable,
-  PublicKey,
-  Reducer,
-  fetchAccount,
-} from 'o1js';
-import { Config, JSONKey, Key } from '../../helper/config.js';
-import { ContractList, compile, wait } from '../../helper/deploy.js';
+import { Field, Mina, Provable, PublicKey, Reducer, fetchAccount } from 'o1js';
+import { compile, wait } from '../../helper/deploy.js';
 import { fetchActions, fetchZkAppState } from '../../helper/deploy.js';
 import {
   CommitteeAction,
@@ -32,8 +21,8 @@ async function main() {
   const { cache, feePayer } = await prepare();
 
   // Compile programs
-  // await compile(CreateCommittee, cache);
-  // await compile(CommitteeContract, cache);
+  await compile(CreateCommittee, cache);
+  await compile(CommitteeContract, cache);
   const committeeAddress =
     'B62qiYCgNQhu1KddDQZs7HL8cLqRd683YufYX1BNceZ6BHnC1qfEcJ9';
   const committeeContract = new CommitteeContract(
@@ -87,20 +76,16 @@ async function main() {
     );
   });
 
-  const rawActions = await fetchActions(
-    // publicKey
-    committeeAddress,
-    // fromState
+  const fromState =
     Field(
       25079927036070901246064867767436987657692091363973573142121686150614948079097n
-    ),
-    // toState
+    );
+  const toState =
     Field(
       1972653782998565751193839543112576956152658311032796175197111159970957407940n
-    )
-  );
+    );
 
-  // Provable.log('Actions:', actions);
+  const rawActions = await fetchActions(committeeAddress, fromState, toState);
   const actions: CommitteeAction[] = rawActions.map((e) => {
     let action: Field[] = e.actions[0].map((e) => Field(e));
     return new CommitteeAction({
@@ -159,7 +144,7 @@ async function main() {
   let tx = await Mina.transaction(
     {
       sender: feePayer.key.publicKey,
-      fee: 0.101 * 1e9,
+      fee: feePayer.fee,
       nonce: feePayer.nonce++,
     },
     () => {

@@ -15,6 +15,7 @@ export async function prepare() {
     archive: ARCHIVEURL,
   });
   Mina.setActiveInstance(network);
+  const FEE = 0.101 * 1e9;
 
   // Accounts configuration
   let configJson: Config = JSON.parse(fs.readFileSync('config.json', 'utf8'));
@@ -49,6 +50,7 @@ export async function prepare() {
     feePayer: {
       key: feePayerKey,
       nonce: feePayerNonce,
+      fee: FEE,
     },
     cache,
   };
