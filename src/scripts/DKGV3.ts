@@ -65,7 +65,6 @@ import {
   KeyCounterStorage,
   MemberStorage,
   SettingStorage,
-  Level1Witness as CommitteeLv1Witness,
 } from '../contracts/CommitteeStorage.js';
 import { MemberArray } from '../libs/Committee.js';
 import {
@@ -73,7 +72,6 @@ import {
   EncryptionStorage,
   KeyStatusStorage,
   PublicKeyStorage,
-  ResponseContributionStorage,
   Round1ContributionStorage,
   Round2ContributionStorage,
 } from '../contracts/DKGStorage.js';
@@ -114,6 +112,7 @@ import {
 import { EMPTY_LEVEL_1_TREE as EMPTY_LEVEL_1_TREE_COMMITEE } from '../contracts/CommitteeStorage.js';
 import { EMPTY_LEVEL_1_TREE as EMPTY_LEVEL_1_TREE_DKG } from '../contracts/DKGStorage.js';
 import { packIndexArray } from '../libs/utils.js';
+import { ResponseContributionStorage } from '../contracts/RequestStorage.js';
 
 const waitTime = 7 * 60 * 1000; // 7m
 

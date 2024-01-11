@@ -65,7 +65,6 @@ import {
   EncryptionStorage,
   KeyStatusStorage,
   PublicKeyStorage,
-  ResponseContributionStorage,
   Round1ContributionStorage,
   Round2ContributionStorage,
 } from '../contracts/DKGStorage.js';
@@ -90,7 +89,6 @@ import {
 } from '../libs/Committee.js';
 import { ZkAppEnum, Contract } from '../constants.js';
 import {
-  RArray,
   accumulateEncryption,
   generateEncryptionWithRandomInput,
 } from '../libs/Requestor.js';
@@ -98,6 +96,7 @@ import {
 import { RequestContract, CreateRequest } from '../contracts/Request.js';
 import { EMPTY_LEVEL_1_TREE } from '../contracts/CommitteeStorage.js';
 import { packIndexArray } from '../libs/utils.js';
+import { ResponseContributionStorage } from '../contracts/RequestStorage.js';
 
 const waitTime = 6 * 60 * 1000; // 6m
 
