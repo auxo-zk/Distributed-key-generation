@@ -19,15 +19,12 @@ import {
   FullMTWitness as CommitteeFullWitness,
   Level1Witness as CommitteeLevel1Witness,
 } from './CommitteeStorage.js';
-import {
-  FullMTWitness as DKGWitness,
-  EMPTY_LEVEL_1_TREE,
-  EMPTY_LEVEL_2_TREE,
-  Level1Witness,
-} from './DKGStorage.js';
+import { FullMTWitness as DKGWitness, Level1Witness } from './DKGStorage.js';
 import {
   FullMTWitness as RequestWitness,
   Level1Witness as RequestLevel1Witness,
+  EMPTY_LEVEL_1_TREE,
+  EMPTY_LEVEL_2_TREE,
 } from './RequestStorage.js';
 import {
   CheckConfigInput,

@@ -56,7 +56,7 @@ async function main() {
   );
   console.log('Done');
 
-  const keyCounters = [0, 0, 0, 0];
+  const keyCounters = [0, 0, 0, 1];
 
   for (let i = 0; i < actions.length; i++) {
     let action = actions[i];

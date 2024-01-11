@@ -123,7 +123,7 @@ describe('DKG', () => {
   let responsedMembers = [0];
   let secrets: SecretPolynomial[] = [];
   let publicKeys: Group[] = [];
-  let requestId = Field(0);
+  let requestId = Field.random();
   let mockRequests = [
     [1000n, 1000n, 1000n],
     [4000n, 3000n, 2000n],
@@ -1339,7 +1339,7 @@ describe('DKG', () => {
       Field(mockResult.length),
       packIndexArray(responsedMembers),
       responseContributionStorage.getLevel1Witness(
-        responseContributionStorage.calculateLevel1Index(requestId)
+        ResponseContributionStorage.calculateLevel1Index(requestId)
       )
     );
     if (profiling) DKGProfiler.stop();
