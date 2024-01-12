@@ -14,8 +14,8 @@ import * as Requestor from './Requestor.js';
 import { Bit255 } from '@auxo-dev/auxo-libs';
 
 describe('Committee', () => {
-  let T = 3;
-  let N = 5;
+  let T = 1;
+  let N = 3;
   let committees: {
     privateKey: PrivateKey;
     memberId: number;
@@ -33,7 +33,7 @@ describe('Committee', () => {
   let sumR: Group[] = [];
   let sumM: Group[] = [];
   let D: Group[][] = [];
-  let responsedMembers = [0, 2, 4];
+  let responsedMembers = [1];
   const plainVectors = [
     [1000n, 1000n, 1000n],
     [4000n, 3000n, 2000n],

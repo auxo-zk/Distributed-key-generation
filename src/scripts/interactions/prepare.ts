@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { Cache, Mina, PrivateKey, PublicKey, fetchAccount } from 'o1js';
 import { Config, JSONKey, Key } from '../helper/config.js';
-import { ContractList, wait } from '../helper/deploy.js';
+import { wait } from '../helper/deploy.js';
 
 export async function prepare() {
   // Cache folder

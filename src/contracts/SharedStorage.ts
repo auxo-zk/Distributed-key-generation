@@ -29,16 +29,28 @@ export class AddressStorage {
     this.addresses = addresses || EMPTY_ADDRESS_MT();
   }
 
-  calculateLeaf(address: PublicKey): Field {
+  static calculateLeaf(address: PublicKey): Field {
     return Poseidon.hash(address.toFields());
   }
 
-  calculateIndex(index: ZkAppEnum | number): Field {
+  calculateLeaf(address: PublicKey): Field {
+    return AddressStorage.calculateLeaf(address);
+  }
+
+  static calculateIndex(index: ZkAppEnum | number): Field {
     return Field(index);
+  }
+
+  calculateIndex(index: ZkAppEnum | number): Field {
+    return AddressStorage.calculateIndex(index);
   }
 
   getWitness(index: Field): AddressWitness {
     return new AddressWitness(this.addresses.getWitness(index.toBigInt()));
+  }
+
+  updateLeaf(index: Field, leaf: Field): void {
+    this.addresses.setLeaf(index.toBigInt(), leaf);
   }
 }
 
@@ -67,12 +79,20 @@ export class ReduceStorage {
     this.actions = actions || EMPTY_REDUCE_MT();
   }
 
-  calculateLeaf(status: ActionStatus): Field {
+  static calculateLeaf(status: ActionStatus): Field {
     return Field(status);
   }
 
-  calculateIndex(actionState: Field): Field {
+  calculateLeaf(status: ActionStatus): Field {
+    return ReduceStorage.calculateLeaf(status);
+  }
+
+  static calculateIndex(actionState: Field): Field {
     return actionState;
+  }
+
+  calculateIndex(actionState: Field): Field {
+    return ReduceStorage.calculateIndex(actionState);
   }
 
   getWitness(index: Field): MerkleMapWitness {

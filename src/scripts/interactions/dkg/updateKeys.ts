@@ -10,13 +10,14 @@ import { DKGContract, KeyStatus, UpdateKey } from '../../../contracts/DKG.js';
 import { DKGAction } from '../../../index.js';
 import { KeyStatusStorage } from '../../../contracts/DKGStorage.js';
 import { KeyCounterStorage } from '../../../contracts/CommitteeStorage.js';
+import axios from 'axios';
 
 async function main() {
   const { cache, feePayer } = await prepare();
 
   // Compile programs
-  await compile(UpdateKey, cache);
-  await compile(DKGContract, cache);
+  // await compile(UpdateKey, cache);
+  // await compile(DKGContract, cache);
   const dkgAddress = 'B62qr8z7cT4D5Qq2aH7SabUDbpXEb8EXMCUin26xmcJNQtVu616CNFC';
   const dkgContract = new DKGContract(PublicKey.fromBase58(dkgAddress));
 
@@ -24,6 +25,36 @@ async function main() {
   const keyStatusStorage = new KeyStatusStorage();
   const keyCounterStorage = new KeyCounterStorage();
 
+  const committees = (await axios.get('https://api.auxo.fund/v0/committees/'))
+    .data;
+
+  const keys = await Promise.all(
+    [...Array(committees.length).keys()].map(
+      async (e) =>
+        (
+          await axios.get(`https://api.auxo.fund/v0/committees/${e}/keys`)
+        ).data
+    )
+  );
+  const keyCounters = keys.map((e) => e.length);
+  keys.map((e, id) => {
+    if (e.length == 0) return;
+    keyCounterStorage.updateLeaf(
+      KeyCounterStorage.calculateLeaf(Field(keyCounters[id])),
+      KeyCounterStorage.calculateLevel1Index(Field(id))
+    );
+    e.map((key: any) => {
+      keyStatusStorage.updateLeaf(
+        Field(key.status),
+        KeyStatusStorage.calculateLevel1Index({
+          committeeId: Field(key.committeeId),
+          keyId: Field(key.keyId),
+        })
+      );
+    });
+  });
+
+  // Fetch state and actions
   const rawState = (await fetchZkAppState(dkgAddress)) || [];
   const dkgState = {
     zkApps: rawState[0],
@@ -35,12 +66,13 @@ async function main() {
     Field(
       25079927036070901246064867767436987657692091363973573142121686150614948079097n
     );
-  const toState =
-    Field(
-      28329272341530795225244483153462207600984423987978417118928482319863638929445n
-    );
+  const toState = Field(0n);
 
-  const rawActions = await fetchActions(dkgAddress, fromState, toState);
+  const rawActions = await fetchActions(
+    dkgAddress,
+    fromState
+    // toState
+  );
   const actions: DKGAction[] = rawActions.map((e) => {
     let action: Field[] = e.actions[0].map((e) => Field(e));
     return DKGAction.fromFields(action);
@@ -56,11 +88,10 @@ async function main() {
   );
   console.log('Done');
 
-  const keyCounters = [0, 0, 0, 1];
-
   for (let i = 0; i < actions.length; i++) {
     let action = actions[i];
-    if (action.keyId.equals(Field(-1))) {
+    Provable.log('Action:', action);
+    if (action.keyId.equals(Field(-1)).toBoolean()) {
       console.log('UpdateKey.nextStepGeneration...');
       proof = await UpdateKey.nextStepGeneration(
         action,
@@ -103,9 +134,9 @@ async function main() {
         action,
         proof,
         keyStatusStorage.getWitness(
-          keyStatusStorage.calculateLevel1Index({
+          KeyStatusStorage.calculateLevel1Index({
             committeeId: action.committeeId,
-            keyId: Field(i),
+            keyId: Field(0),
           })
         )
       );
@@ -119,7 +150,7 @@ async function main() {
         ]),
         KeyStatusStorage.calculateLevel1Index({
           committeeId: action.committeeId,
-          keyId: Field(keyCounters[Number(action.committeeId)]),
+          keyId: Field(0),
         })
       );
       console.log('Done');
