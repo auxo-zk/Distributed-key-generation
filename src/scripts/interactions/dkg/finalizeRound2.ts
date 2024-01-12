@@ -7,6 +7,7 @@ import {
 } from '../../helper/deploy.js';
 import { prepare } from '../prepare.js';
 import {
+  BatchEncryption,
   CommitteeContract,
   CreateCommittee,
   DKGContract,
@@ -51,8 +52,9 @@ async function main() {
   await compile(FinalizeRound1, cache);
   await compile(Round1Contract, cache);
   await compile(ReduceRound2, cache);
+  await compile(BatchEncryption, cache);
   await compile(FinalizeRound2, cache);
-  await compile(Round1Contract, cache);
+  await compile(Round2Contract, cache);
   const committeeAddress =
     'B62qiYCgNQhu1KddDQZs7HL8cLqRd683YufYX1BNceZ6BHnC1qfEcJ9';
   const dkgAddress = 'B62qr8z7cT4D5Qq2aH7SabUDbpXEb8EXMCUin26xmcJNQtVu616CNFC';
