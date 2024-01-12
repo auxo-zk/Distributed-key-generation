@@ -394,21 +394,22 @@ export class RequestContract extends SmartContract {
       actionType,
     });
 
-    // checking if the request have the same id already exists within the accumulator
-    let { state: exists } = this.reducer.reduce(
-      this.reducer.getActions({
-        fromActionState: actionState,
-      }),
-      Bool,
-      (state: Bool, action: RequestAction) => {
-        return action.requestId.equals(resolveInputId).or(state);
-      },
-      // initial state
-      { state: Bool(false), actionState: actionState }
-    );
+    // TODO: add this latter
+    // // checking if the request have the same id already exists within the accumulator
+    // let { state: exists } = this.reducer.reduce(
+    //   this.reducer.getActions({
+    //     fromActionState: actionState,
+    //   }),
+    //   Bool,
+    //   (state: Bool, action: RequestAction) => {
+    //     return action.requestId.equals(resolveInputId).or(state);
+    //   },
+    //   // initial state
+    //   { state: Bool(false), actionState: actionState }
+    // );
 
-    // if exists then don't dispatch any more
-    exists.assertEquals(Bool(false));
+    // // if exists then don't dispatch any more
+    // exists.assertEquals(Bool(false));
 
     this.reducer.dispatch(requestAction);
 

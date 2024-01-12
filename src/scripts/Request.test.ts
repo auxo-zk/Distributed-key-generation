@@ -108,6 +108,21 @@ describe('Testing Request Contract', () => {
     feePayer = Local.testAccounts[0].publicKey;
     requestContract = new RequestContract(addresses.request);
     responeContract = new MockResponeContract(addresses.respone);
+
+    if (doProofs) {
+      const cache = Cache.FileSystem('./caches');
+      await CreateRequest.compile({ cache });
+      await RequestContract.compile();
+      await MockResponeContract.compile();
+    } else {
+      console.log('AnalyzeMethods...');
+      const cache = Cache.FileSystem('./caches');
+      await CreateRequest.compile({ cache });
+      RequestContract.analyzeMethods();
+      MockResponeContract.analyzeMethods();
+      console.log('Done analyzeMethods');
+    }
+
     let tx = await Mina.transaction(feePayer, () => {
       AccountUpdate.fundNewAccount(feePayer, 3);
       requestContract.deploy();
@@ -117,34 +132,23 @@ describe('Testing Request Contract', () => {
       feePayerAccount.send({ to: addresses.rqter1, amount: 10 * 10 ** 9 }); // 10 Mina
     });
     await tx.sign([feePayerKey, keys.request, keys.respone]).send();
-    if (doProofs) {
-      await RequestContract.compile();
-      await MockResponeContract.compile();
-    } else {
-      console.log('AnalyzeMethods...');
-      RequestContract.analyzeMethods();
-      MockResponeContract.analyzeMethods();
-      console.log('Done analyzeMethods');
-    }
   });
 
   beforeEach(() => {});
 
-  it('compile proof', async () => {
-    const cache = Cache.FileSystem('./caches');
-    ActionRequestProfiler.start('CreateRequest.compile');
-    await CreateRequest.compile({ cache });
-    ActionRequestProfiler.stop().store();
-  });
-
   it('Requester1 requestInput1', async () => {
+    Provable.log('REQUEST IIDDIDIDID: ', input1.requestId());
     let balanceBefore = Number(Account(addresses.rqter1).balance.get());
+    let requestBefore = Number(Account(addresses.request).balance.get());
+    console.log('contract before: ', requestBefore);
     let tx = await Mina.transaction(addresses.rqter1, () => {
       requestContract.request(input1);
     });
     await tx.prove();
     await tx.sign([keys.rqter1]).send();
     let balanceAfter = Number(Account(addresses.rqter1).balance.get());
+    let requestAfter = Number(Account(addresses.request).balance.get());
+    console.log('contract after: ', requestAfter);
     expect(balanceBefore - balanceAfter).toEqual(Number(RequestFee));
   });
 
@@ -191,6 +195,22 @@ describe('Testing Request Contract', () => {
   });
 
   it('Respone contract send requestInput2', async () => {
+    console.log(
+      'Contract actionState last: ',
+      requestContract.actionState.get()
+    );
+    console.log('Contract action before responee: ');
+    await Mina.fetchActions(addresses.request).then((actions) => {
+      Provable.log(actions);
+      if (Array.isArray(actions)) {
+        for (let action of actions) {
+          Provable.log(
+            'requestAction: ',
+            RequestAction.fromFields(action.actions[0].map((e) => Field(e)))
+          );
+        }
+      }
+    });
     console.log('Respone contract send requestInput2');
     let balanceBefore = Number(Account(addresses.respone).balance.get());
     let tx = await Mina.transaction(feePayer, () => {

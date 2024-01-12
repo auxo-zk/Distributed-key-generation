@@ -128,7 +128,7 @@ describe('DKG', () => {
     [1000n, 1000n, 1000n],
     [4000n, 3000n, 2000n],
   ];
-  let mockResult = [5000n, 4000n, 5000n];
+  let mockResult = [5000n, 4000n, 3000n];
   let R: Group[][] = [];
   let M: Group[][] = [];
   let sumR: Group[] = [];

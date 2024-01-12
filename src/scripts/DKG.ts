@@ -1081,7 +1081,7 @@ async function main() {
   console.log('Should contribute round 2 successfully');
   let round2Contract = contracts[Contract.ROUND2].contract as Round2Contract;
   for (let i = 0; i < N; i++) {
-    // let randoms = [...Array(N).keys()].map((e) => Scalar.random());
+    // let randoms =f [...Array(N).keys()].map((e) => Scalar.random());
     let round2Contribution = getRound2Contribution(
       secrets[i],
       i + 1,
@@ -1098,21 +1098,21 @@ async function main() {
 
     console.log(`Generate proof BatchEncryption...`);
     if (profiling) DKGProfiler.start('BatchEncryption.encrypt');
-    let encryptionProof = await BatchEncryption.encrypt(
-      new BatchEncryptionInput({
-        publicKeys: new CArray(
-          round1Actions.map((e) => e.contribution.C.get(Field(0)))
-        ),
-        c: action.contribution.c,
-        U: action.contribution.U,
-        memberId: Field(i),
-      }),
-      new PlainArray(secrets[i].f.map((e) => CustomScalar.fromScalar(e))),
-      new RandomArray(randoms[i].map((e) => CustomScalar.fromScalar(e)))
-    );
-    if (profiling) DKGProfiler.stop();
-    console.log('DONE!');
-    encryptionProofs.push(encryptionProof);
+    // let encryptionProof = await BatchEncryption.encrypt(
+    //   new BatchEncryptionInput({
+    //     publicKeys: new CArray(
+    //       round1Actions.map((e) => e.contribution.C.get(Field(0)))
+    //     ),
+    //     c: action.contribution.c,
+    //     U: action.contribution.U,
+    //     memberId: Field(i),
+    //   }),
+    //   new PlainArray(secrets[i].f.map((e) => CustomScalar.fromScalar(e))),
+    //   new RandomArray(randoms[i].map((e) => CustomScalar.fromScalar(e)))
+    // );
+    // if (profiling) DKGProfiler.stop();
+    // console.log('DONE!');
+    // encryptionProofs.push(encryptionProof);
 
     let memberWitness = memberStorage.getWitness(
       memberStorage.calculateLevel1Index(committeeIndex),
@@ -1395,7 +1395,7 @@ async function main() {
 
   // await proveAndSend(tx, feePayerKey, 'DKGContract', 'updateKeys');
   // await wait();
-  await fetchAllContract(contracts);
+  // await fetchAllContract(contracts);
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   console.log('Should contribute response successfully');
@@ -1456,25 +1456,25 @@ async function main() {
     );
     Provable.log('secrets[memberId].a[0]: ', secrets[memberId].a[0]);
 
-    let decryptionProof = await BatchDecryption.decrypt(
-      new BatchDecryptionInput({
-        publicKey: secrets[memberId].C[0],
-        c: new cArray(
-          round2Actions.map((e) => e.contribution.c.get(Field(memberId)))
-        ),
-        U: new UArray(
-          round2Actions.map((e) => e.contribution.U.get(Field(memberId)))
-        ),
-        memberId: Field(memberId),
-      }),
-      new PlainArray(
-        secrets.map((e) => CustomScalar.fromScalar(e.f[memberId]))
-      ),
-      secrets[memberId].a[0]
-    );
+    // let decryptionProof = await BatchDecryption.decrypt(
+    //   new BatchDecryptionInput({
+    //     publicKey: secrets[memberId].C[0],
+    //     c: new cArray(
+    //       round2Actions.map((e) => e.contribution.c.get(Field(memberId)))
+    //     ),
+    //     U: new UArray(
+    //       round2Actions.map((e) => e.contribution.U.get(Field(memberId)))
+    //     ),
+    //     memberId: Field(memberId),
+    //   }),
+    //   new PlainArray(
+    //     secrets.map((e) => CustomScalar.fromScalar(e.f[memberId]))
+    //   ),
+    //   secrets[memberId].a[0]
+    // );
     if (profiling) DKGProfiler.stop();
     console.log('DONE!');
-    decryptionProofs.push(decryptionProof);
+    // decryptionProofs.push(decryptionProof);
 
     // let memberWitness = memberStorage.getWitness(
     //   memberStorage.calculateLevel1Index(committeeIndex),
@@ -1545,11 +1545,11 @@ async function main() {
 
   console.log('Generate first step proof ReduceResponse...');
   if (profiling) DKGProfiler.start('ReduceResponse.firstStep');
-  let reduceProof3 = await ReduceResponse.firstStep(
-    responseActions[0],
-    initialReduceState,
-    initialActionState
-  );
+  // let reduceProof3 = await ReduceResponse.firstStep(
+  //   responseActions[0],
+  //   initialReduceState,
+  //   initialActionState
+  // );
   if (profiling) DKGProfiler.stop();
   console.log('DONE!');
 
@@ -1557,13 +1557,13 @@ async function main() {
     let action = responseActions[i];
     console.log(`Generate step ${i + 1} proof ReduceResponse...`);
     if (profiling) DKGProfiler.start('ReduceResponse.nextStep');
-    reduceProof3 = await ReduceResponse.nextStep(
-      action,
-      reduceProof3,
-      responseReduceStorage.getWitness(
-        contracts[Contract.RESPONSE].actionStates[i + 1]
-      )
-    );
+    // reduceProof3 = await ReduceResponse.nextStep(
+    //   action,
+    //   reduceProof3,
+    //   responseReduceStorage.getWitness(
+    //     contracts[Contract.RESPONSE].actionStates[i + 1]
+    //   )
+    // );
     if (profiling) DKGProfiler.stop();
     console.log('DONE!');
 
@@ -1575,14 +1575,14 @@ async function main() {
     );
   }
 
-  tx = await Mina.transaction(
-    { sender: feePayerKey.publicKey, fee, nonce: ++feePayerNonce },
-    () => {
-      responseContract.reduce(reduceProof3);
-    }
-  );
-  await proveAndSend(tx, feePayerKey, 'ResponseContract', 'reduce');
-  await wait();
+  // tx = await Mina.transaction(
+  //   { sender: feePayerKey.publicKey, fee, nonce: ++feePayerNonce },
+  //   () => {
+  //     responseContract.reduce(reduceProof3);
+  //   }
+  // );
+  // await proveAndSend(tx, feePayerKey, 'ResponseContract', 'reduce');
+  // await wait();
 
   console.log('Should complete response correctly');
   responseContract = contracts[Contract.RESPONSE].contract as ResponseContract;
