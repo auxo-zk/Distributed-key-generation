@@ -101,11 +101,11 @@ export class RequestStatusStorage extends RequestStorage {
     super(level1);
   }
 
-  static calculateLeaf(status: RequestStatusEnum): Field {
+  static calculateLeaf(status: Field): Field {
     return Field(status);
   }
 
-  calculateLeaf(status: RequestStatusEnum): Field {
+  calculateLeaf(status: Field): Field {
     return RequestStatusStorage.calculateLeaf(status);
   }
 
