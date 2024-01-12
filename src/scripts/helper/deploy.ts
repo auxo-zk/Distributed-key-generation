@@ -4,6 +4,7 @@ import {
   Cache,
   Field,
   Mina,
+  Provable,
   PublicKey,
   Reducer,
   SmartContract,
@@ -101,6 +102,8 @@ export async function proveAndSend(
       console.log(`Retrying... (${retries} retries left)`);
     }
   }
+
+  Provable.log('Transaction:', tx);
 }
 
 export async function fetchAllContract(
