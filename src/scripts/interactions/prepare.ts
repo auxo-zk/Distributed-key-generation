@@ -8,8 +8,8 @@ export async function prepare() {
   const cache = Cache.FileSystem('./caches');
 
   // Network configuration
-  const MINAURL = 'https://proxy.berkeley.minaexplorer.com/graphql';
-  const ARCHIVEURL = 'https://archive.berkeley.minaexplorer.com';
+  const MINAURL = 'https://api.minascan.io/node/berkeley/v1/graphql';
+  const ARCHIVEURL = 'https://api.minascan.io/archive/berkeley/v1/graphql/';
   const network = Mina.Network({
     mina: MINAURL,
     archive: ARCHIVEURL,

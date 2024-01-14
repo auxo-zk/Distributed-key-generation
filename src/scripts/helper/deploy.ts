@@ -8,7 +8,9 @@ import {
   PublicKey,
   Reducer,
   SmartContract,
+  UInt32,
   fetchAccount,
+  fetchEvents as fetchEvent,
 } from 'o1js';
 import { Key } from './config.js';
 import { Profiler } from './profiler.js';
@@ -172,6 +174,40 @@ export async function fetchActions(
     fromActionState: fromActionState,
     endActionState: endActionState,
   })) as FetchedActions[];
+}
+
+export interface FetchedEvents {
+  events: {
+    data: string[];
+    transactionInfo: {
+      hash: string;
+      memo: string;
+      status: string;
+    };
+  }[];
+  blockHeight: UInt32;
+  blockHash: string;
+  parentBlockHash: string;
+  globalSlot: UInt32;
+  chainStatus: string;
+}
+
+export async function fetchEvents(
+  publicKey: string,
+  from?: number,
+  to?: number
+): Promise<FetchedEvents[]> {
+  const events = await fetchEvent(
+    {
+      publicKey: publicKey,
+    },
+    undefined,
+    {
+      from: from == undefined ? undefined : UInt32.from(from),
+      to: to == undefined ? undefined : UInt32.from(to),
+    }
+  );
+  return events;
 }
 
 export async function fetchZkAppState(

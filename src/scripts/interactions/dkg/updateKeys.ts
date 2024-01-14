@@ -16,9 +16,9 @@ async function main() {
   const { cache, feePayer } = await prepare();
 
   // Compile programs
-  // await compile(UpdateKey, cache);
-  // await compile(DKGContract, cache);
-  const dkgAddress = 'B62qr8z7cT4D5Qq2aH7SabUDbpXEb8EXMCUin26xmcJNQtVu616CNFC';
+  await compile(UpdateKey, cache);
+  await compile(DKGContract, cache);
+  const dkgAddress = 'B62qqW6Zparz1cdzjTtwX6ytWtq58bbraBr15FLHGMTm6pGqtNHF6ZJ';
   const dkgContract = new DKGContract(PublicKey.fromBase58(dkgAddress));
 
   // Fetch storage trees
@@ -64,7 +64,7 @@ async function main() {
 
   const fromState =
     Field(
-      25079927036070901246064867767436987657692091363973573142121686150614948079097n
+      14478407518327373358465033364812506716780668080743800495402910825565668540189n
     );
   const toState = Field(0n);
 
@@ -103,7 +103,7 @@ async function main() {
         keyStatusStorage.getWitness(
           KeyStatusStorage.calculateLevel1Index({
             committeeId: action.committeeId,
-            keyId: Field(i),
+            keyId: Field(keyCounters[Number(action.committeeId)]),
           })
         )
       );
@@ -136,7 +136,7 @@ async function main() {
         keyStatusStorage.getWitness(
           KeyStatusStorage.calculateLevel1Index({
             committeeId: action.committeeId,
-            keyId: Field(0),
+            keyId: Field(action.keyId),
           })
         )
       );
@@ -150,7 +150,7 @@ async function main() {
         ]),
         KeyStatusStorage.calculateLevel1Index({
           committeeId: action.committeeId,
-          keyId: Field(0),
+          keyId: Field(action.keyId),
         })
       );
       console.log('Done');

@@ -106,7 +106,7 @@ async function main() {
     contributions: rawState[2],
     encryptions: rawState[3],
   };
-  console.log(round2State);
+  Provable.log(round2State);
 
   const fromState =
     Field(
@@ -123,7 +123,7 @@ async function main() {
   const actionHashes: Field[] = rawActions.map((e) => Field(e.hash));
   Provable.log('Action hashes:', actionHashes);
 
-  console.log('FinalizeRound1.firstStep...');
+  console.log('FinalizeRound2.firstStep...');
   let initialHashArray = new EncryptionHashArray(
     [...Array(committee.numberOfMembers).keys()].map(() => Field(0))
   );
@@ -168,7 +168,7 @@ async function main() {
 
   for (let i = 0; i < actions.length; i++) {
     let action = actions[i];
-    console.log('FinalizeRound1.nextStep...');
+    console.log('FinalizeRound2.nextStep...');
     proof = await FinalizeRound2.nextStep(
       new Round2Input({
         previousActionState:
@@ -248,7 +248,7 @@ async function main() {
       );
     }
   );
-  await proveAndSend(tx, feePayer.key, 'Round1Contract', 'finalize');
+  await proveAndSend(tx, feePayer.key, 'FinalizeRound2', 'finalize');
 }
 
 main()

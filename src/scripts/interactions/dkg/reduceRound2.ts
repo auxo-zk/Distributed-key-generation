@@ -1,4 +1,4 @@
-import { Field, Mina, Provable, PublicKey } from 'o1js';
+import { Field, Mina, Provable, PublicKey, Reducer } from 'o1js';
 import {
   compile,
   fetchActions,
@@ -33,12 +33,12 @@ async function main() {
   await compile(FinalizeRound2, cache);
   await compile(Round2Contract, cache);
   const committeeAddress =
-    'B62qiYCgNQhu1KddDQZs7HL8cLqRd683YufYX1BNceZ6BHnC1qfEcJ9';
-  const dkgAddress = 'B62qr8z7cT4D5Qq2aH7SabUDbpXEb8EXMCUin26xmcJNQtVu616CNFC';
+    'B62qmpvE5LFDgC5ocRiCMEFWhigtJ88FRniCpPPou2MMQqBLancqB7f';
+  const dkgAddress = 'B62qqW6Zparz1cdzjTtwX6ytWtq58bbraBr15FLHGMTm6pGqtNHF6ZJ';
   const round1Address =
-    'B62qmj3E8uH1gqtzvywLvP3aaTSaxby9z8LyvBcK7nNQJ67NQMXRXz8';
+    'B62qnBrR7nnKt3rVLbBYKzseJNYvZzirqLKMgD4cTuNRqi86GccZKfV';
   const round2Address =
-    'B62qmZrJai7AG7pffzP4MdufR9ejPesn9ZdZkvJQXisMDUSTJZ846LE';
+    'B62qmHEtKzNY1Zf3WhmagCLBr6j6gr9VRoGbm5Vk8tuEUsMmHVDQKLi';
   const round2Contract = new Round2Contract(
     PublicKey.fromBase58(round2Address)
   );
@@ -47,11 +47,6 @@ async function main() {
   const reduceStorage = new ReduceStorage();
 
   // Fetch state and actions
-  await Promise.all([
-    fetchZkAppState(committeeAddress),
-    fetchZkAppState(dkgAddress),
-    fetchZkAppState(round1Address),
-  ]);
   const rawState = (await fetchZkAppState(round2Address)) || [];
   const round2State = {
     zkApps: rawState[0],
@@ -76,26 +71,43 @@ async function main() {
   const actionHashes: Field[] = rawActions.map((e) => Field(e.hash));
   Provable.log('Action hashes:', actionHashes);
 
+  let nextActionId = 2;
+  const reducedActions = actions.slice(0, nextActionId);
+  const notReducedActions = actions.slice(nextActionId);
+
+  reducedActions.map((action, i) => {
+    Provable.log(`Reduced Action ${i}:`, action);
+    console.log('Adding to storage tree...');
+    reduceStorage.updateLeaf(
+      ReduceStorage.calculateIndex(actionHashes[i]),
+      ReduceStorage.calculateLeaf(ActionStatus.REDUCED)
+    );
+    console.log('Done');
+  });
+
   console.log('ReduceRound2.firstStep...');
   let proof = await ReduceRound2.firstStep(
     Round2Action.empty(),
     round2State.reduceState,
-    fromState
+    nextActionId == 0
+      ? Reducer.initialActionState
+      : actionHashes[nextActionId - 1]
   );
   console.log('Done');
 
-  for (let i = 0; i < actions.length; i++) {
-    let action = actions[i];
+  for (let i = 0; i < notReducedActions.length; i++) {
+    let action = notReducedActions[i];
+    Provable.log(`Reducing Action ${nextActionId + i}:`, action);
     console.log('ReduceRound1.nextStep...');
     proof = await ReduceRound2.nextStep(
       action,
       proof,
-      reduceStorage.getWitness(actionHashes[i])
+      reduceStorage.getWitness(actionHashes[nextActionId + i])
     );
     console.log('Done');
 
     reduceStorage.updateLeaf(
-      ReduceStorage.calculateIndex(actionHashes[i]),
+      ReduceStorage.calculateIndex(actionHashes[nextActionId + i]),
       ReduceStorage.calculateLeaf(ActionStatus.REDUCED)
     );
   }

@@ -1,7 +1,8 @@
-import { Field, Mina, Provable, PublicKey, Reducer } from 'o1js';
+import { Field, Group, Mina, Provable, PublicKey, Reducer } from 'o1js';
 import {
   compile,
   fetchActions,
+  fetchEvents,
   fetchZkAppState,
   proveAndSend,
 } from '../../helper/deploy.js';
@@ -14,6 +15,7 @@ import {
   ReduceRound1,
   Round1Action,
   Round1Contract,
+  Round1Contribution,
   UpdateKey,
 } from '../../../index.js';
 import {
@@ -24,19 +26,18 @@ import {
   EMPTY_LEVEL_2_TREE,
 } from '../../../contracts/DKGStorage.js';
 import {
-  Level1MT,
   Level1Witness as CommitteeLevel1Witness,
   SettingStorage,
 } from '../../../contracts/CommitteeStorage.js';
 import axios from 'axios';
 import {
   AddressWitness,
-  ReduceStorage,
   ReduceWitness,
   ZkAppRef,
 } from '../../../contracts/SharedStorage.js';
 import { Round1Input } from '../../../contracts/Round1.js';
 import { ZkAppEnum } from '../../../constants.js';
+import { CArray } from '../../../libs/Committee.js';
 
 async function main() {
   const { cache, feePayer } = await prepare();
@@ -50,22 +51,20 @@ async function main() {
   await compile(FinalizeRound1, cache);
   await compile(Round1Contract, cache);
   const committeeAddress =
-    'B62qiYCgNQhu1KddDQZs7HL8cLqRd683YufYX1BNceZ6BHnC1qfEcJ9';
-  const dkgAddress = 'B62qr8z7cT4D5Qq2aH7SabUDbpXEb8EXMCUin26xmcJNQtVu616CNFC';
+    'B62qmpvE5LFDgC5ocRiCMEFWhigtJ88FRniCpPPou2MMQqBLancqB7f';
+  const dkgAddress = 'B62qqW6Zparz1cdzjTtwX6ytWtq58bbraBr15FLHGMTm6pGqtNHF6ZJ';
   const round1Address =
-    'B62qmj3E8uH1gqtzvywLvP3aaTSaxby9z8LyvBcK7nNQJ67NQMXRXz8';
+    'B62qnBrR7nnKt3rVLbBYKzseJNYvZzirqLKMgD4cTuNRqi86GccZKfV';
   const round1Contract = new Round1Contract(
     PublicKey.fromBase58(round1Address)
   );
 
-  // Fetch storage trees
-  const contributionStorage = new Round1ContributionStorage();
-  const publicKeyStorage = new PublicKeyStorage();
-
-  const committeeId = Field(3);
+  const committeeId = Field(1);
   const keyId = Field(0);
-  const [committee, round1ZkApp, reduce, setting, keyStatus] =
+
+  const [committees, committee, round1ZkApp, reduce, setting, keyStatus] =
     await Promise.all([
+      (await axios.get(`https://api.auxo.fund/v0/committees/`)).data,
       (
         await axios.get(
           `https://api.auxo.fund/v0/committees/${Number(committeeId)}`
@@ -84,6 +83,72 @@ async function main() {
         )
       ).data,
     ]);
+  const keys = await Promise.all(
+    [...Array(committees.length).keys()].map(
+      async (e) =>
+        (
+          await axios.get(`https://api.auxo.fund/v0/committees/${e}/keys`)
+        ).data
+    )
+  );
+  // Fetch storage trees
+  const contributionStorage = new Round1ContributionStorage();
+  const publicKeyStorage = new PublicKeyStorage();
+
+  const keyCounters = keys.map((e: any[]) => e.length);
+  keys.map((e: any, id: number) => {
+    if (e.length == 0) return;
+    e.map((key: any) => {
+      if (key.status <= 1) return;
+      console.log(
+        `Adding key ${key.keyId} of committee ${key.committeeId} to storage...`
+      );
+      let contributionLevel2Tree = EMPTY_LEVEL_2_TREE();
+      let publicKeyLevel2Tree = EMPTY_LEVEL_2_TREE();
+      for (let i = 0; i < key.round1s.length; i++) {
+        contributionLevel2Tree.setLeaf(
+          Round1ContributionStorage.calculateLevel2Index(
+            Field(key.round1s[i].memberId)
+          ).toBigInt(),
+          Round1ContributionStorage.calculateLeaf(
+            new Round1Contribution({
+              C: new CArray(
+                key.round1s[i].contribution.map(
+                  (group: any) => new Group({ x: group.x, y: group.y })
+                )
+              ),
+            })
+          )
+        );
+        publicKeyLevel2Tree.setLeaf(
+          PublicKeyStorage.calculateLevel2Index(
+            Field(key.round1s[i].memberId)
+          ).toBigInt(),
+          PublicKeyStorage.calculateLeaf(
+            new Group({
+              x: key.round1s[i].contribution[0].x,
+              y: key.round1s[i].contribution[0].y,
+            })
+          )
+        );
+      }
+      contributionStorage.updateInternal(
+        Round1ContributionStorage.calculateLevel1Index({
+          committeeId: Field(key.committeeId),
+          keyId: Field(key.keyId),
+        }),
+        contributionLevel2Tree
+      );
+      publicKeyStorage.updateInternal(
+        PublicKeyStorage.calculateLevel1Index({
+          committeeId: Field(key.committeeId),
+          keyId: Field(key.keyId),
+        }),
+        publicKeyLevel2Tree
+      );
+      console.log('Done');
+    });
+  });
 
   // Fetch state and actions
   await Promise.all([
@@ -97,24 +162,50 @@ async function main() {
     contributions: rawState[2],
     publicKeys: rawState[3],
   };
+  Provable.log('Round 1 states:', round1State);
 
   const fromState =
     Field(
-      25079927036070901246064867767436987657692091363973573142121686150614948079097n
+      2977925925576331193238177691293798723054265877862548292142628434419928603558n
     );
-  const toState =
-    Field(
-      16430373379658489769673052454264952589697482648247772648883131952836196358172n
-    );
+  const toState = undefined;
 
-  const rawActions = await fetchActions(round1Address, fromState, toState);
+  const previousHashes = [
+    Field(
+      2977925925576331193238177691293798723054265877862548292142628434419928603558n
+    ),
+    Field(
+      14781271405539503956580559121893731755382303518761579449560666593432382387926n
+    ),
+  ];
+
+  const currentHashes = [
+    Field(
+      14781271405539503956580559121893731755382303518761579449560666593432382387926n
+    ),
+    Field(
+      23198079334217179174035156672527815936674435672861045726019948415765797774782n
+    ),
+  ];
+
+  const events = await fetchEvents(round1Address);
+  Provable.log('Events:');
+  events.map((e) => Provable.log(e.events));
+
+  const rawActions = (
+    await fetchActions(round1Address, fromState, toState)
+  ).filter((action) =>
+    currentHashes.map((e) => e.toString()).includes(action.hash)
+  );
+  // rawActions.map((e) => Provable.log(e));
   const actions: Round1Action[] = rawActions.map((e) => {
     let action: Field[] = e.actions[0].map((e) => Field(e));
     return Round1Action.fromFields(action);
   });
+  console.log('Finalized Actions:');
   actions.map((e) => Provable.log(e));
-  const actionHashes: Field[] = rawActions.map((e) => Field(e.hash));
-  Provable.log('Action hashes:', actionHashes);
+  // const actionHashes: Field[] = rawActions.map((e) => Field(e[0].hash));
+  // Provable.log('Action hashes:', actionHashes);
 
   console.log('FinalizeRound1.firstStep...');
   let proof = await FinalizeRound1.firstStep(
@@ -138,7 +229,7 @@ async function main() {
       })
     ),
     publicKeyStorage.getLevel1Witness(
-      publicKeyStorage.calculateLevel1Index({
+      PublicKeyStorage.calculateLevel1Index({
         committeeId: committeeId,
         keyId: keyId,
       })
@@ -155,7 +246,7 @@ async function main() {
   );
 
   publicKeyStorage.updateInternal(
-    publicKeyStorage.calculateLevel1Index({
+    PublicKeyStorage.calculateLevel1Index({
       committeeId: committeeId,
       keyId: keyId,
     }),
@@ -164,11 +255,11 @@ async function main() {
 
   for (let i = 0; i < actions.length; i++) {
     let action = actions[i];
+    Provable.log(action);
     console.log('FinalizeRound1.nextStep...');
     proof = await FinalizeRound1.nextStep(
       new Round1Input({
-        previousActionState:
-          i == 0 ? Reducer.initialActionState : actionHashes[i - 1],
+        previousActionState: previousHashes[i],
         action: action,
       }),
       proof,
@@ -177,16 +268,16 @@ async function main() {
           committeeId: action.committeeId,
           keyId: action.keyId,
         }),
-        Round1ContributionStorage.calculateLevel2Index(Field(action.memberId))
+        Round1ContributionStorage.calculateLevel2Index(action.memberId)
       ),
       publicKeyStorage.getWitness(
-        publicKeyStorage.calculateLevel1Index({
+        PublicKeyStorage.calculateLevel1Index({
           committeeId: action.committeeId,
           keyId: action.keyId,
         }),
-        publicKeyStorage.calculateLevel2Index(Field(action.memberId))
+        PublicKeyStorage.calculateLevel2Index(action.memberId)
       ),
-      ReduceWitness.fromJSON(reduce[actionHashes[i].toString()])
+      ReduceWitness.fromJSON(reduce[currentHashes[i].toString()])
     );
     console.log('Done');
 
@@ -208,32 +299,6 @@ async function main() {
       PublicKeyStorage.calculateLevel2Index(action.memberId)
     );
   }
-
-  // Provable.log(
-  //   new ZkAppRef({
-  //     address: PublicKey.fromBase58(committeeAddress),
-  //     witness: AddressWitness.fromJSON(round1ZkApp[ZkAppEnum.COMMITTEE]),
-  //   })
-  // );
-  // Provable.log(
-  //   new ZkAppRef({
-  //     address: PublicKey.fromBase58(dkgAddress),
-  //     witness: AddressWitness.fromJSON(round1ZkApp[ZkAppEnum.DKG]),
-  //   })
-  // );
-  // Provable.log(
-  //   setting[Number(SettingStorage.calculateLevel1Index(committeeId))]
-  // );
-  // Provable.log(
-  //   keyStatus[
-  //     Number(
-  //       KeyStatusStorage.calculateLevel1Index({
-  //         committeeId: committeeId,
-  //         keyId: keyId,
-  //       })
-  //     )
-  //   ]
-  // );
 
   let tx = await Mina.transaction(
     {
