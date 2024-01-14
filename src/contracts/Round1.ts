@@ -270,7 +270,7 @@ export const FinalizeRound1 = ZkProgram({
 
         // Compute new public key root
         let memberPublicKey = input.action.contribution.C.values[0];
-        publicKeyRoot = contributionWitness.level1.calculateRoot(
+        publicKeyRoot = publicKeyWitness.level1.calculateRoot(
           publicKeyWitness.level2.calculateRoot(
             Poseidon.hash(memberPublicKey.toFields())
           )
