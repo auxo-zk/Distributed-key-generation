@@ -32,13 +32,8 @@ async function main() {
   await compile(BatchEncryption, cache);
   await compile(FinalizeRound2, cache);
   await compile(Round2Contract, cache);
-  const committeeAddress =
-    'B62qmpvE5LFDgC5ocRiCMEFWhigtJ88FRniCpPPou2MMQqBLancqB7f';
-  const dkgAddress = 'B62qqW6Zparz1cdzjTtwX6ytWtq58bbraBr15FLHGMTm6pGqtNHF6ZJ';
-  const round1Address =
-    'B62qnBrR7nnKt3rVLbBYKzseJNYvZzirqLKMgD4cTuNRqi86GccZKfV';
   const round2Address =
-    'B62qmHEtKzNY1Zf3WhmagCLBr6j6gr9VRoGbm5Vk8tuEUsMmHVDQKLi';
+    'B62qpvKFv8ey9FhsGAdcXxkg8yg1vZJQGoB2EySqJDZdANwP6Mh8SZ7';
   const round2Contract = new Round2Contract(
     PublicKey.fromBase58(round2Address)
   );
@@ -71,7 +66,7 @@ async function main() {
   const actionHashes: Field[] = rawActions.map((e) => Field(e.hash));
   Provable.log('Action hashes:', actionHashes);
 
-  let nextActionId = 2;
+  let nextActionId = 0;
   const reducedActions = actions.slice(0, nextActionId);
   const notReducedActions = actions.slice(nextActionId);
 
@@ -98,7 +93,7 @@ async function main() {
   for (let i = 0; i < notReducedActions.length; i++) {
     let action = notReducedActions[i];
     Provable.log(`Reducing Action ${nextActionId + i}:`, action);
-    console.log('ReduceRound1.nextStep...');
+    console.log('ReduceRound2.nextStep...');
     proof = await ReduceRound2.nextStep(
       action,
       proof,

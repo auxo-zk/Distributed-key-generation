@@ -386,6 +386,7 @@ export class Round1Contract extends SmartContract {
     let actionState = this.account.actionState.getAndRequireEquals();
 
     // Verify proof
+    // FIXME - need to check the last reduced action state
     proof.verify();
     proof.publicOutput.initialReduceState.assertEquals(reduceState);
     proof.publicOutput.newActionState.assertEquals(actionState);

@@ -140,6 +140,7 @@ export const UpdateKey = ZkProgram({
         // Verify earlier proof
         earlierProof.verify();
 
+        // FIXME - should not allow empty key status
         let previousStatus = Provable.switch(input.mask.values, Field, [
           Field(KeyStatus.EMPTY),
           Field(KeyStatus.ROUND_1_CONTRIBUTION),
@@ -198,6 +199,7 @@ export const UpdateKey = ZkProgram({
         // Verify earlier proof
         earlierProof.verify();
 
+        // FIXME - previousStatus and nextStatus should be fixed
         let previousStatus = Provable.switch(input.mask.values, Field, [
           Field(KeyStatus.EMPTY),
           Field(KeyStatus.ROUND_1_CONTRIBUTION),

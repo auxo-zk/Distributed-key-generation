@@ -18,7 +18,7 @@ async function main() {
   // Compile programs
   await compile(UpdateKey, cache);
   await compile(DKGContract, cache);
-  const dkgAddress = 'B62qqW6Zparz1cdzjTtwX6ytWtq58bbraBr15FLHGMTm6pGqtNHF6ZJ';
+  const dkgAddress = 'B62qogHpAHHNP7PXAiRzHkpKnojERnjZq34GQ1PjjAv5wCLgtbYthAS';
   const dkgContract = new DKGContract(PublicKey.fromBase58(dkgAddress));
 
   // Fetch storage trees
@@ -37,13 +37,18 @@ async function main() {
     )
   );
   const keyCounters = keys.map((e) => e.length);
+  console.log('Key counters:', keyCounters);
   keys.map((e, id) => {
     if (e.length == 0) return;
+    console.log(`Adding key counter storage of committee ${id}`);
     keyCounterStorage.updateLeaf(
       KeyCounterStorage.calculateLeaf(Field(keyCounters[id])),
       KeyCounterStorage.calculateLevel1Index(Field(id))
     );
     e.map((key: any) => {
+      console.log(
+        `Adding key status storage of key ${key.keyId} of committee ${key.committeeId}`
+      );
       keyStatusStorage.updateLeaf(
         Field(key.status),
         KeyStatusStorage.calculateLevel1Index({
@@ -64,7 +69,7 @@ async function main() {
 
   const fromState =
     Field(
-      14478407518327373358465033364812506716780668080743800495402910825565668540189n
+      25406847602233179789694290118800585372041602546807354712504661961576000630389n
     );
   const toState = Field(0n);
 

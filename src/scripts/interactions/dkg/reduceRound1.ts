@@ -24,11 +24,8 @@ async function main() {
   await compile(ReduceRound1, cache);
   await compile(FinalizeRound1, cache);
   await compile(Round1Contract, cache);
-  const committeeAddress =
-    'B62qmpvE5LFDgC5ocRiCMEFWhigtJ88FRniCpPPou2MMQqBLancqB7f';
-  const dkgAddress = 'B62qqW6Zparz1cdzjTtwX6ytWtq58bbraBr15FLHGMTm6pGqtNHF6ZJ';
   const round1Address =
-    'B62qnBrR7nnKt3rVLbBYKzseJNYvZzirqLKMgD4cTuNRqi86GccZKfV';
+    'B62qony53NMnmq49kxhtW1ttrQ8xvr58SNoX5jwgPY17pMChKLrjjWc';
   const round1Contract = new Round1Contract(
     PublicKey.fromBase58(round1Address)
   );
@@ -60,7 +57,7 @@ async function main() {
   const actionHashes: Field[] = rawActions.map((e) => Field(e.hash));
   Provable.log('Action hashes:', actionHashes);
 
-  let nextActionId = 2;
+  let nextActionId = 0;
   const reducedActions = actions.slice(0, nextActionId);
   const notReducedActions = actions.slice(nextActionId);
 

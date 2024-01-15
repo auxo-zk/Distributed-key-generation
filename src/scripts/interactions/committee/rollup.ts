@@ -1,5 +1,6 @@
 import { Field, Mina, Provable, PublicKey, Reducer, fetchAccount } from 'o1js';
-import { compile, wait } from '../../helper/deploy.js';
+import 'dotenv/config.js';
+import { compile, proveAndSend, wait } from '../../helper/deploy.js';
 import { fetchActions, fetchZkAppState } from '../../helper/deploy.js';
 import {
   CommitteeAction,
@@ -18,21 +19,26 @@ import { COMMITTEE_MAX_SIZE } from '../../../constants.js';
 import { prepare } from '../prepare.js';
 
 async function main() {
+  // Prepare for interactions
   const { cache, feePayer } = await prepare();
+
+  // Custom values
+  const fromState =
+    Field(
+      26089382628273984114009748697325178716021230220334200340522908388853527750250n
+    );
+  const toState = undefined;
 
   // Compile programs
   await compile(CreateCommittee, cache);
   await compile(CommitteeContract, cache);
-  const committeeAddress =
-    'B62qmpvE5LFDgC5ocRiCMEFWhigtJ88FRniCpPPou2MMQqBLancqB7f';
+  const committeeAddress = process.env.BERKELEY_COMMITTEE_ADDRESS as string;
+  console.log('Committee address:', committeeAddress);
   const committeeContract = new CommitteeContract(
     PublicKey.fromBase58(committeeAddress)
   );
 
-  // Fetch storage trees
-  let memberStorage = new MemberStorage();
-  let settingStorage = new SettingStorage();
-
+  // Fetch on-chain states
   const rawState = (await fetchZkAppState(committeeAddress)) || [];
   const committeeState = {
     nextCommitteeId: Field(rawState[0]),
@@ -40,15 +46,19 @@ async function main() {
     settingTreeRoot: Field(rawState[2]),
     actionState: Field(rawState[3]),
   };
-  Provable.log('Committee States:', committeeState);
+  Provable.log('Committee states:', committeeState);
 
+  // Fetch off-chain storages
   const committees = (await axios.get('https://api.auxo.fund/v0/committees/'))
     .data;
 
+  // Build off-chain storage trees
+  let memberStorage = new MemberStorage();
+  let settingStorage = new SettingStorage();
   committees
     .filter((e: any) => e.active)
     .map((committee: any) => {
-      console.log('1');
+      console.log(`Adding committee ${committee.committeeId} to storage...`);
       let level2Tree = EMPTY_LEVEL_2_TREE();
       for (let i = 0; i < committee.numberOfMembers; i++) {
         level2Tree.setLeaf(
@@ -64,13 +74,10 @@ async function main() {
         }),
         Field(committee.committeeId)
       );
+      console.log('Done');
     });
-  const fromState =
-    Field(
-      10509277352014891166341784018610763688671446600359290712626136766044008682889n
-    );
-  const toState = undefined;
 
+  // Fetch actions
   const rawActions = await fetchActions(committeeAddress, fromState, toState);
   const actions: CommitteeAction[] = rawActions.map((e) => {
     let action: Field[] = e.actions[0].map((e) => Field(e));
@@ -85,6 +92,7 @@ async function main() {
   console.log('Actions:');
   actions.map((e) => Provable.log(e));
 
+  // Prepare proofs
   console.log('CreateCommittee.firstStep...');
   let proof = await CreateCommittee.firstStep(
     committeeState.actionState,
@@ -143,7 +151,7 @@ async function main() {
     );
   }
 
-  console.log('committeeContract.rollupIncrements: ');
+  // Prove and submit tx
   let tx = await Mina.transaction(
     {
       sender: feePayer.key.publicKey,
@@ -154,11 +162,7 @@ async function main() {
       committeeContract.rollupIncrements(proof);
     }
   );
-  await tx.prove();
-  let res = await tx.sign([feePayer.key.privateKey]).send();
-  Provable.log(res);
-  console.log('committeeContract.rollupIncrements sent!...');
-  await wait();
+  await proveAndSend(tx, feePayer.key, 'CommitteeContract', 'rollupIncrements');
 }
 
 main()

@@ -1,4 +1,4 @@
-import { Field, Mina, Provable, PublicKey, Reducer } from 'o1js';
+import { Field, Group, Mina, Provable, PublicKey, Reducer } from 'o1js';
 import {
   compile,
   fetchActions,
@@ -38,7 +38,13 @@ import {
 } from '../../../contracts/SharedStorage.js';
 import { ZkAppEnum } from '../../../constants.js';
 import { ReduceRound2, Round2Input } from '../../../contracts/Round2.js';
-import { EncryptionHashArray } from '../../../libs/Committee.js';
+import {
+  EncryptionHashArray,
+  Round2Contribution,
+  UArray,
+  cArray,
+} from '../../../libs/Committee.js';
+import { Bit255 } from '@auxo-dev/auxo-libs';
 
 async function main() {
   const { cache, feePayer } = await prepare();
@@ -56,12 +62,12 @@ async function main() {
   await compile(FinalizeRound2, cache);
   await compile(Round2Contract, cache);
   const committeeAddress =
-    'B62qiYCgNQhu1KddDQZs7HL8cLqRd683YufYX1BNceZ6BHnC1qfEcJ9';
-  const dkgAddress = 'B62qr8z7cT4D5Qq2aH7SabUDbpXEb8EXMCUin26xmcJNQtVu616CNFC';
+    'B62qjDLMhAw54JMrJLNZsrBRcoSjbQHQwn4ryceizpsQi8rwHQLA6R1';
+  const dkgAddress = 'B62qogHpAHHNP7PXAiRzHkpKnojERnjZq34GQ1PjjAv5wCLgtbYthAS';
   const round1Address =
-    'B62qmj3E8uH1gqtzvywLvP3aaTSaxby9z8LyvBcK7nNQJ67NQMXRXz8';
+    'B62qony53NMnmq49kxhtW1ttrQ8xvr58SNoX5jwgPY17pMChKLrjjWc';
   const round2Address =
-    'B62qmZrJai7AG7pffzP4MdufR9ejPesn9ZdZkvJQXisMDUSTJZ846LE';
+    'B62qpvKFv8ey9FhsGAdcXxkg8yg1vZJQGoB2EySqJDZdANwP6Mh8SZ7';
   const round2Contract = new Round2Contract(
     PublicKey.fromBase58(round2Address)
   );
@@ -70,10 +76,11 @@ async function main() {
   const contributionStorage = new Round2ContributionStorage();
   const encryptionStorage = new EncryptionStorage();
 
-  const committeeId = Field(3);
+  const committeeId = Field(0);
   const keyId = Field(0);
-  const [committee, round2ZkApp, reduce, setting, keyStatus] =
+  const [committees, committee, round2ZkApp, reduce, setting, keyStatus] =
     await Promise.all([
+      (await axios.get(`https://api.auxo.fund/v0/committees/`)).data,
       (
         await axios.get(
           `https://api.auxo.fund/v0/committees/${Number(committeeId)}`
@@ -92,6 +99,86 @@ async function main() {
         )
       ).data,
     ]);
+
+  const keys = await Promise.all(
+    [...Array(committees.length).keys()].map(
+      async (e) =>
+        (
+          await axios.get(`https://api.auxo.fund/v0/committees/${e}/keys`)
+        ).data
+    )
+  );
+
+  keys.map((e: any, id: number) => {
+    if (e.length == 0) return;
+    e.map((key: any) => {
+      if (key.status <= 2) return;
+      console.log(
+        `Adding key ${key.keyId} of committee ${key.committeeId} to storage...`
+      );
+      let contributionLevel2Tree = EMPTY_LEVEL_2_TREE();
+      let encryptionLevel2Tree = EMPTY_LEVEL_2_TREE();
+      for (let i = 0; i < key.round2s.length; i++) {
+        contributionLevel2Tree.setLeaf(
+          Round2ContributionStorage.calculateLevel2Index(
+            Field(key.round1s[i].memberId)
+          ).toBigInt(),
+          Round2ContributionStorage.calculateLeaf(
+            new Round2Contribution({
+              c: new cArray(
+                key.round2s[i].contribution.c.map((e: any) =>
+                  Bit255.fromBigInt(e)
+                )
+              ),
+              U: new UArray(
+                key.round2s[i].contribution.c.map((e: any) =>
+                  Group.from(e.x, e.y)
+                )
+              ),
+            })
+          )
+        );
+        encryptionLevel2Tree.setLeaf(
+          EncryptionStorage.calculateLevel2Index(
+            Field(key.round1s[i].memberId)
+          ).toBigInt(),
+          EncryptionStorage.calculateLeaf({
+            contributions: key.round2s[i].map(
+              (item: any) =>
+                new Round2Contribution({
+                  c: new cArray(
+                    key.round2s[i].contribution.c.map((e: any) =>
+                      Bit255.fromBigInt(e)
+                    )
+                  ),
+                  U: new UArray(
+                    key.round2s[i].contribution.c.map((e: any) =>
+                      Group.from(e.x, e.y)
+                    )
+                  ),
+                })
+            ),
+            memberId: Field(i),
+          })
+        );
+      }
+      contributionStorage.updateInternal(
+        Round2ContributionStorage.calculateLevel1Index({
+          committeeId: Field(key.committeeId),
+          keyId: Field(key.keyId),
+        }),
+        contributionLevel2Tree
+      );
+      encryptionStorage.updateInternal(
+        EncryptionStorage.calculateLevel1Index({
+          committeeId: Field(key.committeeId),
+          keyId: Field(key.keyId),
+        }),
+        encryptionLevel2Tree
+      );
+      console.log('Done');
+    });
+  });
 
   // Fetch state and actions
   await Promise.all([
@@ -114,14 +201,35 @@ async function main() {
     );
   const toState = undefined;
 
-  const rawActions = await fetchActions(round2Address, fromState, toState);
+  const previousHashes = [
+    Field(
+      25079927036070901246064867767436987657692091363973573142121686150614948079097n
+    ),
+    Field(
+      21129041599995988206620938582898623513674001131404710125933545827931377692037n
+    ),
+  ];
+
+  const currentHashes = [
+    Field(
+      21129041599995988206620938582898623513674001131404710125933545827931377692037n
+    ),
+    Field(
+      2950985295131352328349196989984342832680400793321473398895433393360534242666n
+    ),
+  ];
+
+  const rawActions = (
+    await fetchActions(round2Address, fromState, toState)
+  ).filter((action) =>
+    currentHashes.map((e) => e.toString()).includes(action.hash)
+  );
   const actions: Round2Action[] = rawActions.map((e) => {
     let action: Field[] = e.actions[0].map((e) => Field(e));
     return Round2Action.fromFields(action);
   });
+  console.log('Finalizing Actions:');
   actions.map((e) => Provable.log(e));
-  const actionHashes: Field[] = rawActions.map((e) => Field(e.hash));
-  Provable.log('Action hashes:', actionHashes);
 
   console.log('FinalizeRound2.firstStep...');
   let initialHashArray = new EncryptionHashArray(
@@ -171,8 +279,7 @@ async function main() {
     console.log('FinalizeRound2.nextStep...');
     proof = await FinalizeRound2.nextStep(
       new Round2Input({
-        previousActionState:
-          i == 0 ? Reducer.initialActionState : actionHashes[i - 1],
+        previousActionState: previousHashes[Number(action.memberId)],
         action: action,
       }),
       proof,
@@ -183,7 +290,9 @@ async function main() {
         }),
         Round2ContributionStorage.calculateLevel2Index(action.memberId)
       ),
-      ReduceWitness.fromJSON(reduce[actionHashes[i].toString()])
+      ReduceWitness.fromJSON(
+        reduce[currentHashes[Number(action.memberId)].toString()]
+      )
     );
     console.log('Done');
 

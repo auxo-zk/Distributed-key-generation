@@ -85,15 +85,15 @@ export async function proveAndSend(
     `Generate proof and submit tx for ${contractName}.${methodName}()...`
   );
   let retries = 3; // Number of retries
-
+  let res;
   while (retries > 0) {
     try {
       if (profiler) profiler.start(`${contractName}.${methodName}.prove`);
       await tx.prove();
       if (profiler) profiler.stop();
-
-      await tx.sign([feePayer.privateKey]).send();
+      res = await tx.sign([feePayer.privateKey]).send();
       console.log('DONE!');
+      Provable.log('Transaction:', res);
       break; // Exit the loop if successful
     } catch (error) {
       console.error('Error:', error);
@@ -104,8 +104,13 @@ export async function proveAndSend(
       console.log(`Retrying... (${retries} retries left)`);
     }
   }
-
-  Provable.log('Transaction:', tx);
+  try {
+    console.log('Waiting for tx to succeed...');
+    if (res) await res.wait();
+    console.log('Tx succeeded!');
+  } catch (error) {
+    console.error('Error:', error);
+  }
 }
 
 export async function fetchAllContract(

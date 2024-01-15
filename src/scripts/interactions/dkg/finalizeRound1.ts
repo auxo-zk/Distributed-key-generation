@@ -51,15 +51,15 @@ async function main() {
   await compile(FinalizeRound1, cache);
   await compile(Round1Contract, cache);
   const committeeAddress =
-    'B62qmpvE5LFDgC5ocRiCMEFWhigtJ88FRniCpPPou2MMQqBLancqB7f';
-  const dkgAddress = 'B62qqW6Zparz1cdzjTtwX6ytWtq58bbraBr15FLHGMTm6pGqtNHF6ZJ';
+    'B62qjDLMhAw54JMrJLNZsrBRcoSjbQHQwn4ryceizpsQi8rwHQLA6R1';
+  const dkgAddress = 'B62qogHpAHHNP7PXAiRzHkpKnojERnjZq34GQ1PjjAv5wCLgtbYthAS';
   const round1Address =
-    'B62qnBrR7nnKt3rVLbBYKzseJNYvZzirqLKMgD4cTuNRqi86GccZKfV';
+    'B62qony53NMnmq49kxhtW1ttrQ8xvr58SNoX5jwgPY17pMChKLrjjWc';
   const round1Contract = new Round1Contract(
     PublicKey.fromBase58(round1Address)
   );
 
-  const committeeId = Field(1);
+  const committeeId = Field(0);
   const keyId = Field(0);
 
   const [committees, committee, round1ZkApp, reduce, setting, keyStatus] =
@@ -95,7 +95,6 @@ async function main() {
   const contributionStorage = new Round1ContributionStorage();
   const publicKeyStorage = new PublicKeyStorage();
 
-  const keyCounters = keys.map((e: any[]) => e.length);
   keys.map((e: any, id: number) => {
     if (e.length == 0) return;
     e.map((key: any) => {
@@ -166,31 +165,27 @@ async function main() {
 
   const fromState =
     Field(
-      2977925925576331193238177691293798723054265877862548292142628434419928603558n
+      25079927036070901246064867767436987657692091363973573142121686150614948079097n
     );
   const toState = undefined;
 
   const previousHashes = [
     Field(
-      2977925925576331193238177691293798723054265877862548292142628434419928603558n
+      25079927036070901246064867767436987657692091363973573142121686150614948079097n
     ),
     Field(
-      14781271405539503956580559121893731755382303518761579449560666593432382387926n
+      512457134252924956152177107691263383110427246458568839145901445312896588988n
     ),
   ];
 
   const currentHashes = [
     Field(
-      14781271405539503956580559121893731755382303518761579449560666593432382387926n
+      512457134252924956152177107691263383110427246458568839145901445312896588988n
     ),
     Field(
-      23198079334217179174035156672527815936674435672861045726019948415765797774782n
+      8481153099833621817349097282911289219126620074665421844518804541945637548392n
     ),
   ];
-
-  const events = await fetchEvents(round1Address);
-  Provable.log('Events:');
-  events.map((e) => Provable.log(e.events));
 
   const rawActions = (
     await fetchActions(round1Address, fromState, toState)
@@ -202,10 +197,8 @@ async function main() {
     let action: Field[] = e.actions[0].map((e) => Field(e));
     return Round1Action.fromFields(action);
   });
-  console.log('Finalized Actions:');
+  console.log('Finalizing Actions:');
   actions.map((e) => Provable.log(e));
-  // const actionHashes: Field[] = rawActions.map((e) => Field(e[0].hash));
-  // Provable.log('Action hashes:', actionHashes);
 
   console.log('FinalizeRound1.firstStep...');
   let proof = await FinalizeRound1.firstStep(
@@ -259,7 +252,7 @@ async function main() {
     console.log('FinalizeRound1.nextStep...');
     proof = await FinalizeRound1.nextStep(
       new Round1Input({
-        previousActionState: previousHashes[i],
+        previousActionState: previousHashes[Number(action.memberId)],
         action: action,
       }),
       proof,
@@ -277,7 +270,9 @@ async function main() {
         }),
         PublicKeyStorage.calculateLevel2Index(action.memberId)
       ),
-      ReduceWitness.fromJSON(reduce[currentHashes[i].toString()])
+      ReduceWitness.fromJSON(
+        reduce[currentHashes[Number(action.memberId)].toString()]
+      )
     );
     console.log('Done');
 

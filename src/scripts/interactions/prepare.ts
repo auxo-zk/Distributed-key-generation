@@ -1,3 +1,4 @@
+import 'dotenv/config.js';
 import fs from 'fs';
 import { Cache, Mina, PrivateKey, PublicKey, fetchAccount } from 'o1js';
 import { Config, JSONKey, Key } from '../helper/config.js';
@@ -8,11 +9,9 @@ export async function prepare() {
   const cache = Cache.FileSystem('./caches');
 
   // Network configuration
-  const MINAURL = 'https://api.minascan.io/node/berkeley/v1/graphql';
-  const ARCHIVEURL = 'https://api.minascan.io/archive/berkeley/v1/graphql/';
   const network = Mina.Network({
-    mina: MINAURL,
-    archive: ARCHIVEURL,
+    mina: process.env.BERKELEY_MINA as string,
+    archive: process.env.BERKELEY_ARCHIVE as string,
   });
   Mina.setActiveInstance(network);
   const FEE = 0.101 * 1e9;
@@ -42,7 +41,10 @@ export async function prepare() {
     console.log('Fetch nonce...');
     sender = await fetchAccount({ publicKey: feePayerKey.publicKey });
     feePayerNonce = Number(sender.account?.nonce);
-    if (!isNaN(feePayerNonce)) break;
+    if (!isNaN(feePayerNonce)) {
+      console.log('Nonce:', feePayerNonce);
+      break;
+    }
     await wait(1000); // 1s
   } while (true);
 
