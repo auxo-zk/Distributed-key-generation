@@ -28,7 +28,7 @@ export async function prepare() {
     fs.readFileSync(configJson.deployAliases['acc3'].keyPath, 'utf8')
   );
   let acc4: JSONKey = JSON.parse(
-    fs.readFileSync(configJson.deployAliases['acc3'].keyPath, 'utf8')
+    fs.readFileSync(configJson.deployAliases['acc4'].keyPath, 'utf8')
   );
 
   let feePayerKey: Key;
