@@ -51,13 +51,10 @@ async function main() {
   };
   console.log(round2State);
 
-  const fromState =
-    Field(
-      25079927036070901246064867767436987657692091363973573142121686150614948079097n
-    );
-  const toState = undefined;
-
-  const rawActions = await fetchActions(round2Address, fromState, toState);
+  const rawActions = await fetchActions(
+    round2Address,
+    Reducer.initialActionState
+  );
   const actions: Round2Action[] = rawActions.map((e) => {
     let action: Field[] = e.actions[0].map((e) => Field(e));
     return Round2Action.fromFields(action);
@@ -66,7 +63,7 @@ async function main() {
   const actionHashes: Field[] = rawActions.map((e) => Field(e.hash));
   Provable.log('Action hashes:', actionHashes);
 
-  let nextActionId = 0;
+  let nextActionId = 2;
   const reducedActions = actions.slice(0, nextActionId);
   const notReducedActions = actions.slice(nextActionId);
 

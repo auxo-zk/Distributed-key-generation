@@ -76,7 +76,7 @@ async function main() {
   const contributionStorage = new Round2ContributionStorage();
   const encryptionStorage = new EncryptionStorage();
 
-  const committeeId = Field(0);
+  const committeeId = Field(3);
   const keyId = Field(0);
   const [committees, committee, round2ZkApp, reduce, setting, keyStatus] =
     await Promise.all([
@@ -116,6 +116,7 @@ async function main() {
       console.log(
         `Adding key ${key.keyId} of committee ${key.committeeId} to storage...`
       );
+      console.log(key.round2s);
       let contributionLevel2Tree = EMPTY_LEVEL_2_TREE();
       let encryptionLevel2Tree = EMPTY_LEVEL_2_TREE();
       for (let i = 0; i < key.round2s.length; i++) {
@@ -127,11 +128,11 @@ async function main() {
             new Round2Contribution({
               c: new cArray(
                 key.round2s[i].contribution.c.map((e: any) =>
-                  Bit255.fromBigInt(e)
+                  Bit255.fromBigInt(BigInt(e))
                 )
               ),
               U: new UArray(
-                key.round2s[i].contribution.c.map((e: any) =>
+                key.round2s[i].contribution.u.map((e: any) =>
                   Group.from(e.x, e.y)
                 )
               ),
@@ -143,22 +144,20 @@ async function main() {
             Field(key.round1s[i].memberId)
           ).toBigInt(),
           EncryptionStorage.calculateLeaf({
-            contributions: key.round2s[i].map(
+            contributions: key.round2s.map(
               (item: any) =>
                 new Round2Contribution({
                   c: new cArray(
-                    key.round2s[i].contribution.c.map((e: any) =>
-                      Bit255.fromBigInt(e)
+                    item.contribution.c.map((e: any) =>
+                      Bit255.fromBigInt(BigInt(e))
                     )
                   ),
                   U: new UArray(
-                    key.round2s[i].contribution.c.map((e: any) =>
-                      Group.from(e.x, e.y)
-                    )
+                    item.contribution.u.map((e: any) => Group.from(e.x, e.y))
                   ),
                 })
             ),
-            memberId: Field(i),
+            memberId: Field(key.round2s[i].memberId),
           })
         );
       }

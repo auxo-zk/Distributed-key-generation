@@ -94,6 +94,7 @@ export async function proveAndSend(
       res = await tx.sign([feePayer.privateKey]).send();
       console.log('DONE!');
       Provable.log('Transaction:', res);
+      Provable.log('Transaciton hash:', res.hash());
       break; // Exit the loop if successful
     } catch (error) {
       console.error('Error:', error);
