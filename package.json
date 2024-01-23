@@ -1,73 +1,73 @@
 {
-  "name": "@auxo-dev/dkg",
-  "version": "0.2.13",
-  "description": "Auxo's DKG Module for the On-chain Funding platform on Mina blockchain",
-  "author": "",
-  "license": "Apache-2.0",
-  "keywords": [
-    "mina-zkapp",
-    "mina-zk-app",
-    "mina-dapp",
-    "zkapp"
-  ],
-  "main": "./build/esm/src/index.js",
-  "types": "./build/esm/src/index.d.ts",
-  "scripts": {
-    "build": "tsc --build tsconfig.json tsconfig.cjs.json tsconfig.types.json && ./fix-export.sh",
-    "build:no-scripts": "tsc --build tsconfig.noscripts.json",
-    "scripts": "tsc --build tsconfig.json tsconfig.cjs.json tsconfig.types.json && ./fix-export.sh && node",
-    "buildw": "tsc --watch",
-    "coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
-    "format": "prettier --write --ignore-unknown **/*",
-    "prepare": "husky install",
-    "test": "tsc && node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "testw": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
-    "lint": "npx eslint src/* --fix"
-  },
-  "exports": {
-    ".": {
-      "types": "./build/types/src/index.d.ts",
-      "require": "./build/cjs/src/index.js",
-      "import": "./build/esm/src/index.js",
-      "default": "./build/esm/src/index.js"
+    "name": "@auxo-dev/dkg",
+    "version": "0.2.14",
+    "description": "Auxo's DKG Module for the On-chain Funding platform on Mina blockchain",
+    "author": "Auxo",
+    "license": "Apache-2.0",
+    "keywords": [
+        "mina-zkapp",
+        "mina-zk-app",
+        "mina-dapp",
+        "zkapp"
+    ],
+    "main": "./build/esm/src/index.js",
+    "types": "./build/esm/src/index.d.ts",
+    "scripts": {
+        "build": "tsc --build tsconfig.json tsconfig.cjs.json tsconfig.types.json && ./fix-export.sh",
+        "build:no-scripts": "tsc --build tsconfig.noscripts.json",
+        "scripts": "tsc --build tsconfig.json tsconfig.cjs.json tsconfig.types.json && ./fix-export.sh && node",
+        "buildw": "tsc --watch",
+        "coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+        "format": "prettier --write --ignore-unknown **/*",
+        "prepare": "husky install",
+        "test": "tsc && node --experimental-vm-modules node_modules/jest/bin/jest.js",
+        "testw": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+        "lint": "npx eslint src/* --fix"
     },
-    "./*": {
-      "types": "./*.d.ts",
-      "require": "./*.js",
-      "import": "./*.js",
-      "default": "./*.js"
+    "exports": {
+        ".": {
+            "types": "./build/types/src/index.d.ts",
+            "require": "./build/cjs/src/index.js",
+            "import": "./build/esm/src/index.js",
+            "default": "./build/esm/src/index.js"
+        },
+        "./*": {
+            "types": "./*.d.ts",
+            "require": "./*.js",
+            "import": "./*.js",
+            "default": "./*.js"
+        }
+    },
+    "files": [
+        "build/*",
+        "build/**/*.map"
+    ],
+    "lint-staged": {
+        "**/*": [
+            "eslint src/* --fix --ignore-pattern *.sh",
+            "prettier --write --ignore-unknown"
+        ]
+    },
+    "devDependencies": {
+        "@babel/preset-env": "^7.16.4",
+        "@babel/preset-typescript": "^7.16.0",
+        "@types/jest": "^27.0.3",
+        "@typescript-eslint/eslint-plugin": "^5.5.0",
+        "@typescript-eslint/parser": "^5.5.0",
+        "axios": "^1.6.5",
+        "dotenv": "^16.3.1",
+        "eslint": "^8.7.0",
+        "eslint-plugin-o1js": "^0.4.0",
+        "husky": "^7.0.1",
+        "jest": "^27.3.1",
+        "lint-staged": "^11.0.1",
+        "prettier": "^2.3.2",
+        "ts-jest": "^27.0.7",
+        "typescript": "^4.7.2",
+        "zkapp-cli": "^0.15.0"
+    },
+    "dependencies": {
+        "@auxo-dev/auxo-libs": "^0.3.5",
+        "o1js": "0.15.1"
     }
-  },
-  "files": [
-    "build/*",
-    "build/**/*.map"
-  ],
-  "lint-staged": {
-    "**/*": [
-      "eslint src/* --fix --ignore-pattern *.sh",
-      "prettier --write --ignore-unknown"
-    ]
-  },
-  "devDependencies": {
-    "@babel/preset-env": "^7.16.4",
-    "@babel/preset-typescript": "^7.16.0",
-    "@types/jest": "^27.0.3",
-    "@typescript-eslint/eslint-plugin": "^5.5.0",
-    "@typescript-eslint/parser": "^5.5.0",
-    "axios": "^1.6.5",
-    "dotenv": "^16.3.1",
-    "eslint": "^8.7.0",
-    "eslint-plugin-o1js": "^0.4.0",
-    "husky": "^7.0.1",
-    "jest": "^27.3.1",
-    "lint-staged": "^11.0.1",
-    "prettier": "^2.3.2",
-    "ts-jest": "^27.0.7",
-    "typescript": "^4.7.2",
-    "zkapp-cli": "^0.15.0"
-  },
-  "dependencies": {
-    "@auxo-dev/auxo-libs": "^0.3.5",
-    "o1js": "0.15.1"
-  }
 }

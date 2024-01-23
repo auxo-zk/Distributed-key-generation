@@ -32,6 +32,7 @@ export class AddressStorage {
         addresses?: { index: ZkAppEnum | number; address: PublicKey }[]
     ) {
         this._addressMap = EMPTY_ADDRESS_MT();
+        this._addresses = {};
         if (addresses) {
             for (let i = 0; i < addresses.length; i++) {
                 this.updateAddress(
@@ -127,6 +128,7 @@ export class ReduceStorage {
 
     constructor(actions?: { actionState: Field; status: ActionStatus }[]) {
         this._actionMap = EMPTY_REDUCE_MT();
+        this._actions = {};
         if (actions) {
             for (let i = 0; i < actions.length; i++) {
                 this.updateLeaf(

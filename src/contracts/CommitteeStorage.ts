@@ -38,6 +38,7 @@ export abstract class CommitteeStrorage<RawLeaf> {
     ) {
         this._level1 = EMPTY_LEVEL_1_TREE();
         this._level2s = {};
+        this._leafs = {};
         if (leafs) {
             for (let i = 0; i < leafs.length; i++) {
                 if (leafs[i].leaf instanceof Field) {

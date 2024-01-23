@@ -100,7 +100,7 @@ import { ResponseContributionStorage } from '../contracts/RequestStorage.js';
 describe('DKG', () => {
     const doProofs = false;
     const profiling = false;
-    const logMemory = true;
+    const logMemory = false;
     const cache = Cache.FileSystem('./caches');
     const DKGProfiler = getProfiler('Benchmark DKG');
     let Local = Mina.LocalBlockchain({ proofsEnabled: doProofs });

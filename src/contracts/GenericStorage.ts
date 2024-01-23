@@ -84,29 +84,25 @@ export abstract class GenericStorage<
 
     constructor(
         emptyLevel1Tree: () => Level1MT,
-        level1?: Level1MT,
         emptyLevel2Tree?: () => Level2MT,
-        level2s?: { index: Field; level2: Level2MT }[],
         leafs?: { level1Index: Field; level2Index?: Field; rawLeaf: RawLeaf }[]
     ) {
         this.EMPTY_LEVEL_1_TREE = emptyLevel1Tree;
-        this.level1 = level1 || this.EMPTY_LEVEL_1_TREE();
+        this.level1 = this.EMPTY_LEVEL_1_TREE();
         this.level2s = {};
-        if (emptyLevel2Tree && level2s && level2s.length > 0) {
+        this.leafs = {};
+        if (emptyLevel2Tree) {
             this.EMPTY_LEVEL_2_TREE = emptyLevel2Tree;
-            for (let i = 0; i < level2s.length; i++) {
-                this.level2s[level2s[i].index.toString()] = level2s[i].level2;
-            }
-        }
-        if (leafs) {
-            for (let i = 0; i < leafs.length; i++) {
-                this.updateRawLeaf(
-                    {
-                        level1Index: leafs[i].level1Index,
-                        level2Index: leafs[i].level2Index,
-                    },
-                    leafs[i].rawLeaf
-                );
+            if (leafs) {
+                for (let i = 0; i < leafs.length; i++) {
+                    this.updateRawLeaf(
+                        {
+                            level1Index: leafs[i].level1Index,
+                            level2Index: leafs[i].level2Index,
+                        },
+                        leafs[i].rawLeaf
+                    );
+                }
             }
         }
     }
