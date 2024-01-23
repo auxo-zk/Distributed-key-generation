@@ -20,35 +20,35 @@ import { Bool, Field, Group, Poseidon, Scalar } from 'o1js';
  */
 
 function scalarToBigInt(s: Scalar): bigint {
-  return Field.fromBits(
-    s.toFields().map((e) => Bool.fromFields([e]))
-  ).toBigInt();
+    return Field.fromBits(
+        s.toFields().map((e) => Bool.fromFields([e]))
+    ).toBigInt();
 }
 
 function fieldToBigInt(f: Field): bigint {
-  return f.toBigInt();
+    return f.toBigInt();
 }
 
 export function encrypt(
-  m: Scalar,
-  pbK: Group,
-  b: Scalar
+    m: Scalar,
+    pbK: Group,
+    b: Scalar
 ): {
-  c: Bit255;
-  U: Group;
+    c: Bit255;
+    U: Group;
 } {
-  let U = Group.generator.scale(b);
-  let V = pbK.add(Group.generator).scale(b).sub(Group.generator.scale(b));
-  let k = Poseidon.hash(U.toFields().concat(V.toFields()));
-  let xor = fieldToBigInt(k) ^ scalarToBigInt(m);
-  let c = Bit255.fromBits(Field.fromJSON(xor.toString()).toBits());
-  return { c, U };
+    let U = Group.generator.scale(b);
+    let V = pbK.add(Group.generator).scale(b).sub(Group.generator.scale(b));
+    let k = Poseidon.hash(U.toFields().concat(V.toFields()));
+    let xor = fieldToBigInt(k) ^ scalarToBigInt(m);
+    let c = Bit255.fromBits(Field.fromJSON(xor.toString()).toBits());
+    return { c, U };
 }
 
 export function decrypt(c: Bit255, U: Group, prvK: Scalar): { m: Scalar } {
-  let V = U.add(Group.generator).scale(prvK).sub(Group.generator.scale(prvK));
-  let k = Poseidon.hash(U.toFields().concat(V.toFields()));
-  let xor = fieldToBigInt(k) ^ c.toBigInt();
-  let m = Bit255.fromBits(Field.fromJSON(xor.toString()).toBits()).toScalar();
-  return { m: m };
+    let V = U.add(Group.generator).scale(prvK).sub(Group.generator.scale(prvK));
+    let k = Poseidon.hash(U.toFields().concat(V.toFields()));
+    let xor = fieldToBigInt(k) ^ c.toBigInt();
+    let m = Bit255.fromBits(Field.fromJSON(xor.toString()).toBits()).toScalar();
+    return { m: m };
 }

@@ -27,9 +27,9 @@ export const REQUEST_MAX_SIZE = 5;
  * Maximum amount for each entity
  */
 export const INSTANCE_LIMITS = {
-  COMMITTEE: 2 ** 3,
-  KEY: 2 ** 3,
-  REQUEST: 2 ** 3,
+    COMMITTEE: 2 ** 3,
+    KEY: 2 ** 3,
+    REQUEST: 2 ** 3,
 };
 
 /**
@@ -41,22 +41,22 @@ export const INDEX_SIZE = 6;
  * Indexes of zkApps in the address storage
  */
 export enum ZkAppEnum {
-  COMMITTEE,
-  DKG,
-  ROUND1,
-  ROUND2,
-  RESPONSE,
-  REQUEST,
+    COMMITTEE,
+    DKG,
+    ROUND1,
+    ROUND2,
+    RESPONSE,
+    REQUEST,
 }
 
 /**
  * All zkApp/smart contract names
  */
 export enum Contract {
-  COMMITTEE = 'committee',
-  DKG = 'dkg',
-  ROUND1 = 'round1',
-  ROUND2 = 'round2',
-  RESPONSE = 'response',
-  REQUEST = 'request',
+    COMMITTEE = 'committee',
+    DKG = 'dkg',
+    ROUND1 = 'round1',
+    ROUND2 = 'round2',
+    RESPONSE = 'response',
+    REQUEST = 'request',
 }

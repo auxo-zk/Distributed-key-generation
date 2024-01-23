@@ -38,7 +38,7 @@
 
 // Usage:
 // node build/src/interact.js <deployAlias>
-// Example: 
+// Example:
 // node build/src/scripts/Committee.js committeeberkeley
 // `);
 // Error.stackTraceLimit = 10000000;

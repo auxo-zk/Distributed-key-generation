@@ -11,12 +11,12 @@ import * as Request from './Request.js';
 import * as RequestHelper from './RequestHelper.js';
 
 export {
-  Committee,
-  DKG,
-  Encryption,
-  Round1,
-  Round2,
-  Response,
-  Request,
-  RequestHelper,
+    Committee,
+    DKG,
+    Encryption,
+    Round1,
+    Round2,
+    Response,
+    Request,
+    RequestHelper,
 };

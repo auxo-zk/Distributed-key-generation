@@ -6,9 +6,7 @@ import {
     PublicKey,
     AccountUpdate,
     Poseidon,
-    MerkleMap,
     MerkleTree,
-    MerkleWitness,
     Proof,
     Void,
 } from 'o1js';
@@ -25,17 +23,15 @@ import {
 import { IPFSHash } from '@auxo-dev/auxo-libs';
 import { MemberArray } from '../libs/Committee.js';
 import {
-    EMPTY_LEVEL_1_TREE,
     EMPTY_LEVEL_2_TREE,
-    Level1Witness,
     MemberStorage,
     SettingStorage,
 } from '../contracts/CommitteeStorage.js';
 
 describe('Committee', () => {
     const doProofs = false;
-    let memberStorage = new MemberStorage(EMPTY_LEVEL_1_TREE());
-    let settingStorage = new SettingStorage(EMPTY_LEVEL_1_TREE());
+    let memberStorage = new MemberStorage();
+    let settingStorage = new SettingStorage();
 
     let { keys, addresses } = randomAccounts(
         'committee',

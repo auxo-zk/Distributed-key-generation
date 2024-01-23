@@ -1,17 +1,17 @@
 import {
-  Field,
-  Group,
-  MerkleTree,
-  MerkleWitness,
-  Poseidon,
-  Struct,
+    Field,
+    Group,
+    MerkleTree,
+    MerkleWitness,
+    Poseidon,
+    Struct,
 } from 'o1js';
 import { KeyStatus } from './DKG.js';
 import { Round1Contribution, Round2Contribution } from '../libs/Committee.js';
 import { COMMITTEE_MAX_SIZE, INSTANCE_LIMITS } from '../constants.js';
 
 export const LEVEL1_TREE_HEIGHT =
-  Math.ceil(Math.log2(INSTANCE_LIMITS.COMMITTEE * INSTANCE_LIMITS.KEY)) + 1;
+    Math.ceil(Math.log2(INSTANCE_LIMITS.COMMITTEE * INSTANCE_LIMITS.KEY)) + 1;
 export const LEVEL2_TREE_HEIGHT = Math.ceil(Math.log2(COMMITTEE_MAX_SIZE)) + 1;
 export class Level1MT extends MerkleTree {}
 export class Level1Witness extends MerkleWitness(LEVEL1_TREE_HEIGHT) {}
@@ -20,496 +20,503 @@ export class Level2Witness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
 export const EMPTY_LEVEL_1_TREE = () => new Level1MT(LEVEL1_TREE_HEIGHT);
 export const EMPTY_LEVEL_2_TREE = () => new Level2MT(LEVEL2_TREE_HEIGHT);
 export class FullMTWitness extends Struct({
-  level1: Level1Witness,
-  level2: Level2Witness,
+    level1: Level1Witness,
+    level2: Level2Witness,
 }) {}
 
 export abstract class DKGStorage<RawLeaf> {
-  private _level1: Level1MT;
-  private _level2s: { [key: string]: Level2MT };
-  private _leafs: { [key: string]: { raw: RawLeaf | undefined; leaf: Field } };
+    private _level1: Level1MT;
+    private _level2s: { [key: string]: Level2MT };
+    private _leafs: {
+        [key: string]: { raw: RawLeaf | undefined; leaf: Field };
+    };
 
-  constructor(
-    level1?: Level1MT,
-    level2s?: { index: Field; level2: Level2MT }[],
-    leafs?: { level1Index: Field; level2Index?: Field; rawLeaf: RawLeaf }[]
-  ) {
-    this._level1 = level1 || EMPTY_LEVEL_1_TREE();
-    this._level2s = {};
-    if (level2s) {
-      for (let i = 0; i < level2s.length; i++) {
-        this._level2s[level2s[i].index.toString()] = level2s[i].level2;
-      }
+    constructor(
+        leafs?: {
+            level1Index: Field;
+            level2Index?: Field;
+            leaf: RawLeaf | Field;
+        }[]
+    ) {
+        this._level1 = EMPTY_LEVEL_1_TREE();
+        this._level2s = {};
+        if (leafs) {
+            for (let i = 0; i < leafs.length; i++) {
+                if (leafs[i].leaf instanceof Field) {
+                    this.updateLeaf(
+                        {
+                            level1Index: leafs[i].level1Index,
+                            level2Index: leafs[i].level2Index,
+                        },
+                        leafs[i].leaf as Field
+                    );
+                } else {
+                    this.updateRawLeaf(
+                        {
+                            level1Index: leafs[i].level1Index,
+                            level2Index: leafs[i].level2Index,
+                        },
+                        leafs[i].leaf as RawLeaf
+                    );
+                }
+            }
+        }
     }
-    if (leafs) {
-      for (let i = 0; i < leafs.length; i++) {
-        this.updateRawLeaf(
-          {
-            level1Index: leafs[i].level1Index,
-            level2Index: leafs[i].level2Index,
-          },
-          leafs[i].rawLeaf
+
+    get root(): Field {
+        return this._level1.getRoot();
+    }
+
+    get leafs(): { [key: string]: { raw: RawLeaf | undefined; leaf: Field } } {
+        return this._leafs;
+    }
+
+    abstract calculateLeaf(rawLeaf: RawLeaf): Field;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    abstract calculateLevel1Index(args: any): Field;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    calculateLevel2Index?(args: any): Field;
+
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return new Level1Witness(
+            this._level1.getWitness(level1Index.toBigInt())
         );
-      }
     }
-  }
 
-  get root(): Field {
-    return this._level1.getRoot();
-  }
-
-  get leafs(): { [key: string]: { raw: RawLeaf | undefined; leaf: Field } } {
-    return this._leafs;
-  }
-
-  abstract calculateLeaf(rawLeaf: RawLeaf): Field;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  abstract calculateLevel1Index(args: any): Field;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  calculateLevel2Index?(args: any): Field;
-
-  getLevel1Witness(level1Index: Field): Level1Witness {
-    return new Level1Witness(this._level1.getWitness(level1Index.toBigInt()));
-  }
-
-  getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
-    let level2 = this._level2s[level1Index.toString()];
-    if (level2 === undefined)
-      throw new Error('Level 2 MT does not exist at this index');
-    return new Level2Witness(level2.getWitness(level2Index.toBigInt()));
-  }
-
-  getWitness(
-    level1Index: Field,
-    level2Index?: Field
-  ): Level1Witness | FullMTWitness {
-    if (level2Index) {
-      return new FullMTWitness({
-        level1: this.getLevel1Witness(level1Index),
-        level2: this.getLevel2Witness(level1Index, level2Index),
-      });
-    } else {
-      return this.getLevel1Witness(level1Index);
+    getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
+        let level2 = this._level2s[level1Index.toString()];
+        if (level2 === undefined)
+            throw new Error('Level 2 MT does not exist at this index');
+        return new Level2Witness(level2.getWitness(level2Index.toBigInt()));
     }
-  }
 
-  getLeafs(): Field[] {
-    return Object.values(this.leafs).map((e) => e.leaf);
-  }
+    getWitness(
+        level1Index: Field,
+        level2Index?: Field
+    ): Level1Witness | FullMTWitness {
+        if (level2Index) {
+            return new FullMTWitness({
+                level1: this.getLevel1Witness(level1Index),
+                level2: this.getLevel2Witness(level1Index, level2Index),
+            });
+        } else {
+            return this.getLevel1Witness(level1Index);
+        }
+    }
 
-  getRawLeafs(): (RawLeaf | undefined)[] {
-    return Object.values(this.leafs).map((e) => e.raw);
-  }
+    getLeafs(): Field[] {
+        return Object.values(this.leafs).map((e) => e.leaf);
+    }
 
-  updateInternal(level1Index: Field, level2: Level2MT) {
-    Object.assign(this._level2s, {
-      [level1Index.toString()]: level2,
-    });
-    this._level1.setLeaf(level1Index.toBigInt(), level2.getRoot());
-  }
+    getRawLeafs(): (RawLeaf | undefined)[] {
+        return Object.values(this.leafs).map((e) => e.raw);
+    }
 
-  updateLeaf(
-    { level1Index, level2Index }: { level1Index: Field; level2Index?: Field },
-    leaf: Field
-  ): void {
-    let leafId = level1Index.toString();
-    if (level2Index) {
-      leafId += '-' + level2Index.toString();
-      let level2 = this._level2s[level1Index.toString()];
-      if (level2 === undefined) level2 = EMPTY_LEVEL_2_TREE();
+    updateInternal(level1Index: Field, level2: Level2MT) {
+        Object.assign(this._level2s, {
+            [level1Index.toString()]: level2,
+        });
+        this._level1.setLeaf(level1Index.toBigInt(), level2.getRoot());
+    }
 
-      level2.setLeaf(level2Index.toBigInt(), leaf);
-      this.updateInternal(level1Index, level2);
-    } else this._level1.setLeaf(level1Index.toBigInt(), leaf);
+    updateLeaf(
+        {
+            level1Index,
+            level2Index,
+        }: { level1Index: Field; level2Index?: Field },
+        leaf: Field
+    ): void {
+        let leafId = level1Index.toString();
+        if (level2Index) {
+            leafId += '-' + level2Index.toString();
+            let level2 = this._level2s[level1Index.toString()];
+            if (level2 === undefined) level2 = EMPTY_LEVEL_2_TREE();
 
-    this._leafs[leafId] = {
-      raw: undefined,
-      leaf: leaf,
-    };
-  }
+            level2.setLeaf(level2Index.toBigInt(), leaf);
+            this.updateInternal(level1Index, level2);
+        } else this._level1.setLeaf(level1Index.toBigInt(), leaf);
 
-  updateRawLeaf(
-    { level1Index, level2Index }: { level1Index: Field; level2Index?: Field },
-    rawLeaf: RawLeaf
-  ): void {
-    let leafId = level1Index.toString();
-    let leaf = this.calculateLeaf(rawLeaf);
-    if (level2Index) {
-      leafId += '-' + level2Index.toString();
-      let level2 = this._level2s[level1Index.toString()];
-      if (level2 === undefined) level2 = EMPTY_LEVEL_2_TREE();
+        this._leafs[leafId] = {
+            raw: undefined,
+            leaf: leaf,
+        };
+    }
 
-      level2.setLeaf(level2Index.toBigInt(), leaf);
-      this.updateInternal(level1Index, level2);
-    } else this._level1.setLeaf(level1Index.toBigInt(), leaf);
+    updateRawLeaf(
+        {
+            level1Index,
+            level2Index,
+        }: { level1Index: Field; level2Index?: Field },
+        rawLeaf: RawLeaf
+    ): void {
+        let leafId = level1Index.toString();
+        let leaf = this.calculateLeaf(rawLeaf);
+        if (level2Index) {
+            leafId += '-' + level2Index.toString();
+            let level2 = this._level2s[level1Index.toString()];
+            if (level2 === undefined) level2 = EMPTY_LEVEL_2_TREE();
 
-    this._leafs[leafId] = {
-      raw: rawLeaf,
-      leaf: leaf,
-    };
-  }
+            level2.setLeaf(level2Index.toBigInt(), leaf);
+            this.updateInternal(level1Index, level2);
+        } else this._level1.setLeaf(level1Index.toBigInt(), leaf);
+
+        this._leafs[leafId] = {
+            raw: rawLeaf,
+            leaf: leaf,
+        };
+    }
 }
 
 export type KeyStatusLeaf = {
-  status: KeyStatus;
+    status: KeyStatus;
 };
 
 export class KeyStatusStorage extends DKGStorage<KeyStatusLeaf> {
-  constructor(
-    level1?: Level1MT,
-    leafs?: { level1Index: Field; rawLeaf: KeyStatusLeaf }[]
-  ) {
-    super(level1, [], leafs);
-  }
+    static calculateLeaf(rawLeaf: KeyStatusLeaf): Field {
+        return Field(rawLeaf.status);
+    }
 
-  static calculateLeaf(rawLeaf: KeyStatusLeaf): Field {
-    return Field(rawLeaf.status);
-  }
+    calculateLeaf(rawLeaf: KeyStatusLeaf): Field {
+        return KeyStatusStorage.calculateLeaf(rawLeaf);
+    }
 
-  calculateLeaf(rawLeaf: KeyStatusLeaf): Field {
-    return KeyStatusStorage.calculateLeaf(rawLeaf);
-  }
+    static calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return Field.from(
+            committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) +
+                keyId.toBigInt()
+        );
+    }
 
-  static calculateLevel1Index({
-    committeeId,
-    keyId,
-  }: {
-    committeeId: Field;
-    keyId: Field;
-  }): Field {
-    return Field.from(
-      committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) + keyId.toBigInt()
-    );
-  }
+    calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return KeyStatusStorage.calculateLevel1Index({
+            committeeId,
+            keyId,
+        });
+    }
 
-  calculateLevel1Index({
-    committeeId,
-    keyId,
-  }: {
-    committeeId: Field;
-    keyId: Field;
-  }): Field {
-    return KeyStatusStorage.calculateLevel1Index({
-      committeeId,
-      keyId,
-    });
-  }
+    getWitness(level1Index: Field): Level1Witness {
+        return super.getWitness(level1Index) as Level1Witness;
+    }
 
-  getWitness(level1Index: Field): Level1Witness {
-    return super.getWitness(level1Index) as Level1Witness;
-  }
+    updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
+        super.updateLeaf({ level1Index }, leaf);
+    }
 
-  updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
-    super.updateLeaf({ level1Index }, leaf);
-  }
-
-  updateRawLeaf(
-    { level1Index }: { level1Index: Field },
-    rawLeaf: KeyStatusLeaf
-  ): void {
-    super.updateRawLeaf({ level1Index }, rawLeaf);
-  }
+    updateRawLeaf(
+        { level1Index }: { level1Index: Field },
+        rawLeaf: KeyStatusLeaf
+    ): void {
+        super.updateRawLeaf({ level1Index }, rawLeaf);
+    }
 }
 
 export type Round1ContributionLeaf = {
-  contribution: Round1Contribution;
+    contribution: Round1Contribution;
 };
 
 export class Round1ContributionStorage extends DKGStorage<Round1ContributionLeaf> {
-  constructor(
-    level1?: Level1MT,
-    level2s?: { index: Field; level2: Level2MT }[],
-    leafs?: { level1Index: Field; rawLeaf: Round1ContributionLeaf }[]
-  ) {
-    super(level1, level2s, leafs);
-  }
+    static calculateLeaf(rawLeaf: Round1ContributionLeaf): Field {
+        return rawLeaf.contribution.hash();
+    }
 
-  static calculateLeaf(rawLeaf: Round1ContributionLeaf): Field {
-    return rawLeaf.contribution.hash();
-  }
+    calculateLeaf(rawLeaf: Round1ContributionLeaf): Field {
+        return Round1ContributionStorage.calculateLeaf(rawLeaf);
+    }
 
-  calculateLeaf(rawLeaf: Round1ContributionLeaf): Field {
-    return Round1ContributionStorage.calculateLeaf(rawLeaf);
-  }
+    static calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return Field.from(
+            committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) +
+                keyId.toBigInt()
+        );
+    }
 
-  static calculateLevel1Index({
-    committeeId,
-    keyId,
-  }: {
-    committeeId: Field;
-    keyId: Field;
-  }): Field {
-    return Field.from(
-      committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) + keyId.toBigInt()
-    );
-  }
+    calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return Round1ContributionStorage.calculateLevel1Index({
+            committeeId,
+            keyId,
+        });
+    }
 
-  calculateLevel1Index({
-    committeeId,
-    keyId,
-  }: {
-    committeeId: Field;
-    keyId: Field;
-  }): Field {
-    return Round1ContributionStorage.calculateLevel1Index({
-      committeeId,
-      keyId,
-    });
-  }
+    static calculateLevel2Index(memberId: Field): Field {
+        return memberId;
+    }
 
-  static calculateLevel2Index(memberId: Field): Field {
-    return memberId;
-  }
+    calculateLevel2Index(memberId: Field): Field {
+        return Round1ContributionStorage.calculateLevel2Index(memberId);
+    }
 
-  calculateLevel2Index(memberId: Field): Field {
-    return Round1ContributionStorage.calculateLevel2Index(memberId);
-  }
+    getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
+        return super.getWitness(level1Index, level2Index) as FullMTWitness;
+    }
 
-  getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
-    return super.getWitness(level1Index, level2Index) as FullMTWitness;
-  }
+    updateLeaf(
+        {
+            level1Index,
+            level2Index,
+        }: { level1Index: Field; level2Index: Field },
+        leaf: Field
+    ): void {
+        super.updateLeaf({ level1Index, level2Index }, leaf);
+    }
 
-  updateLeaf(
-    { level1Index, level2Index }: { level1Index: Field; level2Index: Field },
-    leaf: Field
-  ): void {
-    super.updateLeaf({ level1Index, level2Index }, leaf);
-  }
-
-  updateRawLeaf(
-    { level1Index, level2Index }: { level1Index: Field; level2Index: Field },
-    rawLeaf: Round1ContributionLeaf
-  ): void {
-    super.updateRawLeaf({ level1Index, level2Index }, rawLeaf);
-  }
+    updateRawLeaf(
+        {
+            level1Index,
+            level2Index,
+        }: { level1Index: Field; level2Index: Field },
+        rawLeaf: Round1ContributionLeaf
+    ): void {
+        super.updateRawLeaf({ level1Index, level2Index }, rawLeaf);
+    }
 }
 
 export type PublicKeyLeaf = {
-  C0: Group;
+    C0: Group;
 };
 
 export class PublicKeyStorage extends DKGStorage<PublicKeyLeaf> {
-  constructor(
-    level1?: Level1MT,
-    level2s?: { index: Field; level2: Level2MT }[],
-    leafs?: { level1Index: Field; rawLeaf: PublicKeyLeaf }[]
-  ) {
-    super(level1, level2s, leafs);
-  }
+    static calculateLeaf(rawLeaf: PublicKeyLeaf): Field {
+        return Poseidon.hash(rawLeaf.C0.toFields());
+    }
 
-  static calculateLeaf(rawLeaf: PublicKeyLeaf): Field {
-    return Poseidon.hash(rawLeaf.C0.toFields());
-  }
+    calculateLeaf(rawLeaf: PublicKeyLeaf): Field {
+        return PublicKeyStorage.calculateLeaf(rawLeaf);
+    }
 
-  calculateLeaf(rawLeaf: PublicKeyLeaf): Field {
-    return PublicKeyStorage.calculateLeaf(rawLeaf);
-  }
+    static calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return Field.from(
+            committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) +
+                keyId.toBigInt()
+        );
+    }
 
-  static calculateLevel1Index({
-    committeeId,
-    keyId,
-  }: {
-    committeeId: Field;
-    keyId: Field;
-  }): Field {
-    return Field.from(
-      committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) + keyId.toBigInt()
-    );
-  }
+    calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return PublicKeyStorage.calculateLevel1Index({
+            committeeId,
+            keyId,
+        });
+    }
 
-  calculateLevel1Index({
-    committeeId,
-    keyId,
-  }: {
-    committeeId: Field;
-    keyId: Field;
-  }): Field {
-    return PublicKeyStorage.calculateLevel1Index({
-      committeeId,
-      keyId,
-    });
-  }
+    static calculateLevel2Index(memberId: Field): Field {
+        return memberId;
+    }
 
-  static calculateLevel2Index(memberId: Field): Field {
-    return memberId;
-  }
+    calculateLevel2Index(memberId: Field): Field {
+        return PublicKeyStorage.calculateLevel2Index(memberId);
+    }
 
-  calculateLevel2Index(memberId: Field): Field {
-    return PublicKeyStorage.calculateLevel2Index(memberId);
-  }
+    getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
+        return super.getWitness(level1Index, level2Index) as FullMTWitness;
+    }
 
-  getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
-    return super.getWitness(level1Index, level2Index) as FullMTWitness;
-  }
+    updateLeaf(
+        {
+            level1Index,
+            level2Index,
+        }: { level1Index: Field; level2Index: Field },
+        leaf: Field
+    ): void {
+        super.updateLeaf({ level1Index, level2Index }, leaf);
+    }
 
-  updateLeaf(
-    { level1Index, level2Index }: { level1Index: Field; level2Index: Field },
-    leaf: Field
-  ): void {
-    super.updateLeaf({ level1Index, level2Index }, leaf);
-  }
-
-  updateRawLeaf(
-    { level1Index, level2Index }: { level1Index: Field; level2Index: Field },
-    rawLeaf: PublicKeyLeaf
-  ): void {
-    super.updateRawLeaf({ level1Index, level2Index }, rawLeaf);
-  }
+    updateRawLeaf(
+        {
+            level1Index,
+            level2Index,
+        }: { level1Index: Field; level2Index: Field },
+        rawLeaf: PublicKeyLeaf
+    ): void {
+        super.updateRawLeaf({ level1Index, level2Index }, rawLeaf);
+    }
 }
 
 export type Round2ContributionLeaf = {
-  contribution: Round2Contribution;
+    contribution: Round2Contribution;
 };
 
 export class Round2ContributionStorage extends DKGStorage<Round2ContributionLeaf> {
-  constructor(
-    level1?: Level1MT,
-    level2s?: { index: Field; level2: Level2MT }[],
-    leafs?: { level1Index: Field; rawLeaf: Round2ContributionLeaf }[]
-  ) {
-    super(level1, level2s, leafs);
-  }
+    static calculateLeaf(rawLeaf: Round2ContributionLeaf): Field {
+        return rawLeaf.contribution.hash();
+    }
 
-  static calculateLeaf(rawLeaf: Round2ContributionLeaf): Field {
-    return rawLeaf.contribution.hash();
-  }
+    calculateLeaf(rawLeaf: Round2ContributionLeaf): Field {
+        return Round2ContributionStorage.calculateLeaf(rawLeaf);
+    }
 
-  calculateLeaf(rawLeaf: Round2ContributionLeaf): Field {
-    return Round2ContributionStorage.calculateLeaf(rawLeaf);
-  }
+    static calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return Field.from(
+            committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) +
+                keyId.toBigInt()
+        );
+    }
 
-  static calculateLevel1Index({
-    committeeId,
-    keyId,
-  }: {
-    committeeId: Field;
-    keyId: Field;
-  }): Field {
-    return Field.from(
-      committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) + keyId.toBigInt()
-    );
-  }
+    calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return Round2ContributionStorage.calculateLevel1Index({
+            committeeId,
+            keyId,
+        });
+    }
 
-  calculateLevel1Index({
-    committeeId,
-    keyId,
-  }: {
-    committeeId: Field;
-    keyId: Field;
-  }): Field {
-    return Round2ContributionStorage.calculateLevel1Index({
-      committeeId,
-      keyId,
-    });
-  }
+    static calculateLevel2Index(memberId: Field): Field {
+        return memberId;
+    }
 
-  static calculateLevel2Index(memberId: Field): Field {
-    return memberId;
-  }
+    calculateLevel2Index(memberId: Field): Field {
+        return Round2ContributionStorage.calculateLevel2Index(memberId);
+    }
 
-  calculateLevel2Index(memberId: Field): Field {
-    return Round2ContributionStorage.calculateLevel2Index(memberId);
-  }
+    getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
+        return super.getWitness(level1Index, level2Index) as FullMTWitness;
+    }
 
-  getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
-    return super.getWitness(level1Index, level2Index) as FullMTWitness;
-  }
+    updateLeaf(
+        {
+            level1Index,
+            level2Index,
+        }: { level1Index: Field; level2Index: Field },
+        leaf: Field
+    ): void {
+        super.updateLeaf({ level1Index, level2Index }, leaf);
+    }
 
-  updateLeaf(
-    { level1Index, level2Index }: { level1Index: Field; level2Index: Field },
-    leaf: Field
-  ): void {
-    super.updateLeaf({ level1Index, level2Index }, leaf);
-  }
-
-  updateRawLeaf(
-    { level1Index, level2Index }: { level1Index: Field; level2Index: Field },
-    rawLeaf: Round2ContributionLeaf
-  ): void {
-    super.updateRawLeaf({ level1Index, level2Index }, rawLeaf);
-  }
+    updateRawLeaf(
+        {
+            level1Index,
+            level2Index,
+        }: { level1Index: Field; level2Index: Field },
+        rawLeaf: Round2ContributionLeaf
+    ): void {
+        super.updateRawLeaf({ level1Index, level2Index }, rawLeaf);
+    }
 }
 
 export type EncryptionLeaf = {
-  contributions: Round2Contribution[];
-  memberId: Field;
+    contributions: Round2Contribution[];
+    memberId: Field;
 };
 
 export class EncryptionStorage extends DKGStorage<EncryptionLeaf> {
-  constructor(
-    level1?: Level1MT,
-    level2s?: { index: Field; level2: Level2MT }[],
-    leafs?: { level1Index: Field; rawLeaf: EncryptionLeaf }[]
-  ) {
-    super(level1, level2s, leafs);
-  }
-
-  static calculateLeaf(rawLeaf: EncryptionLeaf): Field {
-    let hashChain = Field(0);
-    for (let i = 0; i < Number(rawLeaf.contributions[0].c.length); i++) {
-      hashChain = Poseidon.hash(
-        [
-          hashChain,
-          rawLeaf.contributions[i].c.get(rawLeaf.memberId).toFields(),
-          rawLeaf.contributions[i].U.get(rawLeaf.memberId).toFields(),
-        ].flat()
-      );
+    static calculateLeaf(rawLeaf: EncryptionLeaf): Field {
+        let hashChain = Field(0);
+        for (let i = 0; i < Number(rawLeaf.contributions[0].c.length); i++) {
+            hashChain = Poseidon.hash(
+                [
+                    hashChain,
+                    rawLeaf.contributions[i].c.get(rawLeaf.memberId).toFields(),
+                    rawLeaf.contributions[i].U.get(rawLeaf.memberId).toFields(),
+                ].flat()
+            );
+        }
+        return hashChain;
     }
-    return hashChain;
-  }
 
-  calculateLeaf(rawLeaf: EncryptionLeaf): Field {
-    return EncryptionStorage.calculateLeaf(rawLeaf);
-  }
+    calculateLeaf(rawLeaf: EncryptionLeaf): Field {
+        return EncryptionStorage.calculateLeaf(rawLeaf);
+    }
 
-  static calculateLevel1Index({
-    committeeId,
-    keyId,
-  }: {
-    committeeId: Field;
-    keyId: Field;
-  }): Field {
-    return Field.from(
-      committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) + keyId.toBigInt()
-    );
-  }
+    static calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return Field.from(
+            committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) +
+                keyId.toBigInt()
+        );
+    }
 
-  calculateLevel1Index({
-    committeeId,
-    keyId,
-  }: {
-    committeeId: Field;
-    keyId: Field;
-  }): Field {
-    return EncryptionStorage.calculateLevel1Index({
-      committeeId,
-      keyId,
-    });
-  }
+    calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return EncryptionStorage.calculateLevel1Index({
+            committeeId,
+            keyId,
+        });
+    }
 
-  static calculateLevel2Index(memberId: Field): Field {
-    return memberId;
-  }
+    static calculateLevel2Index(memberId: Field): Field {
+        return memberId;
+    }
 
-  calculateLevel2Index(memberId: Field): Field {
-    return EncryptionStorage.calculateLevel2Index(memberId);
-  }
+    calculateLevel2Index(memberId: Field): Field {
+        return EncryptionStorage.calculateLevel2Index(memberId);
+    }
 
-  getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
-    return super.getWitness(level1Index, level2Index) as FullMTWitness;
-  }
+    getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
+        return super.getWitness(level1Index, level2Index) as FullMTWitness;
+    }
 
-  updateLeaf(
-    { level1Index, level2Index }: { level1Index: Field; level2Index: Field },
-    leaf: Field
-  ): void {
-    super.updateLeaf({ level1Index, level2Index }, leaf);
-  }
+    updateLeaf(
+        {
+            level1Index,
+            level2Index,
+        }: { level1Index: Field; level2Index: Field },
+        leaf: Field
+    ): void {
+        super.updateLeaf({ level1Index, level2Index }, leaf);
+    }
 
-  updateRawLeaf(
-    { level1Index, level2Index }: { level1Index: Field; level2Index: Field },
-    rawLeaf: EncryptionLeaf
-  ): void {
-    super.updateRawLeaf({ level1Index, level2Index }, rawLeaf);
-  }
+    updateRawLeaf(
+        {
+            level1Index,
+            level2Index,
+        }: { level1Index: Field; level2Index: Field },
+        rawLeaf: EncryptionLeaf
+    ): void {
+        super.updateRawLeaf({ level1Index, level2Index }, rawLeaf);
+    }
 }

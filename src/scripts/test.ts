@@ -48,12 +48,12 @@
 //     [0n, 1000n, 0n, 0n],
 //   ];
 //   const plainScalar = [
-    // new CustomScalarArray([
-    //   CustomScalar.fromScalar(Scalar.from(1000n)),
-    //   CustomScalar.fromScalar(Scalar.from(0n)),
-    //   CustomScalar.fromScalar(Scalar.from(0n)),
-    //   CustomScalar.fromScalar(Scalar.from(0n)),
-    // ]),
+// new CustomScalarArray([
+//   CustomScalar.fromScalar(Scalar.from(1000n)),
+//   CustomScalar.fromScalar(Scalar.from(0n)),
+//   CustomScalar.fromScalar(Scalar.from(0n)),
+//   CustomScalar.fromScalar(Scalar.from(0n)),
+// ]),
 //     new CustomScalarArray([
 //       CustomScalar.fromScalar(Scalar.from(0n)),
 //       CustomScalar.fromScalar(Scalar.from(1000n)),
