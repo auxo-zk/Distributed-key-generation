@@ -563,12 +563,12 @@
 //   for (let i = 0; i < members.length; i++) {
 //     memberTree.setLeaf(
 //       BigInt(i),
-//       memberStorage.calculateLeaf(members[i].publicKey)
+//       MemberStorage.calculateLeaf(members[i].publicKey)
 //     );
 //   }
 //   memberStorage.updateInternal(committeeIndex, memberTree);
 //   settingStorage.updateLeaf(
-//     settingStorage.calculateLeaf({ T: Field(T), N: Field(N) }),
+//     SettingStorage.calculateLeaf({ T: Field(T), N: Field(N) }),
 //     settingStorage.calculateLevel1Index(committeeIndex)
 //   );
 
@@ -717,8 +717,8 @@
 //   for (let i = 0; i < 1; i++) {
 //     let action = dkgActions[ActionEnum.GENERATE_KEY][i];
 //     let memberWitness = memberStorage.getWitness(
-//       memberStorage.calculateLevel1Index(committeeIndex),
-//       memberStorage.calculateLevel2Index(Field(i))
+//       MemberStorage.calculateLevel1Index(committeeIndex),
+//       MemberStorage.calculateLevel2Index(Field(i))
 //     );
 //     let tx = await Mina.transaction(
 //       { sender: members[i].publicKey, fee, nonce: ++memberNonces[i] },
@@ -765,7 +765,7 @@
 //         keyCounterStorage.calculateLevel1Index(action.committeeId)
 //       ),
 //       keyStatusStorage.getWitness(
-//         keyStatusStorage.calculateLevel1Index({
+//         KeyStatusStorage.calculateLevel1Index({
 //           committeeId: action.committeeId,
 //           keyId: Field(i),
 //         })
@@ -786,7 +786,7 @@
 //         Field(KeyStatus.ACTIVE),
 //         Field(KeyStatus.DEPRECATED),
 //       ]),
-//       keyStatusStorage.calculateLevel1Index({
+//       KeyStatusStorage.calculateLevel1Index({
 //         committeeId: action.committeeId,
 //         keyId: Field(i),
 //       })
@@ -820,8 +820,8 @@
 //     round1Actions.push(action);
 
 //     let memberWitness = memberStorage.getWitness(
-//       memberStorage.calculateLevel1Index(committeeIndex),
-//       memberStorage.calculateLevel2Index(Field(i))
+//       MemberStorage.calculateLevel1Index(committeeIndex),
+//       MemberStorage.calculateLevel2Index(Field(i))
 //     );
 
 //     let tx = await Mina.transaction(
@@ -916,18 +916,18 @@
 //     initialContributionRoot,
 //     initialPublicKeyRoot,
 //     reduceStateRoot,
-//     round1ContributionStorage.calculateLevel1Index({
+//     Round1ContributionStorage.calculateLevel1Index({
 //       committeeId: Field(0),
 //       keyId: Field(0),
 //     }),
 //     round1ContributionStorage.getLevel1Witness(
-//       round1ContributionStorage.calculateLevel1Index({
+//       Round1ContributionStorage.calculateLevel1Index({
 //         committeeId: Field(0),
 //         keyId: Field(0),
 //       })
 //     ),
 //     publicKeyStorage.getLevel1Witness(
-//       publicKeyStorage.calculateLevel1Index({
+//       PublicKeyStorage.calculateLevel1Index({
 //         committeeId: Field(0),
 //         keyId: Field(0),
 //       })
@@ -937,7 +937,7 @@
 //   console.log('DONE!');
 
 //   round1ContributionStorage.updateInternal(
-//     round1ContributionStorage.calculateLevel1Index({
+//     Round1ContributionStorage.calculateLevel1Index({
 //       committeeId: Field(0),
 //       keyId: Field(0),
 //     }),
@@ -945,7 +945,7 @@
 //   );
 
 //   publicKeyStorage.updateInternal(
-//     publicKeyStorage.calculateLevel1Index({
+//     PublicKeyStorage.calculateLevel1Index({
 //       committeeId: Field(0),
 //       keyId: Field(0),
 //     }),
@@ -963,18 +963,18 @@
 //       }),
 //       finalizeProof,
 //       round1ContributionStorage.getWitness(
-//         round1ContributionStorage.calculateLevel1Index({
+//         Round1ContributionStorage.calculateLevel1Index({
 //           committeeId: action.committeeId,
 //           keyId: action.keyId,
 //         }),
-//         round1ContributionStorage.calculateLevel2Index(Field(i))
+//         Round1ContributionStorage.calculateLevel2Index(Field(i))
 //       ),
 //       publicKeyStorage.getWitness(
-//         publicKeyStorage.calculateLevel1Index({
+//         PublicKeyStorage.calculateLevel1Index({
 //           committeeId: action.committeeId,
 //           keyId: action.keyId,
 //         }),
-//         publicKeyStorage.calculateLevel2Index(Field(i))
+//         PublicKeyStorage.calculateLevel2Index(Field(i))
 //       ),
 //       round1ReduceStorage.getWitness(
 //         contracts[Contract.ROUND1].actionStates[i + 1]
@@ -984,21 +984,21 @@
 //     console.log('DONE!');
 
 //     round1ContributionStorage.updateLeaf(
-//       round1ContributionStorage.calculateLeaf(action.contribution),
-//       round1ContributionStorage.calculateLevel1Index({
+//       Round1ContributionStorage.calculateLeaf(action.contribution),
+//       Round1ContributionStorage.calculateLevel1Index({
 //         committeeId: action.committeeId,
 //         keyId: action.keyId,
 //       }),
-//       round1ContributionStorage.calculateLevel2Index(action.memberId)
+//       Round1ContributionStorage.calculateLevel2Index(action.memberId)
 //     );
 
 //     publicKeyStorage.updateLeaf(
-//       publicKeyStorage.calculateLeaf(action.contribution.C.get(Field(0))),
-//       publicKeyStorage.calculateLevel1Index({
+//       PublicKeyStorage.calculateLeaf(action.contribution.C.get(Field(0))),
+//       PublicKeyStorage.calculateLevel1Index({
 //         committeeId: action.committeeId,
 //         keyId: action.keyId,
 //       }),
-//       publicKeyStorage.calculateLevel2Index(action.memberId)
+//       PublicKeyStorage.calculateLevel2Index(action.memberId)
 //     );
 //   }
 
@@ -1035,7 +1035,7 @@
 //         ),
 //         settingStorage.getWitness(committeeIndex),
 //         keyStatusStorage.getWitness(
-//           keyStatusStorage.calculateLevel1Index({
+//           KeyStatusStorage.calculateLevel1Index({
 //             committeeId: Field(0),
 //             keyId: Field(0),
 //           })
@@ -1067,7 +1067,7 @@
 //     action,
 //     updateKeyProof,
 //     keyStatusStorage.getWitness(
-//       keyStatusStorage.calculateLevel1Index({
+//       KeyStatusStorage.calculateLevel1Index({
 //         committeeId: action.committeeId,
 //         keyId: action.keyId,
 //       })
@@ -1083,7 +1083,7 @@
 //       Field(KeyStatus.ACTIVE),
 //       Field(KeyStatus.DEPRECATED),
 //     ]),
-//     keyStatusStorage.calculateLevel1Index({
+//     KeyStatusStorage.calculateLevel1Index({
 //       committeeId: action.committeeId,
 //       keyId: action.keyId,
 //     })
@@ -1136,8 +1136,8 @@
 //     encryptionProofs.push(encryptionProof);
 
 //     let memberWitness = memberStorage.getWitness(
-//       memberStorage.calculateLevel1Index(committeeIndex),
-//       memberStorage.calculateLevel2Index(Field(i))
+//       MemberStorage.calculateLevel1Index(committeeIndex),
+//       MemberStorage.calculateLevel2Index(Field(i))
 //     );
 
 //     let tx = await Mina.transaction(
@@ -1159,7 +1159,7 @@
 //           ),
 //           memberWitness,
 //           publicKeyStorage.getLevel1Witness(
-//             publicKeyStorage.calculateLevel1Index({
+//             PublicKeyStorage.calculateLevel1Index({
 //               committeeId: committeeIndex,
 //               keyId: Field(0),
 //             })
@@ -1239,13 +1239,13 @@
 //     Field(N),
 //     initialContributionRoot,
 //     reduceStateRoot,
-//     round2ContributionStorage.calculateLevel1Index({
+//     Round2ContributionStorage.calculateLevel1Index({
 //       committeeId: Field(0),
 //       keyId: Field(0),
 //     }),
 //     initialHashArray,
 //     round2ContributionStorage.getLevel1Witness(
-//       round2ContributionStorage.calculateLevel1Index({
+//       Round2ContributionStorage.calculateLevel1Index({
 //         committeeId: committeeIndex,
 //         keyId: Field(0),
 //       })
@@ -1255,7 +1255,7 @@
 //   console.log('DONE!');
 
 //   round2ContributionStorage.updateInternal(
-//     round2ContributionStorage.calculateLevel1Index({
+//     Round2ContributionStorage.calculateLevel1Index({
 //       committeeId: Field(0),
 //       keyId: Field(0),
 //     }),
@@ -1263,7 +1263,7 @@
 //   );
 
 //   encryptionStorage.updateInternal(
-//     encryptionStorage.calculateLevel1Index({
+//     EncryptionStorage.calculateLevel1Index({
 //       committeeId: Field(0),
 //       keyId: Field(0),
 //     }),
@@ -1281,11 +1281,11 @@
 //       }),
 //       finalizeProof2,
 //       round2ContributionStorage.getWitness(
-//         round2ContributionStorage.calculateLevel1Index({
+//         Round2ContributionStorage.calculateLevel1Index({
 //           committeeId: action.committeeId,
 //           keyId: action.keyId,
 //         }),
-//         round2ContributionStorage.calculateLevel2Index(action.memberId)
+//         Round2ContributionStorage.calculateLevel2Index(action.memberId)
 //       ),
 //       round2ReduceStorage.getWitness(
 //         round2ReduceStorage.calculateIndex(
@@ -1297,24 +1297,24 @@
 //     console.log('DONE!');
 
 //     round2ContributionStorage.updateLeaf(
-//       round2ContributionStorage.calculateLeaf(action.contribution),
-//       round2ContributionStorage.calculateLevel1Index({
+//       Round2ContributionStorage.calculateLeaf(action.contribution),
+//       Round2ContributionStorage.calculateLevel1Index({
 //         committeeId: action.committeeId,
 //         keyId: action.keyId,
 //       }),
-//       round2ContributionStorage.calculateLevel2Index(action.memberId)
+//       Round2ContributionStorage.calculateLevel2Index(action.memberId)
 //     );
 
 //     encryptionStorage.updateLeaf(
-//       encryptionStorage.calculateLeaf({
+//       EncryptionStorage.calculateLeaf({
 //         contributions: round2Actions.map((e) => e.contribution),
 //         memberId: action.memberId,
 //       }),
-//       encryptionStorage.calculateLevel1Index({
+//       EncryptionStorage.calculateLevel1Index({
 //         committeeId: action.committeeId,
 //         keyId: action.keyId,
 //       }),
-//       encryptionStorage.calculateLevel2Index(action.memberId)
+//       EncryptionStorage.calculateLevel2Index(action.memberId)
 //     );
 //   }
 
@@ -1336,7 +1336,7 @@
 //       round2Contract.finalize(
 //         finalizeProof2,
 //         encryptionStorage.getLevel1Witness(
-//           encryptionStorage.calculateLevel1Index({
+//           EncryptionStorage.calculateLevel1Index({
 //             committeeId: committeeIndex,
 //             keyId: Field(0),
 //           })
@@ -1353,7 +1353,7 @@
 //         ),
 //         settingStorage.getWitness(committeeIndex),
 //         keyStatusStorage.getWitness(
-//           keyStatusStorage.calculateLevel1Index({
+//           KeyStatusStorage.calculateLevel1Index({
 //             committeeId: Field(0),
 //             keyId: Field(0),
 //           })
@@ -1384,7 +1384,7 @@
 //     action,
 //     updateKeyProof,
 //     keyStatusStorage.getWitness(
-//       keyStatusStorage.calculateLevel1Index({
+//       KeyStatusStorage.calculateLevel1Index({
 //         committeeId: action.committeeId,
 //         keyId: action.keyId,
 //       })
@@ -1400,7 +1400,7 @@
 //       Field(KeyStatus.ACTIVE),
 //       Field(KeyStatus.DEPRECATED),
 //     ]),
-//     keyStatusStorage.calculateLevel1Index({
+//     KeyStatusStorage.calculateLevel1Index({
 //       committeeId: action.committeeId,
 //       keyId: action.keyId,
 //     })
@@ -1480,8 +1480,8 @@
 //     decryptionProofs.push(decryptionProof);
 
 //     let memberWitness = memberStorage.getWitness(
-//       memberStorage.calculateLevel1Index(committeeIndex),
-//       memberStorage.calculateLevel2Index(Field(memberId))
+//       MemberStorage.calculateLevel1Index(committeeIndex),
+//       MemberStorage.calculateLevel2Index(Field(memberId))
 //     );
 
 //     let tx = await Mina.transaction(
@@ -1511,18 +1511,18 @@
 //           ),
 //           memberWitness,
 //           publicKeyStorage.getWitness(
-//             publicKeyStorage.calculateLevel1Index({
+//             PublicKeyStorage.calculateLevel1Index({
 //               committeeId: action.committeeId,
 //               keyId: action.keyId,
 //             }),
-//             publicKeyStorage.calculateLevel2Index(action.memberId)
+//             PublicKeyStorage.calculateLevel2Index(action.memberId)
 //           ),
 //           encryptionStorage.getWitness(
-//             encryptionStorage.calculateLevel1Index({
+//             EncryptionStorage.calculateLevel1Index({
 //               committeeId: action.committeeId,
 //               keyId: action.keyId,
 //             }),
-//             encryptionStorage.calculateLevel2Index(action.memberId)
+//             EncryptionStorage.calculateLevel2Index(action.memberId)
 //           )
 //         );
 //       }
@@ -1605,14 +1605,14 @@
 //     Field(mockResult.length),
 //     packIndexArray(responsedMembers),
 //     responseContributionStorage.getLevel1Witness(
-//       responseContributionStorage.calculateLevel1Index(requestId)
+//       ResponseContributionStorage.calculateLevel1Index(requestId)
 //     )
 //   );
 //   if (profiling) DKGProfiler.stop();
 //   console.log('DONE!');
 
 //   responseContributionStorage.updateInternal(
-//     responseContributionStorage.calculateLevel1Index(requestId),
+//     ResponseContributionStorage.calculateLevel1Index(requestId),
 //     DKG_LEVEL_2_TREE()
 //   );
 
@@ -1628,8 +1628,8 @@
 //       }),
 //       completeProof,
 //       responseContributionStorage.getWitness(
-//         responseContributionStorage.calculateLevel1Index(requestId),
-//         responseContributionStorage.calculateLevel2Index(action.memberId)
+//         ResponseContributionStorage.calculateLevel1Index(requestId),
+//         ResponseContributionStorage.calculateLevel2Index(action.memberId)
 //       ),
 //       responseReduceStorage.getWitness(
 //         responseReduceStorage.calculateIndex(
@@ -1641,9 +1641,9 @@
 //     console.log('DONE!');
 
 //     responseContributionStorage.updateLeaf(
-//       responseContributionStorage.calculateLeaf(action.contribution),
-//       responseContributionStorage.calculateLevel1Index(requestId),
-//       responseContributionStorage.calculateLevel2Index(action.memberId)
+//       ResponseContributionStorage.calculateLeaf(action.contribution),
+//       ResponseContributionStorage.calculateLevel1Index(requestId),
+//       ResponseContributionStorage.calculateLevel2Index(action.memberId)
 //     );
 //   }
 
@@ -1669,7 +1669,7 @@
 //         ),
 //         settingStorage.getWitness(committeeIndex),
 //         keyStatusStorage.getWitness(
-//           keyStatusStorage.calculateLevel1Index({
+//           KeyStatusStorage.calculateLevel1Index({
 //             committeeId: Field(0),
 //             keyId: Field(0),
 //           })

@@ -72,16 +72,20 @@ async function main() {
     memberStorage.updateInternal(Field(committee.committeeId), level2Tree);
 
     settingStorage.updateLeaf(
-      settingStorage.calculateLeaf({
+      {
+        level1Index: SettingStorage.calculateLevel1Index(
+          Field(committee.committeeId)
+        ),
+      },
+      SettingStorage.calculateLeaf({
         T: Field(committee.threshold),
         N: Field(committee.numberOfMembers),
-      }),
-      Field(committee.committeeId)
+      })
     );
   });
 
-  Provable.log(memberStorage.level1.getRoot());
-  Provable.log(settingStorage.level1.getRoot());
+  Provable.log(memberStorage.root);
+  Provable.log(settingStorage.root);
 
   // const rawActions = await fetchActions(
   //   // publicKey

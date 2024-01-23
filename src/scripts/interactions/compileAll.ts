@@ -28,6 +28,7 @@ import { CreateRequest, RequestContract } from '../../contracts/Request.js';
 
 async function main() {
   const cache = Cache.FileSystem('./caches');
+  // const cache = "";
   await compile(CreateCommittee, cache);
 
   await compile(UpdateKey, cache);

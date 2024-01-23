@@ -41,6 +41,7 @@ import {
   ZkAppEnum,
 } from '../constants.js';
 import {
+  ActionStatus,
   EMPTY_ADDRESS_MT,
   EMPTY_REDUCE_MT,
   ReduceWitness,
@@ -49,11 +50,6 @@ import {
 
 export enum EventEnum {
   CONTRIBUTIONS_REDUCED = 'contributions-reduced',
-}
-
-export enum ActionStatus {
-  NOT_EXISTED,
-  REDUCED,
 }
 
 export class Action extends Struct({

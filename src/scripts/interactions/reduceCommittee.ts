@@ -1,4 +1,3 @@
-
 // import fs from 'fs';
 // import { Cache, Field, Mina, Provable, PublicKey, Reducer } from 'o1js';
 // import { Config, JSONKey, Key } from '../helper/config.js';
@@ -139,7 +138,7 @@
 
 //     memberStorage.updateInternal(Field(0), level2Tree);
 //     settingStorage.updateLeaf(
-//       settingStorage.calculateLeaf({
+//       SettingStorage.calculateLeaf({
 //         T: action.threshold,
 //         N: action.addresses.length,
 //       }),

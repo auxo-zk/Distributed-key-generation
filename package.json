@@ -14,6 +14,7 @@
   "types": "./build/esm/src/index.d.ts",
   "scripts": {
     "build": "tsc --build tsconfig.json tsconfig.cjs.json tsconfig.types.json && ./fix-export.sh",
+    "build:no-scripts": "tsc --build tsconfig.noscripts.json",
     "scripts": "tsc --build tsconfig.json tsconfig.cjs.json tsconfig.types.json && ./fix-export.sh && node",
     "buildw": "tsc --watch",
     "coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",

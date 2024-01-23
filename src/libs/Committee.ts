@@ -1,4 +1,4 @@
-import { Field, Group, Poseidon, Provable, Scalar, Struct } from 'o1js';
+import { Field, Group, Poseidon, Scalar, Struct } from 'o1js';
 import {
   Bit255,
   Bit255DynamicArray,
@@ -217,23 +217,19 @@ export function getLagrangeCoefficient(memberIds: number[]): Scalar[] {
   return lagrangeCoefficient;
 }
 
-export function getResultVector(
+export function accumulateResponses(
   memberIds: number[],
-  D: Group[][],
-  M: Group[]
+  D: Group[][]
 ): Group[] {
   let lagrangeCoefficient = getLagrangeCoefficient(memberIds);
   let threshold = memberIds.length;
-  let sumD = Array<Group>(M.length);
+  let sumD = Array<Group>(D[0].length);
   sumD.fill(Group.zero);
   for (let i = 0; i < threshold; i++) {
     for (let j = 0; j < sumD.length; j++) {
-      sumD[j] = sumD[j].add(D[i][j].scale(lagrangeCoefficient[i]));
+      if (!D[i][j].isZero().toBoolean())
+        sumD[j] = sumD[j].add(D[i][j].scale(lagrangeCoefficient[i]));
     }
   }
-  let result = Array<Group>(M.length);
-  for (let i = 0; i < result.length; i++) {
-    result[i] = M[i].sub(sumD[i]);
-  }
-  return result;
+  return sumD;
 }

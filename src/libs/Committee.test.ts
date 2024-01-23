@@ -12,6 +12,7 @@ import {
 import * as Committee from './Committee.js';
 import * as Requestor from './Requestor.js';
 import { Bit255 } from '@auxo-dev/auxo-libs';
+import { FUNDING_UNIT } from '../constants.js';
 
 describe('Committee', () => {
   let T = 1;
@@ -30,15 +31,17 @@ describe('Committee', () => {
   let publicKey: Group;
   let R: Group[][] = [];
   let M: Group[][] = [];
+  let D: Group[][] = [];
   let sumR: Group[] = [];
   let sumM: Group[] = [];
-  let D: Group[][] = [];
+  let sumD: Group[] = [];
   let responsedMembers = [1];
   const plainVectors = [
-    [1000n, 1000n, 1000n],
-    [4000n, 3000n, 2000n],
+    [10000n, 10000n, 10000n].map((e) => e * BigInt(FUNDING_UNIT)),
+    [40000n, 30000n, 20000n].map((e) => e * BigInt(FUNDING_UNIT)),
   ];
-  let result = [5000n, 4000n, 3000n];
+  let result = [50000n, 40000n, 30000n].map((e) => e * BigInt(FUNDING_UNIT));
+  let resultVector: Group[];
 
   beforeAll(async () => {
     for (let i = 0; i < N; i++) {
@@ -120,11 +123,20 @@ describe('Committee', () => {
   });
 
   it('Should calculate result vector', async () => {
-    let resultVector = Committee.getResultVector(responsedMembers, D, sumM);
+    sumD = Committee.accumulateResponses(responsedMembers, D);
+    resultVector = Requestor.getResultVector(sumD, sumM);
+
     for (let i = 0; i < result.length; i++) {
       let point = Group.generator.scale(Scalar.from(result[i]));
       expect(resultVector[i].x).toEqual(point.x);
       expect(resultVector[i].y).toEqual(point.y);
+    }
+  });
+
+  it('Should brute force raw result correctly', async () => {
+    let rawResult = Requestor.bruteForceResultVector(resultVector);
+    for (let i = 0; i < result.length; i++) {
+      expect(rawResult[i].toBigInt()).toEqual(result[i]);
     }
   });
 

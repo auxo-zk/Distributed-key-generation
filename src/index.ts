@@ -58,9 +58,6 @@ export {
 } from './contracts/Encryption.js';
 
 export {
-  // Constants & Enums
-  ActionStatus as Round1ActionStatus,
-
   // Structs
   ReduceOutput as ReduceRound1Output,
   Round1Input as FinalizeRound1Input,
@@ -81,9 +78,6 @@ export {
 } from './contracts/Round1.js';
 
 export {
-  // Constants & Enums
-  ActionStatus as Round2ActionStatus,
-
   // Structs
   ReduceOutput as ReduceRound2Output,
   Round2Input as FinalizeRound2Input,
@@ -153,9 +147,6 @@ export {
 } from './contracts/RequestHelper.js';
 
 export {
-  // Constants & Enums
-  ActionStatus as ResponseActionStatus,
-
   // Structs
   ReduceOutput as ReduceResponseOutput,
   ResponseInput as CompleteResponseInput,
@@ -186,7 +177,12 @@ export {
   getRound1Contribution,
   getRound2Contribution,
   getResponseContribution,
-  getResultVector,
+  accumulateResponses,
 } from './libs/Committee.js';
 
-export { generateEncryption, accumulateEncryption } from './libs/Requestor.js';
+export {
+  generateEncryption,
+  accumulateEncryption,
+  getResultVector,
+  bruteForceResultVector,
+} from './libs/Requestor.js';

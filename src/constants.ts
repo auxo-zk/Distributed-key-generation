@@ -1,4 +1,14 @@
 /**
+ * The unit value for the funding amount
+ */
+export const FUNDING_UNIT = 1e7;
+
+/**
+ * The maximum value for the funding amount
+ */
+export const FUNDING_MAX = 1e12;
+
+/**
  * Maximum amount of zkApp address in storage
  */
 export const ADDRESS_MAX_SIZE = 8;

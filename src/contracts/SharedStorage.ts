@@ -23,10 +23,34 @@ export class ZkAppRef extends Struct({
 }) {}
 
 export class AddressStorage {
-  addresses: AddressMT;
+  private _addressMap: AddressMT;
+  private _addresses: {
+    [key: string]: { raw: PublicKey | undefined; leaf: Field };
+  };
 
-  constructor(addresses?: AddressMT) {
-    this.addresses = addresses || EMPTY_ADDRESS_MT();
+  constructor(
+    addressMap?: AddressMT,
+    addresses?: { index: ZkAppEnum | number; address: PublicKey }[]
+  ) {
+    this._addressMap = addressMap || EMPTY_ADDRESS_MT();
+    if (addresses) {
+      for (let i = 0; i < addresses.length; i++) {
+        this.updateAddress(
+          AddressStorage.calculateIndex(addresses[i].index),
+          addresses[i].address
+        );
+      }
+    }
+  }
+
+  get root(): Field {
+    return this._addressMap.getRoot();
+  }
+
+  get addresses(): {
+    [key: string]: { raw: PublicKey | undefined; leaf: Field };
+  } {
+    return this._addresses;
   }
 
   static calculateLeaf(address: PublicKey): Field {
@@ -46,11 +70,35 @@ export class AddressStorage {
   }
 
   getWitness(index: Field): AddressWitness {
-    return new AddressWitness(this.addresses.getWitness(index.toBigInt()));
+    return new AddressWitness(this._addressMap.getWitness(index.toBigInt()));
+  }
+
+  getAddresses(): (PublicKey | undefined)[] {
+    return Object.values(this._addressMap);
   }
 
   updateLeaf(index: Field, leaf: Field): void {
-    this.addresses.setLeaf(index.toBigInt(), leaf);
+    this._addressMap.setLeaf(index.toBigInt(), leaf);
+    this._addresses[index.toString()] = {
+      raw: undefined,
+      leaf: leaf,
+    };
+  }
+
+  updateAddress(index: Field, address: PublicKey) {
+    let leaf = this.calculateLeaf(address);
+    this._addressMap.setLeaf(index.toBigInt(), leaf);
+    this._addresses[index.toString()] = {
+      raw: address,
+      leaf: leaf,
+    };
+  }
+
+  getZkAppRef(index: ZkAppEnum | number, address: PublicKey) {
+    return new ZkAppRef({
+      address: address,
+      witness: this.getWitness(this.calculateIndex(index)),
+    });
   }
 }
 
@@ -62,7 +110,7 @@ export function getZkAppRef(
   return new ZkAppRef({
     address: address,
     witness: new AddressWitness(
-      map.getWitness(new AddressStorage().calculateIndex(index).toBigInt())
+      map.getWitness(AddressStorage.calculateIndex(index).toBigInt())
     ),
   });
 }
@@ -73,10 +121,30 @@ export const enum ActionStatus {
 }
 
 export class ReduceStorage {
-  actions: MerkleMap;
+  private _actionMap: MerkleMap;
+  private _actions: { [key: string]: Field };
 
-  constructor(actions?: MerkleMap) {
-    this.actions = actions || EMPTY_REDUCE_MT();
+  constructor(
+    actionMap?: MerkleMap,
+    actions?: { actionState: Field; status: ActionStatus }[]
+  ) {
+    this._actionMap = actionMap || EMPTY_REDUCE_MT();
+    if (actions) {
+      for (let i = 0; i < actions.length; i++) {
+        this.updateLeaf(
+          actions[i].actionState,
+          ReduceStorage.calculateLeaf(actions[i].status)
+        );
+      }
+    }
+  }
+
+  get root(): Field {
+    return this._actionMap.getRoot();
+  }
+
+  get actions(): { [key: string]: Field } {
+    return this._actions;
   }
 
   static calculateLeaf(status: ActionStatus): Field {
@@ -96,10 +164,11 @@ export class ReduceStorage {
   }
 
   getWitness(index: Field): MerkleMapWitness {
-    return this.actions.getWitness(index);
+    return this._actionMap.getWitness(index);
   }
 
   updateLeaf(index: Field, leaf: Field): void {
-    this.actions.set(index, leaf);
+    this._actionMap.set(index, leaf);
+    this._actions[index.toString()] = leaf;
   }
 }

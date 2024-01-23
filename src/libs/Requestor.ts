@@ -1,6 +1,6 @@
 import { Group, Scalar } from 'o1js';
 import { GroupDynamicArray, ScalarDynamicArray } from '@auxo-dev/auxo-libs';
-import { REQUEST_MAX_SIZE } from '../constants.js';
+import { FUNDING_MAX, FUNDING_UNIT, REQUEST_MAX_SIZE } from '../constants.js';
 
 export class MArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class RArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
@@ -83,4 +83,39 @@ export function accumulateEncryption(
     }
   }
   return { sumR, sumM };
+}
+
+export function getResultVector(D: Group[], M: Group[]): Group[] {
+  let result = Array<Group>(M.length);
+  for (let i = 0; i < result.length; i++) {
+    result[i] = M[i].sub(D[i]);
+  }
+  return result;
+}
+
+export function bruteForceResultVector(resultVector: Group[]): Scalar[] {
+  let dimension = resultVector.length;
+  let rawResult = [...Array(dimension).keys()].map(() => Scalar.from(0));
+  let coefficient = [...Array(dimension).keys()].map(() => BigInt(0));
+
+  [...Array(dimension).keys()].map((i) => {
+    let found = false;
+    let targetPoint = resultVector[i];
+    while (!found) {
+      let testingValue = Scalar.from(coefficient[i] * BigInt(FUNDING_UNIT));
+      found = targetPoint
+        .sub(Group.generator.scale(testingValue))
+        .equals(Group.zero)
+        .toBoolean();
+
+      if (found) rawResult[i] = testingValue;
+      else {
+        coefficient[i] += BigInt(1);
+        if (testingValue.toBigInt() == BigInt(FUNDING_MAX))
+          throw new Error('No valid value found!');
+      }
+    }
+  });
+
+  return rawResult;
 }

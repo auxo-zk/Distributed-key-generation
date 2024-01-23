@@ -19,7 +19,7 @@ import axios from 'axios';
 
 async function main() {
   const { cache, feePayer } = await prepare();
-  const committeeId = Field(0);
+  const committeeId = Field(3);
   const keyId = Field(0);
 
   // Compile programs
@@ -42,11 +42,6 @@ async function main() {
   // Create request value
   let publicKey: Group = PublicKey.fromBase58(key.publicKey).toGroup();
   let MINA = BigInt(1e7); // 0.01 MINA
-  // let random: Scalar[] = [
-  //   Scalar.from(100n),
-  //   Scalar.from(200n),
-  //   Scalar.from(300n),
-  // ];
 
   let investInputs = [
     [MINA, 2n * MINA, 3n * MINA],

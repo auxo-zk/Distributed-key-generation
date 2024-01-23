@@ -43,6 +43,7 @@ import {
   ZkAppEnum,
 } from '../constants.js';
 import {
+  ActionStatus,
   EMPTY_ADDRESS_MT,
   EMPTY_REDUCE_MT,
   ReduceWitness,
@@ -52,11 +53,6 @@ import { DArray, RArray } from '../libs/Requestor.js';
 
 export enum EventEnum {
   CONTRIBUTIONS_REDUCED = 'contributions-reduced',
-}
-
-export enum ActionStatus {
-  NOT_EXISTED,
-  REDUCED,
 }
 
 export class Action extends Struct({
@@ -492,7 +488,7 @@ export class ResponseContract extends SmartContract {
           encryptionWitness.level2.calculateRoot(encryptionHashChain)
         )
       );
-    keyId.assertEquals(encryptionWitness.level1.calculateIndex());
+    keyIndex.assertEquals(encryptionWitness.level1.calculateIndex());
     memberId.assertEquals(encryptionWitness.level2.calculateIndex());
 
     // Compute response

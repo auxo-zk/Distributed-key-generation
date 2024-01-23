@@ -1,26 +1,13 @@
-import fs from 'fs';
-import {
-  Cache,
-  Field,
-  Mina,
-  PrivateKey,
-  Provable,
-  PublicKey,
-  Reducer,
-  fetchAccount,
-} from 'o1js';
-import { Config, JSONKey, Key } from '../../helper/config.js';
-import { ContractList, compile, wait } from '../../helper/deploy.js';
-import { fetchActions, fetchZkAppState } from '../../helper/deploy.js';
+import { Field, Provable, PublicKey } from 'o1js';
+import { compile } from '../../helper/deploy.js';
+import { fetchZkAppState } from '../../helper/deploy.js';
 import {
   CheckMemberInput,
-  CommitteeAction,
   CommitteeContract,
   CreateCommittee,
 } from '../../../contracts/Committee.js';
 import axios from 'axios';
 import { MemberArray } from '../../../libs/Committee.js';
-import { IPFSHash } from '@auxo-dev/auxo-libs';
 import {
   EMPTY_LEVEL_2_TREE,
   FullMTWitness,
@@ -29,7 +16,6 @@ import {
   MemberStorage,
   SettingStorage,
 } from '../../../contracts/CommitteeStorage.js';
-import { COMMITTEE_MAX_SIZE } from '../../../constants.js';
 import { prepare } from '../prepare.js';
 
 async function main() {
@@ -72,41 +58,20 @@ async function main() {
     memberStorage.updateInternal(Field(committee.committeeId), level2Tree);
 
     settingStorage.updateLeaf(
-      settingStorage.calculateLeaf({
+      {
+        level1Index: SettingStorage.calculateLevel1Index(
+          Field(committee.committeeId)
+        ),
+      },
+      SettingStorage.calculateLeaf({
         T: Field(committee.threshold),
         N: Field(committee.numberOfMembers),
-      }),
-      Field(committee.committeeId)
+      })
     );
   });
 
-  Provable.log(memberStorage.level1.getRoot());
-  Provable.log(settingStorage.level1.getRoot());
-
-  // const rawActions = await fetchActions(
-  //   // publicKey
-  //   committeeAddress,
-  //   // fromState
-  //   Field(
-  //     25079927036070901246064867767436987657692091363973573142121686150614948079097n
-  //   ),
-  //   // toState
-  //   Field(
-  //     1972653782998565751193839543112576956152658311032796175197111159970957407940n
-  //   )
-  // );
-
-  // // Provable.log('Actions:', actions);
-  // const actions: CommitteeAction[] = rawActions.map((e) => {
-  //   let action: Field[] = e.actions[0].map((e) => Field(e));
-  //   return new CommitteeAction({
-  //     addresses: MemberArray.fromFields(
-  //       action.slice(0, COMMITTEE_MAX_SIZE * 2 + 1)
-  //     ),
-  //     threshold: Field(action[COMMITTEE_MAX_SIZE * 2 + 1]),
-  //     ipfsHash: IPFSHash.fromFields(action.slice(COMMITTEE_MAX_SIZE * 2 + 2)),
-  //   });
-  // });
+  Provable.log(memberStorage.root);
+  Provable.log(settingStorage.root);
 
   console.log('committeeContract.checkMember: ');
   const committeeId = Field(3);
@@ -157,11 +122,11 @@ async function main() {
         ],
         isLeft: [true, true],
       }).calculateRoot(
-        memberStorage.calculateLeaf(
-          PublicKey.fromBase58(
+        MemberStorage.calculateLeaf({
+          publicKey: PublicKey.fromBase58(
             'B62qomDwU81ESmFrQDMRtXHgTeof3yXH8rgBzzNqdogevZSFK8VVdgB'
-          )
-        )
+          ),
+        })
       )
     )
   );
