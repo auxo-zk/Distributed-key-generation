@@ -47,6 +47,10 @@ export class AddressStorage {
         return this._addressMap.getRoot();
     }
 
+    get addressMap(): AddressMT {
+        return this._addressMap;
+    }
+
     get addresses(): {
         [key: string]: { raw: PublicKey | undefined; leaf: Field };
     } {
@@ -137,6 +141,10 @@ export class ReduceStorage {
 
     get root(): Field {
         return this._actionMap.getRoot();
+    }
+
+    get actionMap(): MerkleMap {
+        return this._actionMap;
     }
 
     get actions(): { [key: string]: Field } {
