@@ -68,6 +68,14 @@ export abstract class DKGStorage<RawLeaf> {
         return this._level1.getRoot();
     }
 
+    get level1(): Level1MT {
+        return this._level1;
+    }
+
+    get level2s(): { [key: string]: Level2MT } {
+        return this._level2s;
+    }
+
     get leafs(): { [key: string]: { raw: RawLeaf | undefined; leaf: Field } } {
         return this._leafs;
     }
