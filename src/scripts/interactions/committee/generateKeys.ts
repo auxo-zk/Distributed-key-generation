@@ -62,26 +62,33 @@ async function main() {
 
     committees.map((committee: any) => {
         console.log(committee);
-        let level2Tree = EMPTY_LEVEL_2_TREE();
-        for (let i = 0; i < committee.numberOfMembers; i++) {
-            level2Tree.setLeaf(
-                BigInt(i),
-                MemberArray.hash(PublicKey.fromBase58(committee.publicKeys[i]))
+        if (Boolean(committee.active)) {
+            let level2Tree = EMPTY_LEVEL_2_TREE();
+            for (let i = 0; i < committee.numberOfMembers; i++) {
+                level2Tree.setLeaf(
+                    BigInt(i),
+                    MemberArray.hash(
+                        PublicKey.fromBase58(committee.publicKeys[i])
+                    )
+                );
+            }
+            memberStorage.updateInternal(
+                Field(committee.committeeId),
+                level2Tree
+            );
+
+            settingStorage.updateLeaf(
+                {
+                    level1Index: SettingStorage.calculateLevel1Index(
+                        Field(committee.committeeId)
+                    ),
+                },
+                SettingStorage.calculateLeaf({
+                    T: Field(committee.threshold),
+                    N: Field(committee.numberOfMembers),
+                })
             );
         }
-        memberStorage.updateInternal(Field(committee.committeeId), level2Tree);
-
-        settingStorage.updateLeaf(
-            {
-                level1Index: SettingStorage.calculateLevel1Index(
-                    Field(committee.committeeId)
-                ),
-            },
-            SettingStorage.calculateLeaf({
-                T: Field(committee.threshold),
-                N: Field(committee.numberOfMembers),
-            })
-        );
     });
 
     Provable.log(memberStorage.root);
