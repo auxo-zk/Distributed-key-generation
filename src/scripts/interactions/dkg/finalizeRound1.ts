@@ -120,27 +120,27 @@ async function main() {
                     Round1ContributionStorage.calculateLevel2Index(
                         Field(key.round1s[i].memberId)
                     ).toBigInt(),
-                    Round1ContributionStorage.calculateLeaf({
-                        contribution: new Round1Contribution({
+                    Round1ContributionStorage.calculateLeaf(
+                        new Round1Contribution({
                             C: new CArray(
                                 key.round1s[i].contribution.map(
                                     (group: any) =>
                                         new Group({ x: group.x, y: group.y })
                                 )
                             ),
-                        }),
-                    })
+                        })
+                    )
                 );
                 publicKeyLevel2Tree.setLeaf(
                     PublicKeyStorage.calculateLevel2Index(
                         Field(key.round1s[i].memberId)
                     ).toBigInt(),
-                    PublicKeyStorage.calculateLeaf({
-                        C0: new Group({
+                    PublicKeyStorage.calculateLeaf(
+                        new Group({
                             x: key.round1s[i].contribution[0].x,
                             y: key.round1s[i].contribution[0].y,
-                        }),
-                    })
+                        })
+                    )
                 );
             }
             contributionStorage.updateInternal(
@@ -298,9 +298,7 @@ async function main() {
                     action.memberId
                 ),
             },
-            Round1ContributionStorage.calculateLeaf({
-                contribution: action.contribution,
-            })
+            Round1ContributionStorage.calculateLeaf(action.contribution)
         );
 
         publicKeyStorage.updateLeaf(
@@ -313,9 +311,7 @@ async function main() {
                     action.memberId
                 ),
             },
-            PublicKeyStorage.calculateLeaf({
-                C0: action.contribution.C.get(Field(0)),
-            })
+            PublicKeyStorage.calculateLeaf(action.contribution.C.get(Field(0)))
         );
     }
 

@@ -102,14 +102,6 @@ export abstract class RequestStorage<RawLeaf> {
         }
     }
 
-    getLeafs(): Field[] {
-        return Object.values(this.leafs).map((e) => e.leaf);
-    }
-
-    getRawLeafs(): (RawLeaf | undefined)[] {
-        return Object.values(this.leafs).map((e) => e.raw);
-    }
-
     updateInternal(level1Index: Field, level2: Level2MT) {
         Object.assign(this._level2s, {
             [level1Index.toString()]: level2,
@@ -165,17 +157,15 @@ export abstract class RequestStorage<RawLeaf> {
     }
 }
 
-export type RequestStatusLeaf = {
-    status: Field;
-};
+export type RequestStatusLeaf = Field;
 
 export class RequestStatusStorage extends RequestStorage<RequestStatusLeaf> {
-    static calculateLeaf(rawLeaf: RequestStatusLeaf): Field {
-        return Field(rawLeaf.status);
+    static calculateLeaf(status: RequestStatusLeaf): Field {
+        return Field(status);
     }
 
-    calculateLeaf(rawLeaf: RequestStatusLeaf): Field {
-        return RequestStatusStorage.calculateLeaf(rawLeaf);
+    calculateLeaf(status: RequestStatusLeaf): Field {
+        return RequestStatusStorage.calculateLeaf(status);
     }
 
     static calculateLevel1Index(requestId: Field): Field {
@@ -202,17 +192,15 @@ export class RequestStatusStorage extends RequestStorage<RequestStatusLeaf> {
     }
 }
 
-export type RequesterLeaf = {
-    address: PublicKey;
-};
+export type RequesterLeaf = PublicKey;
 
 export class RequesterStorage extends RequestStorage<RequesterLeaf> {
-    static calculateLeaf(rawLeaf: RequesterLeaf): Field {
-        return Poseidon.hash(rawLeaf.address.toFields());
+    static calculateLeaf(address: RequesterLeaf): Field {
+        return Poseidon.hash(address.toFields());
     }
 
-    calculateLeaf(rawLeaf: RequesterLeaf): Field {
-        return RequesterStorage.calculateLeaf(rawLeaf);
+    calculateLeaf(address: RequesterLeaf): Field {
+        return RequesterStorage.calculateLeaf(address);
     }
 
     static calculateLevel1Index(requestId: Field): Field {
@@ -239,17 +227,15 @@ export class RequesterStorage extends RequestStorage<RequesterLeaf> {
     }
 }
 
-export type ResponseContributionLeaf = {
-    contribution: ResponseContribution;
-};
+export type ResponseContributionLeaf = ResponseContribution;
 
 export class ResponseContributionStorage extends RequestStorage<ResponseContributionLeaf> {
-    static calculateLeaf(rawLeaf: ResponseContributionLeaf): Field {
-        return rawLeaf.contribution.hash();
+    static calculateLeaf(contribution: ResponseContributionLeaf): Field {
+        return contribution.hash();
     }
 
-    calculateLeaf(rawLeaf: ResponseContributionLeaf): Field {
-        return ResponseContributionStorage.calculateLeaf(rawLeaf);
+    calculateLeaf(contribution: ResponseContributionLeaf): Field {
+        return ResponseContributionStorage.calculateLeaf(contribution);
     }
 
     static calculateLevel1Index(requestId: Field): Field {

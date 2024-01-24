@@ -103,14 +103,6 @@ export abstract class CommitteeStrorage<RawLeaf> {
         }
     }
 
-    getLeafs(): Field[] {
-        return Object.values(this.leafs).map((e) => e.leaf);
-    }
-
-    getRawLeafs(): (RawLeaf | undefined)[] {
-        return Object.values(this.leafs).map((e) => e.raw);
-    }
-
     updateInternal(level1Index: Field, level2: Level2MT) {
         Object.assign(this._level2s, {
             [level1Index.toString()]: level2,
@@ -166,9 +158,7 @@ export abstract class CommitteeStrorage<RawLeaf> {
     }
 }
 
-export type MemberLeaf = {
-    publicKey: PublicKey;
-};
+export type MemberLeaf = PublicKey;
 
 // export class MemberStorage extends GenericStorage<
 //   MemberLeaf,
@@ -179,12 +169,12 @@ export type MemberLeaf = {
 // >
 
 export class MemberStorage extends CommitteeStrorage<MemberLeaf> {
-    static calculateLeaf(rawLeaf: MemberLeaf): Field {
-        return Poseidon.hash(rawLeaf.publicKey.toFields());
+    static calculateLeaf(publicKey: MemberLeaf): Field {
+        return Poseidon.hash(publicKey.toFields());
     }
 
-    calculateLeaf(rawLeaf: MemberLeaf): Field {
-        return MemberStorage.calculateLeaf(rawLeaf);
+    calculateLeaf(publicKey: MemberLeaf): Field {
+        return MemberStorage.calculateLeaf(publicKey);
     }
 
     static calculateLevel1Index(committeeId: Field): Field {
@@ -266,17 +256,15 @@ export class SettingStorage extends CommitteeStrorage<SettingLeaf> {
     }
 }
 
-export type KeyCounterLeaf = {
-    nextKeyId: Field;
-};
+export type KeyCounterLeaf = Field;
 
 export class KeyCounterStorage extends CommitteeStrorage<KeyCounterLeaf> {
-    static calculateLeaf(rawLeaf: KeyCounterLeaf): Field {
-        return rawLeaf.nextKeyId;
+    static calculateLeaf(nextKeyId: KeyCounterLeaf): Field {
+        return nextKeyId;
     }
 
-    calculateLeaf(rawLeaf: KeyCounterLeaf): Field {
-        return KeyCounterStorage.calculateLeaf(rawLeaf);
+    calculateLeaf(nextKeyId: KeyCounterLeaf): Field {
+        return KeyCounterStorage.calculateLeaf(nextKeyId);
     }
 
     static calculateLevel1Index(committeeId: Field): Field {

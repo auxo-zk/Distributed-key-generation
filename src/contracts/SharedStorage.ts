@@ -75,10 +75,6 @@ export class AddressStorage {
         );
     }
 
-    getAddresses(): (PublicKey | undefined)[] {
-        return Object.values(this._addressMap);
-    }
-
     updateLeaf(index: Field, leaf: Field): void {
         this._addressMap.setLeaf(index.toBigInt(), leaf);
         this._addresses[index.toString()] = {

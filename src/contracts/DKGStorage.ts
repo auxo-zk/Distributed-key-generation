@@ -105,14 +105,6 @@ export abstract class DKGStorage<RawLeaf> {
         }
     }
 
-    getLeafs(): Field[] {
-        return Object.values(this.leafs).map((e) => e.leaf);
-    }
-
-    getRawLeafs(): (RawLeaf | undefined)[] {
-        return Object.values(this.leafs).map((e) => e.raw);
-    }
-
     updateInternal(level1Index: Field, level2: Level2MT) {
         Object.assign(this._level2s, {
             [level1Index.toString()]: level2,
@@ -168,17 +160,15 @@ export abstract class DKGStorage<RawLeaf> {
     }
 }
 
-export type KeyStatusLeaf = {
-    status: KeyStatus;
-};
+export type KeyStatusLeaf = KeyStatus;
 
 export class KeyStatusStorage extends DKGStorage<KeyStatusLeaf> {
-    static calculateLeaf(rawLeaf: KeyStatusLeaf): Field {
-        return Field(rawLeaf.status);
+    static calculateLeaf(status: KeyStatusLeaf): Field {
+        return Field(status);
     }
 
-    calculateLeaf(rawLeaf: KeyStatusLeaf): Field {
-        return KeyStatusStorage.calculateLeaf(rawLeaf);
+    calculateLeaf(status: KeyStatusLeaf): Field {
+        return KeyStatusStorage.calculateLeaf(status);
     }
 
     static calculateLevel1Index({
@@ -223,17 +213,15 @@ export class KeyStatusStorage extends DKGStorage<KeyStatusLeaf> {
     }
 }
 
-export type Round1ContributionLeaf = {
-    contribution: Round1Contribution;
-};
+export type Round1ContributionLeaf = Round1Contribution;
 
 export class Round1ContributionStorage extends DKGStorage<Round1ContributionLeaf> {
-    static calculateLeaf(rawLeaf: Round1ContributionLeaf): Field {
-        return rawLeaf.contribution.hash();
+    static calculateLeaf(contribution: Round1ContributionLeaf): Field {
+        return contribution.hash();
     }
 
-    calculateLeaf(rawLeaf: Round1ContributionLeaf): Field {
-        return Round1ContributionStorage.calculateLeaf(rawLeaf);
+    calculateLeaf(contribution: Round1ContributionLeaf): Field {
+        return Round1ContributionStorage.calculateLeaf(contribution);
     }
 
     static calculateLevel1Index({
@@ -295,17 +283,15 @@ export class Round1ContributionStorage extends DKGStorage<Round1ContributionLeaf
     }
 }
 
-export type PublicKeyLeaf = {
-    C0: Group;
-};
+export type PublicKeyLeaf = Group;
 
 export class PublicKeyStorage extends DKGStorage<PublicKeyLeaf> {
-    static calculateLeaf(rawLeaf: PublicKeyLeaf): Field {
-        return Poseidon.hash(rawLeaf.C0.toFields());
+    static calculateLeaf(C0: PublicKeyLeaf): Field {
+        return Poseidon.hash(C0.toFields());
     }
 
-    calculateLeaf(rawLeaf: PublicKeyLeaf): Field {
-        return PublicKeyStorage.calculateLeaf(rawLeaf);
+    calculateLeaf(C0: PublicKeyLeaf): Field {
+        return PublicKeyStorage.calculateLeaf(C0);
     }
 
     static calculateLevel1Index({
@@ -367,17 +353,15 @@ export class PublicKeyStorage extends DKGStorage<PublicKeyLeaf> {
     }
 }
 
-export type Round2ContributionLeaf = {
-    contribution: Round2Contribution;
-};
+export type Round2ContributionLeaf = Round2Contribution;
 
 export class Round2ContributionStorage extends DKGStorage<Round2ContributionLeaf> {
-    static calculateLeaf(rawLeaf: Round2ContributionLeaf): Field {
-        return rawLeaf.contribution.hash();
+    static calculateLeaf(contribution: Round2ContributionLeaf): Field {
+        return contribution.hash();
     }
 
-    calculateLeaf(rawLeaf: Round2ContributionLeaf): Field {
-        return Round2ContributionStorage.calculateLeaf(rawLeaf);
+    calculateLeaf(contribution: Round2ContributionLeaf): Field {
+        return Round2ContributionStorage.calculateLeaf(contribution);
     }
 
     static calculateLevel1Index({

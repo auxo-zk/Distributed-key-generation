@@ -46,9 +46,7 @@ async function main() {
         console.log(`Adding key counter storage of committee ${id}`);
         keyCounterStorage.updateLeaf(
             { level1Index: KeyCounterStorage.calculateLevel1Index(Field(id)) },
-            KeyCounterStorage.calculateLeaf({
-                nextKeyId: Field(keyCounters[id]),
-            })
+            KeyCounterStorage.calculateLeaf(Field(keyCounters[id]))
         );
         e.map((key: any) => {
             console.log(
@@ -142,9 +140,9 @@ async function main() {
                         action.committeeId
                     ),
                 },
-                KeyCounterStorage.calculateLeaf({
-                    nextKeyId: Field(++keyCounters[Number(action.committeeId)]),
-                })
+                KeyCounterStorage.calculateLeaf(
+                    Field(++keyCounters[Number(action.committeeId)])
+                )
             );
         } else {
             console.log('UpdateKey.nextStep...');

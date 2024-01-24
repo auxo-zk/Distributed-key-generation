@@ -104,15 +104,15 @@ async function main() {
         ////// update local state:
         requesterStorage.updateLeaf(
             { level1Index: action.requestId },
-            requesterStorage.calculateLeaf({ address: action.newRequester })
+            requesterStorage.calculateLeaf(action.newRequester)
         );
 
         // turn to request state
         requestStatusStorage.updateLeaf(
             { level1Index: action.requestId },
-            requestStatusStorage.calculateLeaf({
-                status: Field(RequestStatusEnum.REQUESTING),
-            })
+            requestStatusStorage.calculateLeaf(
+                Field(RequestStatusEnum.REQUESTING)
+            )
         );
     }
 

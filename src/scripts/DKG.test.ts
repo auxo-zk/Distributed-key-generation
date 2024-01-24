@@ -357,7 +357,7 @@ describe('DKG', () => {
         for (let i = 0; i < members.length; i++) {
             memberTree.setLeaf(
                 BigInt(i),
-                MemberStorage.calculateLeaf({ publicKey: members[i].publicKey })
+                MemberStorage.calculateLeaf(members[i].publicKey)
             );
         }
         memberStorage.updateInternal(committeeIndex, memberTree);
@@ -539,7 +539,7 @@ describe('DKG', () => {
                         action.committeeId
                     ),
                 },
-                KeyCounterStorage.calculateLeaf({ nextKeyId: Field(i + 1) })
+                KeyCounterStorage.calculateLeaf(Field(i + 1))
             );
 
             keyStatusStorage.updateLeaf(
@@ -750,9 +750,7 @@ describe('DKG', () => {
                         action.memberId
                     ),
                 },
-                Round1ContributionStorage.calculateLeaf({
-                    contribution: action.contribution,
-                })
+                Round1ContributionStorage.calculateLeaf(action.contribution)
             );
 
             publicKeyStorage.updateLeaf(
@@ -765,9 +763,9 @@ describe('DKG', () => {
                         action.memberId
                     ),
                 },
-                PublicKeyStorage.calculateLeaf({
-                    C0: action.contribution.C.get(Field(0)),
-                })
+                PublicKeyStorage.calculateLeaf(
+                    action.contribution.C.get(Field(0))
+                )
             );
         }
 
@@ -1066,9 +1064,7 @@ describe('DKG', () => {
                         action.memberId
                     ),
                 },
-                Round2ContributionStorage.calculateLeaf({
-                    contribution: action.contribution,
-                })
+                Round2ContributionStorage.calculateLeaf(action.contribution)
             );
 
             encryptionStorage.updateLeaf(
@@ -1420,9 +1416,7 @@ describe('DKG', () => {
                             action.memberId
                         ),
                 },
-                ResponseContributionStorage.calculateLeaf({
-                    contribution: action.contribution,
-                })
+                ResponseContributionStorage.calculateLeaf(action.contribution)
             );
         }
 

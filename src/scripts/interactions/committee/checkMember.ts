@@ -122,11 +122,11 @@ async function main() {
                 ],
                 isLeft: [true, true],
             }).calculateRoot(
-                MemberStorage.calculateLeaf({
-                    publicKey: PublicKey.fromBase58(
+                MemberStorage.calculateLeaf(
+                    PublicKey.fromBase58(
                         'B62qomDwU81ESmFrQDMRtXHgTeof3yXH8rgBzzNqdogevZSFK8VVdgB'
-                    ),
-                })
+                    )
+                )
             )
         )
     );

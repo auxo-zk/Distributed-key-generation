@@ -135,8 +135,8 @@ async function main() {
                     Round2ContributionStorage.calculateLevel2Index(
                         Field(key.round1s[i].memberId)
                     ).toBigInt(),
-                    Round2ContributionStorage.calculateLeaf({
-                        contribution: new Round2Contribution({
+                    Round2ContributionStorage.calculateLeaf(
+                        new Round2Contribution({
                             c: new cArray(
                                 key.round2s[i].contribution.c.map((e: any) =>
                                     Bit255.fromBigInt(BigInt(e))
@@ -147,8 +147,8 @@ async function main() {
                                     Group.from(e.x, e.y)
                                 )
                             ),
-                        }),
-                    })
+                        })
+                    )
                 );
                 encryptionLevel2Tree.setLeaf(
                     EncryptionStorage.calculateLevel2Index(
@@ -329,9 +329,7 @@ async function main() {
                     action.memberId
                 ),
             },
-            Round2ContributionStorage.calculateLeaf({
-                contribution: action.contribution,
-            })
+            Round2ContributionStorage.calculateLeaf(action.contribution)
         );
 
         encryptionStorage.updateLeaf(
