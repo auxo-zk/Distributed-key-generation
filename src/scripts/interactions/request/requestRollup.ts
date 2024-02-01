@@ -22,7 +22,7 @@ async function main() {
     await compile(CreateRequest, cache);
     await compile(RequestContract, cache);
     const requestAddress =
-        'B62qnDCCc8iHuXu7systFTc2EuipJQQcbA5DwYGXkJgrviv7dkcSnPi';
+        'B62qjujctknmNAsUHEiRhxttm6vZ9ipSd5nfWP8ijGgHHcRzMDRHDcu';
     const requestContract = new RequestContract(
         PublicKey.fromBase58(requestAddress)
     );
@@ -42,12 +42,12 @@ async function main() {
     const [requesterValue, requestStatusValue] = await Promise.all([
         (
             await axios.get(
-                'https://api.auxo.fund/v0/storages/request/requester/leaves/level1'
+                'https://api.auxo.fund/v0/storages/request/requester/leafs'
             )
         ).data,
         (
             await axios.get(
-                'https://api.auxo.fund/v0/storages/request/request-status/leaves/level1'
+                'https://api.auxo.fund/v0/storages/request/request-status/leafs'
             )
         ).data,
     ]);
@@ -60,16 +60,19 @@ async function main() {
     for (const key in requestStatusValue) {
         requestStatusStorage.updateLeaf(
             { level1Index: Field(key) },
-            Field(requestStatusValue[key])
+            Field(requestStatusValue[key]['leaf'])
         );
     }
 
     for (const key in requesterValue) {
         requesterStorage.updateLeaf(
             { level1Index: Field(key) },
-            Field(requesterValue[key])
+            Field(requesterValue[key]['leaf'])
         );
     }
+
+    Provable.log('request status root: ', requestStatusStorage.root);
+    Provable.log('requester value root: ', requesterStorage.root);
 
     const fromState = committeeState.actionState;
     const rawActions = await fetchActions(requestAddress, fromState);
