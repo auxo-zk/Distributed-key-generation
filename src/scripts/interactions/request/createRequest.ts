@@ -14,19 +14,19 @@ import {
     accumulateEncryption,
     generateEncryption,
 } from '../../../libs/Requestor.js';
-
+import { Constants } from '../../../index.js';
 import axios from 'axios';
 
 async function main() {
     const { cache, feePayer } = await prepare();
-    const committeeId = Field(3);
+    const committeeId = Field(4);
     const keyId = Field(0);
 
     // Compile programs
     await compile(CreateRequest, cache);
     await compile(RequestContract, cache);
     const requestAddress =
-        'B62qnDCCc8iHuXu7systFTc2EuipJQQcbA5DwYGXkJgrviv7dkcSnPi';
+        'B62qjujctknmNAsUHEiRhxttm6vZ9ipSd5nfWP8ijGgHHcRzMDRHDcu';
     const requestContract = new RequestContract(
         PublicKey.fromBase58(requestAddress)
     );
@@ -41,8 +41,13 @@ async function main() {
 
     // Create request value
     let publicKey: Group = PublicKey.fromBase58(key.publicKey).toGroup();
-    let MINA = BigInt(1e7); // 0.01 MINA
+    let MINA = BigInt(Constants.FUNDING_UNIT); // 0.01 MINA
 
+    /**
+     * r1 = 12, 15, 18
+     * r2 = 12, 14, 10
+     * r3 = 4, 10, 7
+     */
     let investInputs = [
         [MINA, 2n * MINA, 3n * MINA],
         [4n * MINA, 5n * MINA, 6n * MINA],

@@ -22,7 +22,7 @@ async function main() {
     await compile(CreateRequest, cache);
     await compile(RequestContract, cache);
     const requestAddress =
-        'B62qnDCCc8iHuXu7systFTc2EuipJQQcbA5DwYGXkJgrviv7dkcSnPi';
+        'B62qjujctknmNAsUHEiRhxttm6vZ9ipSd5nfWP8ijGgHHcRzMDRHDcu';
     const requestContract = new RequestContract(
         PublicKey.fromBase58(requestAddress)
     );
