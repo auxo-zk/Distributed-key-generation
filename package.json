@@ -1,6 +1,6 @@
 {
     "name": "@auxo-dev/dkg",
-    "version": "0.2.17",
+    "version": "0.2.19",
     "description": "Auxo's DKG Module for the On-chain Funding platform on Mina blockchain",
     "author": "Auxo",
     "license": "Apache-2.0",
@@ -67,7 +67,7 @@
         "zkapp-cli": "^0.15.0"
     },
     "dependencies": {
-        "@auxo-dev/auxo-libs": "^0.3.5",
-        "o1js": "0.15.1"
+        "@auxo-dev/auxo-libs": "^0.3.6",
+        "o1js": "0.16.0"
     }
 }
