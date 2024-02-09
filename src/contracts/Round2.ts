@@ -395,7 +395,7 @@ export class Round2Contract extends SmartContract {
         let memberId = committeeContract.checkMember(
             new CheckMemberInput({
                 address: this.sender,
-                commiteeId: committeeId,
+                committeeId: committeeId,
                 memberWitness: memberWitness,
             })
         );
@@ -521,7 +521,7 @@ export class Round2Contract extends SmartContract {
             new CheckConfigInput({
                 N: proof.publicOutput.N,
                 T: proof.publicOutput.T,
-                commiteeId: proof.publicInput.action.committeeId,
+                committeeId: proof.publicInput.action.committeeId,
                 settingWitness: settingWitness,
             })
         );

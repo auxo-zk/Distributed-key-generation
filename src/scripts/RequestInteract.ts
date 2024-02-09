@@ -89,7 +89,7 @@ async function main() {
     let feePayer: PublicKey;
     let requestContract: RequestContract;
     let proof: RequestProof;
-    let commiteeId1 = Field(1);
+    let committeeId1 = Field(1);
     let keyId1 = Field(1);
     // let D1: RequestVector = RequestVector.from([
     //   addresses.D1.toGroup(),
@@ -131,7 +131,7 @@ async function main() {
     ]);
 
     let input1: RequestInput = new RequestInput({
-        committeeId: commiteeId1,
+        committeeId: committeeId1,
         keyId: keyId1,
         R: R1,
     });

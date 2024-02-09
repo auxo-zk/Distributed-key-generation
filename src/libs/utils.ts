@@ -11,3 +11,11 @@ export function packIndexArray(memberIds: number[]): Field {
         memberIds.map((e) => Field(e).toBits(INDEX_SIZE)).flat()
     );
 }
+
+export function buildAssertMessage(
+    circuit: string,
+    method: string,
+    errorEnum: string
+): string {
+    return `${circuit}::${method}: ${errorEnum}`;
+}

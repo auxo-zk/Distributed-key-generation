@@ -110,7 +110,7 @@
 //     await tx.sign([feePayerKey, keys.committee]).send();
 //     console.log('committeeContract deployed!');
 
-//     // create commitee consist of 2 people with thresh hold 1
+//     // create committee consist of 2 people with thresh hold 1
 //     let arrayAddress = [];
 //     arrayAddress.push(addresses.p1, addresses.p2);
 //     let myMemberArray1 = new MemberArray(arrayAddress);
@@ -133,7 +133,7 @@
 //       committeeContract.account.actionState.get()
 //     );
 
-//     // create commitee consist of 3 people with thresh hold 2
+//     // create committee consist of 3 people with thresh hold 2
 //     arrayAddress = [];
 //     arrayAddress.push(addresses.p3, addresses.p4, addresses.p5);
 //     arrayAddress = arrayAddress.map((value) => {
@@ -249,7 +249,7 @@
 //     console.log('committeeContract.checkMember p2: ');
 //     let checkInput = new CheckMemberInput({
 //       address: addresses.p2,
-//       commiteeId: Field(0),
+//       committeeId: Field(0),
 //       memberMerkleTreeWitness: new CommitteeMerkleWitness(tree.getWitness(1n)),
 //       memberMerkleMapWitness: memberMerkleMap.getWitness(Field(0)),
 //     });
@@ -314,7 +314,7 @@
 //       console.log('committeeContract deployed!');
 //     }
 
-//     // create commitee consist of 2 people with thresh hold 1
+//     // create committee consist of 2 people with thresh hold 1
 //     let arrayAddress = [];
 //     arrayAddress.push(p1Address, p2Address);
 //     let myMemberArray1 = new MemberArray(arrayAddress);
@@ -390,7 +390,7 @@
 //       console.log('committeeContract.checkMember p2: ');
 //       let checkInput = new CheckMemberInput({
 //         address: p2Address,
-//         commiteeId: Field(0),
+//         committeeId: Field(0),
 //         memberMerkleTreeWitness: new CommitteeMerkleWitness(
 //           tree.getWitness(1n)
 //         ),

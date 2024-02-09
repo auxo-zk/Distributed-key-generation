@@ -126,7 +126,7 @@ async function main() {
         address: PublicKey.fromBase58(
             'B62qomDwU81ESmFrQDMRtXHgTeof3yXH8rgBzzNqdogevZSFK8VVdgB'
         ),
-        commiteeId: committeeId,
+        committeeId: committeeId,
         memberWitness: new FullMTWitness({
             level1: Level1Witness.fromJSON({
                 path: [

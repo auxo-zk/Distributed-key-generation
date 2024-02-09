@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
     Field,
     Reducer,
@@ -81,7 +82,7 @@ describe('Committee', () => {
         await CreateCommittee.compile();
     });
 
-    xit('Create commitee consist of 2 people with threshhold 1, and test deploy DKG', async () => {
+    it('Create committee consist of 2 people with threshold 1, and test deploy DKG', async () => {
         let arrayAddress = [];
         arrayAddress.push(addresses.p1, addresses.p2);
         myMemberArray1 = new MemberArray(arrayAddress);
@@ -99,7 +100,7 @@ describe('Committee', () => {
         await tx.sign([feePayerKey]).send();
     });
 
-    xit('Create commitee consist of 3 people with threshhold 2', async () => {
+    it('Create committee consist of 3 people with threshold 2', async () => {
         let arrayAddress = [];
         arrayAddress.push(addresses.p3, addresses.p4, addresses.p5);
         myMemberArray2 = new MemberArray(arrayAddress);
@@ -117,7 +118,7 @@ describe('Committee', () => {
         await tx.sign([feePayerKey]).send();
     });
 
-    xit('create proof first step...', async () => {
+    it('create proof first step...', async () => {
         // create first step proof
         proof = await CreateCommittee.firstStep(
             Reducer.initialActionState,
@@ -147,9 +148,7 @@ describe('Committee', () => {
             Reducer.initialActionState
         );
 
-        ////// udpate data to local
-
-        // memberMerkleTree.set
+        // Update data to local
         tree1 = EMPTY_LEVEL_2_TREE();
         for (let i = 0; i < Number(myMemberArray1.length); i++) {
             tree1.setLeaf(
@@ -180,9 +179,8 @@ describe('Committee', () => {
         expect(proof.publicOutput.initialActionState).toEqual(
             Reducer.initialActionState
         );
-        ////// udpate data to local
 
-        // memberMerkleTree.set
+        // Update data to local
         tree2 = EMPTY_LEVEL_2_TREE();
         for (let i = 0; i < Number(myMemberArray2.length); i++) {
             tree2.setLeaf(
@@ -207,10 +205,10 @@ describe('Committee', () => {
     });
 
     xit('check if p2 belong to committee 0', async () => {
-        // check if memerber belong to committeeId
+        // Check if member belong to committeeId
         let checkInput = new CheckMemberInput({
             address: addresses.p2,
-            commiteeId: Field(0),
+            committeeId: Field(0),
             memberWitness: memberStorage.getWitness(Field(0), Field(1)),
         });
         let tx = await Mina.transaction(feePayer, () => {
@@ -221,10 +219,10 @@ describe('Committee', () => {
     });
 
     xit('check if p2 belong to committee 1: to throw error', async () => {
-        // check if memerber belong to committeeId
+        // Check if member belong to committeeId
         let checkInput = new CheckMemberInput({
             address: addresses.p2,
-            commiteeId: Field(1),
+            committeeId: Field(1),
             memberWitness: memberStorage.getWitness(Field(1), Field(1)),
         });
         expect(() => {

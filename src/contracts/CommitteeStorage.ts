@@ -240,12 +240,12 @@ export class SettingStorage extends CommitteeStrorage<SettingLeaf> {
         return SettingStorage.calculateLeaf(rawLeaf);
     }
 
-    static calculateLevel1Index(commiteeId: Field): Field {
-        return commiteeId;
+    static calculateLevel1Index(committeeId: Field): Field {
+        return committeeId;
     }
 
-    calculateLevel1Index(commiteeId: Field): Field {
-        return SettingStorage.calculateLevel1Index(commiteeId);
+    calculateLevel1Index(committeeId: Field): Field {
+        return SettingStorage.calculateLevel1Index(committeeId);
     }
 
     getWitness(level1Index: Field): Level1Witness {

@@ -330,7 +330,7 @@ export class DKGContract extends SmartContract {
             .checkMember(
                 new CheckMemberInput({
                     address: this.sender,
-                    commiteeId: committeeId,
+                    committeeId: committeeId,
                     memberWitness: memberWitness,
                 })
             )
