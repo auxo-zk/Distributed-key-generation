@@ -1,5 +1,5 @@
-import { CommitteeContract, CreateCommittee } from '../contracts/Committee.js';
-import { DKGContract, UpdateKey } from '../contracts/DKG.js';
+import { CommitteeContract, RollupCommittee } from '../contracts/Committee.js';
+import { DkgContract, RollupDkg } from '../contracts/DKG.js';
 import { BatchDecryption, BatchEncryption } from '../contracts/Encryption.js';
 import { CreateRequest, RequestContract } from '../contracts/Request.js';
 import {
@@ -25,8 +25,8 @@ import {
 const PROGRAMS = {
     BatchEncryption,
     BatchDecryption,
-    CreateCommittee,
-    UpdateKey,
+    RollupCommittee,
+    RollupDkg,
     ReduceRound1,
     FinalizeRound1,
     ReduceRound2,
@@ -40,7 +40,7 @@ const PROGRAMS = {
 
 const CONTRACTS = {
     CommitteeContract,
-    DKGContract,
+    DkgContract,
     Round1Contract,
     Round2Contract,
     ResponseContract,
@@ -49,8 +49,8 @@ const CONTRACTS = {
 };
 
 const DEPENDENCIES = {
-    CommitteeContract: [CreateCommittee],
-    DKGContract: [UpdateKey],
+    CommitteeContract: [RollupCommittee],
+    DkgContract: [RollupDkg],
     Round1Contract: [ReduceRound1, FinalizeRound1],
     Round2Contract: [ReduceRound2, BatchEncryption, FinalizeRound2],
     ResponseContract: [ReduceResponse, BatchDecryption, CompleteResponse],

@@ -7,10 +7,10 @@ export {
     // Structs
     CheckMemberInput,
     CheckConfigInput,
-    CreateCommitteeOutput,
+    RollupCommitteeOutput,
 
     // Zk Programs & Proofs
-    CreateCommittee,
+    RollupCommittee,
     CommitteeProof,
 
     // Smart Contract
@@ -26,14 +26,14 @@ export {
     KeyStatus,
 
     // Structs
-    UpdateKeyOutput,
+    RollupDkgOutput,
 
     // Zk Programs
-    UpdateKey,
-    UpdateKeyProof,
+    RollupDkg,
+    RollupDkgProof,
 
     // Smart Contract
-    DKGContract,
+    DkgContract,
 
     // Actions & Events
     ActionMask as DKGActionMask,

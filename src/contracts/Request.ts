@@ -20,7 +20,7 @@ import {
 } from 'o1js';
 
 import { GroupDynamicArray, BoolDynamicArray } from '@auxo-dev/auxo-libs';
-import { updateOutOfSnark } from '../libs/utils.js';
+import { updateActionState } from '../libs/utils.js';
 import { REQUEST_MAX_SIZE } from '../constants.js';
 
 const EmptyMerkleMap = new MerkleMap();
@@ -145,14 +145,14 @@ export const CreateRequest = ZkProgram({
             ],
 
             method(
-                preProof: SelfProof<Void, RollupStateOutput>,
+                earlierProof: SelfProof<Void, RollupStateOutput>,
                 input: RequestAction,
                 requestStatusWitness: MerkleMapWitness,
                 // TODO: check if provide witness and value is the good idea?
                 requesterWitness: MerkleMapWitness,
                 onchainRequester: PublicKey
             ): RollupStateOutput {
-                preProof.verify();
+                earlierProof.verify();
 
                 let requestId = input.requestId;
 
@@ -182,7 +182,7 @@ export const CreateRequest = ZkProgram({
                 caculateRequestId.assertEquals(requestId);
 
                 preRequestStatusRoot.assertEquals(
-                    preProof.publicOutput.finalRequestStatusRoot
+                    earlierProof.publicOutput.finalRequestStatusRoot
                 );
 
                 // caculate new request state root
@@ -220,7 +220,7 @@ export const CreateRequest = ZkProgram({
                 caculateRequestId2.assertEquals(requestId);
 
                 preRequesterRoot.assertEquals(
-                    preProof.publicOutput.finalRequesterRoot
+                    earlierProof.publicOutput.finalRequesterRoot
                 );
 
                 // caculate new requester root
@@ -229,13 +229,13 @@ export const CreateRequest = ZkProgram({
 
                 return new RollupStateOutput({
                     initialActionState:
-                        preProof.publicOutput.initialActionState,
+                        earlierProof.publicOutput.initialActionState,
                     initialRequestStatusRoot:
-                        preProof.publicOutput.initialRequestStatusRoot,
+                        earlierProof.publicOutput.initialRequestStatusRoot,
                     initialRequesterRoot:
-                        preProof.publicOutput.initialRequesterRoot,
-                    finalActionState: updateOutOfSnark(
-                        preProof.publicOutput.finalActionState,
+                        earlierProof.publicOutput.initialRequesterRoot,
+                    finalActionState: updateActionState(
+                        earlierProof.publicOutput.finalActionState,
                         [RequestAction.toFields(input)]
                     ),
                     finalRequestStatusRoot: newRequestStatusRoot,

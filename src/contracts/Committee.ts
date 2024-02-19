@@ -14,7 +14,7 @@ import {
     Void,
 } from 'o1js';
 import { IPFSHash } from '@auxo-dev/auxo-libs';
-import { buildAssertMessage, updateOutOfSnark } from '../libs/utils.js';
+import { buildAssertMessage, updateActionState } from '../libs/utils.js';
 import { COMMITTEE_MAX_SIZE } from '../constants.js';
 import {
     EMPTY_LEVEL_1_TREE,
@@ -23,6 +23,7 @@ import {
     FullMTWitness,
 } from './CommitteeStorage.js';
 import { MemberArray } from '../libs/Committee.js';
+import { ErrorEnum, EventEnum } from './shared.js';
 
 export class CommitteeAction extends Struct({
     addresses: MemberArray,
@@ -32,20 +33,6 @@ export class CommitteeAction extends Struct({
     static fromFields(fields: Field[]): CommitteeAction {
         return super.fromFields(fields) as CommitteeAction;
     }
-}
-
-export enum EventEnum {
-    COMMITTEE_CREATED = 'committee-created',
-}
-
-export enum ErrorEnum {
-    CURRENT_ACTION_STATE = 'Incorrect current action state',
-    LAST_ACTION_STATE = 'Incorrect last action state',
-    NEXT_COMMITTEE_ID = 'Incorrect next committee Id',
-    MEMBER_TREE_ROOT = 'Incorrect member tree root',
-    MEMBER_TREE_KEY = 'Incorrect member tree key',
-    SETTING_TREE_ROOT = 'Incorrect setting tree root',
-    SETTING_TREE_KEY = 'Incorrect setting tree key',
 }
 
 export class CheckMemberInput extends Struct({
@@ -61,159 +48,163 @@ export class CheckConfigInput extends Struct({
     settingWitness: Level1Witness,
 }) {}
 
-export class CreateCommitteeOutput extends Struct({
+export class RollupCommitteeOutput extends Struct({
     initialActionState: Field,
-    initialMemberTreeRoot: Field,
-    initialSettingTreeRoot: Field,
+    initialMemberRoot: Field,
+    initialSettingRoot: Field,
     initialCommitteeId: Field,
-    finalActionState: Field,
-    finalMemberTreeRoot: Field,
-    finalSettingTreeRoot: Field,
-    finalCommitteeId: Field,
+    nextActionState: Field,
+    nextMemberRoot: Field,
+    nextSettingRoot: Field,
+    nextCommitteeId: Field,
 }) {
     hash(): Field {
-        return Poseidon.hash(CreateCommitteeOutput.toFields(this));
+        return Poseidon.hash(RollupCommitteeOutput.toFields(this));
     }
 }
 
-export const CreateCommittee = ZkProgram({
-    name: 'CreateCommittee',
-    publicOutput: CreateCommitteeOutput,
+export const RollupCommittee = ZkProgram({
+    name: 'RollupCommittee',
+    publicOutput: RollupCommitteeOutput,
     methods: {
         firstStep: {
             privateInputs: [Field, Field, Field, Field],
             method(
                 initialActionState: Field,
-                initialMemberTreeRoot: Field,
-                initialSettingTreeRoot: Field,
+                initialMemberRoot: Field,
+                initialSettingRoot: Field,
                 initialCommitteeId: Field
-            ): CreateCommitteeOutput {
-                return new CreateCommitteeOutput({
+            ): RollupCommitteeOutput {
+                return new RollupCommitteeOutput({
                     initialActionState,
-                    initialMemberTreeRoot,
-                    initialSettingTreeRoot,
+                    initialMemberRoot,
+                    initialSettingRoot,
                     initialCommitteeId,
-                    finalActionState: initialActionState,
-                    finalMemberTreeRoot: initialMemberTreeRoot,
-                    finalSettingTreeRoot: initialSettingTreeRoot,
-                    finalCommitteeId: initialCommitteeId,
+                    nextActionState: initialActionState,
+                    nextMemberRoot: initialMemberRoot,
+                    nextSettingRoot: initialSettingRoot,
+                    nextCommitteeId: initialCommitteeId,
                 });
             },
         },
         nextStep: {
             privateInputs: [
-                SelfProof<Void, CreateCommitteeOutput>,
+                SelfProof<Void, RollupCommitteeOutput>,
                 CommitteeAction,
                 Level1Witness,
                 Level1Witness,
             ],
             method(
-                preProof: SelfProof<Void, CreateCommitteeOutput>,
+                earlierProof: SelfProof<Void, RollupCommitteeOutput>,
                 input: CommitteeAction,
                 memberWitness: Level1Witness,
                 settingWitness: Level1Witness
-            ): CreateCommitteeOutput {
-                preProof.verify();
+            ): RollupCommitteeOutput {
+                // Verify earlier proof
+                earlierProof.verify();
 
-                // Calculate new memberTreeRoot
-                let preMemberRoot = memberWitness.calculateRoot(Field(0));
-                let nextCommitteeId = memberWitness.calculateIndex();
-
-                nextCommitteeId.assertEquals(
-                    preProof.publicOutput.finalCommitteeId,
+                // Verify empty member level 2 MT
+                let prevMemberRoot = memberWitness.calculateRoot(Field(0));
+                let memberKey = memberWitness.calculateIndex();
+                prevMemberRoot.assertEquals(
+                    earlierProof.publicOutput.nextMemberRoot,
                     buildAssertMessage(
-                        CreateCommittee.name,
+                        RollupCommittee.name,
                         'nextStep',
-                        ErrorEnum.NEXT_COMMITTEE_ID
+                        ErrorEnum.MEMBER_ROOT
                     )
                 );
-                preMemberRoot.assertEquals(
-                    preProof.publicOutput.finalMemberTreeRoot,
+                memberKey.assertEquals(
+                    earlierProof.publicOutput.nextCommitteeId,
                     buildAssertMessage(
-                        CreateCommittee.name,
+                        RollupCommittee.name,
                         'nextStep',
-                        ErrorEnum.MEMBER_TREE_ROOT
+                        ErrorEnum.MEMBER_KEY
                     )
                 );
 
-                let tree = EMPTY_LEVEL_2_TREE();
+                // Verify empty setting level 2 MT
+                let prevSettingRoot = settingWitness.calculateRoot(Field(0));
+                let settingKey = settingWitness.calculateIndex();
+                prevSettingRoot.assertEquals(
+                    earlierProof.publicOutput.nextSettingRoot,
+                    buildAssertMessage(
+                        RollupCommittee.name,
+                        'nextStep',
+                        ErrorEnum.SETTING_ROOT
+                    )
+                );
+                settingKey.assertEquals(
+                    earlierProof.publicOutput.nextCommitteeId,
+                    buildAssertMessage(
+                        RollupCommittee.name,
+                        'nextStep',
+                        ErrorEnum.SETTING_KEY
+                    )
+                );
+
+                // Create new level 2 MT for committee members' public keys
+                let level2MT = EMPTY_LEVEL_2_TREE();
                 for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
                     let value = Provable.if(
                         Field(i).greaterThanOrEqual(input.addresses.length),
                         Field(0),
                         MemberArray.hash(input.addresses.get(Field(i)))
                     );
-                    tree.setLeaf(BigInt(i), value);
+                    level2MT.setLeaf(BigInt(i), value);
                 }
 
-                // Update new tree of public key in to the member tree
-                let newMemberRoot = memberWitness.calculateRoot(tree.getRoot());
+                // Update memberRoot
+                let nextMemberRoot = memberWitness.calculateRoot(
+                    level2MT.getRoot()
+                );
 
-                // Calculate new settingTreeRoot
-                let preSettingRoot = settingWitness.calculateRoot(Field(0));
-                let settingKey = settingWitness.calculateIndex();
-                settingKey.assertEquals(
-                    nextCommitteeId,
-                    buildAssertMessage(
-                        CreateCommittee.name,
-                        'nextStep',
-                        ErrorEnum.SETTING_TREE_KEY
-                    )
-                );
-                preSettingRoot.assertEquals(
-                    preProof.publicOutput.finalSettingTreeRoot,
-                    buildAssertMessage(
-                        CreateCommittee.name,
-                        'nextStep',
-                        ErrorEnum.SETTING_TREE_ROOT
-                    )
-                );
                 // update setting tree with hash [t,n]
-                let newSettingRoot = settingWitness.calculateRoot(
+                let nextSettingRoot = settingWitness.calculateRoot(
                     Poseidon.hash([input.threshold, input.addresses.length])
                 );
 
-                return new CreateCommitteeOutput({
+                return new RollupCommitteeOutput({
                     initialActionState:
-                        preProof.publicOutput.initialActionState,
-                    initialMemberTreeRoot:
-                        preProof.publicOutput.initialMemberTreeRoot,
-                    initialSettingTreeRoot:
-                        preProof.publicOutput.initialSettingTreeRoot,
+                        earlierProof.publicOutput.initialActionState,
+                    initialMemberRoot:
+                        earlierProof.publicOutput.initialMemberRoot,
+                    initialSettingRoot:
+                        earlierProof.publicOutput.initialSettingRoot,
                     initialCommitteeId:
-                        preProof.publicOutput.initialCommitteeId,
-                    finalActionState: updateOutOfSnark(
-                        preProof.publicOutput.finalActionState,
+                        earlierProof.publicOutput.initialCommitteeId,
+                    nextActionState: updateActionState(
+                        earlierProof.publicOutput.nextActionState,
                         [CommitteeAction.toFields(input)]
                     ),
-                    finalMemberTreeRoot: newMemberRoot,
-                    finalSettingTreeRoot: newSettingRoot,
-                    finalCommitteeId: nextCommitteeId.add(Field(1)),
+                    nextMemberRoot: nextMemberRoot,
+                    nextSettingRoot: nextSettingRoot,
+                    nextCommitteeId:
+                        earlierProof.publicOutput.nextCommitteeId.add(Field(1)),
                 });
             },
         },
     },
 });
 
-export class CommitteeProof extends ZkProgram.Proof(CreateCommittee) {}
+export class CommitteeProof extends ZkProgram.Proof(RollupCommittee) {}
 
 export class CommitteeContract extends SmartContract {
     @state(Field) nextCommitteeId = State<Field>();
-    @state(Field) memberTreeRoot = State<Field>();
-    @state(Field) settingTreeRoot = State<Field>();
-
+    @state(Field) memberRoot = State<Field>();
+    @state(Field) settingRoot = State<Field>();
     @state(Field) actionState = State<Field>();
 
     reducer = Reducer({ actionType: CommitteeAction });
 
     events = {
-        [EventEnum.COMMITTEE_CREATED]: Field,
+        [EventEnum.ROLLUPED]: Field,
     };
 
     init() {
         super.init();
-        this.memberTreeRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
-        this.settingTreeRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
+        this.memberRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
+        this.settingRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
         this.actionState.set(Reducer.initialActionState);
     }
 
@@ -226,8 +217,8 @@ export class CommitteeContract extends SmartContract {
         proof.verify();
         let curActionState = this.actionState.getAndRequireEquals();
         let nextCommitteeId = this.nextCommitteeId.getAndRequireEquals();
-        let memberTreeRoot = this.memberTreeRoot.getAndRequireEquals();
-        let settingTreeRoot = this.settingTreeRoot.getAndRequireEquals();
+        let memberRoot = this.memberRoot.getAndRequireEquals();
+        let settingRoot = this.settingRoot.getAndRequireEquals();
 
         curActionState.assertEquals(
             proof.publicOutput.initialActionState,
@@ -245,26 +236,26 @@ export class CommitteeContract extends SmartContract {
                 ErrorEnum.NEXT_COMMITTEE_ID
             )
         );
-        memberTreeRoot.assertEquals(
-            proof.publicOutput.initialMemberTreeRoot,
+        memberRoot.assertEquals(
+            proof.publicOutput.initialMemberRoot,
             buildAssertMessage(
                 CommitteeContract.name,
                 'rollupIncrements',
-                ErrorEnum.MEMBER_TREE_ROOT
+                ErrorEnum.MEMBER_ROOT
             )
         );
-        settingTreeRoot.assertEquals(
-            proof.publicOutput.initialSettingTreeRoot,
+        settingRoot.assertEquals(
+            proof.publicOutput.initialSettingRoot,
             buildAssertMessage(
                 CommitteeContract.name,
                 'rollupIncrements',
-                ErrorEnum.SETTING_TREE_ROOT
+                ErrorEnum.SETTING_ROOT
             )
         );
 
         let lastActionState = this.account.actionState.getAndRequireEquals();
         lastActionState.assertEquals(
-            proof.publicOutput.finalActionState,
+            proof.publicOutput.nextActionState,
             buildAssertMessage(
                 CommitteeContract.name,
                 'rollupIncrements',
@@ -273,20 +264,19 @@ export class CommitteeContract extends SmartContract {
         );
 
         // update on-chain state
-        this.actionState.set(proof.publicOutput.finalActionState);
-        this.nextCommitteeId.set(proof.publicOutput.finalCommitteeId);
-        this.memberTreeRoot.set(proof.publicOutput.finalMemberTreeRoot);
-        this.settingTreeRoot.set(proof.publicOutput.finalSettingTreeRoot);
+        this.actionState.set(proof.publicOutput.nextActionState);
+        this.nextCommitteeId.set(proof.publicOutput.nextCommitteeId);
+        this.memberRoot.set(proof.publicOutput.nextMemberRoot);
+        this.settingRoot.set(proof.publicOutput.nextSettingRoot);
 
         this.emitEvent(
-            EventEnum.COMMITTEE_CREATED,
-            proof.publicOutput.finalCommitteeId.sub(Field(1))
+            EventEnum.ROLLUPED,
+            proof.publicOutput.nextCommitteeId.sub(Field(1))
         );
     }
 
     // Add memberIndex to input for checking
-    // TODO - Consider removing this method
-    @method checkMember(input: CheckMemberInput): Field {
+    checkMember(input: CheckMemberInput): Field {
         let leaf = input.memberWitness.level2.calculateRoot(
             MemberArray.hash(input.address)
         );
@@ -295,13 +285,13 @@ export class CommitteeContract extends SmartContract {
         let root = input.memberWitness.level1.calculateRoot(leaf);
         let _committeeId = input.memberWitness.level1.calculateIndex();
 
-        const onChainRoot = this.memberTreeRoot.getAndRequireEquals();
+        const onChainRoot = this.memberRoot.getAndRequireEquals();
         root.assertEquals(
             onChainRoot,
             buildAssertMessage(
                 CommitteeContract.name,
                 'checkMember',
-                ErrorEnum.MEMBER_TREE_ROOT
+                ErrorEnum.MEMBER_ROOT
             )
         );
         input.committeeId.assertEquals(
@@ -309,26 +299,25 @@ export class CommitteeContract extends SmartContract {
             buildAssertMessage(
                 CommitteeContract.name,
                 'checkMember',
-                ErrorEnum.MEMBER_TREE_KEY
+                ErrorEnum.MEMBER_KEY
             )
         );
         return memberId;
     }
 
-    // TODO - Consider removing this method
-    @method checkConfig(input: CheckConfigInput) {
+    checkConfig(input: CheckConfigInput) {
         input.N.assertGreaterThanOrEqual(input.T);
         // hash[T,N]
         let hashSetting = Poseidon.hash([input.T, input.N]);
         let root = input.settingWitness.calculateRoot(hashSetting);
         let _committeeId = input.settingWitness.calculateIndex();
-        const onChainRoot = this.settingTreeRoot.getAndRequireEquals();
+        const onChainRoot = this.settingRoot.getAndRequireEquals();
         root.assertEquals(
             onChainRoot,
             buildAssertMessage(
                 CommitteeContract.name,
                 'checkConfig',
-                ErrorEnum.SETTING_TREE_ROOT
+                ErrorEnum.SETTING_ROOT
             )
         );
         input.committeeId.assertEquals(
@@ -336,7 +325,7 @@ export class CommitteeContract extends SmartContract {
             buildAssertMessage(
                 CommitteeContract.name,
                 'checkConfig',
-                ErrorEnum.SETTING_TREE_KEY
+                ErrorEnum.SETTING_KEY
             )
         );
     }

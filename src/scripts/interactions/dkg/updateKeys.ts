@@ -6,7 +6,7 @@ import {
     proveAndSend,
 } from '../../helper/deploy.js';
 import { prepare } from '../prepare.js';
-import { DKGContract, KeyStatus, UpdateKey } from '../../../contracts/DKG.js';
+import { DkgContract, KeyStatus, RollupDkg } from '../../../contracts/DKG.js';
 import { DKGAction } from '../../../index.js';
 import { KeyStatusStorage } from '../../../contracts/DKGStorage.js';
 import { KeyCounterStorage } from '../../../contracts/CommitteeStorage.js';
@@ -16,11 +16,11 @@ async function main() {
     const { cache, feePayer } = await prepare();
 
     // Compile programs
-    await compile(UpdateKey, cache);
-    await compile(DKGContract, cache);
+    await compile(RollupDkg, cache);
+    await compile(DkgContract, cache);
     const dkgAddress =
         'B62qogHpAHHNP7PXAiRzHkpKnojERnjZq34GQ1PjjAv5wCLgtbYthAS';
-    const dkgContract = new DKGContract(PublicKey.fromBase58(dkgAddress));
+    const dkgContract = new DkgContract(PublicKey.fromBase58(dkgAddress));
 
     // Fetch storage trees
     const keyStatusStorage = new KeyStatusStorage();
@@ -89,8 +89,8 @@ async function main() {
     });
     actions.map((e) => Provable.log(e));
 
-    console.log('UpdateKey.firstStep...');
-    let proof = await UpdateKey.firstStep(
+    console.log('RollupDkg.firstStep...');
+    let proof = await RollupDkg.firstStep(
         DKGAction.empty(),
         dkgState.keyCounter,
         dkgState.keyStatus,
@@ -102,8 +102,8 @@ async function main() {
         let action = actions[i];
         Provable.log('Action:', action);
         if (action.keyId.equals(Field(-1)).toBoolean()) {
-            console.log('UpdateKey.nextStepGeneration...');
-            proof = await UpdateKey.nextStepGeneration(
+            console.log('RollupDkg.nextStepGeneration...');
+            proof = await RollupDkg.nextStepGeneration(
                 action,
                 proof,
                 Field(keyCounters[Number(action.committeeId)]),
@@ -145,8 +145,8 @@ async function main() {
                 )
             );
         } else {
-            console.log('UpdateKey.nextStep...');
-            proof = await UpdateKey.nextStep(
+            console.log('RollupDkg.nextStep...');
+            proof = await RollupDkg.nextStep(
                 action,
                 proof,
                 keyStatusStorage.getWitness(
@@ -185,7 +185,7 @@ async function main() {
             dkgContract.updateKeys(proof);
         }
     );
-    await proveAndSend(tx, feePayer.key, 'DKGContract', 'updateKeys');
+    await proveAndSend(tx, feePayer.key, 'DkgContract', 'updateKeys');
 }
 
 main()

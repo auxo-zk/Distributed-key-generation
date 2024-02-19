@@ -19,13 +19,13 @@ import { getProfiler } from './helper/profiler.js';
 import { Config, Key } from './helper/config.js';
 import {
     CommitteeContract,
-    CreateCommittee,
+    RollupCommittee,
     CommitteeAction,
 } from '../contracts/Committee.js';
 import {
     Action as DKGAction,
-    DKGContract,
-    UpdateKey,
+    DkgContract,
+    RollupDkg,
 } from '../contracts/DKG.js';
 import {
     Action as Round1Action,
@@ -233,7 +233,7 @@ async function main() {
                         case Contract.COMMITTEE:
                             return new CommitteeContract(key.publicKey);
                         case Contract.DKG:
-                            return new DKGContract(key.publicKey);
+                            return new DkgContract(key.publicKey);
                         case Contract.ROUND1:
                             return new Round1Contract(key.publicKey);
                         case Contract.ROUND2:
@@ -255,7 +255,7 @@ async function main() {
             })
     );
 
-    // DKGContract storage
+    // DkgContract storage
     let dkgAddressStorage = new AddressStorage();
 
     // Round1Contract storage
@@ -270,7 +270,7 @@ async function main() {
     await fetchAllContract(contracts);
 
     if (true) {
-        await compile(UpdateKey, 'UpdateKey', profiling);
+        await compile(RollupDkg, 'RollupDkg', profiling);
 
         await compile(ReduceRound1, 'ReduceRound1', profiling);
         await compile(FinalizeRound1, 'FinalizeRound1', profiling);
@@ -283,12 +283,12 @@ async function main() {
         await compile(BatchDecryption, 'BatchDecryption', profiling);
         await compile(CompleteResponse, 'CompleteResponse', profiling);
 
-        await compile(CreateCommittee, 'CreateCommittee', profiling);
+        await compile(RollupCommittee, 'RollupCommittee', profiling);
 
         await compile(CreateRequest, 'CreateRequest', profiling);
 
         await compile(CommitteeContract, 'CommitteeContract', profiling);
-        await compile(DKGContract, 'DKGContract', profiling);
+        await compile(DkgContract, 'DkgContract', profiling);
         await compile(Round1Contract, 'Round1Contract', profiling);
         await compile(Round2Contract, 'Round2Contract', profiling);
         await compile(ResponseContract, 'ResponseContract', profiling);
@@ -328,7 +328,7 @@ async function main() {
     // Deploy dkg contract
     await deploy(
         feePayerKey,
-        'DKGContract',
+        'DkgContract',
         [['zkApps', dkgAddressStorage.root]],
         fee,
         ++feePayerNonce

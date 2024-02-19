@@ -9,15 +9,15 @@ import { prepare } from '../prepare.js';
 import {
     BatchEncryption,
     CommitteeContract,
-    CreateCommittee,
-    DKGContract,
+    RollupCommittee,
+    DkgContract,
     FinalizeRound1,
     FinalizeRound2,
     ReduceRound1,
     Round1Contract,
     Round2Action,
     Round2Contract,
-    UpdateKey,
+    RollupDkg,
 } from '../../../index.js';
 import {
     Level1Witness as DKGLevel1Witness,
@@ -50,10 +50,10 @@ async function main() {
     const { cache, feePayer } = await prepare();
 
     // Compile programs
-    await compile(CreateCommittee, cache);
+    await compile(RollupCommittee, cache);
     await compile(CommitteeContract, cache);
-    await compile(UpdateKey, cache);
-    await compile(DKGContract, cache);
+    await compile(RollupDkg, cache);
+    await compile(DkgContract, cache);
     await compile(ReduceRound1, cache);
     await compile(FinalizeRound1, cache);
     await compile(Round1Contract, cache);

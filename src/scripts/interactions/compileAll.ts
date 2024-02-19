@@ -1,6 +1,6 @@
 import { Cache } from 'o1js';
 import { compile } from '../helper/deploy.js';
-import { DKGContract, UpdateKey } from '../../contracts/DKG.js';
+import { DkgContract, RollupDkg } from '../../contracts/DKG.js';
 import {
     FinalizeRound1,
     ReduceRound1,
@@ -22,16 +22,16 @@ import {
 } from '../../contracts/Response.js';
 import {
     CommitteeContract,
-    CreateCommittee,
+    RollupCommittee,
 } from '../../contracts/Committee.js';
 import { CreateRequest, RequestContract } from '../../contracts/Request.js';
 
 async function main() {
     const cache = Cache.FileSystem('./caches');
     // const cache = "";
-    await compile(CreateCommittee, cache);
+    await compile(RollupCommittee, cache);
 
-    await compile(UpdateKey, cache);
+    await compile(RollupDkg, cache);
 
     await compile(ReduceRound1, cache);
     await compile(FinalizeRound1, cache);
@@ -47,7 +47,7 @@ async function main() {
     await compile(CreateRequest, cache);
 
     await compile(CommitteeContract, cache);
-    await compile(DKGContract, cache);
+    await compile(DkgContract, cache);
     await compile(Round1Contract, cache);
     await compile(Round2Contract, cache);
     await compile(ResponseContract, cache);

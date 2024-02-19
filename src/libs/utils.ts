@@ -1,7 +1,7 @@
 import { AccountUpdate, Field } from 'o1js';
 import { INDEX_SIZE } from '../constants.js';
 
-export function updateOutOfSnark(state: Field, action: Field[][]) {
+export function updateActionState(state: Field, action: Field[][]) {
     let actionsHash = AccountUpdate.Actions.hash(action);
     return AccountUpdate.Actions.updateSequenceState(state, actionsHash);
 }

@@ -17,7 +17,7 @@ import {
     ZkProgram,
 } from 'o1js';
 import { ScalarDynamicArray } from '@auxo-dev/auxo-libs';
-import { updateOutOfSnark } from '../libs/utils.js';
+import { updateActionState } from '../libs/utils.js';
 import { REQUEST_MAX_SIZE } from '../constants.js';
 import { RequestVector } from './Request.js';
 
@@ -108,7 +108,7 @@ export const CreateReduce = ZkProgram({
                 earlierProof.verify();
 
                 // Calculate new action state == action id in the tree
-                let newActionState = updateOutOfSnark(
+                let newActionState = updateActionState(
                     earlierProof.publicOutput.finalActionState,
                     [action.toFields()]
                 );
@@ -174,16 +174,16 @@ export const CreateRollup = ZkProgram({
             ],
 
             method(
-                preProof: SelfProof<Void, RollupActionsOutput>,
+                earlierProof: SelfProof<Void, RollupActionsOutput>,
                 action: RequestHelperAction,
                 preActionState: Field,
                 rollupStatusWitness: MerkleMapWitness
             ): RollupActionsOutput {
-                preProof.verify();
+                earlierProof.verify();
                 let requestId = action.requestId;
-                requestId.assertEquals(preProof.publicOutput.requestId);
+                requestId.assertEquals(earlierProof.publicOutput.requestId);
 
-                let actionState = updateOutOfSnark(preActionState, [
+                let actionState = updateActionState(preActionState, [
                     action.toFields(),
                 ]);
 
@@ -192,15 +192,15 @@ export const CreateRollup = ZkProgram({
                     Field(ActionStatus.REDUCED)
                 );
                 key.assertEquals(actionState);
-                root.assertEquals(preProof.publicOutput.finalStatusRoot);
+                root.assertEquals(earlierProof.publicOutput.finalStatusRoot);
 
                 // Update satus to ROLL_UPED
                 let [newRoot] = rollupStatusWitness.computeRootAndKey(
                     Field(ActionStatus.ROLL_UPED)
                 );
 
-                let sum_R = preProof.publicOutput.sum_R;
-                let sum_M = preProof.publicOutput.sum_M;
+                let sum_R = earlierProof.publicOutput.sum_R;
+                let sum_M = earlierProof.publicOutput.sum_M;
 
                 for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
                     sum_R.set(
@@ -217,8 +217,9 @@ export const CreateRollup = ZkProgram({
                     requestId: requestId,
                     sum_R,
                     sum_M,
-                    cur_T: preProof.publicOutput.cur_T.add(Field(1)),
-                    initialStatusRoot: preProof.publicOutput.initialStatusRoot,
+                    cur_T: earlierProof.publicOutput.cur_T.add(Field(1)),
+                    initialStatusRoot:
+                        earlierProof.publicOutput.initialStatusRoot,
                     finalStatusRoot: newRoot,
                 });
             },

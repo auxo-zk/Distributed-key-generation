@@ -16,7 +16,7 @@ import {
     CheckMemberInput,
     CommitteeAction,
     CommitteeContract,
-    CreateCommittee,
+    RollupCommittee,
 } from '../../../contracts/Committee.js';
 import axios from 'axios';
 import { MemberArray } from '../../../libs/Committee.js';
@@ -36,7 +36,7 @@ async function main() {
     const { cache, feePayer } = await prepare();
 
     // Compile programs
-    await compile(CreateCommittee, cache);
+    await compile(RollupCommittee, cache);
     await compile(CommitteeContract, cache);
     const committeeAddress =
         'B62qiYCgNQhu1KddDQZs7HL8cLqRd683YufYX1BNceZ6BHnC1qfEcJ9';
@@ -53,7 +53,7 @@ async function main() {
     const committeeState = {
         nextCommitteeId: Field(rawState[0]),
         committeeTreeRoot: Field(rawState[1]),
-        settingTreeRoot: Field(rawState[2]),
+        settingRoot: Field(rawState[2]),
         actionState: Field(rawState[3]),
     };
 

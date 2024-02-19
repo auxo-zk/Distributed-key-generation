@@ -12,7 +12,7 @@ import {
     state,
 } from 'o1js';
 import { CArray, Round1Contribution } from '../libs/Committee.js';
-import { updateOutOfSnark } from '../libs/utils.js';
+import { updateActionState } from '../libs/utils.js';
 import {
     FullMTWitness as CommitteeFullWitness,
     Level1Witness as CommitteeLevel1Witness,
@@ -28,7 +28,7 @@ import {
     CheckMemberInput,
     CommitteeContract,
 } from './Committee.js';
-import { ActionEnum as KeyUpdateEnum, DKGContract, KeyStatus } from './DKG.js';
+import { ActionEnum as KeyUpdateEnum, DkgContract, KeyStatus } from './DKG.js';
 import { INSTANCE_LIMITS, ZkAppEnum } from '../constants.js';
 import {
     ActionStatus,
@@ -100,7 +100,7 @@ export const ReduceRound1 = ZkProgram({
                 earlierProof.verify();
 
                 // Calculate corresponding action state
-                let actionState = updateOutOfSnark(
+                let actionState = updateActionState(
                     earlierProof.publicOutput.newActionState,
                     [Action.toFields(input)]
                 );
@@ -281,7 +281,7 @@ export const FinalizeRound1 = ZkProgram({
                 );
 
                 // Calculate corresponding action state
-                let actionState = updateOutOfSnark(input.previousActionState, [
+                let actionState = updateActionState(input.previousActionState, [
                     Action.toFields(input.action),
                 ]);
 
@@ -377,7 +377,7 @@ export class Round1Contract extends SmartContract {
             })
         );
 
-        // Create & dispatch action to DKGContract
+        // Create & dispatch action to DkgContract
         let action = new Action({
             committeeId: committeeId,
             keyId: keyId,
@@ -416,7 +416,7 @@ export class Round1Contract extends SmartContract {
      * - Verify committee config
      * - Verify key status
      * - Set new states
-     * - Create & dispatch action to DKGContract
+     * - Create & dispatch action to DkgContract
      * @param proof
      * @param committee
      * @param settingWitness
@@ -448,14 +448,14 @@ export class Round1Contract extends SmartContract {
             committee.witness.calculateIndex()
         );
 
-        // DKGContract
+        // DkgContract
         zkApps.assertEquals(
             dkg.witness.calculateRoot(Poseidon.hash(dkg.address.toFields()))
         );
         Field(ZkAppEnum.DKG).assertEquals(dkg.witness.calculateIndex());
 
         const committeeContract = new CommitteeContract(committee.address);
-        const dkgContract = new DKGContract(dkg.address);
+        const dkgContract = new DkgContract(dkg.address);
 
         // Verify finalize proof
         proof.verify();
@@ -491,7 +491,7 @@ export class Round1Contract extends SmartContract {
         this.contributions.set(proof.publicOutput.newContributionRoot);
         this.publicKeys.set(proof.publicOutput.newPublicKeyRoot);
 
-        // Create & dispatch action to DKGContract
+        // Create & dispatch action to DkgContract
         dkgContract.publicAction(
             proof.publicInput.action.committeeId,
             proof.publicInput.action.keyId,

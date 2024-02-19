@@ -17,9 +17,9 @@ import randomAccounts from './helper/randomAccounts.js';
 import {
     CommitteeContract,
     CommitteeAction,
-    CreateCommittee,
+    RollupCommittee,
     CheckMemberInput,
-    CreateCommitteeOutput,
+    RollupCommitteeOutput,
 } from '../contracts/Committee.js';
 import { IPFSHash } from '@auxo-dev/auxo-libs';
 import { MemberArray } from '../libs/Committee.js';
@@ -45,7 +45,7 @@ describe('Committee', () => {
     let feePayerKey: PrivateKey;
     let feePayer: PublicKey;
     let committeeContract: CommitteeContract;
-    let proof: Proof<Void, CreateCommitteeOutput>;
+    let proof: Proof<Void, RollupCommitteeOutput>;
     let myMemberArray1: MemberArray;
     let threshold1 = Field(1);
     let threshold2 = Field(2);
@@ -64,7 +64,7 @@ describe('Committee', () => {
         if (doProofs) {
             await CommitteeContract.compile();
         } else {
-            // CreateCommittee.analyzeMethods();
+            // RollupCommittee.analyzeMethods();
             CommitteeContract.analyzeMethods();
         }
 
@@ -79,7 +79,7 @@ describe('Committee', () => {
 
     it('compile proof', async () => {
         // compile proof
-        await CreateCommittee.compile();
+        await RollupCommittee.compile();
     });
 
     it('Create committee consist of 2 people with threshold 1, and test deploy DKG', async () => {
@@ -120,7 +120,7 @@ describe('Committee', () => {
 
     it('create proof first step...', async () => {
         // create first step proof
-        proof = await CreateCommittee.firstStep(
+        proof = await RollupCommittee.firstStep(
             Reducer.initialActionState,
             memberStorage.root,
             settingStorage.root,
@@ -133,7 +133,7 @@ describe('Committee', () => {
     });
 
     xit('create proof next step 1...', async () => {
-        proof = await CreateCommittee.nextStep(
+        proof = await RollupCommittee.nextStep(
             proof,
             new CommitteeAction({
                 addresses: myMemberArray1,
@@ -165,7 +165,7 @@ describe('Committee', () => {
     });
 
     xit('create proof next step 2...', async () => {
-        proof = await CreateCommittee.nextStep(
+        proof = await RollupCommittee.nextStep(
             proof,
             new CommitteeAction({
                 addresses: myMemberArray2,

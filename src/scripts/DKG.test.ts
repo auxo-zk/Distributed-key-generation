@@ -15,14 +15,14 @@ import { CustomScalar } from '@auxo-dev/auxo-libs';
 import fs from 'fs';
 import { getProfiler } from './helper/profiler.js';
 import { Config, Key } from './helper/config.js';
-import { CommitteeContract, CreateCommittee } from '../contracts/Committee.js';
+import { CommitteeContract, RollupCommittee } from '../contracts/Committee.js';
 import {
     Action as DKGAction,
     ActionEnum,
     ACTION_MASK,
-    DKGContract,
+    DkgContract,
     KeyStatus,
-    UpdateKey,
+    RollupDkg,
 } from '../contracts/DKG.js';
 import {
     Action as Round1Action,
@@ -138,7 +138,7 @@ describe('DKG', () => {
     let settingStorage = new SettingStorage();
     let commmitteeAddressStorage = new AddressStorage();
 
-    // DKGContract storage
+    // DkgContract storage
     let keyCounterStorage = new KeyCounterStorage();
     let keyStatusStorage = new KeyStatusStorage();
     let dkgAddressStorage = new AddressStorage();
@@ -301,7 +301,7 @@ describe('DKG', () => {
                             case Contract.COMMITTEE:
                                 return new CommitteeContract(key.publicKey);
                             case Contract.DKG:
-                                return new DKGContract(key.publicKey);
+                                return new DkgContract(key.publicKey);
                             case Contract.ROUND1:
                                 return new Round1Contract(key.publicKey);
                             case Contract.ROUND2:
@@ -324,7 +324,7 @@ describe('DKG', () => {
     });
 
     it('Should compile all ZK programs', async () => {
-        await compile(UpdateKey, 'UpdateKey', profiling);
+        await compile(RollupDkg, 'RollupDkg', profiling);
 
         await compile(ReduceRound1, 'ReduceRound1', profiling);
         await compile(FinalizeRound1, 'FinalizeRound1', profiling);
@@ -337,13 +337,13 @@ describe('DKG', () => {
         await compile(BatchDecryption, 'BatchDecryption', profiling);
         await compile(CompleteResponse, 'CompleteResponse', profiling);
 
-        await compile(CreateCommittee, 'CreateCommittee', profiling);
+        await compile(RollupCommittee, 'RollupCommittee', profiling);
 
         await compile(CreateRequest, 'CreateRequest', profiling);
 
         if (doProofs) {
             await compile(CommitteeContract, 'CommitteeContract', profiling);
-            await compile(DKGContract, 'DKGContract', profiling);
+            await compile(DkgContract, 'DkgContract', profiling);
             await compile(Round1Contract, 'Round1Contract', profiling);
             await compile(Round2Contract, 'Round2Contract', profiling);
             await compile(ResponseContract, 'ResponseContract', profiling);
@@ -372,8 +372,8 @@ describe('DKG', () => {
         // Deploy committee contract
         await deploy(feePayerKey, 'CommitteeContract', [
             ['nextCommitteeId', committeeIndex.add(Field(1))],
-            ['memberTreeRoot', memberStorage.root],
-            ['settingTreeRoot', settingStorage.root],
+            ['memberRoot', memberStorage.root],
+            ['settingRoot', settingStorage.root],
         ]);
         dkgAddressStorage.updateAddress(
             AddressStorage.calculateIndex(ZkAppEnum.COMMITTEE),
@@ -393,7 +393,7 @@ describe('DKG', () => {
         );
 
         // Deploy dkg contract
-        await deploy(feePayerKey, 'DKGContract', [
+        await deploy(feePayerKey, 'DkgContract', [
             ['zkApps', dkgAddressStorage.root],
         ]);
         round1AddressStorage.updateAddress(
@@ -467,7 +467,7 @@ describe('DKG', () => {
     });
 
     it('Should reduce dkg actions and generate new keys', async () => {
-        let dkgContract = contracts[Contract.DKG].contract as DKGContract;
+        let dkgContract = contracts[Contract.DKG].contract as DkgContract;
         let initialActionState = dkgContract.account.actionState.get();
         let initialKeyCounter = dkgContract.keyCounter.get();
         let initialKeyStatus = dkgContract.keyStatus.get();
@@ -493,7 +493,7 @@ describe('DKG', () => {
             await proveAndSend(
                 tx,
                 members[i],
-                'DKGContract',
+                'DkgContract',
                 'committeeAction'
             );
             contracts[Contract.DKG].actionStates.push(
@@ -501,9 +501,9 @@ describe('DKG', () => {
             );
         }
 
-        console.log('Generate first step proof UpdateKey...');
-        if (profiling) DKGProfiler.start('UpdateKey.firstStep');
-        let updateKeyProof = await UpdateKey.firstStep(
+        console.log('Generate first step proof RollupDkg...');
+        if (profiling) DKGProfiler.start('RollupDkg.firstStep');
+        let updateKeyProof = await RollupDkg.firstStep(
             DKGAction.empty(),
             initialKeyCounter,
             initialKeyStatus,
@@ -514,9 +514,9 @@ describe('DKG', () => {
 
         for (let i = 0; i < 1; i++) {
             let action = dkgActions[ActionEnum.GENERATE_KEY][i];
-            console.log(`Generate step ${i + 1} proof UpdateKey...`);
-            if (profiling) DKGProfiler.start('UpdateKey.nextStepGeneration');
-            updateKeyProof = await UpdateKey.nextStepGeneration(
+            console.log(`Generate step ${i + 1} proof RollupDkg...`);
+            if (profiling) DKGProfiler.start('RollupDkg.nextStepGeneration');
+            updateKeyProof = await RollupDkg.nextStepGeneration(
                 action,
                 updateKeyProof,
                 Field(i),
@@ -561,7 +561,7 @@ describe('DKG', () => {
         let tx = await Mina.transaction(feePayerKey.publicKey, () => {
             dkgContract.updateKeys(updateKeyProof);
         });
-        await proveAndSend(tx, feePayerKey, 'DKGContract', 'updateKeys');
+        await proveAndSend(tx, feePayerKey, 'DkgContract', 'updateKeys');
         dkgContract.keyStatus.get().assertEquals(keyStatusStorage.root);
     });
 
@@ -771,7 +771,7 @@ describe('DKG', () => {
 
         finalizeProof.publicOutput.publicKey.assertEquals(publicKeys[0]);
 
-        let dkgContract = contracts[Contract.DKG].contract as DKGContract;
+        let dkgContract = contracts[Contract.DKG].contract as DkgContract;
         let initialDKGActionState = dkgContract.account.actionState.get();
         let initialKeyCounter = dkgContract.keyCounter.get();
         let initialKeyStatus = dkgContract.keyStatus.get();
@@ -807,9 +807,9 @@ describe('DKG', () => {
             dkgContract.account.actionState.get()
         );
 
-        console.log('Generate first step proof UpdateKey...');
-        if (profiling) DKGProfiler.start('UpdateKey.firstStep');
-        let updateKeyProof = await UpdateKey.firstStep(
+        console.log('Generate first step proof RollupDkg...');
+        if (profiling) DKGProfiler.start('RollupDkg.firstStep');
+        let updateKeyProof = await RollupDkg.firstStep(
             DKGAction.empty(),
             initialKeyCounter,
             initialKeyStatus,
@@ -818,9 +818,9 @@ describe('DKG', () => {
         if (profiling) DKGProfiler.stop();
         console.log('DONE!');
 
-        console.log(`Generate next step proof UpdateKey...`);
-        if (profiling) DKGProfiler.start('UpdateKey.nextStep');
-        updateKeyProof = await UpdateKey.nextStep(
+        console.log(`Generate next step proof RollupDkg...`);
+        if (profiling) DKGProfiler.start('RollupDkg.nextStep');
+        updateKeyProof = await RollupDkg.nextStep(
             action,
             updateKeyProof,
             keyStatusStorage.getWitness(
@@ -851,7 +851,7 @@ describe('DKG', () => {
         tx = await Mina.transaction(feePayerKey.publicKey, () => {
             dkgContract.updateKeys(updateKeyProof);
         });
-        await proveAndSend(tx, feePayerKey, 'DKGContract', 'updateKeys');
+        await proveAndSend(tx, feePayerKey, 'DkgContract', 'updateKeys');
         dkgContract.keyStatus.get().assertEquals(keyStatusStorage.root);
     });
 
@@ -1084,7 +1084,7 @@ describe('DKG', () => {
             );
         }
 
-        let dkgContract = contracts[Contract.DKG].contract as DKGContract;
+        let dkgContract = contracts[Contract.DKG].contract as DkgContract;
         let initialDKGActionState = dkgContract.account.actionState.get();
         let initialKeyCounter = dkgContract.keyCounter.get();
         let initialKeyStatus = dkgContract.keyStatus.get();
@@ -1126,9 +1126,9 @@ describe('DKG', () => {
             dkgContract.account.actionState.get()
         );
 
-        console.log('Generate first step proof UpdateKey...');
-        if (profiling) DKGProfiler.start('UpdateKey.firstStep');
-        let updateKeyProof = await UpdateKey.firstStep(
+        console.log('Generate first step proof RollupDkg...');
+        if (profiling) DKGProfiler.start('RollupDkg.firstStep');
+        let updateKeyProof = await RollupDkg.firstStep(
             DKGAction.empty(),
             initialKeyCounter,
             initialKeyStatus,
@@ -1137,9 +1137,9 @@ describe('DKG', () => {
         if (profiling) DKGProfiler.stop();
         console.log('DONE!');
 
-        console.log(`Generate next step proof UpdateKey...`);
-        if (profiling) DKGProfiler.start('UpdateKey.nextStep');
-        updateKeyProof = await UpdateKey.nextStep(
+        console.log(`Generate next step proof RollupDkg...`);
+        if (profiling) DKGProfiler.start('RollupDkg.nextStep');
+        updateKeyProof = await RollupDkg.nextStep(
             action,
             updateKeyProof,
             keyStatusStorage.getWitness(
@@ -1170,7 +1170,7 @@ describe('DKG', () => {
         tx = await Mina.transaction(feePayerKey.publicKey, () => {
             dkgContract.updateKeys(updateKeyProof);
         });
-        await proveAndSend(tx, feePayerKey, 'DKGContract', 'updateKeys');
+        await proveAndSend(tx, feePayerKey, 'DkgContract', 'updateKeys');
         dkgContract.keyStatus.get().assertEquals(keyStatusStorage.root);
     });
 

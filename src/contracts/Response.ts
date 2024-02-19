@@ -14,7 +14,7 @@ import {
     state,
 } from 'o1js';
 import { ResponseContribution } from '../libs/Committee.js';
-import { updateOutOfSnark } from '../libs/utils.js';
+import { updateActionState } from '../libs/utils.js';
 import {
     FullMTWitness as CommitteeFullWitness,
     Level1Witness as CommitteeLevel1Witness,
@@ -31,7 +31,7 @@ import {
     CheckMemberInput,
     CommitteeContract,
 } from './Committee.js';
-import { DKGContract, KeyStatus } from './DKG.js';
+import { DkgContract, KeyStatus } from './DKG.js';
 import { RequestContract, RequestVector, ResolveInput } from './Request.js';
 import { BatchDecryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
@@ -115,7 +115,7 @@ export const ReduceResponse = ZkProgram({
                 earlierProof.verify();
 
                 // Calculate corresponding action state
-                let actionState = updateOutOfSnark(
+                let actionState = updateActionState(
                     earlierProof.publicOutput.newActionState,
                     [Action.toFields(input)]
                 );
@@ -346,7 +346,7 @@ export const CompleteResponse = ZkProgram({
                 }
 
                 // Verify the action has been reduced
-                let actionState = updateOutOfSnark(input.previousActionState, [
+                let actionState = updateActionState(input.previousActionState, [
                     Action.toFields(input.action),
                 ]);
                 let [reduceRoot, reduceIndex] = reduceWitness.computeRootAndKey(
@@ -401,7 +401,7 @@ export class ResponseContract extends SmartContract {
      * - Verify round 1 public key (C0)
      * - Verify round 2 encryptions (hashes)
      * - Compute response
-     * - Create & dispatch action to DKGContract
+     * - Create & dispatch action to DkgContract
      * @param committeeId
      * @param keyId
      * @param requestId
@@ -540,7 +540,7 @@ export class ResponseContract extends SmartContract {
             );
         }
 
-        // Create & dispatch action to DKGContract
+        // Create & dispatch action to DkgContract
         let action = new Action({
             committeeId: committeeId,
             keyId: keyId,
@@ -611,7 +611,7 @@ export class ResponseContract extends SmartContract {
             committee.witness.calculateIndex()
         );
 
-        // DKGContract
+        // DkgContract
         zkApps.assertEquals(
             dkg.witness.calculateRoot(Poseidon.hash(dkg.address.toFields()))
         );
@@ -626,7 +626,7 @@ export class ResponseContract extends SmartContract {
         Field(ZkAppEnum.REQUEST).assertEquals(request.witness.calculateIndex());
 
         const committeeContract = new CommitteeContract(committee.address);
-        const dkgContract = new DKGContract(dkg.address);
+        const dkgContract = new DkgContract(dkg.address);
 
         // Verify response proof
         proof.verify();

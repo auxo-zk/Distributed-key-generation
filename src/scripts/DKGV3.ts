@@ -20,16 +20,16 @@ import { getProfiler } from './helper/profiler.js';
 import { Config, Key } from './helper/config.js';
 import {
     CommitteeContract,
-    CreateCommittee,
+    RollupCommittee,
     CommitteeAction,
 } from '../contracts/Committee.js';
 import {
     Action as DKGAction,
     ActionEnum,
     ACTION_MASK,
-    DKGContract,
+    DkgContract,
     KeyStatus,
-    UpdateKey,
+    RollupDkg,
 } from '../contracts/DKG.js';
 import {
     Action as Round1Action,
@@ -114,7 +114,7 @@ import {
 } from '../contracts/Request.js';
 import { EMPTY_LEVEL_1_TREE as EMPTY_LEVEL_1_TREE_COMMITEE } from '../contracts/CommitteeStorage.js';
 import { EMPTY_LEVEL_1_TREE as EMPTY_LEVEL_1_TREE_DKG } from '../contracts/DKGStorage.js';
-import { packIndexArray, updateOutOfSnark } from '../libs/utils.js';
+import { packIndexArray, updateActionState } from '../libs/utils.js';
 import { ResponseContributionStorage } from '../contracts/RequestStorage.js';
 
 const waitTime = 10 * 60 * 1000; // 10m
@@ -477,7 +477,7 @@ async function main() {
                         case Contract.COMMITTEE:
                             return new CommitteeContract(key.publicKey);
                         case Contract.DKG:
-                            return new DKGContract(key.publicKey);
+                            return new DkgContract(key.publicKey);
                         case Contract.ROUND1:
                             return new Round1Contract(key.publicKey);
                         case Contract.ROUND2:
@@ -504,7 +504,7 @@ async function main() {
     let settingStorage = new SettingStorage();
     let commmitteeAddressStorage = new AddressStorage();
 
-    // DKGContract storage
+    // DkgContract storage
     let keyCounterStorage = new KeyCounterStorage();
     let keyStatusStorage = new KeyStatusStorage();
     let dkgAddressStorage = new AddressStorage();
@@ -596,7 +596,7 @@ async function main() {
     Provable.log(requestId);
 
     if (true) {
-        // await compile(UpdateKey, 'UpdateKey', profiling);
+        // await compile(RollupDkg, 'RollupDkg', profiling);
 
         // await compile(ReduceRound1, 'ReduceRound1', profiling);
         // await compile(FinalizeRound1, 'FinalizeRound1', profiling);
@@ -609,12 +609,12 @@ async function main() {
         await compile(BatchDecryption, 'BatchDecryption', profiling);
         await compile(CompleteResponse, 'CompleteResponse', profiling);
 
-        // await compile(CreateCommittee, 'CreateCommittee', profiling);
+        // await compile(RollupCommittee, 'RollupCommittee', profiling);
 
         await compile(CreateRequest, 'CreateRequest', profiling);
 
         // await compile(CommitteeContract, 'CommitteeContract', profiling);
-        // await compile(DKGContract, 'DKGContract', profiling);
+        // await compile(DkgContract, 'DkgContract', profiling);
         // await compile(Round1Contract, 'Round1Contract', profiling);
         // await compile(Round2Contract, 'Round2Contract', profiling);
         await compile(ResponseContract, 'ResponseContract', profiling);
@@ -654,7 +654,7 @@ async function main() {
     // Deploy dkg contract
     // await deploy(
     //     feePayerKey,
-    //     'DKGContract',
+    //     'DkgContract',
     //     [['zkApps', dkgAddressStorage.root]],
     //     fee,
     //     ++feePayerNonce
@@ -848,7 +848,7 @@ async function main() {
     console.log('Reduce committe');
     // create first step proof
     console.log('create proof first step...');
-    // let proof = await CreateCommittee.firstStep(
+    // let proof = await RollupCommittee.firstStep(
     //   Reducer.initialActionState,
     //   memberStorage.level1.getRoot(),
     //   settingStorage.level1.getRoot(),
@@ -856,7 +856,7 @@ async function main() {
     // );
 
     console.log('create proof next step...');
-    // proof = await CreateCommittee.nextStep(
+    // proof = await RollupCommittee.nextStep(
     //   proof,
     //   new CommitteeAction({
     //     addresses: myMemberArray1,
@@ -901,7 +901,7 @@ async function main() {
 
     //   console.log('Should reduce dkg actions and generate new keys');
     //   await fetchAllContract(contracts);
-    //   let dkgContract = contracts[Contract.DKG].contract as DKGContract;
+    //   let dkgContract = contracts[Contract.DKG].contract as DkgContract;
     //   let initialActionState = Reducer.initialActionState;
     //   let initialKeyCounter = EMPTY_LEVEL_1_TREE_COMMITEE().getRoot();
     //   let initialKeyStatus = EMPTY_LEVEL_1_TREE_DKG().getRoot();
@@ -929,15 +929,15 @@ async function main() {
     //   //       );
     //   //     }
     //   //   );
-    //   //   await proveAndSend(tx, members[i], 'DKGContract', 'committeeAction');
+    //   //   await proveAndSend(tx, members[i], 'DkgContract', 'committeeAction');
     //   // }
     //   // await wait();
 
     //   // await fetchAllContract(contracts);
 
-    //   // console.log('Generate first step proof UpdateKey...');
-    //   // if (profiling) DKGProfiler.start('UpdateKey.firstStep');
-    //   // let updateKeyProof = await UpdateKey.firstStep(
+    //   // console.log('Generate first step proof RollupDkg...');
+    //   // if (profiling) DKGProfiler.start('RollupDkg.firstStep');
+    //   // let updateKeyProof = await RollupDkg.firstStep(
     //   //   DKGAction.empty(),
     //   //   initialKeyCounter,
     //   //   initialKeyStatus,
@@ -948,9 +948,9 @@ async function main() {
 
     //   for (let i = 0; i < 1; i++) {
     //     let action = dkgActions[ActionEnum.GENERATE_KEY][i];
-    //     console.log(`Generate step ${i + 1} proof UpdateKey...`);
-    //     if (profiling) DKGProfiler.start('UpdateKey.nextStepGeneration');
-    //     // updateKeyProof = await UpdateKey.nextStepGeneration(
+    //     console.log(`Generate step ${i + 1} proof RollupDkg...`);
+    //     if (profiling) DKGProfiler.start('RollupDkg.nextStepGeneration');
+    //     // updateKeyProof = await RollupDkg.nextStepGeneration(
     //     //   action,
     //     //   updateKeyProof,
     //     //   Field(i),
@@ -992,7 +992,7 @@ async function main() {
     //   //     dkgContract.updateKeys(updateKeyProof);
     //   //   }
     //   // );
-    //   // await proveAndSend(tx, feePayerKey, 'DKGContract', 'updateKeys');
+    //   // await proveAndSend(tx, feePayerKey, 'DkgContract', 'updateKeys');
 
     //   // await wait();
     //   // await fetchAllContract(contracts);
@@ -1196,7 +1196,7 @@ async function main() {
     //   }
 
     //   // await fetchAllContract(contracts);
-    //   dkgContract = contracts[Contract.DKG].contract as DKGContract;
+    //   dkgContract = contracts[Contract.DKG].contract as DkgContract;
     //   // let initialDKGActionState = dkgContract.account.actionState.get();
     //   // Fix cung tam thoi
     //   let initialDKGActionState = Field.from(
@@ -1244,9 +1244,9 @@ async function main() {
 
     //   // await fetchAllContract(contracts);
 
-    //   console.log('Generate first step proof UpdateKey...');
-    //   if (profiling) DKGProfiler.start('UpdateKey.firstStep');
-    //   // let updateKeyProof = await UpdateKey.firstStep(
+    //   console.log('Generate first step proof RollupDkg...');
+    //   if (profiling) DKGProfiler.start('RollupDkg.firstStep');
+    //   // let updateKeyProof = await RollupDkg.firstStep(
     //   //   DKGAction.empty(),
     //   //   initialKeyCounter,
     //   //   initialKeyStatus,
@@ -1255,9 +1255,9 @@ async function main() {
     //   if (profiling) DKGProfiler.stop();
     //   console.log('DONE!');
 
-    //   console.log(`Generate next step proof UpdateKey...`);
-    //   if (profiling) DKGProfiler.start('UpdateKey.nextStep');
-    //   // updateKeyProof = await UpdateKey.nextStep(
+    //   console.log(`Generate next step proof RollupDkg...`);
+    //   if (profiling) DKGProfiler.start('RollupDkg.nextStep');
+    //   // updateKeyProof = await RollupDkg.nextStep(
     //   //   action,
     //   //   updateKeyProof,
     //   //   keyStatusStorage.getWitness(
@@ -1289,7 +1289,7 @@ async function main() {
     //   //     dkgContract.updateKeys(updateKeyProof);
     //   //   }
     //   // );
-    //   // await proveAndSend(tx, feePayerKey, 'DKGContract', 'updateKeys');
+    //   // await proveAndSend(tx, feePayerKey, 'DkgContract', 'updateKeys');
     //   // await wait();
     //   ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //   // await fetchAllContract(contracts);
@@ -1377,13 +1377,13 @@ async function main() {
     //   );
     //   Provable.log(
     //     'round2Actions 0: ',
-    //     updateOutOfSnark(initialActionState, [
+    //     updateActionState(initialActionState, [
     //       Round2Action.toFields(round2Actions[0]),
     //     ])
     //   );
     //   Provable.log(
     //     'round2Actions 1: ',
-    //     updateOutOfSnark(initialActionState, [
+    //     updateActionState(initialActionState, [
     //       Round2Action.toFields(round2Actions[1]),
     //     ])
     //   );
@@ -1538,7 +1538,7 @@ async function main() {
     //     );
     //   }
 
-    //   dkgContract = contracts[Contract.DKG].contract as DKGContract;
+    //   dkgContract = contracts[Contract.DKG].contract as DkgContract;
     //   // await fetchAllContract(contracts);
     //   // initialDKGActionState = dkgContract.account.actionState.get();
     //   // initialKeyCounter = dkgContract.keyCounter.get();
@@ -1587,9 +1587,9 @@ async function main() {
 
     //   // await fetchAllContract(contracts);
 
-    //   console.log('Generate first step proof UpdateKey...');
-    //   if (profiling) DKGProfiler.start('UpdateKey.firstStep');
-    //   // let updateKeyProof = await UpdateKey.firstStep(
+    //   console.log('Generate first step proof RollupDkg...');
+    //   if (profiling) DKGProfiler.start('RollupDkg.firstStep');
+    //   // let updateKeyProof = await RollupDkg.firstStep(
     //   //   DKGAction.empty(),
     //   //   initialKeyCounter,
     //   //   initialKeyStatus,
@@ -1598,9 +1598,9 @@ async function main() {
     //   if (profiling) DKGProfiler.stop();
     //   console.log('DONE!');
 
-    //   console.log(`Generate next step proof UpdateKey...`);
-    //   if (profiling) DKGProfiler.start('UpdateKey.nextStep');
-    //   // updateKeyProof = await UpdateKey.nextStep(
+    //   console.log(`Generate next step proof RollupDkg...`);
+    //   if (profiling) DKGProfiler.start('RollupDkg.nextStep');
+    //   // updateKeyProof = await RollupDkg.nextStep(
     //   //   action,
     //   //   updateKeyProof,
     //   //   keyStatusStorage.getWitness(
@@ -1633,7 +1633,7 @@ async function main() {
     //   //   }
     //   // );
 
-    //   // await proveAndSend(tx, feePayerKey, 'DKGContract', 'updateKeys');
+    //   // await proveAndSend(tx, feePayerKey, 'DkgContract', 'updateKeys');
     //   // await wait();
     //   // await fetchAllContract(contracts);
     //   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

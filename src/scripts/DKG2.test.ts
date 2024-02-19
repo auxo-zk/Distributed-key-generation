@@ -16,14 +16,14 @@ import { CustomScalar } from '@auxo-dev/auxo-libs';
 import fs from 'fs';
 import { getProfiler } from './helper/profiler.js';
 import { Config, Key } from './helper/config.js';
-import { CommitteeContract, CreateCommittee } from '../contracts/Committee.js';
+import { CommitteeContract, RollupCommittee } from '../contracts/Committee.js';
 import {
     Action as DKGAction,
     ActionEnum,
     ACTION_MASK,
-    DKGContract,
+    DkgContract,
     KeyStatus,
-    UpdateKey,
+    RollupDkg,
 } from '../contracts/DKG.js';
 import {
     Action as Round1Action,
@@ -146,7 +146,7 @@ describe('DKG', () => {
     let settingStorage = new SettingStorage();
     let commmitteeAddressStorage = new AddressStorage();
 
-    // DKGContract storage
+    // DkgContract storage
     let keyCounterStorage = new KeyCounterStorage();
     let keyStatusStorage = new KeyStatusStorage();
     let dkgAddressStorage = new AddressStorage();
@@ -303,7 +303,7 @@ describe('DKG', () => {
                             case Contract.COMMITTEE:
                                 return new CommitteeContract(key.publicKey);
                             case Contract.DKG:
-                                return new DKGContract(key.publicKey);
+                                return new DkgContract(key.publicKey);
                             case Contract.ROUND1:
                                 return new Round1Contract(key.publicKey);
                             case Contract.ROUND2:

@@ -18,7 +18,7 @@
 // import {
 //   CommitteeContract,
 //   CommitteeAction,
-//   CreateCommittee,
+//   RollupCommittee,
 //   CheckMemberInput,
 // } from '../contracts/Committee.js';
 // import {
@@ -90,14 +90,14 @@
 //     // the committeeContract account
 //     let committeeContract = new CommitteeContract(addresses.committee);
 //     if (doProofs) {
-//       console.time('CreateCommittee.compile');
-//       await CreateCommittee.compile();
-//       console.timeEnd('CreateCommittee.compile');
+//       console.time('RollupCommittee.compile');
+//       await RollupCommittee.compile();
+//       console.timeEnd('RollupCommittee.compile');
 //       await CommitteeContract.compile();
 //     } else {
-//       console.time('CreateCommittee.compile');
-//       await CreateCommittee.compile();
-//       console.timeEnd('CreateCommittee.compile');
+//       console.time('RollupCommittee.compile');
+//       await RollupCommittee.compile();
+//       console.timeEnd('RollupCommittee.compile');
 //       console.log('analyzeMethods...');
 //       CommitteeContract.analyzeMethods();
 //     }
@@ -161,8 +161,8 @@
 
 //     // create first step proof
 //     console.log('create proof first step...');
-//     ActionCommitteeProfiler.start('CreateCommittee create fist step');
-//     let proof = await CreateCommittee.firstStep(
+//     ActionCommitteeProfiler.start('RollupCommittee create fist step');
+//     let proof = await RollupCommittee.firstStep(
 //       Reducer.initialActionState,
 //       memberStorage.level1.getRoot(),
 //       settingStorage.level1.getRoot(),
@@ -171,8 +171,8 @@
 //     ActionCommitteeProfiler.stop().store();
 
 //     console.log('create proof next step...');
-//     ActionCommitteeProfiler.start('CreateCommittee create next step');
-//     proof = await CreateCommittee.nextStep(
+//     ActionCommitteeProfiler.start('RollupCommittee create next step');
+//     proof = await RollupCommittee.nextStep(
 //       proof,
 //       new CommitteeAction({
 //         addresses: myMemberArray1,
@@ -199,8 +199,8 @@
 //     );
 
 //     console.log('create proof next step again...');
-//     ActionCommitteeProfiler.start('CreateCommittee create next step');
-//     proof = await CreateCommittee.nextStep(
+//     ActionCommitteeProfiler.start('RollupCommittee create next step');
+//     proof = await RollupCommittee.nextStep(
 //       proof,
 //       new CommitteeAction({
 //         addresses: myMemberArray2,
@@ -295,8 +295,8 @@
 
 //     // compile proof
 //     if (actionn == 0 || actionn == 1 || actionn == 2) {
-//       console.log('compile CreateCommittee...');
-//       await CreateCommittee.compile();
+//       console.log('compile RollupCommittee...');
+//       await RollupCommittee.compile();
 //       console.log('compile Committee contract... ');
 //       await CommitteeContract.compile();
 //     }
@@ -354,14 +354,14 @@
 //     if (actionn == 2) {
 //       // create first step proof
 //       console.log('create proof first step...');
-//       let proof = await CreateCommittee.firstStep(
+//       let proof = await RollupCommittee.firstStep(
 //         Reducer.initialActionState,
 //         EmptyMerkleMap.getRoot(),
 //         EmptyMerkleMap.getRoot(),
 //         committeeContract.nextCommitteeId.get()
 //       );
 //       console.log('create proof next step...');
-//       proof = await CreateCommittee.nextStep(
+//       proof = await RollupCommittee.nextStep(
 //         proof,
 //         new CommitteeAction({
 //           addresses: myMemberArray1,
