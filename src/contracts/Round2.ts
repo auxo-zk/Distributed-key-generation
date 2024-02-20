@@ -32,7 +32,12 @@ import {
     CheckMemberInput,
     CommitteeContract,
 } from './Committee.js';
-import { ActionEnum as KeyUpdateEnum, DkgContract, KeyStatus } from './DKG.js';
+import {
+    ActionEnum as KeyUpdateEnum,
+    DkgContract,
+    KeyStatus,
+    KeyStatusInput,
+} from './DKG.js';
 import { BatchEncryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
 import {
@@ -527,15 +532,14 @@ export class Round2Contract extends SmartContract {
         );
 
         // Verify key status
-        let keyIndex = proof.publicOutput.keyIndex;
-        dkgContract.keyStatus
-            .getAndRequireEquals()
-            .assertEquals(
-                keyStatusWitness.calculateRoot(
-                    Field(KeyStatus.ROUND_2_CONTRIBUTION)
-                )
-            );
-        keyIndex.assertEquals(keyStatusWitness.calculateIndex());
+        dkgContract.verifyKeyStatus(
+            new KeyStatusInput({
+                committeeId: proof.publicInput.action.committeeId,
+                keyId: proof.publicInput.action.keyId,
+                status: Field(KeyStatus.ROUND_2_CONTRIBUTION),
+                witness: keyStatusWitness,
+            })
+        );
 
         // Verify encryption witness
         // TODO: Remove Provable.witness or adding assertion
@@ -554,7 +558,9 @@ export class Round2Contract extends SmartContract {
             return encryptionHashesMT.getRoot();
         });
         encryptions.assertEquals(encryptionWitness.calculateRoot(Field(0)));
-        keyIndex.assertEquals(encryptionWitness.calculateIndex());
+        proof.publicOutput.keyIndex.assertEquals(
+            encryptionWitness.calculateIndex()
+        );
 
         // Set new states
         this.contributions.set(proof.publicOutput.newContributionRoot);

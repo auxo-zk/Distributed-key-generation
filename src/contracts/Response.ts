@@ -31,7 +31,7 @@ import {
     CheckMemberInput,
     CommitteeContract,
 } from './Committee.js';
-import { DkgContract, KeyStatus } from './DKG.js';
+import { DkgContract, KeyStatus, KeyStatusInput } from './DKG.js';
 import { RequestContract, RequestVector, ResolveInput } from './Request.js';
 import { BatchDecryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
@@ -645,15 +645,14 @@ export class ResponseContract extends SmartContract {
         );
 
         // Verify key status
-        let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))
-            .mul(proof.publicInput.action.committeeId)
-            .add(proof.publicInput.action.keyId);
-        dkgContract.keyStatus
-            .getAndRequireEquals()
-            .assertEquals(
-                keyStatusWitness.calculateRoot(Field(KeyStatus.ACTIVE))
-            );
-        keyIndex.assertEquals(keyStatusWitness.calculateIndex());
+        dkgContract.verifyKeyStatus(
+            new KeyStatusInput({
+                committeeId: proof.publicInput.action.committeeId,
+                keyId: proof.publicInput.action.keyId,
+                status: Field(KeyStatus.ACTIVE),
+                witness: keyStatusWitness,
+            })
+        );
 
         // Set new states
         this.contributions.set(proof.publicOutput.newContributionRoot);

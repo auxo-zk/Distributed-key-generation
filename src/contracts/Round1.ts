@@ -28,7 +28,12 @@ import {
     CheckMemberInput,
     CommitteeContract,
 } from './Committee.js';
-import { ActionEnum as KeyUpdateEnum, DkgContract, KeyStatus } from './DKG.js';
+import {
+    ActionEnum as KeyUpdateEnum,
+    DkgContract,
+    KeyStatus,
+    KeyStatusInput,
+} from './DKG.js';
 import { INSTANCE_LIMITS, ZkAppEnum } from '../constants.js';
 import {
     ActionStatus,
@@ -475,17 +480,14 @@ export class Round1Contract extends SmartContract {
         );
 
         // Verify key status
-        let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))
-            .mul(proof.publicInput.action.committeeId)
-            .add(proof.publicInput.action.keyId);
-        dkgContract.keyStatus
-            .getAndRequireEquals()
-            .assertEquals(
-                keyStatusWitness.calculateRoot(
-                    Field(KeyStatus.ROUND_1_CONTRIBUTION)
-                )
-            );
-        keyIndex.assertEquals(keyStatusWitness.calculateIndex());
+        dkgContract.verifyKeyStatus(
+            new KeyStatusInput({
+                committeeId: proof.publicInput.action.committeeId,
+                keyId: proof.publicInput.action.keyId,
+                status: Field(KeyStatus.ROUND_1_CONTRIBUTION),
+                witness: keyStatusWitness,
+            })
+        );
 
         // Set new states
         this.contributions.set(proof.publicOutput.newContributionRoot);

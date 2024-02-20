@@ -27,7 +27,6 @@ import {
 } from './DKGStorage.js';
 import { INSTANCE_LIMITS, ZkAppEnum } from '../constants.js';
 import { ErrorEnum, EventEnum } from './shared.js';
-import { MemberArray } from '../libs/Committee.js';
 
 export const enum KeyStatus {
     EMPTY,
@@ -36,6 +35,13 @@ export const enum KeyStatus {
     ACTIVE,
     DEPRECATED,
 }
+
+export class KeyStatusInput extends Struct({
+    committeeId: Field,
+    keyId: Field,
+    status: Field,
+    witness: Level1Witness,
+}) {}
 
 export const enum ActionEnum {
     GENERATE_KEY,
@@ -388,5 +394,16 @@ export class DkgContract extends SmartContract {
 
         // Emit events
         this.emitEvent(EventEnum.ROLLUPED, actionState);
+    }
+
+    verifyKeyStatus(input: KeyStatusInput) {
+        let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))
+            .mul(input.committeeId)
+            .add(input.keyId);
+
+        this.keyStatusRoot
+            .getAndRequireEquals()
+            .assertEquals(input.witness.calculateRoot(input.status));
+        keyIndex.assertEquals(input.witness.calculateIndex());
     }
 }
