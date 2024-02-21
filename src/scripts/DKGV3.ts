@@ -885,16 +885,16 @@ async function main() {
     //     settingStorage.calculateLevel1Index(committeeIndex)
     //   );
 
-    //   // console.log('committeeContract.rollupIncrements: ');
+    //   // console.log('committeeContract.rollup: ');
     //   // tx = await Mina.transaction(
     //   //   { sender: feePayerKey.publicKey, fee, nonce: ++feePayerNonce },
     //   //   () => {
-    //   //     committeeContract.rollupIncrements(proof);
+    //   //     committeeContract.rollup(proof);
     //   //   }
     //   // );
     //   // await tx.prove();
     //   // await tx.sign([feePayerKey.privateKey]).send();
-    //   // console.log('committeeContract.rollupIncrements sent!...');
+    //   // console.log('committeeContract.rollup sent!...');
 
     //   // await wait();
     //   // await fetchAllContract(contracts);

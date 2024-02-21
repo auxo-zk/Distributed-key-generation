@@ -14,7 +14,7 @@ import {
 } from 'o1js';
 import { BoolDynamicArray } from '@auxo-dev/auxo-libs';
 import { buildAssertMessage, updateActionState } from '../libs/utils.js';
-import { CheckMemberInput, CommitteeContract } from './Committee.js';
+import { CommitteeMemberInput, CommitteeContract } from './Committee.js';
 import { EMPTY_ADDRESS_MT, ZkAppRef } from './SharedStorage.js';
 import {
     EMPTY_LEVEL_1_TREE as COMMITTEE_LEVEL_1_TREE,
@@ -326,7 +326,7 @@ export class DkgContract extends SmartContract {
         // Verify committee member - FIXME check if using this.sender is secure
         committeeContract
             .checkMember(
-                new CheckMemberInput({
+                new CommitteeMemberInput({
                     address: this.sender,
                     committeeId: committeeId,
                     memberWitness: memberWitness,

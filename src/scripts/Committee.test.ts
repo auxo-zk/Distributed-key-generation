@@ -18,7 +18,7 @@ import {
     CommitteeContract,
     CommitteeAction,
     RollupCommittee,
-    CheckMemberInput,
+    CommitteeMemberInput,
     RollupCommitteeOutput,
 } from '../contracts/Committee.js';
 import { IPFSHash } from '@auxo-dev/auxo-libs';
@@ -196,9 +196,9 @@ describe('Committee', () => {
         );
     });
 
-    xit('committeeContract rollupIncrements', async () => {
+    xit('committeeContract rollup', async () => {
         let tx = await Mina.transaction(feePayer, () => {
-            committeeContract.rollupIncrements(proof);
+            committeeContract.rollup(proof);
         });
         await tx.prove();
         await tx.sign([feePayerKey]).send();
@@ -206,7 +206,7 @@ describe('Committee', () => {
 
     xit('check if p2 belong to committee 0', async () => {
         // Check if member belong to committeeId
-        let checkInput = new CheckMemberInput({
+        let checkInput = new CommitteeMemberInput({
             address: addresses.p2,
             committeeId: Field(0),
             memberWitness: memberStorage.getWitness(Field(0), Field(1)),
@@ -220,7 +220,7 @@ describe('Committee', () => {
 
     xit('check if p2 belong to committee 1: to throw error', async () => {
         // Check if member belong to committeeId
-        let checkInput = new CheckMemberInput({
+        let checkInput = new CommitteeMemberInput({
             address: addresses.p2,
             committeeId: Field(1),
             memberWitness: memberStorage.getWitness(Field(1), Field(1)),

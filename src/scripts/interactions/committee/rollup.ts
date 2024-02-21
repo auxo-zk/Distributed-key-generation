@@ -174,15 +174,10 @@ async function main() {
             nonce: feePayer.nonce++,
         },
         () => {
-            committeeContract.rollupIncrements(proof);
+            committeeContract.rollup(proof);
         }
     );
-    await proveAndSend(
-        tx,
-        feePayer.key,
-        'CommitteeContract',
-        'rollupIncrements'
-    );
+    await proveAndSend(tx, feePayer.key, 'CommitteeContract', 'rollup');
 }
 
 main()

@@ -35,13 +35,13 @@ export class CommitteeAction extends Struct({
     }
 }
 
-export class CheckMemberInput extends Struct({
+export class CommitteeMemberInput extends Struct({
     address: PublicKey,
     committeeId: Field,
     memberWitness: FullMTWitness,
 }) {}
 
-export class CheckConfigInput extends Struct({
+export class CommitteeConfigInput extends Struct({
     N: Field,
     T: Field,
     committeeId: Field,
@@ -187,12 +187,27 @@ export const RollupCommittee = ZkProgram({
     },
 });
 
-export class CommitteeProof extends ZkProgram.Proof(RollupCommittee) {}
+export class RollupCommitteeProof extends ZkProgram.Proof(RollupCommittee) {}
 
 export class CommitteeContract extends SmartContract {
+    /**
+     * @description Incremental value to keep track of committees
+     */
     @state(Field) nextCommitteeId = State<Field>();
+
+    /**
+     * @description MT root storing committees' members
+     */
     @state(Field) memberRoot = State<Field>();
+
+    /**
+     * @description MT root storing committees' threshold setting (T/N)
+     */
     @state(Field) settingRoot = State<Field>();
+
+    /**
+     * @description Latest rolluped action's state
+     */
     @state(Field) actionState = State<Field>();
 
     reducer = Reducer({ actionType: CommitteeAction });
@@ -208,75 +223,100 @@ export class CommitteeContract extends SmartContract {
         this.actionState.set(Reducer.initialActionState);
     }
 
+    /**
+     * Create new committee
+     * @param action Committee's information
+     */
     @method createCommittee(action: CommitteeAction) {
         action.threshold.assertLessThanOrEqual(action.addresses.length);
         this.reducer.dispatch(action);
     }
 
-    @method rollupIncrements(proof: CommitteeProof) {
+    /**
+     * Rollup committee actions
+     * @param proof Recursive rollup proof
+     */
+    @method rollup(proof: RollupCommitteeProof) {
+        // Verify proof
         proof.verify();
+
+        // Assert on-chain states
         let curActionState = this.actionState.getAndRequireEquals();
         let nextCommitteeId = this.nextCommitteeId.getAndRequireEquals();
         let memberRoot = this.memberRoot.getAndRequireEquals();
         let settingRoot = this.settingRoot.getAndRequireEquals();
+        let lastActionState = this.account.actionState.getAndRequireEquals();
 
+        // Verify current action state
         curActionState.assertEquals(
             proof.publicOutput.initialActionState,
             buildAssertMessage(
                 CommitteeContract.name,
-                'rollupIncrements',
+                'rollup',
                 ErrorEnum.CURRENT_ACTION_STATE
             )
         );
+
+        // Verify current committee Id
         nextCommitteeId.assertEquals(
             proof.publicOutput.initialCommitteeId,
             buildAssertMessage(
                 CommitteeContract.name,
-                'rollupIncrements',
+                'rollup',
                 ErrorEnum.NEXT_COMMITTEE_ID
             )
         );
+
+        // Verify current member root
         memberRoot.assertEquals(
             proof.publicOutput.initialMemberRoot,
             buildAssertMessage(
                 CommitteeContract.name,
-                'rollupIncrements',
+                'rollup',
                 ErrorEnum.MEMBER_ROOT
             )
         );
+
+        // Verify current setting root
         settingRoot.assertEquals(
             proof.publicOutput.initialSettingRoot,
             buildAssertMessage(
                 CommitteeContract.name,
-                'rollupIncrements',
+                'rollup',
                 ErrorEnum.SETTING_ROOT
             )
         );
 
-        let lastActionState = this.account.actionState.getAndRequireEquals();
+        // Verify last action state
         lastActionState.assertEquals(
             proof.publicOutput.nextActionState,
             buildAssertMessage(
                 CommitteeContract.name,
-                'rollupIncrements',
+                'rollup',
                 ErrorEnum.LAST_ACTION_STATE
             )
         );
 
-        // update on-chain state
+        // Update on-chain states
         this.actionState.set(proof.publicOutput.nextActionState);
         this.nextCommitteeId.set(proof.publicOutput.nextCommitteeId);
         this.memberRoot.set(proof.publicOutput.nextMemberRoot);
         this.settingRoot.set(proof.publicOutput.nextSettingRoot);
 
+        // Emit rollup event
         this.emitEvent(
             EventEnum.ROLLUPED,
             proof.publicOutput.nextCommitteeId.sub(Field(1))
         );
     }
 
-    // Add memberIndex to input for checking
-    checkMember(input: CheckMemberInput): Field {
+    /**
+     * Verify if an address is a member of a committee
+     * @param input Verification input
+     * @returns Member Id in the committee
+     * @todo Add memberIndex to input for checking
+     */
+    checkMember(input: CommitteeMemberInput): Field {
         let leaf = input.memberWitness.level2.calculateRoot(
             MemberArray.hash(input.address)
         );
@@ -305,9 +345,12 @@ export class CommitteeContract extends SmartContract {
         return memberId;
     }
 
-    checkConfig(input: CheckConfigInput) {
+    /**
+     * Verify the setting of a committee
+     * @param input Verification input
+     */
+    checkConfig(input: CommitteeConfigInput) {
         input.N.assertGreaterThanOrEqual(input.T);
-        // hash[T,N]
         let hashSetting = Poseidon.hash([input.T, input.N]);
         let root = input.settingWitness.calculateRoot(hashSetting);
         let _committeeId = input.settingWitness.calculateIndex();

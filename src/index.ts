@@ -5,13 +5,13 @@ export * as ZkApp from './contracts/index.js';
 
 export {
     // Structs
-    CheckMemberInput,
-    CheckConfigInput,
+    CommitteeMemberInput,
+    CommitteeConfigInput,
     RollupCommitteeOutput,
 
     // Zk Programs & Proofs
     RollupCommittee,
-    CommitteeProof,
+    RollupCommitteeProof,
 
     // Smart Contract
     CommitteeContract,

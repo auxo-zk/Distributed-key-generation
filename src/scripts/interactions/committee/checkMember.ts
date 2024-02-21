@@ -2,7 +2,7 @@ import { Field, Provable, PublicKey } from 'o1js';
 import { compile } from '../../helper/deploy.js';
 import { fetchZkAppState } from '../../helper/deploy.js';
 import {
-    CheckMemberInput,
+    CommitteeMemberInput,
     CommitteeContract,
     RollupCommittee,
 } from '../../../contracts/Committee.js';
@@ -76,7 +76,7 @@ async function main() {
     console.log('committeeContract.checkMember: ');
     const committeeId = Field(3);
     const memberId = Field(0);
-    let input = new CheckMemberInput({
+    let input = new CommitteeMemberInput({
         address: PublicKey.fromBase58(
             'B62qomDwU81ESmFrQDMRtXHgTeof3yXH8rgBzzNqdogevZSFK8VVdgB'
         ),

@@ -13,7 +13,7 @@ import { Config, JSONKey, Key } from '../../helper/config.js';
 import { ContractList, compile, wait } from '../../helper/deploy.js';
 import { fetchActions, fetchZkAppState } from '../../helper/deploy.js';
 import {
-    CheckMemberInput,
+    CommitteeMemberInput,
     CommitteeAction,
     CommitteeContract,
     RollupCommittee,
@@ -122,7 +122,7 @@ async function main() {
     console.log('committeeContract.checkMember: ');
     const committeeId = Field(3);
     const memberId = Field(0);
-    let input = new CheckMemberInput({
+    let input = new CommitteeMemberInput({
         address: PublicKey.fromBase58(
             'B62qomDwU81ESmFrQDMRtXHgTeof3yXH8rgBzzNqdogevZSFK8VVdgB'
         ),

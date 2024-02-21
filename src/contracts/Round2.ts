@@ -28,8 +28,8 @@ import {
     Level1Witness,
 } from './DKGStorage.js';
 import {
-    CheckConfigInput,
-    CheckMemberInput,
+    CommitteeConfigInput,
+    CommitteeMemberInput,
     CommitteeContract,
 } from './Committee.js';
 import {
@@ -398,7 +398,7 @@ export class Round2Contract extends SmartContract {
 
         // Verify committee member - FIXME check if using this.sender is secure
         let memberId = committeeContract.checkMember(
-            new CheckMemberInput({
+            new CommitteeMemberInput({
                 address: this.sender,
                 committeeId: committeeId,
                 memberWitness: memberWitness,
@@ -523,7 +523,7 @@ export class Round2Contract extends SmartContract {
 
         // Verify committee config
         committeeContract.checkConfig(
-            new CheckConfigInput({
+            new CommitteeConfigInput({
                 N: proof.publicOutput.N,
                 T: proof.publicOutput.T,
                 committeeId: proof.publicInput.action.committeeId,

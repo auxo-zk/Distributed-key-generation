@@ -19,7 +19,7 @@
 //   CommitteeContract,
 //   CommitteeAction,
 //   RollupCommittee,
-//   CheckMemberInput,
+//   CommitteeMemberInput,
 // } from '../contracts/Committee.js';
 // import {
 //   EMPTY_LEVEL_1_TREE,
@@ -212,14 +212,14 @@
 //     );
 //     ActionCommitteeProfiler.stop();
 
-//     ActionCommitteeProfiler.start('committeeContract.rollupIncrements...');
-//     console.log('committeeContract.rollupIncrements: ');
+//     ActionCommitteeProfiler.start('committeeContract.rollup...');
+//     console.log('committeeContract.rollup: ');
 //     tx = await Mina.transaction(feePayer, () => {
-//       committeeContract.rollupIncrements(proof);
+//       committeeContract.rollup(proof);
 //     });
 //     await tx.prove();
 //     await tx.sign([feePayerKey]).send();
-//     console.log('committeeContract.rollupIncrements sent!...');
+//     console.log('committeeContract.rollup sent!...');
 //     ActionCommitteeProfiler.stop().store();
 
 //     //// udpate data to local
@@ -247,7 +247,7 @@
 
 //     // check if memerber belong to committeeId
 //     console.log('committeeContract.checkMember p2: ');
-//     let checkInput = new CheckMemberInput({
+//     let checkInput = new CommitteeMemberInput({
 //       address: addresses.p2,
 //       committeeId: Field(0),
 //       memberMerkleTreeWitness: new CommitteeMerkleWitness(tree.getWitness(1n)),
@@ -373,22 +373,22 @@
 //         memberMerkleMap.getWitness(Field(0)),
 //         settingMerkleMap.getWitness(Field(0))
 //       );
-//       console.log('committeeContract.rollupIncrements: ');
+//       console.log('committeeContract.rollup: ');
 //       let tx = await Mina.transaction(
 //         { sender: feePayer, fee, nonce: currentNonce },
 //         () => {
-//           committeeContract.rollupIncrements(proof);
+//           committeeContract.rollup(proof);
 //         }
 //       );
 //       await tx.prove();
 //       await tx.sign([feePayerKey]).send();
-//       console.log('committeeContract.rollupIncrements sent!...');
+//       console.log('committeeContract.rollup sent!...');
 //     }
 
 //     if (actionn == 3) {
 //       // check if memerber belong to committeeId
 //       console.log('committeeContract.checkMember p2: ');
-//       let checkInput = new CheckMemberInput({
+//       let checkInput = new CommitteeMemberInput({
 //         address: p2Address,
 //         committeeId: Field(0),
 //         memberMerkleTreeWitness: new CommitteeMerkleWitness(
