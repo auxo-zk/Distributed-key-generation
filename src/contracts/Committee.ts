@@ -38,6 +38,7 @@ export class CommitteeAction extends Struct({
 export class CommitteeMemberInput extends Struct({
     address: PublicKey,
     committeeId: Field,
+    memberId: Field,
     memberWitness: FullMTWitness,
 }) {}
 
@@ -119,7 +120,7 @@ export const RollupCommittee = ZkProgram({
                     buildAssertMessage(
                         RollupCommittee.name,
                         'nextStep',
-                        ErrorEnum.MEMBER_KEY
+                        ErrorEnum.MEMBER_KEY_L1
                     )
                 );
 
@@ -313,36 +314,38 @@ export class CommitteeContract extends SmartContract {
     /**
      * Verify if an address is a member of a committee
      * @param input Verification input
-     * @returns Member Id in the committee
-     * @todo Add memberIndex to input for checking
      */
-    checkMember(input: CommitteeMemberInput): Field {
-        let leaf = input.memberWitness.level2.calculateRoot(
-            MemberArray.hash(input.address)
-        );
-        let memberId = input.memberWitness.level2.calculateIndex();
-
-        let root = input.memberWitness.level1.calculateRoot(leaf);
-        let _committeeId = input.memberWitness.level1.calculateIndex();
-
-        const onChainRoot = this.memberRoot.getAndRequireEquals();
-        root.assertEquals(
-            onChainRoot,
-            buildAssertMessage(
-                CommitteeContract.name,
-                'checkMember',
-                ErrorEnum.MEMBER_ROOT
-            )
-        );
+    checkMember(input: CommitteeMemberInput) {
+        this.memberRoot
+            .getAndRequireEquals()
+            .assertEquals(
+                input.memberWitness.level1.calculateRoot(
+                    input.memberWitness.level2.calculateRoot(
+                        MemberArray.hash(input.address)
+                    )
+                ),
+                buildAssertMessage(
+                    CommitteeContract.name,
+                    'checkMember',
+                    ErrorEnum.MEMBER_ROOT
+                )
+            );
         input.committeeId.assertEquals(
-            _committeeId,
+            input.memberWitness.level1.calculateIndex(),
             buildAssertMessage(
                 CommitteeContract.name,
                 'checkMember',
-                ErrorEnum.MEMBER_KEY
+                ErrorEnum.MEMBER_KEY_L1
             )
         );
-        return memberId;
+        input.memberId.assertEquals(
+            input.memberWitness.level2.calculateIndex(),
+            buildAssertMessage(
+                CommitteeContract.name,
+                'checkMember',
+                ErrorEnum.MEMBER_KEY_L2
+            )
+        );
     }
 
     /**
