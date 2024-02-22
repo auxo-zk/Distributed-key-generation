@@ -352,7 +352,6 @@ export class Round1Contract extends SmartContract {
      */
     @method
     contribute(
-        committeeId: Field,
         keyId: Field,
         C: CArray,
         committee: ZkAppRef,
@@ -374,19 +373,20 @@ export class Round1Contract extends SmartContract {
         const committeeContract = new CommitteeContract(committee.address);
 
         // Verify committee member - FIXME check if using this.sender is secure
-        let memberId = committeeContract.checkMember(
+        committeeContract.checkMember(
             new CommitteeMemberInput({
                 address: this.sender,
-                committeeId: committeeId,
+                committeeId: memberWitness.level1.calculateIndex(),
+                memberId: memberWitness.level2.calculateIndex(),
                 memberWitness: memberWitness,
             })
         );
 
         // Create & dispatch action to DkgContract
         let action = new Action({
-            committeeId: committeeId,
+            committeeId: memberWitness.level1.calculateIndex(),
             keyId: keyId,
-            memberId: memberId,
+            memberId: memberWitness.level2.calculateIndex(),
             contribution: new Round1Contribution({
                 C: C,
             }),
