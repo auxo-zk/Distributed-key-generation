@@ -13,9 +13,13 @@ import {
     Bool,
 } from 'o1js';
 import { BoolDynamicArray } from '@auxo-dev/auxo-libs';
-import { buildAssertMessage, updateActionState } from '../libs/utils.js';
+import { buildAssertMessage } from '../libs/utils.js';
 import { CommitteeMemberInput, CommitteeContract } from './Committee.js';
-import { EMPTY_ADDRESS_MT, ZkAppRef } from './SharedStorage.js';
+import {
+    EMPTY_ACTION_MT,
+    EMPTY_ADDRESS_MT,
+    ZkAppRef,
+} from './SharedStorage.js';
 import {
     EMPTY_LEVEL_1_TREE as COMMITTEE_LEVEL_1_TREE,
     FullMTWitness as CommitteeFullWitness,
@@ -27,6 +31,7 @@ import {
 } from './DKGStorage.js';
 import { INSTANCE_LIMITS, ZkAppEnum } from '../constants.js';
 import { ErrorEnum, EventEnum } from './shared.js';
+import { Rollup, rollup } from './Rollup.js';
 
 export const enum KeyStatus {
     EMPTY,
@@ -87,49 +92,7 @@ export class Action extends Struct({
     }
 }
 
-export class RollupDkgOutput extends Struct({
-    initialActionState: Field,
-    newActionState: Field,
-}) {}
-
-export const RollupDkg = ZkProgram({
-    name: 'RollupDkg',
-    publicInput: Action,
-    publicOutput: RollupDkgOutput,
-    methods: {
-        firstStep: {
-            privateInputs: [Field],
-            method(input: Action, initialActionState: Field) {
-                return new RollupDkgOutput({
-                    initialActionState: initialActionState,
-                    newActionState: initialActionState,
-                });
-            },
-        },
-        nextStep: {
-            privateInputs: [SelfProof<Action, RollupDkgOutput>],
-            method(
-                input: Action,
-                earlierProof: SelfProof<Action, RollupDkgOutput>
-            ) {
-                // Verify earlier proof
-                earlierProof.verify();
-
-                // Calculate corresponding action state
-                let newActionState = updateActionState(
-                    earlierProof.publicOutput.newActionState,
-                    [Action.toFields(input)]
-                );
-
-                return new RollupDkgOutput({
-                    initialActionState:
-                        earlierProof.publicOutput.initialActionState,
-                    newActionState: newActionState,
-                });
-            },
-        },
-    },
-});
+export const RollupDkg = Rollup('RollupDkg', Action);
 
 export class RollupDkgProof extends ZkProgram.Proof(RollupDkg) {}
 
@@ -348,6 +311,11 @@ export class DkgContract extends SmartContract {
     @state(Field) actionState = State<Field>();
 
     /**
+     * @description MT root storing actions' rollup state
+     */
+    @state(Field) rollupRoot = State<Field>();
+
+    /**
      * @description MT root storing actions' process state
      */
     @state(Field) processRoot = State<Field>();
@@ -364,6 +332,8 @@ export class DkgContract extends SmartContract {
         this.keyCounterRoot.set(COMMITTEE_LEVEL_1_TREE().getRoot());
         this.keyStatusRoot.set(DKG_LEVEL_1_TREE().getRoot());
         this.actionState.set(Reducer.initialActionState);
+        this.rollupRoot.set(EMPTY_ACTION_MT().getRoot());
+        this.processRoot.set(EMPTY_ACTION_MT().getRoot());
     }
 
     /**
@@ -457,29 +427,21 @@ export class DkgContract extends SmartContract {
     @method rollup(proof: RollupDkgProof) {
         // Get current state values
         let curActionState = this.actionState.getAndRequireEquals();
+        let rollupRoot = this.rollupRoot.getAndRequireEquals();
         let lastActionState = this.account.actionState.getAndRequireEquals();
 
         // Verify proof
         proof.verify();
-        proof.publicOutput.initialActionState.assertEquals(
+        rollup(
+            DkgContract.name,
+            proof.publicOutput,
             curActionState,
-            buildAssertMessage(
-                DkgContract.name,
-                'updateKeys',
-                ErrorEnum.CURRENT_ACTION_STATE
-            )
-        );
-        proof.publicOutput.newActionState.assertEquals(
-            lastActionState,
-            buildAssertMessage(
-                DkgContract.name,
-                'updateKeys',
-                ErrorEnum.LAST_ACTION_STATE
-            )
+            rollupRoot,
+            lastActionState
         );
 
-        // Emit events
-        this.emitEvent(EventEnum.ROLLUPED, lastActionState);
+        // Update state values
+        this.rollupRoot.set(proof.publicOutput.newRollupRoot);
     }
 
     /**

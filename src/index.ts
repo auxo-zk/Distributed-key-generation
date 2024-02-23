@@ -18,7 +18,6 @@ export {
 
     // Actions & Events
     CommitteeAction,
-    EventEnum as CommitteeEvents,
 } from './contracts/Committee.js';
 
 export {
@@ -39,7 +38,6 @@ export {
     ActionMask as DKGActionMask,
     Action as DKGAction,
     ActionEnum as DKGActions,
-    EventEnum as DKGEvents,
 } from './contracts/DKG.js';
 
 export {

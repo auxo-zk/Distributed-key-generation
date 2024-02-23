@@ -362,7 +362,6 @@ export class Round2Contract extends SmartContract {
      */
     @method
     contribute(
-        committeeId: Field,
         keyId: Field,
         proof: BatchEncryptionProof,
         committee: ZkAppRef,
@@ -395,16 +394,18 @@ export class Round2Contract extends SmartContract {
 
         // Verify encryption proof
         proof.verify();
+        let committeeId = memberWitness.level1.calculateIndex();
+        let memberId = memberWitness.level2.calculateIndex();
 
         // Verify committee member - FIXME check if using this.sender is secure
-        let memberId = committeeContract.checkMember(
+        committeeContract.checkMember(
             new CommitteeMemberInput({
                 address: this.sender,
                 committeeId: committeeId,
+                memberId: memberId,
                 memberWitness: memberWitness,
             })
         );
-        memberId.assertEquals(proof.publicInput.memberId);
 
         // Verify round 1 public keys (C0[]])
         let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))

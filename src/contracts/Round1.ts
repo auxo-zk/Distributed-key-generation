@@ -342,13 +342,10 @@ export class Round1Contract extends SmartContract {
 
     /**
      * Submit round 1 contribution for key generation
-     * - Verify zkApp references
-     * - Verify committee member
-     * - Verify contribution
-     * - Create & dispatch action
-     * @param action
-     * @param committee
-     * @param memberWitness
+     * @param keyId Committee's key Id
+     * @param C Contribution value: Array of group points
+     * @param committee Reference to committee zkApp
+     * @param memberWitness Witness for proof of committee's member
      */
     @method
     contribute(

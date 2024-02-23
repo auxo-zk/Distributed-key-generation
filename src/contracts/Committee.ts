@@ -315,7 +315,7 @@ export class CommitteeContract extends SmartContract {
      * Verify if an address is a member of a committee
      * @param input Verification input
      */
-    checkMember(input: CommitteeMemberInput): Field {
+    checkMember(input: CommitteeMemberInput) {
         this.memberRoot
             .getAndRequireEquals()
             .assertEquals(

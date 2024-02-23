@@ -11,6 +11,9 @@ export enum ErrorEnum {
     CURRENT_ACTION_STATE = 'Incorrect current action state',
     LAST_ACTION_STATE = 'Incorrect last action state',
 
+    ROLLUP_ROOT = 'Incorrect rollup MT root',
+    ROLLUP_KEY = 'Incorrect rollup MT key',
+
     NEXT_COMMITTEE_ID = 'Incorrect next committee Id',
     MEMBER_ROOT = 'Incorrect member MT root',
     MEMBER_KEY_L1 = 'Incorrect member MT level 1 key',
