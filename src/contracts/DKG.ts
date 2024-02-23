@@ -13,11 +13,14 @@ import {
     Bool,
 } from 'o1js';
 import { BoolDynamicArray } from '@auxo-dev/auxo-libs';
-import { buildAssertMessage } from '../libs/utils.js';
+import { buildAssertMessage, updateActionState } from '../libs/utils.js';
 import { CommitteeMemberInput, CommitteeContract } from './Committee.js';
 import {
+    ActionWitness,
     EMPTY_ACTION_MT,
     EMPTY_ADDRESS_MT,
+    ProcessStatus,
+    ProcessedActions,
     ZkAppRef,
 } from './SharedStorage.js';
 import {
@@ -30,7 +33,7 @@ import {
     Level1Witness,
 } from './DKGStorage.js';
 import { INSTANCE_LIMITS, ZkAppEnum } from '../constants.js';
-import { ErrorEnum, EventEnum } from './shared.js';
+import { ErrorEnum, EventEnum } from './constants.js';
 import { Rollup, rollup } from './Rollup.js';
 
 export const enum KeyStatus {
@@ -62,6 +65,10 @@ export function createActionMask(action: Field): ActionMask {
     let mask = ActionMask.empty(Field(ActionEnum.__LENGTH));
     mask.set(action, Bool(true));
     return mask;
+}
+
+export function calculateKeyIndex(committeeId: Field, keyId: Field): Field {
+    return Field.from(BigInt(INSTANCE_LIMITS.KEY)).mul(committeeId).add(keyId);
 }
 
 /**
@@ -96,62 +103,87 @@ export const RollupDkg = Rollup('RollupDkg', Action);
 
 export class RollupDkgProof extends ZkProgram.Proof(RollupDkg) {}
 
-export class UpdateKeysOutput extends Struct({
-    initialKeyCounter: Field,
-    initialKeyStatus: Field,
-    nextKeyCounter: Field,
-    nextKeyStatus: Field,
+export class UpdateKeyInput extends Struct({
+    previousActionState: Field,
+    action: Action,
 }) {}
 
-export const UpdateKeys = ZkProgram({
-    name: 'UpdateKeys',
-    publicInput: Action,
-    publicOutput: UpdateKeysOutput,
+export class UpdateKeyOutput extends Struct({
+    initialKeyCounterRoot: Field,
+    initialKeyStatusRoot: Field,
+    initialProcessRoot: Field,
+    nextKeyCounterRoot: Field,
+    nextKeyStatusRoot: Field,
+    nextProcessRoot: Field,
+    processedActions: ProcessedActions,
+}) {}
+
+export const UpdateKey = ZkProgram({
+    name: 'UpdateKey',
+    publicInput: UpdateKeyInput,
+    publicOutput: UpdateKeyOutput,
     methods: {
         firstStep: {
-            privateInputs: [Field, Field],
+            privateInputs: [Field, Field, Field],
             method(
-                input: Action,
+                input: UpdateKeyInput,
                 initialKeyCounter: Field,
-                initialKeyStatus: Field
+                initialKeyStatus: Field,
+                initialProcessRoot: Field
             ) {
-                return new UpdateKeysOutput({
-                    initialKeyCounter: initialKeyCounter,
-                    initialKeyStatus: initialKeyStatus,
-                    nextKeyCounter: initialKeyCounter,
-                    nextKeyStatus: initialKeyStatus,
+                return new UpdateKeyOutput({
+                    initialKeyCounterRoot: initialKeyCounter,
+                    initialKeyStatusRoot: initialKeyStatus,
+                    initialProcessRoot: initialProcessRoot,
+                    nextKeyCounterRoot: initialKeyCounter,
+                    nextKeyStatusRoot: initialKeyStatus,
+                    nextProcessRoot: initialProcessRoot,
+                    processedActions: new ProcessedActions(),
                 });
             },
         },
         nextStep: {
-            privateInputs: [SelfProof<Action, UpdateKeysOutput>, Level1Witness],
+            privateInputs: [
+                SelfProof<UpdateKeyInput, UpdateKeyOutput>,
+                Level1Witness,
+                ActionWitness,
+            ],
             method(
-                input: Action,
-                earlierProof: SelfProof<Action, UpdateKeysOutput>,
-                keyStatusWitness: Level1Witness
+                input: UpdateKeyInput,
+                earlierProof: SelfProof<UpdateKeyInput, UpdateKeyOutput>,
+                keyStatusWitness: Level1Witness,
+                processWitness: ActionWitness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
 
                 // Verify key status
-                let prevStatus = Provable.switch(input.mask.values, Field, [
-                    Field(KeyStatus.EMPTY),
-                    Field(KeyStatus.ROUND_1_CONTRIBUTION),
-                    Field(KeyStatus.ROUND_2_CONTRIBUTION),
-                    Field(KeyStatus.ACTIVE),
-                ]);
+                let prevStatus = Provable.switch(
+                    input.action.mask.values,
+                    Field,
+                    [
+                        Field(KeyStatus.EMPTY),
+                        Field(KeyStatus.ROUND_1_CONTRIBUTION),
+                        Field(KeyStatus.ROUND_2_CONTRIBUTION),
+                        Field(KeyStatus.ACTIVE),
+                    ]
+                );
 
-                let nextStatus = Provable.switch(input.mask.values, Field, [
-                    Field(KeyStatus.ROUND_1_CONTRIBUTION),
-                    Field(KeyStatus.ROUND_2_CONTRIBUTION),
-                    Field(KeyStatus.ACTIVE),
-                    Field(KeyStatus.DEPRECATED),
-                ]);
+                let nextStatus = Provable.switch(
+                    input.action.mask.values,
+                    Field,
+                    [
+                        Field(KeyStatus.ROUND_1_CONTRIBUTION),
+                        Field(KeyStatus.ROUND_2_CONTRIBUTION),
+                        Field(KeyStatus.ACTIVE),
+                        Field(KeyStatus.DEPRECATED),
+                    ]
+                );
 
                 prevStatus.assertNotEquals(
                     Field(KeyStatus.EMPTY),
                     buildAssertMessage(
-                        UpdateKeys.name,
+                        UpdateKey.name,
                         'nextStep',
                         ErrorEnum.KEY_STATUS_VALUE
                     )
@@ -159,20 +191,21 @@ export const UpdateKeys = ZkProgram({
                 nextStatus.assertNotEquals(
                     Field(KeyStatus.ROUND_1_CONTRIBUTION),
                     buildAssertMessage(
-                        UpdateKeys.name,
+                        UpdateKey.name,
                         'nextStep',
                         ErrorEnum.KEY_STATUS_VALUE
                     )
                 );
 
                 // Check the key's previous status
-                let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))
-                    .mul(input.committeeId)
-                    .add(input.keyId);
-                earlierProof.publicOutput.nextKeyStatus.assertEquals(
+                let keyIndex = calculateKeyIndex(
+                    input.action.committeeId,
+                    input.action.keyId
+                );
+                earlierProof.publicOutput.nextKeyStatusRoot.assertEquals(
                     keyStatusWitness.calculateRoot(prevStatus),
                     buildAssertMessage(
-                        UpdateKeys.name,
+                        UpdateKey.name,
                         'nextStep',
                         ErrorEnum.KEY_STATUS_ROOT
                     )
@@ -180,68 +213,112 @@ export const UpdateKeys = ZkProgram({
                 keyIndex.assertEquals(
                     keyStatusWitness.calculateIndex(),
                     buildAssertMessage(
-                        UpdateKeys.name,
+                        UpdateKey.name,
                         'nextStep',
                         ErrorEnum.KEY_STATUS_KEY
                     )
                 );
 
-                // Calculate the new keyStatus tree root
-                let nextKeyStatus = keyStatusWitness.calculateRoot(nextStatus);
+                // Calculate the new key status MT root
+                let nextKeyStatusRoot =
+                    keyStatusWitness.calculateRoot(nextStatus);
 
-                return {
-                    initialKeyCounter:
-                        earlierProof.publicOutput.initialKeyCounter,
-                    initialKeyStatus:
-                        earlierProof.publicOutput.initialKeyStatus,
-                    nextKeyCounter: earlierProof.publicOutput.nextKeyCounter,
-                    nextKeyStatus: nextKeyStatus,
-                };
+                // Calculate corresponding action state
+                let actionState = updateActionState(input.previousActionState, [
+                    Action.toFields(input.action),
+                ]);
+                let processedActions =
+                    earlierProof.publicOutput.processedActions;
+                processedActions.push(actionState);
+
+                // Verify the action isn't already processed
+                let [processRoot, processKey] =
+                    processWitness.computeRootAndKey(
+                        Field(ProcessStatus.NOT_PROCESSED)
+                    );
+                processRoot.assertEquals(
+                    earlierProof.publicOutput.nextProcessRoot,
+                    buildAssertMessage(
+                        UpdateKey.name,
+                        'nextStep',
+                        ErrorEnum.PROCESS_ROOT
+                    )
+                );
+                processKey.assertEquals(
+                    actionState,
+                    buildAssertMessage(
+                        UpdateKey.name,
+                        'nextStep',
+                        ErrorEnum.PROCESS_KEY
+                    )
+                );
+
+                // Calculate the new process MT root
+                let nextProcessRoot = processWitness.computeRootAndKey(
+                    Field(ProcessStatus.PROCESSED)
+                )[0];
+
+                return new UpdateKeyOutput({
+                    initialKeyCounterRoot:
+                        earlierProof.publicOutput.initialKeyCounterRoot,
+                    initialKeyStatusRoot:
+                        earlierProof.publicOutput.initialKeyStatusRoot,
+                    initialProcessRoot:
+                        earlierProof.publicOutput.initialProcessRoot,
+                    nextKeyCounterRoot:
+                        earlierProof.publicOutput.nextKeyCounterRoot,
+                    nextKeyStatusRoot: nextKeyStatusRoot,
+                    nextProcessRoot: nextProcessRoot,
+                    processedActions: processedActions,
+                });
             },
         },
         nextStepGeneration: {
             privateInputs: [
-                SelfProof<Action, UpdateKeysOutput>,
+                SelfProof<UpdateKeyInput, UpdateKeyOutput>,
                 Field,
                 CommitteeLevel1Witness,
                 Level1Witness,
+                ActionWitness,
             ],
             method(
-                input: Action,
-                earlierProof: SelfProof<Action, UpdateKeysOutput>,
+                input: UpdateKeyInput,
+                earlierProof: SelfProof<UpdateKeyInput, UpdateKeyOutput>,
                 currKeyId: Field,
                 keyCounterWitness: CommitteeLevel1Witness,
-                keyStatusWitness: Level1Witness
+                keyStatusWitness: Level1Witness,
+                processWitness: ActionWitness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
 
                 // Check the key's previous index
-                earlierProof.publicOutput.nextKeyCounter.assertEquals(
+                earlierProof.publicOutput.nextKeyCounterRoot.assertEquals(
                     keyCounterWitness.calculateRoot(currKeyId),
                     buildAssertMessage(
-                        UpdateKeys.name,
+                        UpdateKey.name,
                         'nextStepGeneration',
                         ErrorEnum.KEY_COUNTER_ROOT
                     )
                 );
-                input.committeeId.assertEquals(
+                input.action.committeeId.assertEquals(
                     keyCounterWitness.calculateIndex(),
                     buildAssertMessage(
-                        UpdateKeys.name,
+                        UpdateKey.name,
                         'nextStepGeneration',
                         ErrorEnum.KEY_COUNTER_KEY
                     )
                 );
-                let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))
-                    .mul(input.committeeId)
-                    .add(currKeyId);
+                let keyIndex = calculateKeyIndex(
+                    input.action.committeeId,
+                    input.action.keyId
+                );
                 keyIndex.assertLessThan(
                     Field.from(BigInt(INSTANCE_LIMITS.KEY)).mul(
-                        input.committeeId.add(Field(1))
+                        input.action.committeeId.add(Field(1))
                     ),
                     buildAssertMessage(
-                        UpdateKeys.name,
+                        UpdateKey.name,
                         'nextStepGeneration',
                         ErrorEnum.KEY_COUNTER_LIMIT
                     )
@@ -253,10 +330,10 @@ export const UpdateKeys = ZkProgram({
                 );
 
                 // Check the key's previous status
-                earlierProof.publicOutput.nextKeyStatus.assertEquals(
+                earlierProof.publicOutput.nextKeyStatusRoot.assertEquals(
                     keyStatusWitness.calculateRoot(Field(KeyStatus.EMPTY)),
                     buildAssertMessage(
-                        UpdateKeys.name,
+                        UpdateKey.name,
                         'nextStepGeneration',
                         ErrorEnum.KEY_STATUS_ROOT
                     )
@@ -264,7 +341,7 @@ export const UpdateKeys = ZkProgram({
                 keyIndex.assertEquals(
                     keyStatusWitness.calculateIndex(),
                     buildAssertMessage(
-                        UpdateKeys.name,
+                        UpdateKey.name,
                         'nextStepGeneration',
                         ErrorEnum.KEY_STATUS_KEY
                     )
@@ -275,20 +352,59 @@ export const UpdateKeys = ZkProgram({
                     Field(KeyStatus.ROUND_1_CONTRIBUTION)
                 );
 
-                return {
-                    initialKeyCounter:
-                        earlierProof.publicOutput.initialKeyCounter,
-                    initialKeyStatus:
-                        earlierProof.publicOutput.initialKeyStatus,
-                    nextKeyCounter: nextKeyCounter,
-                    nextKeyStatus: nextKeyStatus,
-                };
+                // Calculate corresponding action state
+                let actionState = updateActionState(input.previousActionState, [
+                    Action.toFields(input.action),
+                ]);
+                let processedActions =
+                    earlierProof.publicOutput.processedActions;
+                processedActions.push(actionState);
+
+                // Verify the action isn't already processed
+                let [processRoot, processKey] =
+                    processWitness.computeRootAndKey(
+                        Field(ProcessStatus.NOT_PROCESSED)
+                    );
+                processRoot.assertEquals(
+                    earlierProof.publicOutput.nextProcessRoot,
+                    buildAssertMessage(
+                        UpdateKey.name,
+                        'nextStep',
+                        ErrorEnum.PROCESS_ROOT
+                    )
+                );
+                processKey.assertEquals(
+                    actionState,
+                    buildAssertMessage(
+                        UpdateKey.name,
+                        'nextStep',
+                        ErrorEnum.PROCESS_KEY
+                    )
+                );
+
+                // Calculate the new process MT root
+                let nextProcessRoot = processWitness.computeRootAndKey(
+                    Field(ProcessStatus.PROCESSED)
+                )[0];
+
+                return new UpdateKeyOutput({
+                    initialKeyCounterRoot:
+                        earlierProof.publicOutput.initialKeyCounterRoot,
+                    initialKeyStatusRoot:
+                        earlierProof.publicOutput.initialKeyStatusRoot,
+                    initialProcessRoot:
+                        earlierProof.publicOutput.initialProcessRoot,
+                    nextKeyCounterRoot: nextKeyCounter,
+                    nextKeyStatusRoot: nextKeyStatus,
+                    nextProcessRoot: nextProcessRoot,
+                    processedActions: processedActions,
+                });
             },
         },
     },
 });
 
-export class UpdateKeysProof extends ZkProgram.Proof(UpdateKeys) {}
+export class UpdateKeyProof extends ZkProgram.Proof(UpdateKey) {}
 
 export class DkgContract extends SmartContract {
     /**
@@ -324,6 +440,7 @@ export class DkgContract extends SmartContract {
 
     events = {
         [EventEnum.ROLLUPED]: Field,
+        [EventEnum.PROCESSED]: ProcessedActions,
     };
 
     init() {
@@ -448,14 +565,15 @@ export class DkgContract extends SmartContract {
      * Process DKG actions and update status and counter values
      * @param proof Verification proof
      */
-    @method updateKeys(proof: UpdateKeysProof) {
+    @method updateKeys(proof: UpdateKeyProof) {
         // Get current state values
         let keyCounterRoot = this.keyCounterRoot.getAndRequireEquals();
         let keyStatusRoot = this.keyStatusRoot.getAndRequireEquals();
+        let processRoot = this.processRoot.getAndRequireEquals();
 
         // Verify proof
         proof.verify();
-        proof.publicOutput.initialKeyCounter.assertEquals(
+        proof.publicOutput.initialKeyCounterRoot.assertEquals(
             keyCounterRoot,
             buildAssertMessage(
                 DkgContract.name,
@@ -463,7 +581,7 @@ export class DkgContract extends SmartContract {
                 ErrorEnum.KEY_COUNTER_ROOT
             )
         );
-        proof.publicOutput.initialKeyStatus.assertEquals(
+        proof.publicOutput.initialKeyStatusRoot.assertEquals(
             keyStatusRoot,
             buildAssertMessage(
                 DkgContract.name,
@@ -471,10 +589,24 @@ export class DkgContract extends SmartContract {
                 ErrorEnum.KEY_STATUS_ROOT
             )
         );
+        proof.publicOutput.initialProcessRoot.assertEquals(
+            processRoot,
+            buildAssertMessage(
+                DkgContract.name,
+                'updateKeys',
+                ErrorEnum.PROCESS_ROOT
+            )
+        );
 
         // Set new state values
-        this.keyCounterRoot.set(proof.publicOutput.nextKeyCounter);
-        this.keyStatusRoot.set(proof.publicOutput.nextKeyStatus);
+        this.keyCounterRoot.set(proof.publicOutput.nextKeyCounterRoot);
+        this.keyStatusRoot.set(proof.publicOutput.nextKeyStatusRoot);
+        this.processRoot.set(proof.publicOutput.nextProcessRoot);
+
+        this.emitEvent(
+            EventEnum.PROCESSED,
+            proof.publicOutput.processedActions
+        );
     }
 
     /**

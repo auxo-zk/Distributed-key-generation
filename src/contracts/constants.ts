@@ -1,5 +1,6 @@
 export enum EventEnum {
     ROLLUPED = 'actions-rolluped',
+    PROCESSED = 'actions-processed',
 }
 
 export enum ErrorEnum {
@@ -13,6 +14,8 @@ export enum ErrorEnum {
 
     ROLLUP_ROOT = 'Incorrect rollup MT root',
     ROLLUP_KEY = 'Incorrect rollup MT key',
+    PROCESS_ROOT = 'Incorrect process MT root',
+    PROCESS_KEY = 'Incorrect process MT key',
 
     NEXT_COMMITTEE_ID = 'Incorrect next committee Id',
     MEMBER_ROOT = 'Incorrect member MT root',

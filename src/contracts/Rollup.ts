@@ -1,6 +1,6 @@
 import { Field, SelfProof, Struct, ZkProgram } from 'o1js';
 import { buildAssertMessage, updateActionState } from '../libs/utils.js';
-import { ErrorEnum } from './shared.js';
+import { ErrorEnum } from './constants.js';
 import { ActionWitness, RollupStatus } from './SharedStorage.js';
 
 export class RollupOutput extends Struct({

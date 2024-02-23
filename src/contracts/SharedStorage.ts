@@ -8,7 +8,12 @@ import {
     PublicKey,
     Struct,
 } from 'o1js';
-import { ADDRESS_MAX_SIZE, ZkAppEnum } from '../constants.js';
+import {
+    ACTION_PROCESS_LIMITS,
+    ADDRESS_MAX_SIZE,
+    ZkAppEnum,
+} from '../constants.js';
+import { FieldDynamicArray } from '@auxo-dev/auxo-libs';
 
 export const ADDRESS_TREE_HEIGHT = Math.ceil(Math.log2(ADDRESS_MAX_SIZE)) + 1;
 export class AddressMT extends MerkleTree {}
@@ -183,6 +188,15 @@ export enum RollupStatus {
     NOT_EXISTED,
     ROLLUPED,
 }
+
+export enum ProcessStatus {
+    NOT_PROCESSED,
+    PROCESSED,
+}
+
+export class ProcessedActions extends FieldDynamicArray(
+    ACTION_PROCESS_LIMITS
+) {}
 
 export class ActionStorage {
     private _actionMap: MerkleMap;

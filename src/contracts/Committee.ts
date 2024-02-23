@@ -23,7 +23,7 @@ import {
     FullMTWitness,
 } from './CommitteeStorage.js';
 import { MemberArray } from '../libs/Committee.js';
-import { ErrorEnum, EventEnum } from './shared.js';
+import { ErrorEnum, EventEnum } from './constants.js';
 
 export class CommitteeAction extends Struct({
     addresses: MemberArray,
