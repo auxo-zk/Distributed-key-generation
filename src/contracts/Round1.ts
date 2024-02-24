@@ -12,7 +12,7 @@ import {
     state,
 } from 'o1js';
 import { CArray, Round1Contribution } from '../libs/Committee.js';
-import { updateActionState } from '../libs/utils.js';
+import { buildAssertMessage, updateActionState } from '../libs/utils.js';
 import {
     FullMTWitness as CommitteeFullWitness,
     Level1Witness as CommitteeLevel1Witness,
@@ -33,19 +33,19 @@ import {
     DkgContract,
     KeyStatus,
     KeyStatusInput,
+    calculateKeyIndex,
 } from './DKG.js';
-import { INSTANCE_LIMITS, ZkAppEnum } from '../constants.js';
+import { ZkAppEnum, ZkProgramEnum } from '../constants.js';
 import {
-    ActionStatus,
+    ActionWitness,
+    EMPTY_ACTION_MT,
     EMPTY_ADDRESS_MT,
-    EMPTY_REDUCE_MT,
-    ReduceWitness,
+    ProcessedActions,
     ZkAppRef,
+    verifyZkApp,
 } from './SharedStorage.js';
-
-export enum EventEnum {
-    CONTRIBUTIONS_REDUCED = 'contributions-reduced',
-}
+import { Rollup, processAction, rollup } from './Rollup.js';
+import { ErrorEnum, EventEnum } from './constants.js';
 
 export class Action extends Struct({
     committeeId: Field,
@@ -69,97 +69,33 @@ export class Action extends Struct({
     }
 }
 
-export class ReduceOutput extends Struct({
-    initialReduceState: Field,
-    newActionState: Field,
-    newReduceState: Field,
-}) {}
+export const RollupRound1 = Rollup(ZkProgramEnum.RollupRound1, Action);
 
-export const ReduceRound1 = ZkProgram({
-    name: 'reduce-round-1-contribution',
-    publicInput: Action,
-    publicOutput: ReduceOutput,
-    methods: {
-        firstStep: {
-            privateInputs: [Field, Field],
-            method(
-                input: Action,
-                initialReduceState: Field,
-                initialActionState: Field
-            ) {
-                return new ReduceOutput({
-                    initialReduceState: initialReduceState,
-                    newActionState: initialActionState,
-                    newReduceState: initialReduceState,
-                });
-            },
-        },
-        nextStep: {
-            privateInputs: [SelfProof<Action, ReduceOutput>, ReduceWitness],
-            method(
-                input: Action,
-                earlierProof: SelfProof<Action, ReduceOutput>,
-                reduceWitness: ReduceWitness
-            ) {
-                // Verify earlier proof
-                earlierProof.verify();
+export class RollupRound1Proof extends ZkProgram.Proof(RollupRound1) {}
 
-                // Calculate corresponding action state
-                let actionState = updateActionState(
-                    earlierProof.publicOutput.newActionState,
-                    [Action.toFields(input)]
-                );
-
-                // Check the non-existence of the action
-                let [root, key] = reduceWitness.computeRootAndKey(
-                    Field(ActionStatus.NOT_EXISTED)
-                );
-                root.assertEquals(earlierProof.publicOutput.newReduceState);
-                key.assertEquals(actionState);
-
-                // Check the new tree contains the reduced action
-                [root] = reduceWitness.computeRootAndKey(
-                    Field(ActionStatus.REDUCED)
-                );
-
-                return new ReduceOutput({
-                    initialReduceState:
-                        earlierProof.publicOutput.initialReduceState,
-                    newActionState: actionState,
-                    newReduceState: root,
-                });
-            },
-        },
-    },
-});
-
-export class ReduceRound1Proof extends ZkProgram.Proof(ReduceRound1) {}
-
-export class Round1Input extends Struct({
+export class FinalizeRound1Input extends Struct({
     previousActionState: Field,
     action: Action,
 }) {}
 
-/**
- *
- */
-export class Round1Output extends Struct({
+export class FinalizeRound1Output extends Struct({
     T: Field,
     N: Field,
     initialContributionRoot: Field,
     initialPublicKeyRoot: Field,
-    reduceStateRoot: Field,
-    newContributionRoot: Field,
-    newPublicKeyRoot: Field,
+    initialProcessRoot: Field,
+    nextContributionRoot: Field,
+    nextPublicKeyRoot: Field,
+    nextProcessRoot: Field,
     keyIndex: Field,
     publicKey: Group,
-    counter: Field,
+    processedActions: ProcessedActions,
 }) {}
 
 export const FinalizeRound1 = ZkProgram({
-    name: 'finalize-round-1',
-    publicInput: Round1Input,
-    publicOutput: Round1Output,
+    name: ZkProgramEnum.FinalizeRound1,
+    publicInput: FinalizeRound1Input,
+    publicOutput: FinalizeRound1Output,
     methods: {
         firstStep: {
             privateInputs: [
@@ -173,113 +109,185 @@ export const FinalizeRound1 = ZkProgram({
                 Level1Witness,
             ],
             method(
-                input: Round1Input,
+                input: FinalizeRound1Input,
                 T: Field,
                 N: Field,
                 initialContributionRoot: Field,
                 initialPublicKeyRoot: Field,
-                reduceStateRoot: Field,
+                initialProcessRoot: Field,
                 keyIndex: Field,
                 contributionWitness: Level1Witness,
                 publicKeyWitness: Level1Witness
             ) {
-                let contributionRoot = contributionWitness.calculateRoot(
-                    Field(0)
+                // Verify and update empty contribution level 2 MT
+                initialContributionRoot.assertEquals(
+                    contributionWitness.calculateRoot(Field(0)),
+                    buildAssertMessage(
+                        FinalizeRound1.name,
+                        'firstStep',
+                        ErrorEnum.R1_CONTRIBUTION_ROOT
+                    )
                 );
-                let contributionIndex = contributionWitness.calculateIndex();
-                contributionRoot.assertEquals(initialContributionRoot);
-                contributionIndex.assertEquals(keyIndex);
 
-                contributionRoot = contributionWitness.calculateRoot(
+                keyIndex.assertEquals(
+                    contributionWitness.calculateIndex(),
+                    buildAssertMessage(
+                        FinalizeRound1.name,
+                        'firstStep',
+                        ErrorEnum.R1_CONTRIBUTION_KEY_L1
+                    )
+                );
+
+                let nextContributionRoot = contributionWitness.calculateRoot(
                     EMPTY_LEVEL_2_TREE().getRoot()
                 );
 
-                let publicKeyRoot = publicKeyWitness.calculateRoot(Field(0));
-                let publicKeyIndex = publicKeyWitness.calculateIndex();
-                publicKeyRoot.assertEquals(initialPublicKeyRoot);
-                publicKeyIndex.assertEquals(keyIndex);
+                // Verify and update empty public key level 2 MT
+                initialPublicKeyRoot.assertEquals(
+                    publicKeyWitness.calculateRoot(Field(0)),
+                    buildAssertMessage(
+                        FinalizeRound1.name,
+                        'firstStep',
+                        ErrorEnum.ENC_PUBKEY_ROOT
+                    )
+                );
+                keyIndex.assertEquals(
+                    publicKeyWitness.calculateIndex(),
+                    buildAssertMessage(
+                        FinalizeRound1.name,
+                        'firstStep',
+                        ErrorEnum.ENCRYPTION_KEY_L1
+                    )
+                );
 
-                publicKeyRoot = publicKeyWitness.calculateRoot(
+                let nextPublicKeyRoot = publicKeyWitness.calculateRoot(
                     EMPTY_LEVEL_2_TREE().getRoot()
                 );
 
-                return new Round1Output({
+                return new FinalizeRound1Output({
                     T: T,
                     N: N,
                     initialContributionRoot: initialContributionRoot,
                     initialPublicKeyRoot: initialPublicKeyRoot,
-                    reduceStateRoot: reduceStateRoot,
-                    newContributionRoot: contributionRoot,
-                    newPublicKeyRoot: publicKeyRoot,
+                    initialProcessRoot: initialProcessRoot,
+                    nextContributionRoot: nextContributionRoot,
+                    nextPublicKeyRoot: nextPublicKeyRoot,
+                    nextProcessRoot: initialProcessRoot,
                     keyIndex: keyIndex,
                     publicKey: Group.zero,
-                    counter: Field(0),
+                    processedActions: new ProcessedActions(),
                 });
             },
         },
         nextStep: {
             privateInputs: [
-                SelfProof<Round1Input, Round1Output>,
+                SelfProof<FinalizeRound1Input, FinalizeRound1Output>,
                 DKGWitness,
                 DKGWitness,
-                ReduceWitness,
+                ActionWitness,
             ],
             method(
-                input: Round1Input,
-                earlierProof: SelfProof<Round1Input, Round1Output>,
+                input: FinalizeRound1Input,
+                earlierProof: SelfProof<
+                    FinalizeRound1Input,
+                    FinalizeRound1Output
+                >,
                 contributionWitness: DKGWitness,
                 publicKeyWitness: DKGWitness,
-                reduceWitness: ReduceWitness
+                processWitness: ActionWitness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
                 input.action.contribution.C.length.assertEquals(
-                    earlierProof.publicOutput.T
-                );
-
-                // Check if the actions have the same keyIndex
-                let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))
-                    .mul(input.action.committeeId)
-                    .add(input.action.keyId);
-                keyIndex.assertEquals(earlierProof.publicOutput.keyIndex);
-
-                // Check if this committee member has contributed yet
-                contributionWitness.level2
-                    .calculateIndex()
-                    .assertEquals(input.action.memberId);
-                let contributionRoot = contributionWitness.level1.calculateRoot(
-                    contributionWitness.level2.calculateRoot(Field(0))
-                );
-                let contributionIndex =
-                    contributionWitness.level1.calculateIndex();
-                contributionRoot.assertEquals(
-                    earlierProof.publicOutput.newContributionRoot
-                );
-                contributionIndex.assertEquals(keyIndex);
-
-                // Compute new contribution root
-                contributionRoot = contributionWitness.level1.calculateRoot(
-                    contributionWitness.level2.calculateRoot(
-                        input.action.contribution.hash()
+                    earlierProof.publicOutput.T,
+                    buildAssertMessage(
+                        FinalizeRound1.name,
+                        'nextStep',
+                        ErrorEnum.R1_CONTRIBUTION_VALUE
                     )
                 );
 
+                // Check if the actions have the same keyIndex
+                let keyIndex = calculateKeyIndex(
+                    input.action.committeeId,
+                    input.action.keyId
+                );
+                keyIndex.assertEquals(
+                    earlierProof.publicOutput.keyIndex,
+                    buildAssertMessage(
+                        FinalizeRound1.name,
+                        'nextStep',
+                        ErrorEnum.R1_CONTRIBUTION_KEY_INDEX
+                    )
+                );
+
+                // Check if this committee member has contributed yet
+                earlierProof.publicOutput.nextContributionRoot.assertEquals(
+                    contributionWitness.level1.calculateRoot(
+                        contributionWitness.level2.calculateRoot(Field(0))
+                    ),
+                    buildAssertMessage(
+                        FinalizeRound1.name,
+                        'nextStep',
+                        ErrorEnum.R1_CONTRIBUTION_ROOT
+                    )
+                );
+                keyIndex.assertEquals(
+                    contributionWitness.level1.calculateIndex(),
+                    buildAssertMessage(
+                        FinalizeRound1.name,
+                        'nextStep',
+                        ErrorEnum.R1_CONTRIBUTION_KEY_L1
+                    )
+                );
+                input.action.memberId.assertEquals(
+                    contributionWitness.level2.calculateIndex(),
+                    buildAssertMessage(
+                        FinalizeRound1.name,
+                        'nextStep',
+                        ErrorEnum.R1_CONTRIBUTION_KEY_L2
+                    )
+                );
+
+                // Compute new contribution root
+                let nextContributionRoot =
+                    contributionWitness.level1.calculateRoot(
+                        contributionWitness.level2.calculateRoot(
+                            input.action.contribution.hash()
+                        )
+                    );
+
                 // Check if this member's public key has not been registered
-                publicKeyWitness.level2
-                    .calculateIndex()
-                    .assertEquals(input.action.memberId);
-                let publicKeyRoot = publicKeyWitness.level1.calculateRoot(
-                    publicKeyWitness.level2.calculateRoot(Field(0))
+                earlierProof.publicOutput.nextPublicKeyRoot.assertEquals(
+                    publicKeyWitness.level1.calculateRoot(
+                        publicKeyWitness.level2.calculateRoot(Field(0))
+                    ),
+                    buildAssertMessage(
+                        FinalizeRound1.name,
+                        'nextStep',
+                        ErrorEnum.ENC_PUBKEY_ROOT
+                    )
                 );
-                let publicKeyIndex = publicKeyWitness.level1.calculateIndex();
-                publicKeyRoot.assertEquals(
-                    earlierProof.publicOutput.newPublicKeyRoot
+                keyIndex.assertEquals(
+                    publicKeyWitness.level1.calculateIndex(),
+                    buildAssertMessage(
+                        FinalizeRound1.name,
+                        'nextStep',
+                        ErrorEnum.ENC_PUBKEY_KEY_L1
+                    )
                 );
-                publicKeyIndex.assertEquals(keyIndex);
+                input.action.memberId.assertEquals(
+                    publicKeyWitness.level2.calculateIndex(),
+                    buildAssertMessage(
+                        FinalizeRound1.name,
+                        'nextStep',
+                        ErrorEnum.ENC_PUBKEY_KEY_L2
+                    )
+                );
 
                 // Compute new public key root
                 let memberPublicKey = input.action.contribution.C.values[0];
-                publicKeyRoot = publicKeyWitness.level1.calculateRoot(
+                let nextPublicKeyRoot = publicKeyWitness.level1.calculateRoot(
                     publicKeyWitness.level2.calculateRoot(
                         Poseidon.hash(memberPublicKey.toFields())
                     )
@@ -289,30 +297,36 @@ export const FinalizeRound1 = ZkProgram({
                 let actionState = updateActionState(input.previousActionState, [
                     Action.toFields(input.action),
                 ]);
+                let processedActions =
+                    earlierProof.publicOutput.processedActions;
+                processedActions.push(actionState);
 
-                // Current value of the action hash should be 1
-                let [root, key] = reduceWitness.computeRootAndKey(
-                    Field(ActionStatus.REDUCED)
+                // Verify the action isn't already processed
+                let nextProcessRoot = processAction(
+                    FinalizeRound1.name,
+                    actionState,
+                    earlierProof.publicOutput.nextProcessRoot,
+                    processWitness
                 );
-                root.assertEquals(earlierProof.publicOutput.reduceStateRoot);
-                key.assertEquals(actionState);
 
-                return new Round1Output({
+                return new FinalizeRound1Output({
                     T: earlierProof.publicOutput.T,
                     N: earlierProof.publicOutput.N,
                     initialContributionRoot:
                         earlierProof.publicOutput.initialContributionRoot,
                     initialPublicKeyRoot:
                         earlierProof.publicOutput.initialPublicKeyRoot,
-                    reduceStateRoot: earlierProof.publicOutput.reduceStateRoot,
-                    newContributionRoot: contributionRoot,
-                    newPublicKeyRoot: publicKeyRoot,
+                    initialProcessRoot:
+                        earlierProof.publicOutput.initialProcessRoot,
+                    nextContributionRoot: nextContributionRoot,
+                    nextPublicKeyRoot: nextPublicKeyRoot,
+                    nextProcessRoot: nextProcessRoot,
                     keyIndex: keyIndex,
                     publicKey:
                         earlierProof.publicOutput.publicKey.add(
                             memberPublicKey
                         ),
-                    counter: earlierProof.publicOutput.counter.add(Field(1)),
+                    processedActions: processedActions,
                 });
             },
         },
@@ -322,29 +336,58 @@ export const FinalizeRound1 = ZkProgram({
 export class FinalizeRound1Proof extends ZkProgram.Proof(FinalizeRound1) {}
 
 export class Round1Contract extends SmartContract {
-    reducer = Reducer({ actionType: Action });
-    events = {
-        [EventEnum.CONTRIBUTIONS_REDUCED]: Field,
-    };
+    /**
+     * @description MT root storing addresses of other zkApps
+     */
+    @state(Field) zkAppRoot = State<Field>();
 
-    @state(Field) zkApps = State<Field>();
-    @state(Field) reduceState = State<Field>();
-    @state(Field) contributions = State<Field>();
-    @state(Field) publicKeys = State<Field>();
+    /**
+     * @description MT root storing members' contributions
+     */
+    @state(Field) contributionRoot = State<Field>();
+
+    /**
+     * @description MT root storing members' encryption public keys
+     */
+    @state(Field) publicKeyRoot = State<Field>();
+
+    /**
+     * @description Latest rolluped action's state
+     */
+    @state(Field) actionState = State<Field>();
+
+    /**
+     * @description MT root storing actions' rollup state
+     */
+    @state(Field) rollupRoot = State<Field>();
+
+    /**
+     * @description MT root storing actions' process state
+     */
+    @state(Field) processRoot = State<Field>();
+
+    reducer = Reducer({ actionType: Action });
+
+    events = {
+        [EventEnum.ROLLUPED]: Field,
+        [EventEnum.PROCESSED]: Field,
+    };
 
     init() {
         super.init();
-        this.zkApps.set(EMPTY_ADDRESS_MT().getRoot());
-        this.reduceState.set(EMPTY_REDUCE_MT().getRoot());
-        this.contributions.set(EMPTY_LEVEL_1_TREE().getRoot());
-        this.publicKeys.set(EMPTY_LEVEL_1_TREE().getRoot());
+        this.zkAppRoot.set(EMPTY_ADDRESS_MT().getRoot());
+        this.contributionRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
+        this.publicKeyRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
+        this.actionState.set(Reducer.initialActionState);
+        this.rollupRoot.set(EMPTY_ACTION_MT().getRoot());
+        this.processRoot.set(EMPTY_ACTION_MT().getRoot());
     }
 
     /**
      * Submit round 1 contribution for key generation
      * @param keyId Committee's key Id
      * @param C Contribution value: Array of group points
-     * @param committee Reference to committee zkApp
+     * @param committee Reference to Committee Contract
      * @param memberWitness Witness for proof of committee's member
      */
     @method
@@ -354,17 +397,17 @@ export class Round1Contract extends SmartContract {
         committee: ZkAppRef,
         memberWitness: CommitteeFullWitness
     ) {
-        // Verify zkApp references
-        let zkApps = this.zkApps.getAndRequireEquals();
+        // Get current state values
+        let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
+        let committeeId = memberWitness.level1.calculateIndex();
+        let memberId = memberWitness.level2.calculateIndex();
 
-        // CommitteeContract
-        zkApps.assertEquals(
-            committee.witness.calculateRoot(
-                Poseidon.hash(committee.address.toFields())
-            )
-        );
-        Field(ZkAppEnum.COMMITTEE).assertEquals(
-            committee.witness.calculateIndex()
+        // Verify CommitteeContract address
+        verifyZkApp(
+            Round1Contract.name,
+            committee,
+            zkAppRoot,
+            Field(ZkAppEnum.COMMITTEE)
         );
 
         const committeeContract = new CommitteeContract(committee.address);
@@ -373,17 +416,17 @@ export class Round1Contract extends SmartContract {
         committeeContract.checkMember(
             new CommitteeMemberInput({
                 address: this.sender,
-                committeeId: memberWitness.level1.calculateIndex(),
-                memberId: memberWitness.level2.calculateIndex(),
+                committeeId: committeeId,
+                memberId: memberId,
                 memberWitness: memberWitness,
             })
         );
 
         // Create & dispatch action to DkgContract
         let action = new Action({
-            committeeId: memberWitness.level1.calculateIndex(),
+            committeeId: committeeId,
             keyId: keyId,
-            memberId: memberWitness.level2.calculateIndex(),
+            memberId: memberId,
             contribution: new Round1Contribution({
                 C: C,
             }),
@@ -391,39 +434,41 @@ export class Round1Contract extends SmartContract {
         this.reducer.dispatch(action);
     }
 
+    /**
+     * Rollup Round 1 actions
+     * @param proof Verification proof
+     */
     @method
-    reduce(proof: ReduceRound1Proof) {
+    rollup(proof: RollupRound1Proof) {
         // Get current state values
-        let reduceState = this.reduceState.getAndRequireEquals();
-        let actionState = this.account.actionState.getAndRequireEquals();
+        let curActionState = this.actionState.getAndRequireEquals();
+        let rollupRoot = this.rollupRoot.getAndRequireEquals();
+        let lastActionState = this.account.actionState.getAndRequireEquals();
 
         // Verify proof
-        // FIXME - need to check the last reduced action state
         proof.verify();
-        proof.publicOutput.initialReduceState.assertEquals(reduceState);
-        proof.publicOutput.newActionState.assertEquals(actionState);
+        rollup(
+            Round1Contract.name,
+            proof.publicOutput,
+            curActionState,
+            rollupRoot,
+            lastActionState
+        );
 
-        // Set new states
-        this.reduceState.set(proof.publicOutput.newReduceState);
+        // Update state values
+        this.rollupRoot.set(proof.publicOutput.newRollupRoot);
 
         // Emit events
-        this.emitEvent(EventEnum.CONTRIBUTIONS_REDUCED, actionState);
+        this.emitEvent(EventEnum.ROLLUPED, lastActionState);
     }
 
     /**
-     * Finalize round 2 with N members' contribution
-     * - Get current state values
-     * - Verify zkApp references
-     * - Verify finalize proof
-     * - Verify committee config
-     * - Verify key status
-     * - Set new states
-     * - Create & dispatch action to DkgContract
-     * @param proof
-     * @param committee
-     * @param settingWitness
-     * @param dkg
-     * @param keyStatusWitness
+     * Finalize round 1 with N members' contribution
+     * @param proof Verification proof
+     * @param committee Reference to Committee Contract
+     * @param dkg Reference to Dkg Contract
+     * @param settingWitness Witness for proof of committee's config
+     * @param keyStatusWitness Witness for proof of key status
      */
     @method
     finalize(
@@ -434,37 +479,59 @@ export class Round1Contract extends SmartContract {
         keyStatusWitness: Level1Witness
     ) {
         // Get current state values
-        let zkApps = this.zkApps.getAndRequireEquals();
-        let contributions = this.contributions.getAndRequireEquals();
-        let publicKeys = this.publicKeys.getAndRequireEquals();
-        let reduceState = this.reduceState.getAndRequireEquals();
+        let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
+        let contributionRoot = this.contributionRoot.getAndRequireEquals();
+        let publicKeyRoot = this.publicKeyRoot.getAndRequireEquals();
+        let processRoot = this.processRoot.getAndRequireEquals();
 
-        // Verify zkApp references
-        // CommitteeContract
-        zkApps.assertEquals(
-            committee.witness.calculateRoot(
-                Poseidon.hash(committee.address.toFields())
-            )
-        );
-        Field(ZkAppEnum.COMMITTEE).assertEquals(
-            committee.witness.calculateIndex()
+        // Verify Committee Contract address
+        verifyZkApp(
+            Round1Contract.name,
+            committee,
+            zkAppRoot,
+            Field(ZkAppEnum.COMMITTEE)
         );
 
-        // DkgContract
-        zkApps.assertEquals(
-            dkg.witness.calculateRoot(Poseidon.hash(dkg.address.toFields()))
-        );
-        Field(ZkAppEnum.DKG).assertEquals(dkg.witness.calculateIndex());
+        // Verify Dkg Contract address
+        verifyZkApp(Round1Contract.name, dkg, zkAppRoot, Field(ZkAppEnum.DKG));
 
         const committeeContract = new CommitteeContract(committee.address);
         const dkgContract = new DkgContract(dkg.address);
 
         // Verify finalize proof
         proof.verify();
-        proof.publicOutput.initialContributionRoot.assertEquals(contributions);
-        proof.publicOutput.initialPublicKeyRoot.assertEquals(publicKeys);
-        proof.publicOutput.reduceStateRoot.assertEquals(reduceState);
-        proof.publicOutput.counter.assertEquals(proof.publicOutput.N);
+        proof.publicOutput.processedActions.length.assertEquals(
+            proof.publicOutput.N,
+            buildAssertMessage(
+                Round1Contract.name,
+                'finalize',
+                ErrorEnum.R1_CONTRIBUTION_THRESHOLD
+            )
+        );
+        proof.publicOutput.initialContributionRoot.assertEquals(
+            contributionRoot,
+            buildAssertMessage(
+                Round1Contract.name,
+                'finalize',
+                ErrorEnum.R1_CONTRIBUTION_ROOT
+            )
+        );
+        proof.publicOutput.initialPublicKeyRoot.assertEquals(
+            publicKeyRoot,
+            buildAssertMessage(
+                Round1Contract.name,
+                'finalize',
+                ErrorEnum.ENC_PUBKEY_KEY_L1
+            )
+        );
+        proof.publicOutput.initialProcessRoot.assertEquals(
+            processRoot,
+            buildAssertMessage(
+                Round1Contract.name,
+                'finalize',
+                ErrorEnum.PROCESS_ROOT
+            )
+        );
 
         // Verify committee config
         committeeContract.checkConfig(
@@ -487,14 +554,21 @@ export class Round1Contract extends SmartContract {
         );
 
         // Set new states
-        this.contributions.set(proof.publicOutput.newContributionRoot);
-        this.publicKeys.set(proof.publicOutput.newPublicKeyRoot);
+        this.contributionRoot.set(proof.publicOutput.nextContributionRoot);
+        this.publicKeyRoot.set(proof.publicOutput.nextPublicKeyRoot);
+        this.processRoot.set(proof.publicOutput.nextProcessRoot);
 
         // Create & dispatch action to DkgContract
         dkgContract.publicAction(
             proof.publicInput.action.committeeId,
             proof.publicInput.action.keyId,
             Field(KeyUpdateEnum.FINALIZE_ROUND_1)
+        );
+
+        // Emit events
+        this.emitEvent(
+            EventEnum.PROCESSED,
+            proof.publicOutput.processedActions
         );
     }
 }

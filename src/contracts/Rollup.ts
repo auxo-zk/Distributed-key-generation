@@ -1,7 +1,7 @@
 import { Field, SelfProof, Struct, ZkProgram } from 'o1js';
 import { buildAssertMessage, updateActionState } from '../libs/utils.js';
 import { ErrorEnum } from './constants.js';
-import { ActionWitness, RollupStatus } from './SharedStorage.js';
+import { ActionWitness, ProcessStatus, RollupStatus } from './SharedStorage.js';
 
 export class RollupOutput extends Struct({
     initialActionState: Field,
@@ -108,4 +108,25 @@ export const rollup = (
         newActionState,
         buildAssertMessage(programName, 'rollup', ErrorEnum.LAST_ACTION_STATE)
     );
+};
+
+export const processAction = (
+    programName: string,
+    actionState: Field,
+    previousRoot: Field,
+    witness: ActionWitness
+): Field => {
+    let [root, key] = witness.computeRootAndKey(
+        Field(ProcessStatus.NOT_PROCESSED)
+    );
+    root.assertEquals(
+        previousRoot,
+        buildAssertMessage(programName, 'process', ErrorEnum.PROCESS_ROOT)
+    );
+    key.assertEquals(
+        actionState,
+        buildAssertMessage(programName, 'process', ErrorEnum.PROCESS_KEY)
+    );
+
+    return witness.computeRootAndKey(Field(ProcessStatus.PROCESSED))[0];
 };

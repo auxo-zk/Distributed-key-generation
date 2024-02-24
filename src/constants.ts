@@ -33,6 +33,11 @@ export const INSTANCE_LIMITS = {
 };
 
 /**
+ * Maximum amount of action processed in a recursive proof
+ */
+export const ACTION_PROCESS_LIMITS = 8;
+
+/**
  * The size of an index value in bits for packing indexes array
  */
 export const INDEX_SIZE = 6;
@@ -47,6 +52,19 @@ export enum ZkAppEnum {
     ROUND2,
     RESPONSE,
     REQUEST,
+}
+
+export enum ZkProgramEnum {
+    RollupCommittee = 'RollupCommittee',
+    RollupDkg = 'RollupDkg',
+    RollupRound1 = 'RollupRound1',
+    RollupRound2 = 'RollupRound2',
+    RollupResponse = 'RollupResponse',
+
+    UpdateKey = 'UpdateKey',
+    FinalizeRound1 = 'FinalizeRound1',
+    FinalizeRound2 = 'FinalizeRound2',
+    FinalizeResponse = 'FinalizeResponse',
 }
 
 /**

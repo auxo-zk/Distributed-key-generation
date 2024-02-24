@@ -22,6 +22,7 @@ import {
     ProcessStatus,
     ProcessedActions,
     ZkAppRef,
+    verifyZkApp,
 } from './SharedStorage.js';
 import {
     EMPTY_LEVEL_1_TREE as COMMITTEE_LEVEL_1_TREE,
@@ -34,7 +35,7 @@ import {
 } from './DKGStorage.js';
 import { INSTANCE_LIMITS, ZkAppEnum } from '../constants.js';
 import { ErrorEnum, EventEnum } from './constants.js';
-import { Rollup, rollup } from './Rollup.js';
+import { Rollup, processAction, rollup } from './Rollup.js';
 
 export const enum KeyStatus {
     EMPTY,
@@ -232,31 +233,12 @@ export const UpdateKey = ZkProgram({
                 processedActions.push(actionState);
 
                 // Verify the action isn't already processed
-                let [processRoot, processKey] =
-                    processWitness.computeRootAndKey(
-                        Field(ProcessStatus.NOT_PROCESSED)
-                    );
-                processRoot.assertEquals(
-                    earlierProof.publicOutput.nextProcessRoot,
-                    buildAssertMessage(
-                        UpdateKey.name,
-                        'nextStep',
-                        ErrorEnum.PROCESS_ROOT
-                    )
-                );
-                processKey.assertEquals(
+                let nextProcessRoot = processAction(
+                    UpdateKey.name,
                     actionState,
-                    buildAssertMessage(
-                        UpdateKey.name,
-                        'nextStep',
-                        ErrorEnum.PROCESS_KEY
-                    )
+                    earlierProof.publicOutput.nextProcessRoot,
+                    processWitness
                 );
-
-                // Calculate the new process MT root
-                let nextProcessRoot = processWitness.computeRootAndKey(
-                    Field(ProcessStatus.PROCESSED)
-                )[0];
 
                 return new UpdateKeyOutput({
                     initialKeyCounterRoot:
@@ -411,6 +393,7 @@ export class DkgContract extends SmartContract {
      * @description MT root storing addresses of other zkApps
      */
     @state(Field) zkAppRoot = State<Field>();
+
     /**
      * @description MT root storing incremental counter of committees' keys
      */
@@ -457,7 +440,7 @@ export class DkgContract extends SmartContract {
      * Generate a new key or deprecate an existed key
      * @param keyId Committee's key Id
      * @param actionType Action type
-     * @param committee Reference to committee zkApp
+     * @param committee Reference to Committee Contract
      * @param memberWitness Witness for proof of committee's member
      */
     @method
@@ -468,7 +451,13 @@ export class DkgContract extends SmartContract {
         memberWitness: CommitteeFullWitness
     ) {
         // Verify Committee Contract address
-        this.verifyZkApp(committee, Field(ZkAppEnum.COMMITTEE));
+        let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
+        verifyZkApp(
+            DkgContract.name,
+            committee,
+            zkAppRoot,
+            Field(ZkAppEnum.COMMITTEE)
+        );
         const committeeContract = new CommitteeContract(committee.address);
 
         // Verify committee member - FIXME check if using this.sender is secure
@@ -559,6 +548,9 @@ export class DkgContract extends SmartContract {
 
         // Update state values
         this.rollupRoot.set(proof.publicOutput.newRollupRoot);
+
+        // Emit events
+        this.emitEvent(EventEnum.ROLLUPED, lastActionState);
     }
 
     /**
@@ -634,35 +626,6 @@ export class DkgContract extends SmartContract {
                 DkgContract.name,
                 'verifyKeyStatus',
                 ErrorEnum.KEY_STATUS_KEY
-            )
-        );
-    }
-
-    /**
-     * Verify the address of a zkApp
-     * @param ref Reference to a zkApp
-     * @param key Index of its address in MT
-     */
-    verifyZkApp(ref: ZkAppRef, key: Field) {
-        this.zkAppRoot
-            .getAndRequireEquals()
-            .assertEquals(
-                ref.witness.calculateRoot(
-                    Poseidon.hash(ref.address.toFields())
-                ),
-                buildAssertMessage(
-                    DkgContract.name,
-                    'verifyZkApp',
-                    ErrorEnum.ZKAPP_ROOT
-                )
-            );
-
-        key.assertEquals(
-            ref.witness.calculateIndex(),
-            buildAssertMessage(
-                DkgContract.name,
-                'verifyZkApp',
-                ErrorEnum.ZKAPP_KEY
             )
         );
     }

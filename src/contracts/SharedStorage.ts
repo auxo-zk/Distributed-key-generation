@@ -14,6 +14,8 @@ import {
     ZkAppEnum,
 } from '../constants.js';
 import { FieldDynamicArray } from '@auxo-dev/auxo-libs';
+import { buildAssertMessage } from '../libs/utils.js';
+import { ErrorEnum } from './constants.js';
 
 export const ADDRESS_TREE_HEIGHT = Math.ceil(Math.log2(ADDRESS_MAX_SIZE)) + 1;
 export class AddressMT extends MerkleTree {}
@@ -122,6 +124,28 @@ export function getZkAppRef(
             map.getWitness(AddressStorage.calculateIndex(index).toBigInt())
         ),
     });
+}
+
+/**
+ * Verify the address of a zkApp
+ * @param ref Reference to a zkApp
+ * @param key Index of its address in MT
+ */
+export function verifyZkApp(
+    programName: string,
+    ref: ZkAppRef,
+    root: Field,
+    key: Field
+) {
+    root.assertEquals(
+        ref.witness.calculateRoot(Poseidon.hash(ref.address.toFields())),
+        buildAssertMessage(programName, 'verifyZkApp', ErrorEnum.ZKAPP_ROOT)
+    );
+
+    key.assertEquals(
+        ref.witness.calculateIndex(),
+        buildAssertMessage(programName, 'verifyZkApp', ErrorEnum.ZKAPP_KEY)
+    );
 }
 
 export const enum ActionStatus {

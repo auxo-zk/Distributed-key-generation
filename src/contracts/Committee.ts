@@ -15,7 +15,7 @@ import {
 } from 'o1js';
 import { IPFSHash } from '@auxo-dev/auxo-libs';
 import { buildAssertMessage, updateActionState } from '../libs/utils.js';
-import { COMMITTEE_MAX_SIZE } from '../constants.js';
+import { COMMITTEE_MAX_SIZE, ZkProgramEnum } from '../constants.js';
 import {
     EMPTY_LEVEL_1_TREE,
     EMPTY_LEVEL_2_TREE,
@@ -65,7 +65,7 @@ export class RollupCommitteeOutput extends Struct({
 }
 
 export const RollupCommittee = ZkProgram({
-    name: 'RollupCommittee',
+    name: ZkProgramEnum.RollupCommittee,
     publicOutput: RollupCommitteeOutput,
     methods: {
         firstStep: {
