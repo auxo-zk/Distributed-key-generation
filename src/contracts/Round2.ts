@@ -638,12 +638,19 @@ export class Round2Contract extends SmartContract {
         this.encryptionRoot.set(
             encryptionWitness.calculateRoot(encryptionLeaf)
         );
+        this.processRoot.set(proof.publicOutput.nextProcessRoot);
 
         // Create & dispatch action to DkgContract
         dkgContract.publicAction(
             committeeId,
             keyId,
             Field(KeyUpdateEnum.FINALIZE_ROUND_2)
+        );
+
+        // Emit events
+        this.emitEvent(
+            EventEnum.PROCESSED,
+            proof.publicOutput.processedActions
         );
     }
 }
