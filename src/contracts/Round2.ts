@@ -386,12 +386,7 @@ export class Round2Contract extends SmartContract {
 
     /**
      * Submit round 2 contribution for key generation
-     * - Verify zkApp references
-     * - Verify encryption proof
-     * - Verify committee member
-     * - Verify round 1 public keys (C0[]])
-     * - Create & dispatch action
-     * @param keyId
+     * @param keyId Committee's key Id
      * @param proof
      * @param committee
      * @param round1
@@ -539,24 +534,21 @@ export class Round2Contract extends SmartContract {
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
         let contributionRoot = this.contributionRoot.getAndRequireEquals();
         let encryptionRoot = this.encryptionRoot.getAndRequireEquals();
-        // let reduceState = this.reduceState.getAndRequireEquals();
+        let processRoot = this.processRoot.getAndRequireEquals();
 
-        // Verify zkApp references
-        // CommitteeContract
-        zkAppRoot.assertEquals(
-            committee.witness.calculateRoot(
-                Poseidon.hash(committee.address.toFields())
-            )
-        );
-        Field(ZkAppEnum.COMMITTEE).assertEquals(
-            committee.witness.calculateIndex()
+        let committeeId = proof.publicInput.action.committeeId;
+        let keyId = proof.publicInput.action.keyId;
+
+        // Verify CommitteeContract address
+        verifyZkApp(
+            Round2Contract.name,
+            committee,
+            zkAppRoot,
+            Field(ZkAppEnum.COMMITTEE)
         );
 
-        // DkgContract
-        zkAppRoot.assertEquals(
-            dkg.witness.calculateRoot(Poseidon.hash(dkg.address.toFields()))
-        );
-        Field(ZkAppEnum.DKG).assertEquals(dkg.witness.calculateIndex());
+        // Verify Round1Contract address
+        verifyZkApp(Round2Contract.name, dkg, zkAppRoot, Field(ZkAppEnum.DKG));
 
         const committeeContract = new CommitteeContract(committee.address);
         const dkgContract = new DkgContract(dkg.address);
@@ -564,11 +556,28 @@ export class Round2Contract extends SmartContract {
         // Verify proof
         proof.verify();
         proof.publicOutput.initialContributionRoot.assertEquals(
-            contributionRoot
+            contributionRoot,
+            buildAssertMessage(
+                Round2Contract.name,
+                'finalize',
+                ErrorEnum.R2_CONTRIBUTION_ROOT
+            )
         );
-        // proof.publicOutput.reduceStateRoot.assertEquals(reduceState);
+        proof.publicOutput.initialProcessRoot.assertEquals(
+            processRoot,
+            buildAssertMessage(
+                Round2Contract.name,
+                'finalize',
+                ErrorEnum.PROCESS_ROOT
+            )
+        );
         proof.publicOutput.processedActions.length.assertEquals(
-            proof.publicOutput.N
+            proof.publicOutput.N,
+            buildAssertMessage(
+                Round2Contract.name,
+                'finalize',
+                ErrorEnum.R2_CONTRIBUTION_THRESHOLD
+            )
         );
 
         // Verify committee config
@@ -576,7 +585,7 @@ export class Round2Contract extends SmartContract {
             new CommitteeConfigInput({
                 N: proof.publicOutput.N,
                 T: proof.publicOutput.T,
-                committeeId: proof.publicInput.action.committeeId,
+                committeeId: committeeId,
                 settingWitness: settingWitness,
             })
         );
@@ -584,8 +593,8 @@ export class Round2Contract extends SmartContract {
         // Verify key status
         dkgContract.verifyKeyStatus(
             new KeyStatusInput({
-                committeeId: proof.publicInput.action.committeeId,
-                keyId: proof.publicInput.action.keyId,
+                committeeId: committeeId,
+                keyId: keyId,
                 status: Field(KeyStatus.ROUND_2_CONTRIBUTION),
                 witness: keyStatusWitness,
             })
@@ -607,9 +616,21 @@ export class Round2Contract extends SmartContract {
             }
             return encryptionHashesMT.getRoot();
         });
-        encryptionRoot.assertEquals(encryptionWitness.calculateRoot(Field(0)));
+        encryptionRoot.assertEquals(
+            encryptionWitness.calculateRoot(Field(0)),
+            buildAssertMessage(
+                Round2Contract.name,
+                'finalize',
+                ErrorEnum.ENCRYPTION_ROOT
+            )
+        );
         proof.publicOutput.keyIndex.assertEquals(
-            encryptionWitness.calculateIndex()
+            encryptionWitness.calculateIndex(),
+            buildAssertMessage(
+                Round2Contract.name,
+                'finalize',
+                ErrorEnum.ENCRYPTION_KEY_L1
+            )
         );
 
         // Set new states
@@ -620,8 +641,8 @@ export class Round2Contract extends SmartContract {
 
         // Create & dispatch action to DkgContract
         dkgContract.publicAction(
-            proof.publicInput.action.committeeId,
-            proof.publicInput.action.keyId,
+            committeeId,
+            keyId,
             Field(KeyUpdateEnum.FINALIZE_ROUND_2)
         );
     }
