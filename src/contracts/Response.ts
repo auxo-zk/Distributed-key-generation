@@ -43,19 +43,15 @@ import { Round1Contract } from './Round1.js';
 import { Round2Contract } from './Round2.js';
 import {
     COMMITTEE_MAX_SIZE,
-    INSTANCE_LIMITS,
     REQUEST_MAX_SIZE,
     ZkAppEnum,
     ZkProgramEnum,
 } from '../constants.js';
 import {
-    ActionStatus,
     ActionWitness,
     EMPTY_ACTION_MT,
     EMPTY_ADDRESS_MT,
-    EMPTY_REDUCE_MT,
     ProcessedActions,
-    ReduceWitness,
     ZkAppRef,
     verifyZkApp,
 } from './SharedStorage.js';
@@ -420,25 +416,18 @@ export class ResponseContract extends SmartContract {
     }
 
     /**
-     * Submit response contribution for key generation
-     * - Verify zkApp references
-     * - Verify decryption proof
-     * - Verify committee member
-     * - Verify round 1 public key (C0)
-     * - Verify round 2 encryptions (hashes)
-     * - Compute response
-     * - Create & dispatch action to DkgContract
-     * @param keyId
-     * @param requestId
-     * @param proof
-     * @param R
-     * @param ski
-     * @param committee
-     * @param round1
-     * @param round2
-     * @param memberWitness
-     * @param publicKeyWitness
-     * @param encryptionWitness
+     * Submit response contribution for key usage request
+     * @param keyId Committee's key Id
+     * @param requestId Request Id
+     * @param proof Decryption proof
+     * @param R Commitment of random inputs
+     * @param ski Partial secret for decryption
+     * @param committee Reference to Committee Contract
+     * @param round1 Reference to Round 1 Contract
+     * @param round2 Reference to Round 2 Contract
+     * @param memberWitness Witness for proof of committee membership
+     * @param publicKeyWitness Witness for proof of encryption public key
+     * @param encryptionWitness Witness for encryption hashes
      */
     @method
     contribute(
@@ -618,7 +607,7 @@ export class ResponseContract extends SmartContract {
     }
 
     /**
-     * Rollup Round 2 actions
+     * Rollup actions
      * @param proof Verification proof
      */
     @method
@@ -646,19 +635,12 @@ export class ResponseContract extends SmartContract {
     }
 
     /**
-     * Complete response with T members' contribution
-     * - Get current state values
-     * - Verify zkApp references
-     * - Verify response proof
-     * - Verify committee config
-     * - Verify key status
-     * - Set new states
-     *
-     * @param proof
-     * @param committee
-     * @param dkg
-     * @param settingWitness
-     * @param keyStatusWitness
+     * Finalize response with T members' contribution
+     * @param proof Verification proof
+     * @param committee Reference to Committee Contract
+     * @param dkg Reference to Dkg Contract
+     * @param settingWitness Witness for proof of committee's setting
+     * @param keyStatusWitness Witness for proof of threshold
      */
     @method
     finalize(
@@ -673,9 +655,6 @@ export class ResponseContract extends SmartContract {
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
         let contributionRoot = this.contributionRoot.getAndRequireEquals();
         let processRoot = this.processRoot.getAndRequireEquals();
-
-        let committeeId = proof.publicInput.action.committeeId;
-        let keyId = proof.publicInput.action.keyId;
 
         // Verify CommitteeContract address
         verifyZkApp(
