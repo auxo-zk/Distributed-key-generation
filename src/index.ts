@@ -24,9 +24,6 @@ export {
     // Constants & Enums
     KeyStatus,
 
-    // Structs
-    RollupDkgOutput,
-
     // Zk Programs
     RollupDkg,
     RollupDkgProof,
@@ -57,13 +54,12 @@ export {
 
 export {
     // Structs
-    ReduceOutput as ReduceRound1Output,
-    Round1Input as FinalizeRound1Input,
-    Round1Output as FinalizeRound1Output,
+    FinalizeRound1Input,
+    FinalizeRound1Output,
 
     // Zk Programs
-    ReduceRound1,
-    ReduceRound1Proof,
+    RollupRound1,
+    RollupRound1Proof,
     FinalizeRound1,
     FinalizeRound1Proof,
 
@@ -72,18 +68,16 @@ export {
 
     // Actions & Events
     Action as Round1Action,
-    EventEnum as Round1Events,
 } from './contracts/Round1.js';
 
 export {
     // Structs
-    ReduceOutput as ReduceRound2Output,
-    Round2Input as FinalizeRound2Input,
-    Round2Output as FinalizeRound2Output,
+    FinalizeRound2Input,
+    FinalizeRound2Output,
 
     // Zk Programs
-    ReduceRound2,
-    ReduceRound2Proof,
+    RollupRound2,
+    RollupRound2Proof,
     FinalizeRound2,
     FinalizeRound2Proof,
 
@@ -92,7 +86,6 @@ export {
 
     // Actions & Events
     Action as Round2Action,
-    EventEnum as Round2Events,
 } from './contracts/Round2.js';
 
 export {
@@ -115,7 +108,7 @@ export {
     // Actions & Events
     ActionMask as RequestActionMask,
     createActionMask,
-    RequestAction,
+    Action as RequestAction,
     ActionEnum as RequestActions,
     EventEnum as RequestEvents,
     CreateRequestEvent,
@@ -146,22 +139,20 @@ export {
 
 export {
     // Structs
-    ReduceOutput as ReduceResponseOutput,
-    ResponseInput as CompleteResponseInput,
-    ResponseOutput as CompleteResponseOutput,
+    FinalizeResponseInput,
+    FinalizeResponseOutput,
 
     // Zk Programs
-    ReduceResponse,
-    ReduceResponseProof,
-    CompleteResponse,
-    CompleteResponseProof,
+    RollupResponse,
+    RollupResponseProof,
+    FinalizeResponse,
+    FinalizeResponseProof,
 
     // Smart Contract
     ResponseContract,
 
     // Actions & Events
     Action as ResponseAction,
-    EventEnum as ResponseEvents,
 } from './contracts/Response.js';
 
 export {
