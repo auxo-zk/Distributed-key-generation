@@ -55,7 +55,7 @@ import {
     ZkAppRef,
     verifyZkApp,
 } from './SharedStorage.js';
-import { DArray, RArray } from '../libs/Requestor.js';
+import { DArray, RArray } from '../libs/Requester.js';
 import { Rollup, processAction, rollup } from './Rollup.js';
 import { ErrorEnum, EventEnum } from './constants.js';
 

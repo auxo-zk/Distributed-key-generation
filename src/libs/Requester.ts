@@ -6,6 +6,9 @@ export class MArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class RArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class DArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class skArray extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
+export class RequestVector extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
+export class SecretVector extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
+export class RandomVector extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
 
 export function calculatePublicKey(contributedPublicKeys: Group[]): Group {
     let result = Group.zero;

@@ -7,7 +7,6 @@ import {
     PublicKey,
     Bool,
     Reducer,
-    MerkleMap,
     MerkleMapWitness,
     Struct,
     SelfProof,
@@ -18,32 +17,22 @@ import {
     ZkProgram,
     Void,
 } from 'o1js';
-
-import { GroupDynamicArray, BoolDynamicArray } from '@auxo-dev/auxo-libs';
+import { BoolDynamicArray } from '@auxo-dev/auxo-libs';
 import { updateActionState } from '../libs/utils.js';
-import { REQUEST_MAX_SIZE } from '../constants.js';
+import { RequestVector } from '../libs/Requester.js';
 
-const EmptyMerkleMap = new MerkleMap();
-export const RequestFee = Field(10 ** 9); // 1 Mina
-export const ZeroFee = Field(0); // 0 Mina
-export class RequestVector extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
+export const enum RequestStatus {
+    EMPTY,
+    WAITING_RESPONSE,
+    FINALIZED,
+    ABORTED,
+}
 
 export const enum ActionEnum {
     REQUEST,
-    UNREQUEST,
+    ABORT,
     RESOLVE,
     __LENGTH,
-}
-
-export const enum RequestStatusEnum {
-    NOT_YET_REQUESTED,
-    REQUESTING,
-    // RESOLVED, this will be hash of request vector D: H(length + values)
-}
-
-export enum EventEnum {
-    CREATE_REQUEST = 'create-request',
-    ACTION_REDUCED = 'action-reduced',
 }
 
 export class ActionMask extends BoolDynamicArray(ActionEnum.__LENGTH) {}
@@ -61,19 +50,19 @@ export class CreateRequestEvent extends Struct({
     R: RequestVector,
 }) {}
 
-export class RequestAction extends Struct({
+export class Action extends Struct({
     requestId: Field,
     newRequester: PublicKey,
     R: RequestVector, // request value
     D: RequestVector, // resolve value
     actionType: ActionMask,
 }) {
-    static fromFields(input: Field[]): RequestAction {
-        return super.fromFields(input) as RequestAction;
+    static fromFields(input: Field[]): Action {
+        return super.fromFields(input) as Action;
     }
 
     hash(): Field {
-        return Poseidon.hash(RequestAction.toFields(this));
+        return Poseidon.hash(Action.toFields(this));
     }
 
     hashD(): Field {
@@ -138,7 +127,7 @@ export const CreateRequest = ZkProgram({
         nextStep: {
             privateInputs: [
                 SelfProof<Void, RollupStateOutput>,
-                RequestAction,
+                Action,
                 MerkleMapWitness,
                 MerkleMapWitness,
                 PublicKey,
@@ -146,7 +135,7 @@ export const CreateRequest = ZkProgram({
 
             method(
                 earlierProof: SelfProof<Void, RollupStateOutput>,
-                input: RequestAction,
+                input: Action,
                 requestStatusWitness: MerkleMapWitness,
                 // TODO: check if provide witness and value is the good idea?
                 requesterWitness: MerkleMapWitness,
@@ -192,8 +181,8 @@ export const CreateRequest = ZkProgram({
                 ////// caculate requesterWitess
 
                 // if want to request: so the current requester must be Field(0)
-                // if want to unrequest: so the current requester must be onchainRequester: hash(Publickey(requestor))
-                // if want to resolve: so the current requester must be onchainRequester: hash(Publickey(requestor))
+                // if want to unrequest: so the current requester must be onchainRequester: hash(Publickey(requester))
+                // if want to resolve: so the current requester must be onchainRequester: hash(Publickey(requester))
                 let currentRequester = Provable.switch(
                     input.actionType.values,
                     Field,
@@ -236,7 +225,7 @@ export const CreateRequest = ZkProgram({
                         earlierProof.publicOutput.initialRequesterRoot,
                     finalActionState: updateActionState(
                         earlierProof.publicOutput.finalActionState,
-                        [RequestAction.toFields(input)]
+                        [Action.toFields(input)]
                     ),
                     finalRequestStatusRoot: newRequestStatusRoot,
                     finalRequesterRoot: newRequesterRoot,
@@ -267,15 +256,12 @@ export const CreateRequest = ZkProgram({
 export class RequestProof extends ZkProgram.Proof(CreateRequest) {}
 
 export class RequestContract extends SmartContract {
-    // requestId = hash(committeeId, keyId, hash(valueR))
-    // -> state: enable to check if request the same data
+    @state(PublicKey) responseContractAddress = State<PublicKey>();
     @state(Field) requestStatusRoot = State<Field>();
-    // request id -> requester
     @state(Field) requesterRoot = State<Field>();
     @state(Field) actionState = State<Field>();
-    @state(PublicKey) responeContractAddress = State<PublicKey>();
 
-    reducer = Reducer({ actionType: RequestAction });
+    reducer = Reducer({ actionType: Action });
 
     events = {
         [EventEnum.CREATE_REQUEST]: CreateRequestEvent,
@@ -295,7 +281,7 @@ export class RequestContract extends SmartContract {
 
         let requestInputId = requestInput.requestId();
 
-        let requestAction = new RequestAction({
+        let requestAction = new Action({
             requestId: requestInputId,
             newRequester: this.sender,
             R: requestInput.R, // request value
@@ -310,7 +296,7 @@ export class RequestContract extends SmartContract {
                 fromActionState: actionState,
             }),
             Bool,
-            (state: Bool, action: RequestAction) => {
+            (state: Bool, action: Action) => {
                 return action.requestId.equals(requestInputId).or(state);
             },
             // initial state
@@ -366,7 +352,7 @@ export class RequestContract extends SmartContract {
         // only requester can unrequest their request
         this.sender.assertEquals(unRequestInput.currentRequester);
 
-        let requestAction = new RequestAction({
+        let requestAction = new Action({
             requestId: requestStatusId,
             newRequester: PublicKey.empty(),
             R: RequestVector.empty(),
@@ -380,7 +366,7 @@ export class RequestContract extends SmartContract {
                 fromActionState: actionState,
             }),
             Bool,
-            (state: Bool, action: RequestAction) => {
+            (state: Bool, action: Action) => {
                 return action.requestId.equals(requestStatusId).or(state);
             },
             // initial state
@@ -401,15 +387,15 @@ export class RequestContract extends SmartContract {
 
         let actionType = createActionMask(Field(ActionEnum.RESOLVE));
 
-        // Do this so that only respone contract can called function
-        let responeContractAddress =
-            this.responeContractAddress.getAndRequireEquals();
-        let update = AccountUpdate.create(responeContractAddress);
+        // Do this so that only response contract can called function
+        let responseContractAddress =
+            this.responseContractAddress.getAndRequireEquals();
+        let update = AccountUpdate.create(responseContractAddress);
         update.body.mayUseToken = AccountUpdate.MayUseToken.InheritFromParent;
 
         let resolveInputId = resolveInput.requestId;
 
-        let requestAction = new RequestAction({
+        let requestAction = new Action({
             requestId: resolveInputId,
             newRequester: PublicKey.empty(),
             R: RequestVector.empty(),
@@ -424,7 +410,7 @@ export class RequestContract extends SmartContract {
         //     fromActionState: actionState,
         //   }),
         //   Bool,
-        //   (state: Bool, action: RequestAction) => {
+        //   (state: Bool, action: Action) => {
         //     return action.requestId.equals(resolveInputId).or(state);
         //   },
         //   // initial state
@@ -436,9 +422,9 @@ export class RequestContract extends SmartContract {
 
         this.reducer.dispatch(requestAction);
 
-        // respone contract earn fee
+        // response contract earn fee
         this.send({
-            to: responeContractAddress,
+            to: responseContractAddress,
             amount: UInt64.from(RequestFee),
         });
     }
