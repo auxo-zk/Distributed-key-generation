@@ -90,7 +90,7 @@ export {
 
 export {
     // Constants & Enums
-    RequestStatusEnum as RequestStatus,
+    RequestStatus,
 
     // Structs
     RequestInput,
@@ -107,20 +107,18 @@ export {
 
     // Actions & Events
     ActionMask as RequestActionMask,
-    createActionMask,
     Action as RequestAction,
     ActionEnum as RequestActions,
-    EventEnum as RequestEvents,
     CreateRequestEvent,
 } from './contracts/Request.js';
 
 export {
     // Constants & Enums
-    ActionStatus as RequestHelperActionStatus,
+    ActionStatus as RequesterActionStatus,
 
     // Structs
     CustomScalarArray,
-    RequestHelperInput,
+    RequesterInput,
     ReduceOutput as ReduceRequestOutput,
     RollupActionsOutput,
 
@@ -131,11 +129,11 @@ export {
     CreateRollupProof,
 
     // Smart Contract
-    RequestHelperContract,
+    RequesterContract,
 
     // Actions & Events
-    RequestHelperAction,
-} from './contracts/RequestHelper.js';
+    RequesterAction,
+} from './contracts/Requester.js';
 
 export {
     // Structs
@@ -174,4 +172,4 @@ export {
     accumulateEncryption,
     getResultVector,
     bruteForceResultVector,
-} from './libs/Requestor.js';
+} from './libs/Requester.js';

@@ -10,9 +10,7 @@ import {
     Struct,
     SelfProof,
     ZkProgram,
-    Bool,
 } from 'o1js';
-import { BoolDynamicArray } from '@auxo-dev/auxo-libs';
 import { buildAssertMessage, updateActionState } from '../libs/utils.js';
 import { CommitteeMemberInput, CommitteeContract } from './Committee.js';
 import {
@@ -35,7 +33,12 @@ import {
 } from './DKGStorage.js';
 import { INSTANCE_LIMITS, ZkAppEnum } from '../constants.js';
 import { ErrorEnum, EventEnum } from './constants.js';
-import { Rollup, processAction, rollup } from './Rollup.js';
+import {
+    ActionMask as _ActionMask,
+    Rollup,
+    processAction,
+    rollup,
+} from './Actions.js';
 
 export const enum KeyStatus {
     EMPTY,
@@ -60,13 +63,7 @@ export const enum ActionEnum {
     __LENGTH,
 }
 
-export class ActionMask extends BoolDynamicArray(ActionEnum.__LENGTH) {}
-
-export function createActionMask(action: Field): ActionMask {
-    let mask = ActionMask.empty(Field(ActionEnum.__LENGTH));
-    mask.set(action, Bool(true));
-    return mask;
-}
+export const ActionMask = _ActionMask(ActionEnum.__LENGTH);
 
 export function calculateKeyIndex(committeeId: Field, keyId: Field): Field {
     return Field.from(BigInt(INSTANCE_LIMITS.KEY)).mul(committeeId).add(keyId);
@@ -492,7 +489,7 @@ export class DkgContract extends SmartContract {
                 Field(-1),
                 keyId
             ),
-            mask: createActionMask(actionType),
+            mask: ActionMask.createMask(actionType),
         });
         this.reducer.dispatch(action);
     }
@@ -521,7 +518,7 @@ export class DkgContract extends SmartContract {
         let action = new Action({
             committeeId: committeeId,
             keyId: keyId,
-            mask: createActionMask(actionType),
+            mask: ActionMask.createMask(actionType),
         });
         this.reducer.dispatch(action);
     }
