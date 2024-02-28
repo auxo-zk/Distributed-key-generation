@@ -1,7 +1,23 @@
-import { Bool, Field, SelfProof, Struct, ZkProgram } from 'o1js';
+import {
+    Bool,
+    Field,
+    Reducer,
+    SelfProof,
+    SmartContract,
+    State,
+    Struct,
+    ZkProgram,
+    method,
+    state,
+} from 'o1js';
 import { buildAssertMessage, updateActionState } from '../libs/utils.js';
-import { ErrorEnum } from './constants.js';
-import { ActionWitness, ProcessStatus, RollupStatus } from './SharedStorage.js';
+import { ErrorEnum, EventEnum } from './constants.js';
+import {
+    ActionWitness,
+    EMPTY_ACTION_MT,
+    ProcessStatus,
+    RollupStatus,
+} from './SharedStorage.js';
 import { BoolDynamicArray } from '@auxo-dev/auxo-libs';
 
 export const ActionMask = (numActionTypes: number) => {
@@ -141,3 +157,54 @@ export const processAction = (
 
     return witness.computeRootAndKey(Field(ProcessStatus.PROCESSED))[0];
 };
+
+export const RecursiveRollup = Rollup('RecursiveRollup', Field);
+
+export class RollupProof extends ZkProgram.Proof(RecursiveRollup) {}
+
+export class RollupContract extends SmartContract {
+    /**
+     * @description Latest rolluped action's state
+     */
+    @state(Field) actionState = State<Field>();
+
+    /**
+     * @description MT storing actions' rollup state
+     */
+    @state(Field) rollupRoot = State<Field>();
+
+    reducer = Reducer({ actionType: Field });
+
+    events = {
+        [EventEnum.ROLLUPED]: Field,
+    };
+
+    init() {
+        super.init();
+        this.actionState.set(Reducer.initialActionState);
+        this.rollupRoot.set(EMPTY_ACTION_MT().getRoot());
+    }
+
+    @method rollup(proof: RollupProof) {
+        // Get current state values
+        let curActionState = this.actionState.getAndRequireEquals();
+        let rollupRoot = this.rollupRoot.getAndRequireEquals();
+        let lastActionState = this.account.actionState.getAndRequireEquals();
+
+        // Verify proof
+        proof.verify();
+        rollup(
+            RollupContract.name,
+            proof.publicOutput,
+            curActionState,
+            rollupRoot,
+            lastActionState
+        );
+
+        // Update state values
+        this.rollupRoot.set(proof.publicOutput.newRollupRoot);
+
+        // Emit events
+        this.emitEvent(EventEnum.ROLLUPED, lastActionState);
+    }
+}
