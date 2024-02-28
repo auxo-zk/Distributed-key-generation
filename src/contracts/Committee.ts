@@ -197,12 +197,12 @@ export class CommitteeContract extends SmartContract {
     @state(Field) nextCommitteeId = State<Field>();
 
     /**
-     * @description MT root storing committees' members
+     * @description MT storing committees' members
      */
     @state(Field) memberRoot = State<Field>();
 
     /**
-     * @description MT root storing committees' threshold setting (T/N)
+     * @description MT storing committees' threshold setting (T/N)
      */
     @state(Field) settingRoot = State<Field>();
 

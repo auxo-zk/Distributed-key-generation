@@ -63,7 +63,7 @@ export const enum ActionEnum {
     __LENGTH,
 }
 
-export const ActionMask = _ActionMask(ActionEnum.__LENGTH);
+export class ActionMask extends _ActionMask(ActionEnum.__LENGTH) {}
 
 export function calculateKeyIndex(committeeId: Field, keyId: Field): Field {
     return Field.from(BigInt(INSTANCE_LIMITS.KEY)).mul(committeeId).add(keyId);
@@ -387,17 +387,17 @@ export class UpdateKeyProof extends ZkProgram.Proof(UpdateKey) {}
 
 export class DkgContract extends SmartContract {
     /**
-     * @description MT root storing addresses of other zkApps
+     * @description MT storing addresses of other zkApps
      */
     @state(Field) zkAppRoot = State<Field>();
 
     /**
-     * @description MT root storing incremental counter of committees' keys
+     * @description MT storing incremental counter of committees' keys
      */
     @state(Field) keyCounterRoot = State<Field>();
 
     /**
-     * @description MT root storing keys' status
+     * @description MT storing keys' status
      */
     @state(Field) keyStatusRoot = State<Field>();
 
@@ -407,12 +407,12 @@ export class DkgContract extends SmartContract {
     @state(Field) actionState = State<Field>();
 
     /**
-     * @description MT root storing actions' rollup state
+     * @description MT storing actions' rollup state
      */
     @state(Field) rollupRoot = State<Field>();
 
     /**
-     * @description MT root storing actions' process state
+     * @description MT storing actions' process state
      */
     @state(Field) processRoot = State<Field>();
 

@@ -37,7 +37,7 @@ import {
     KeyStatusInput,
     calculateKeyIndex,
 } from './DKG.js';
-import { RequestContract, RequestVector, ResolveInput } from './Request.js';
+import { RequestContract, ResolveInput } from './Request.js';
 import { BatchDecryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
 import { Round2Contract } from './Round2.js';
@@ -55,8 +55,8 @@ import {
     ZkAppRef,
     verifyZkApp,
 } from './SharedStorage.js';
-import { DArray, RArray } from '../libs/Requester.js';
-import { Rollup, processAction, rollup } from './Rollup.js';
+import { DArray, RArray, RequestVector } from '../libs/Requester.js';
+import { Rollup, processAction, rollup } from './Actions.js';
 import { ErrorEnum, EventEnum } from './constants.js';
 
 export class Action extends Struct({
@@ -375,12 +375,12 @@ export class FinalizeResponseProof extends ZkProgram.Proof(FinalizeResponse) {}
 
 export class ResponseContract extends SmartContract {
     /**
-     * @description MT root storing addresses of other zkApps
+     * @description MT storing addresses of other zkApps
      */
     @state(Field) zkAppRoot = State<Field>();
 
     /**
-     * @description MT root storing members' contributions
+     * @description MT storing members' contributions
      */
     @state(Field) contributionRoot = State<Field>();
 
@@ -390,12 +390,12 @@ export class ResponseContract extends SmartContract {
     @state(Field) actionState = State<Field>();
 
     /**
-     * @description MT root storing actions' rollup state
+     * @description MT storing actions' rollup state
      */
     @state(Field) rollupRoot = State<Field>();
 
     /**
-     * @description MT root storing actions' process state
+     * @description MT storing actions' process state
      */
     @state(Field) processRoot = State<Field>();
 
@@ -403,7 +403,7 @@ export class ResponseContract extends SmartContract {
 
     events = {
         [EventEnum.ROLLUPED]: Field,
-        [EventEnum.PROCESSED]: Field,
+        [EventEnum.PROCESSED]: ProcessedActions,
     };
 
     init() {
@@ -731,7 +731,7 @@ export class ResponseContract extends SmartContract {
         this.processRoot.set(proof.publicOutput.nextProcessRoot);
 
         // Create & dispatch action to RequestContract
-        requestContract.resolveRequest(
+        requestContract.resolve(
             new ResolveInput({
                 requestId: proof.publicOutput.requestId,
                 D: proof.publicOutput.D,

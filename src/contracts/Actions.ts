@@ -1,6 +1,8 @@
 import {
     Bool,
     Field,
+    Poseidon,
+    PublicKey,
     Reducer,
     SelfProof,
     SmartContract,
@@ -183,6 +185,14 @@ export class RollupContract extends SmartContract {
         super.init();
         this.actionState.set(Reducer.initialActionState);
         this.rollupRoot.set(EMPTY_ACTION_MT().getRoot());
+    }
+
+    @method recordAction(actionHash: Field, address: PublicKey) {
+        // Verify whitelist address (optional)
+
+        // Create and dispatch action
+        let action = Poseidon.hash([actionHash, address.toFields()].flat());
+        this.reducer.dispatch(action);
     }
 
     @method rollup(proof: RollupProof) {

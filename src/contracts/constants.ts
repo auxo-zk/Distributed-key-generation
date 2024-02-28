@@ -59,6 +59,16 @@ export enum ErrorEnum {
     ENCRYPTION_KEY_L1 = 'Incorrect public key MT level 1 key',
     ENCRYPTION_KEY_L2 = 'Incorrect public key MT level 2 key',
 
+    // RequesterContract errors
+    REQUEST_VECTOR_DIM = 'Incorrect dimension',
+    REQUEST_COUNTER = 'Incorrect request counter',
+    REQUEST_ID_ROOT = 'Incorrect request Id MT root',
+    REQUEST_ID_KEY = 'Incorrect request Id MT key',
+    ACCUMULATION_ROOT = 'Incorrect accumulation Id MT root',
+    ACCUMULATION_KEY = 'Incorrect accumulation Id MT key',
+    COMMITMENT_ROOT = 'Incorrect commitment Id MT root',
+    COMMITMENT_KEY = 'Incorrect commitment Id MT key',
+
     // ResponseContract errors
     REQUEST_ID = 'Incorrect request Id',
     RES_CONTRIBUTION_ROOT = 'Incorrect contribution MT root',

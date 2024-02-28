@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-empty-function */
 import {
     Field,
     SmartContract,
@@ -20,28 +21,28 @@ import {
 import { BoolDynamicArray } from '@auxo-dev/auxo-libs';
 import { updateActionState } from '../libs/utils.js';
 import { RequestVector } from '../libs/Requester.js';
+import { REQUEST_FEE } from '../constants.js';
+import { ActionMask as _ActionMask } from './Actions.js';
+import { EventEnum } from './constants.js';
+import { ProcessedActions } from './SharedStorage.js';
 
 export const enum RequestStatus {
     EMPTY,
-    WAITING_RESPONSE,
+    INITIALIZED,
     FINALIZED,
+    RESOLVED,
     ABORTED,
 }
 
 export const enum ActionEnum {
-    REQUEST,
-    ABORT,
+    INITIALIZE,
+    FINALIZE,
     RESOLVE,
+    ABORT,
     __LENGTH,
 }
 
-export class ActionMask extends BoolDynamicArray(ActionEnum.__LENGTH) {}
-
-export function createActionMask(action: Field): ActionMask {
-    let mask = ActionMask.empty(Field(ActionEnum.__LENGTH));
-    mask.set(action, Bool(true));
-    return mask;
-}
+export class ActionMask extends _ActionMask(ActionEnum.__LENGTH) {}
 
 export class CreateRequestEvent extends Struct({
     requestId: Field,
@@ -264,8 +265,7 @@ export class RequestContract extends SmartContract {
     reducer = Reducer({ actionType: Action });
 
     events = {
-        [EventEnum.CREATE_REQUEST]: CreateRequestEvent,
-        [EventEnum.ACTION_REDUCED]: Field,
+        [EventEnum.PROCESSED]: ProcessedActions,
     };
 
     init() {
@@ -274,6 +274,20 @@ export class RequestContract extends SmartContract {
         this.requesterRoot.set(EmptyMerkleMap.getRoot());
         this.actionState.set(Reducer.initialActionState);
     }
+
+    @method initialize(
+        committeeId: Field,
+        keyId: Field,
+        requester: PublicKey
+    ) {}
+
+    @method abort(requestId: Field) {}
+
+    @method finalize(
+        requestId: Field,
+        accumulatedR: RequestVector,
+        accumulatedM: RequestVector
+    ) {}
 
     @method request(requestInput: RequestInput) {
         let actionState = this.actionState.getAndRequireEquals();
@@ -324,7 +338,7 @@ export class RequestContract extends SmartContract {
         );
     }
 
-    @method unrequest(unRequestInput: UnRequestInput) {
+    @method cancel(unRequestInput: UnRequestInput) {
         let actionState = this.actionState.getAndRequireEquals();
         let actionType = createActionMask(Field(ActionEnum.UNREQUEST));
 
@@ -382,7 +396,7 @@ export class RequestContract extends SmartContract {
         this.send({ to: this.sender, amount: UInt64.from(RequestFee) });
     }
 
-    @method resolveRequest(resolveInput: ResolveInput) {
+    @method resolve(resolveInput: ResolveInput) {
         let actionState = this.actionState.getAndRequireEquals();
 
         let actionType = createActionMask(Field(ActionEnum.RESOLVE));
@@ -425,11 +439,11 @@ export class RequestContract extends SmartContract {
         // response contract earn fee
         this.send({
             to: responseContractAddress,
-            amount: UInt64.from(RequestFee),
+            amount: UInt64.from(REQUEST_FEE),
         });
     }
 
-    @method rollupRequest(proof: RequestProof) {
+    @method rollup(proof: RequestProof) {
         proof.verify();
         let actionState = this.actionState.getAndRequireEquals();
         let requestStatusRoot = this.requestStatusRoot.getAndRequireEquals();
@@ -455,15 +469,16 @@ export class RequestContract extends SmartContract {
     // to-do: after finished request, committee can take fee (maybe using another contract)
 }
 
-export class MockResponeContract extends SmartContract {
+export class MockResponseContract extends SmartContract {
     @method
     resolve(address: PublicKey, resolveInput: ResolveInput) {
         const requestContract = new RequestContract(address);
-        requestContract.resolveRequest(
+        requestContract.resolve(
             new ResolveInput({
                 requestId: resolveInput.requestId,
                 D: resolveInput.D,
             })
         );
+        requestContract.requestStatusRoot.set(Field(0));
     }
 }

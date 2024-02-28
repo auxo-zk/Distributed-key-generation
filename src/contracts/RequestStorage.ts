@@ -1,7 +1,5 @@
 import {
     Field,
-    MerkleMap,
-    MerkleMapWitness,
     MerkleTree,
     MerkleWitness,
     Poseidon,
@@ -9,19 +7,39 @@ import {
     Struct,
 } from 'o1js';
 import { ResponseContribution } from '../libs/Committee.js';
-import { COMMITTEE_MAX_SIZE } from '../constants.js';
+import { COMMITTEE_MAX_SIZE, INSTANCE_LIMITS } from '../constants.js';
 
+export const LEVEL1_TREE_HEIGHT =
+    Math.ceil(
+        Math.log2(
+            INSTANCE_LIMITS.COMMITTEE *
+                INSTANCE_LIMITS.KEY *
+                INSTANCE_LIMITS.REQUEST
+        )
+    ) + 1;
 export const LEVEL2_TREE_HEIGHT = Math.ceil(Math.log2(COMMITTEE_MAX_SIZE)) + 1;
-export class Level1MT extends MerkleMap {}
-export class Level1Witness extends MerkleMapWitness {}
+export class Level1MT extends MerkleTree {}
+export class Level1Witness extends MerkleWitness(LEVEL1_TREE_HEIGHT) {}
 export class Level2MT extends MerkleTree {}
 export class Level2Witness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
-export const EMPTY_LEVEL_1_TREE = () => new Level1MT();
+export const EMPTY_LEVEL_1_TREE = () => new Level1MT(LEVEL1_TREE_HEIGHT);
 export const EMPTY_LEVEL_2_TREE = () => new Level2MT(LEVEL2_TREE_HEIGHT);
 export class FullMTWitness extends Struct({
     level1: Level1Witness,
     level2: Level2Witness,
 }) {}
+
+export const calculateRequestIndex = (
+    committeeId: Field,
+    keyId: Field,
+    requestId: Field
+): Field =>
+    Field.from(
+        Field.from(BigInt(INSTANCE_LIMITS.KEY * INSTANCE_LIMITS.REQUEST))
+            .mul(committeeId)
+            .add(Field.from(BigInt(INSTANCE_LIMITS.REQUEST)).mul(keyId))
+            .add(requestId)
+    );
 
 export abstract class RequestStorage<RawLeaf> {
     private _level1: Level1MT;
@@ -86,7 +104,9 @@ export abstract class RequestStorage<RawLeaf> {
     calculateLevel2Index?(args: any): Field;
 
     getLevel1Witness(level1Index: Field): Level1Witness {
-        return this._level1.getWitness(level1Index);
+        return new Level1Witness(
+            this._level1.getWitness(level1Index.toBigInt())
+        );
     }
 
     getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
@@ -114,7 +134,7 @@ export abstract class RequestStorage<RawLeaf> {
         Object.assign(this._level2s, {
             [level1Index.toString()]: level2,
         });
-        this._level1.set(level1Index, level2.getRoot());
+        this._level1.setLeaf(level1Index.toBigInt(), level2.getRoot());
     }
 
     updateLeaf(
@@ -132,7 +152,7 @@ export abstract class RequestStorage<RawLeaf> {
 
             level2.setLeaf(level2Index.toBigInt(), leaf);
             this.updateInternal(level1Index, level2);
-        } else this._level1.set(level1Index, leaf);
+        } else this._level1.setLeaf(level1Index.toBigInt(), leaf);
 
         this._leafs[leafId] = {
             raw: undefined,
@@ -156,7 +176,7 @@ export abstract class RequestStorage<RawLeaf> {
 
             level2.setLeaf(level2Index.toBigInt(), leaf);
             this.updateInternal(level1Index, level2);
-        } else this._level1.set(level1Index, leaf);
+        } else this._level1.setLeaf(level1Index.toBigInt(), leaf);
 
         this._leafs[leafId] = {
             raw: rawLeaf,
@@ -165,23 +185,38 @@ export abstract class RequestStorage<RawLeaf> {
     }
 }
 
-export type RequestStatusLeaf = Field;
+export type AccumulationLeaf = {
+    accumulatedR: Field;
+    accumulatedM: Field;
+};
 
-export class RequestStatusStorage extends RequestStorage<RequestStatusLeaf> {
-    static calculateLeaf(status: RequestStatusLeaf): Field {
-        return Field(status);
+export class AccumulationStorage extends RequestStorage<AccumulationLeaf> {
+    static calculateLeaf(rawLeaf: AccumulationLeaf): Field {
+        return Poseidon.hash([rawLeaf.accumulatedR, rawLeaf.accumulatedM]);
     }
 
-    calculateLeaf(status: RequestStatusLeaf): Field {
-        return RequestStatusStorage.calculateLeaf(status);
+    calculateLeaf(rawLeaf: AccumulationLeaf): Field {
+        return AccumulationStorage.calculateLeaf(rawLeaf);
     }
 
-    static calculateLevel1Index(requestId: Field): Field {
-        return requestId;
+    static calculateLevel1Index({
+        committeeId,
+        keyId,
+        requestId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+        requestId: Field;
+    }): Field {
+        return calculateRequestIndex(committeeId, keyId, requestId);
     }
 
     calculateLevel1Index(requestId: Field): Field {
-        return RequestStatusStorage.calculateLevel1Index(requestId);
+        return AccumulationStorage.calculateLevel1Index({
+            committeeId,
+            keyId,
+            requestId,
+        });
     }
 
     getWitness(level1Index: Field): Level1Witness {

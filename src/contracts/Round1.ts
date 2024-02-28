@@ -44,7 +44,7 @@ import {
     ZkAppRef,
     verifyZkApp,
 } from './SharedStorage.js';
-import { Rollup, processAction, rollup } from './Rollup.js';
+import { Rollup, processAction, rollup } from './Actions.js';
 import { ErrorEnum, EventEnum } from './constants.js';
 
 export class Action extends Struct({
@@ -337,17 +337,17 @@ export class FinalizeRound1Proof extends ZkProgram.Proof(FinalizeRound1) {}
 
 export class Round1Contract extends SmartContract {
     /**
-     * @description MT root storing addresses of other zkApps
+     * @description MT storing addresses of other zkApps
      */
     @state(Field) zkAppRoot = State<Field>();
 
     /**
-     * @description MT root storing members' contributions
+     * @description MT storing members' contributions
      */
     @state(Field) contributionRoot = State<Field>();
 
     /**
-     * @description MT root storing members' encryption public keys
+     * @description MT storing members' encryption public keys
      */
     @state(Field) publicKeyRoot = State<Field>();
 
@@ -357,12 +357,12 @@ export class Round1Contract extends SmartContract {
     @state(Field) actionState = State<Field>();
 
     /**
-     * @description MT root storing actions' rollup state
+     * @description MT storing actions' rollup state
      */
     @state(Field) rollupRoot = State<Field>();
 
     /**
-     * @description MT root storing actions' process state
+     * @description MT storing actions' process state
      */
     @state(Field) processRoot = State<Field>();
 
@@ -370,7 +370,7 @@ export class Round1Contract extends SmartContract {
 
     events = {
         [EventEnum.ROLLUPED]: Field,
-        [EventEnum.PROCESSED]: Field,
+        [EventEnum.PROCESSED]: ProcessedActions,
     };
 
     init() {
