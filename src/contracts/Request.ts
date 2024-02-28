@@ -257,10 +257,30 @@ export const CreateRequest = ZkProgram({
 export class RequestProof extends ZkProgram.Proof(CreateRequest) {}
 
 export class RequestContract extends SmartContract {
+    /**
+     * @description Address of Response Contract
+     */
     @state(PublicKey) responseContractAddress = State<PublicKey>();
-    @state(Field) requestStatusRoot = State<Field>();
+
+    /**
+     * @description MT storing corresponding keys
+     */
+    @state(Field) keyIndexRoot = State<Field>();
+
+    /**
+     * @description MT storing requests' address
+     */
     @state(Field) requesterRoot = State<Field>();
-    @state(Field) actionState = State<Field>();
+
+    /**
+     * @description MT storing requests' status
+     */
+    @state(Field) requestStatusRoot = State<Field>();
+
+    /**
+     * @description MT storing requests' period
+     */
+    @state(Field) requestPeriodRoot = State<Field>();
 
     reducer = Reducer({ actionType: Action });
 
@@ -270,7 +290,7 @@ export class RequestContract extends SmartContract {
 
     init() {
         super.init();
-        this.requestStatusRoot.set(EmptyMerkleMap.getRoot());
+        this.requestStatusRoot.set(.getRoot());
         this.requesterRoot.set(EmptyMerkleMap.getRoot());
         this.actionState.set(Reducer.initialActionState);
     }

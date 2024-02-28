@@ -262,7 +262,7 @@ export class RequesterContract extends SmartContract {
     @state(Field) requestCounter = State<Field>();
 
     /**
-     * @description MT storing corresponding request
+     * @description MT storing corresponding requests
      */
     @state(Field) requestIdRoot = State<Field>();
 
