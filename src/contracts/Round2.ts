@@ -22,6 +22,7 @@ import {
     Level1Witness as CommitteeLevel1Witness,
 } from './CommitteeStorage.js';
 import {
+    calculateKeyIndex,
     FullMTWitness as DKGWitness,
     EMPTY_LEVEL_1_TREE,
     EMPTY_LEVEL_2_TREE,
@@ -37,7 +38,6 @@ import {
     DkgContract,
     KeyStatus,
     KeyStatusInput,
-    calculateKeyIndex,
 } from './DKG.js';
 import { BatchEncryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
@@ -157,7 +157,7 @@ export const FinalizeRound2 = ZkProgram({
                     buildAssertMessage(
                         FinalizeRound2.name,
                         'firstStep',
-                        ErrorEnum.R2_CONTRIBUTION_KEY_L1
+                        ErrorEnum.R2_CONTRIBUTION_INDEX_L1
                     )
                 );
                 initialEncryptionHashes.hash().assertEquals(
@@ -235,7 +235,7 @@ export const FinalizeRound2 = ZkProgram({
                     buildAssertMessage(
                         FinalizeRound2.name,
                         'nextStep',
-                        ErrorEnum.R2_CONTRIBUTION_KEY_INDEX
+                        ErrorEnum.R2_CONTRIBUTION_INDEX_INDEX
                     )
                 );
 
@@ -255,7 +255,7 @@ export const FinalizeRound2 = ZkProgram({
                     buildAssertMessage(
                         FinalizeRound2.name,
                         'nextStep',
-                        ErrorEnum.R2_CONTRIBUTION_KEY_L1
+                        ErrorEnum.R2_CONTRIBUTION_INDEX_L1
                     )
                 );
                 input.action.memberId.assertEquals(
@@ -263,7 +263,7 @@ export const FinalizeRound2 = ZkProgram({
                     buildAssertMessage(
                         FinalizeRound2.name,
                         'nextStep',
-                        ErrorEnum.R2_CONTRIBUTION_KEY_L2
+                        ErrorEnum.R2_CONTRIBUTION_INDEX_L2
                     )
                 );
 
@@ -629,7 +629,7 @@ export class Round2Contract extends SmartContract {
             buildAssertMessage(
                 Round2Contract.name,
                 'finalize',
-                ErrorEnum.ENCRYPTION_KEY_L1
+                ErrorEnum.ENCRYPTION_INDEX_L1
             )
         );
 

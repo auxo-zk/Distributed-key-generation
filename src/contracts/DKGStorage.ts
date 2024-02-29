@@ -24,6 +24,10 @@ export class FullMTWitness extends Struct({
     level2: Level2Witness,
 }) {}
 
+export function calculateKeyIndex(committeeId: Field, keyId: Field): Field {
+    return Field.from(BigInt(INSTANCE_LIMITS.KEY)).mul(committeeId).add(keyId);
+}
+
 export abstract class DKGStorage<RawLeaf> {
     private _level1: Level1MT;
     private _level2s: { [key: string]: Level2MT };

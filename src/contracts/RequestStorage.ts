@@ -5,6 +5,7 @@ import {
     Poseidon,
     PublicKey,
     Struct,
+    UInt64,
 } from 'o1js';
 import { ResponseContribution } from '../libs/Committee.js';
 import { COMMITTEE_MAX_SIZE, INSTANCE_LIMITS } from '../constants.js';
@@ -32,38 +33,24 @@ export abstract class RequestStorage<RawLeaf> extends GenericStorage<
     Level2Witness
 > {}
 
-export type AccumulationLeaf = {
-    accumulatedR: Field;
-    accumulatedM: Field;
-};
+// TODO: Consider changing to UInt64 for optimization
+export type KeyIndexLeaf = Field;
 
-export class AccumulationStorage extends RequestStorage<AccumulationLeaf> {
-    static calculateLeaf(rawLeaf: AccumulationLeaf): Field {
-        return Poseidon.hash([rawLeaf.accumulatedR, rawLeaf.accumulatedM]);
+export class KeyIndexStorage extends RequestStorage<KeyIndexLeaf> {
+    static calculateLeaf(keyIndex: KeyIndexLeaf): Field {
+        return keyIndex;
     }
 
-    calculateLeaf(rawLeaf: AccumulationLeaf): Field {
-        return AccumulationStorage.calculateLeaf(rawLeaf);
+    calculateLeaf(keyIndex: KeyIndexLeaf): Field {
+        return KeyIndexStorage.calculateLeaf(keyIndex);
     }
 
-    static calculateLevel1Index({
-        committeeId,
-        keyId,
-        requestId,
-    }: {
-        committeeId: Field;
-        keyId: Field;
-        requestId: Field;
-    }): Field {
-        return calculateRequestIndex(committeeId, keyId, requestId);
+    static calculateLevel1Index(requestId: Field): Field {
+        return requestId;
     }
 
     calculateLevel1Index(requestId: Field): Field {
-        return AccumulationStorage.calculateLevel1Index({
-            committeeId,
-            keyId,
-            requestId,
-        });
+        return KeyIndexStorage.calculateLevel1Index(requestId);
     }
 
     getWitness(level1Index: Field): Level1Witness {
@@ -76,7 +63,7 @@ export class AccumulationStorage extends RequestStorage<AccumulationLeaf> {
 
     updateRawLeaf(
         { level1Index }: { level1Index: Field },
-        rawLeaf: RequestStatusLeaf
+        rawLeaf: KeyIndexLeaf
     ): void {
         super.updateRawLeaf({ level1Index }, rawLeaf);
     }
@@ -112,6 +99,84 @@ export class RequesterStorage extends RequestStorage<RequesterLeaf> {
     updateRawLeaf(
         { level1Index }: { level1Index: Field },
         rawLeaf: RequesterLeaf
+    ): void {
+        super.updateRawLeaf({ level1Index }, rawLeaf);
+    }
+}
+
+export type RequestStatusLeaf = Field;
+
+export class RequestStatusStorage extends RequestStorage<RequestStatusLeaf> {
+    static calculateLeaf(keyIndex: RequestStatusLeaf): Field {
+        return keyIndex;
+    }
+
+    calculateLeaf(keyIndex: RequestStatusLeaf): Field {
+        return RequestStatusStorage.calculateLeaf(keyIndex);
+    }
+
+    static calculateLevel1Index(requestId: Field): Field {
+        return requestId;
+    }
+
+    calculateLevel1Index(requestId: Field): Field {
+        return RequestStatusStorage.calculateLevel1Index(requestId);
+    }
+
+    getWitness(level1Index: Field): Level1Witness {
+        return super.getWitness(level1Index) as Level1Witness;
+    }
+
+    updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
+        super.updateLeaf({ level1Index }, leaf);
+    }
+
+    updateRawLeaf(
+        { level1Index }: { level1Index: Field },
+        rawLeaf: RequestStatusLeaf
+    ): void {
+        super.updateRawLeaf({ level1Index }, rawLeaf);
+    }
+}
+
+export type RequestPeriodLeaf = {
+    startTimestamp: UInt64;
+    endTimestamp: UInt64;
+};
+
+export class RequestPeriodStorage extends RequestStorage<RequestPeriodLeaf> {
+    static calculateLeaf(rawLeaf: RequestPeriodLeaf): Field {
+        return Poseidon.hash(
+            [
+                rawLeaf.startTimestamp.toFields(),
+                rawLeaf.endTimestamp.toFields(),
+            ].flat()
+        );
+    }
+
+    calculateLeaf(rawLeaf: RequestPeriodLeaf): Field {
+        return RequestPeriodStorage.calculateLeaf(rawLeaf);
+    }
+
+    static calculateLevel1Index(requestId: Field): Field {
+        return requestId;
+    }
+
+    calculateLevel1Index(requestId: Field): Field {
+        return RequestStatusStorage.calculateLevel1Index(requestId);
+    }
+
+    getWitness(level1Index: Field): Level1Witness {
+        return super.getWitness(level1Index) as Level1Witness;
+    }
+
+    updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
+        super.updateLeaf({ level1Index }, leaf);
+    }
+
+    updateRawLeaf(
+        { level1Index }: { level1Index: Field },
+        rawLeaf: RequestPeriodLeaf
     ): void {
         super.updateRawLeaf({ level1Index }, rawLeaf);
     }

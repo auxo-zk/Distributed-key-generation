@@ -166,7 +166,7 @@ export const FinalizeResponse = ZkProgram({
                     buildAssertMessage(
                         FinalizeResponse.name,
                         'firstStep',
-                        ErrorEnum.RES_CONTRIBUTION_KEY_L1
+                        ErrorEnum.RES_CONTRIBUTION_INDEX_L1
                     )
                 );
 
@@ -257,7 +257,7 @@ export const FinalizeResponse = ZkProgram({
                     buildAssertMessage(
                         FinalizeResponse.name,
                         'nextStep',
-                        ErrorEnum.RES_CONTRIBUTION_KEY_L1
+                        ErrorEnum.RES_CONTRIBUTION_INDEX_L1
                     )
                 );
                 input.action.memberId.assertEquals(
@@ -265,7 +265,7 @@ export const FinalizeResponse = ZkProgram({
                     buildAssertMessage(
                         FinalizeResponse.name,
                         'nextStep',
-                        ErrorEnum.RES_CONTRIBUTION_KEY_L2
+                        ErrorEnum.RES_CONTRIBUTION_INDEX_L2
                     )
                 );
 
@@ -510,7 +510,7 @@ export class ResponseContract extends SmartContract {
             buildAssertMessage(
                 ResponseContract.name,
                 'contribute',
-                ErrorEnum.R1_CONTRIBUTION_KEY_L1
+                ErrorEnum.R1_CONTRIBUTION_INDEX_L1
             )
         );
         memberId.assertEquals(
@@ -518,7 +518,7 @@ export class ResponseContract extends SmartContract {
             buildAssertMessage(
                 ResponseContract.name,
                 'contribute',
-                ErrorEnum.R1_CONTRIBUTION_KEY_L2
+                ErrorEnum.R1_CONTRIBUTION_INDEX_L2
             )
         );
 
@@ -554,7 +554,7 @@ export class ResponseContract extends SmartContract {
             buildAssertMessage(
                 ResponseContract.name,
                 'contribute',
-                ErrorEnum.ENCRYPTION_KEY_L1
+                ErrorEnum.ENCRYPTION_INDEX_L1
             )
         );
         memberId.assertEquals(
@@ -562,7 +562,7 @@ export class ResponseContract extends SmartContract {
             buildAssertMessage(
                 ResponseContract.name,
                 'contribute',
-                ErrorEnum.ENCRYPTION_KEY_L2
+                ErrorEnum.ENCRYPTION_INDEX_L2
             )
         );
 
@@ -646,10 +646,8 @@ export class ResponseContract extends SmartContract {
     finalize(
         proof: FinalizeResponseProof,
         committee: ZkAppRef,
-        dkg: ZkAppRef,
         request: ZkAppRef,
-        settingWitness: CommitteeLevel1Witness,
-        keyStatusWitness: Level1Witness
+        settingWitness: CommitteeLevel1Witness
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -664,9 +662,6 @@ export class ResponseContract extends SmartContract {
             Field(ZkAppEnum.COMMITTEE)
         );
 
-        // Verify Round1Contract address
-        verifyZkApp(Round2Contract.name, dkg, zkAppRoot, Field(ZkAppEnum.DKG));
-
         // RequestContract
         verifyZkApp(
             Round2Contract.name,
@@ -676,7 +671,6 @@ export class ResponseContract extends SmartContract {
         );
 
         const committeeContract = new CommitteeContract(committee.address);
-        const dkgContract = new DkgContract(dkg.address);
         const requestContract = new RequestContract(request.address);
 
         // Verify response proof
@@ -713,16 +707,6 @@ export class ResponseContract extends SmartContract {
                 T: proof.publicOutput.T,
                 committeeId: proof.publicInput.action.committeeId,
                 settingWitness: settingWitness,
-            })
-        );
-
-        // Verify key status
-        dkgContract.verifyKeyStatus(
-            new KeyStatusInput({
-                committeeId: proof.publicInput.action.committeeId,
-                keyId: proof.publicInput.action.keyId,
-                status: Field(KeyStatus.ACTIVE),
-                witness: keyStatusWitness,
             })
         );
 

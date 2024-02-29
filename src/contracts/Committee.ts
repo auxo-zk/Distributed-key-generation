@@ -120,7 +120,7 @@ export const RollupCommittee = ZkProgram({
                     buildAssertMessage(
                         RollupCommittee.name,
                         'nextStep',
-                        ErrorEnum.MEMBER_KEY_L1
+                        ErrorEnum.MEMBER_INDEX_L1
                     )
                 );
 
@@ -140,7 +140,7 @@ export const RollupCommittee = ZkProgram({
                     buildAssertMessage(
                         RollupCommittee.name,
                         'nextStep',
-                        ErrorEnum.SETTING_KEY
+                        ErrorEnum.SETTING_INDEX
                     )
                 );
 
@@ -335,7 +335,7 @@ export class CommitteeContract extends SmartContract {
             buildAssertMessage(
                 CommitteeContract.name,
                 'checkMember',
-                ErrorEnum.MEMBER_KEY_L1
+                ErrorEnum.MEMBER_INDEX_L1
             )
         );
         input.memberId.assertEquals(
@@ -343,7 +343,7 @@ export class CommitteeContract extends SmartContract {
             buildAssertMessage(
                 CommitteeContract.name,
                 'checkMember',
-                ErrorEnum.MEMBER_KEY_L2
+                ErrorEnum.MEMBER_INDEX_L2
             )
         );
     }
@@ -371,7 +371,7 @@ export class CommitteeContract extends SmartContract {
             buildAssertMessage(
                 CommitteeContract.name,
                 'checkConfig',
-                ErrorEnum.SETTING_KEY
+                ErrorEnum.SETTING_INDEX
             )
         );
     }

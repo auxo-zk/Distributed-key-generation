@@ -22,6 +22,7 @@ import {
     EMPTY_LEVEL_1_TREE,
     EMPTY_LEVEL_2_TREE,
     Level1Witness,
+    calculateKeyIndex,
 } from './DKGStorage.js';
 import {
     CommitteeConfigInput,
@@ -33,7 +34,6 @@ import {
     DkgContract,
     KeyStatus,
     KeyStatusInput,
-    calculateKeyIndex,
 } from './DKG.js';
 import { ZkAppEnum, ZkProgramEnum } from '../constants.js';
 import {
@@ -134,7 +134,7 @@ export const FinalizeRound1 = ZkProgram({
                     buildAssertMessage(
                         FinalizeRound1.name,
                         'firstStep',
-                        ErrorEnum.R1_CONTRIBUTION_KEY_L1
+                        ErrorEnum.R1_CONTRIBUTION_INDEX_L1
                     )
                 );
 
@@ -156,7 +156,7 @@ export const FinalizeRound1 = ZkProgram({
                     buildAssertMessage(
                         FinalizeRound1.name,
                         'firstStep',
-                        ErrorEnum.ENCRYPTION_KEY_L1
+                        ErrorEnum.ENCRYPTION_INDEX_L1
                     )
                 );
 
@@ -217,7 +217,7 @@ export const FinalizeRound1 = ZkProgram({
                     buildAssertMessage(
                         FinalizeRound1.name,
                         'nextStep',
-                        ErrorEnum.R1_CONTRIBUTION_KEY_INDEX
+                        ErrorEnum.R1_CONTRIBUTION_INDEX_INDEX
                     )
                 );
 
@@ -237,7 +237,7 @@ export const FinalizeRound1 = ZkProgram({
                     buildAssertMessage(
                         FinalizeRound1.name,
                         'nextStep',
-                        ErrorEnum.R1_CONTRIBUTION_KEY_L1
+                        ErrorEnum.R1_CONTRIBUTION_INDEX_L1
                     )
                 );
                 input.action.memberId.assertEquals(
@@ -245,7 +245,7 @@ export const FinalizeRound1 = ZkProgram({
                     buildAssertMessage(
                         FinalizeRound1.name,
                         'nextStep',
-                        ErrorEnum.R1_CONTRIBUTION_KEY_L2
+                        ErrorEnum.R1_CONTRIBUTION_INDEX_L2
                     )
                 );
 
@@ -273,7 +273,7 @@ export const FinalizeRound1 = ZkProgram({
                     buildAssertMessage(
                         FinalizeRound1.name,
                         'nextStep',
-                        ErrorEnum.ENC_PUBKEY_KEY_L1
+                        ErrorEnum.ENC_PUBKEY_INDEX_L1
                     )
                 );
                 input.action.memberId.assertEquals(
@@ -281,7 +281,7 @@ export const FinalizeRound1 = ZkProgram({
                     buildAssertMessage(
                         FinalizeRound1.name,
                         'nextStep',
-                        ErrorEnum.ENC_PUBKEY_KEY_L2
+                        ErrorEnum.ENC_PUBKEY_INDEX_L2
                     )
                 );
 
@@ -521,7 +521,7 @@ export class Round1Contract extends SmartContract {
             buildAssertMessage(
                 Round1Contract.name,
                 'finalize',
-                ErrorEnum.ENC_PUBKEY_KEY_L1
+                ErrorEnum.ENC_PUBKEY_INDEX_L1
             )
         );
         proof.publicOutput.initialProcessRoot.assertEquals(

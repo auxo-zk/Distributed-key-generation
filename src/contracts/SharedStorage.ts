@@ -144,7 +144,7 @@ export function verifyZkApp(
 
     key.assertEquals(
         ref.witness.calculateIndex(),
-        buildAssertMessage(programName, 'verifyZkApp', ErrorEnum.ZKAPP_KEY)
+        buildAssertMessage(programName, 'verifyZkApp', ErrorEnum.ZKAPP_INDEX)
     );
 }
 

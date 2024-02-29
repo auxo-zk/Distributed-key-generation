@@ -30,6 +30,7 @@ import {
 import {
     EMPTY_LEVEL_1_TREE as DKG_LEVEL_1_TREE,
     Level1Witness,
+    calculateKeyIndex,
 } from './DKGStorage.js';
 import { INSTANCE_LIMITS, ZkAppEnum } from '../constants.js';
 import { ErrorEnum, EventEnum } from './constants.js';
@@ -64,10 +65,6 @@ export const enum ActionEnum {
 }
 
 export class ActionMask extends _ActionMask(ActionEnum.__LENGTH) {}
-
-export function calculateKeyIndex(committeeId: Field, keyId: Field): Field {
-    return Field.from(BigInt(INSTANCE_LIMITS.KEY)).mul(committeeId).add(keyId);
-}
 
 /**
  * Class of action dispatched by users
@@ -213,7 +210,7 @@ export const UpdateKey = ZkProgram({
                     buildAssertMessage(
                         UpdateKey.name,
                         'nextStep',
-                        ErrorEnum.KEY_STATUS_KEY
+                        ErrorEnum.KEY_STATUS_INDEX
                     )
                 );
 
@@ -285,7 +282,7 @@ export const UpdateKey = ZkProgram({
                     buildAssertMessage(
                         UpdateKey.name,
                         'nextStepGeneration',
-                        ErrorEnum.KEY_COUNTER_KEY
+                        ErrorEnum.KEY_COUNTER_INDEX
                     )
                 );
                 let keyIndex = calculateKeyIndex(
@@ -322,7 +319,7 @@ export const UpdateKey = ZkProgram({
                     buildAssertMessage(
                         UpdateKey.name,
                         'nextStepGeneration',
-                        ErrorEnum.KEY_STATUS_KEY
+                        ErrorEnum.KEY_STATUS_INDEX
                     )
                 );
 
@@ -357,7 +354,7 @@ export const UpdateKey = ZkProgram({
                     buildAssertMessage(
                         UpdateKey.name,
                         'nextStep',
-                        ErrorEnum.PROCESS_KEY
+                        ErrorEnum.PROCESS_INDEX
                     )
                 );
 
@@ -622,7 +619,7 @@ export class DkgContract extends SmartContract {
             buildAssertMessage(
                 DkgContract.name,
                 'verifyKeyStatus',
-                ErrorEnum.KEY_STATUS_KEY
+                ErrorEnum.KEY_STATUS_INDEX
             )
         );
     }

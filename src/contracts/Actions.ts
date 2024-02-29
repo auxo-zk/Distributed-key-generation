@@ -97,7 +97,7 @@ export const Rollup = (name: string, ActionType: any) =>
                         buildAssertMessage(
                             name,
                             'nextStep',
-                            ErrorEnum.ROLLUP_KEY
+                            ErrorEnum.ROLLUP_INDEX
                         )
                     );
 
@@ -154,7 +154,7 @@ export const processAction = (
     );
     key.assertEquals(
         actionState,
-        buildAssertMessage(programName, 'process', ErrorEnum.PROCESS_KEY)
+        buildAssertMessage(programName, 'process', ErrorEnum.PROCESS_INDEX)
     );
 
     return witness.computeRootAndKey(Field(ProcessStatus.PROCESSED))[0];

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-empty-function */
 import {
     Field,
     SmartContract,
@@ -15,7 +14,9 @@ import {
     ZkProgram,
     Void,
     Scalar,
+    UInt64,
 } from 'o1js';
+import { CustomScalar } from '@auxo-dev/auxo-libs';
 import { buildAssertMessage, updateActionState } from '../libs/utils.js';
 import { REQUEST_MAX_SIZE, ZkAppEnum, ZkProgramEnum } from '../constants.js';
 import {
@@ -36,10 +37,10 @@ import {
     EMPTY_LEVEL_1_TREE as REQUESTER_LEVEL_1_TREE,
 } from './RequesterStorage.js';
 import { ErrorEnum, EventEnum } from './constants.js';
-import { RequestContract } from './Request.js';
-import { CustomScalar } from '@auxo-dev/auxo-libs';
-import { Level1Witness as DkgLevel1Witness } from './DKGStorage.js';
+
 import { CommitteeContract } from './Committee.js';
+import { RequestContract } from './Request.js';
+import { Level1Witness as DkgLevel1Witness } from './DKGStorage.js';
 
 export class Action extends Struct({
     taskId: Field,
@@ -112,7 +113,7 @@ export const AttachRequest = ZkProgram({
                     buildAssertMessage(
                         AttachRequest.name,
                         AttachRequest.nextStep.name,
-                        ErrorEnum.REQUEST_ID_KEY
+                        ErrorEnum.REQUEST_ID_INDEX
                     )
                 );
                 taskId.assertEquals(
@@ -120,7 +121,7 @@ export const AttachRequest = ZkProgram({
                     buildAssertMessage(
                         AttachRequest.name,
                         AttachRequest.nextStep.name,
-                        ErrorEnum.REQUEST_ID_KEY
+                        ErrorEnum.REQUEST_ID_INDEX
                     )
                 );
 
@@ -297,6 +298,7 @@ export class RequesterContract extends SmartContract {
         this.zkAppRoot.set(EMPTY_ADDRESS_MT().getRoot());
         this.requestCounter.set(Field(0));
         this.requestIdRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
+        this.submissionCounterRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.accumulationRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.commitmentRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.processRoot.set(EMPTY_ACTION_MT().getRoot());
@@ -311,7 +313,11 @@ export class RequesterContract extends SmartContract {
     @method initializeRequest(
         committeeId: Field,
         keyId: Field,
-        request: ZkAppRef
+        startTimestamp: UInt64,
+        endTimestamp: UInt64,
+        request: ZkAppRef,
+        dkg: ZkAppRef,
+        keyStatusWitness: DkgLevel1Witness
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -328,7 +334,15 @@ export class RequesterContract extends SmartContract {
         const requestContract = new RequestContract(request.address);
 
         // Create and dispatch action in Request Contract
-        requestContract.initialize(committeeId, keyId, this.address);
+        requestContract.initialize(
+            committeeId,
+            keyId,
+            this.address,
+            startTimestamp,
+            endTimestamp,
+            dkg,
+            keyStatusWitness
+        );
 
         // Update state values
         this.requestCounter.set(requestCounter.add(1));
