@@ -6,16 +6,14 @@ import {
     method,
     PublicKey,
     Reducer,
-    MerkleMapWitness,
     Struct,
     SelfProof,
     Poseidon,
-    Provable,
     AccountUpdate,
     UInt64,
     ZkProgram,
-    Void,
     PrivateKey,
+    Provable,
 } from 'o1js';
 import { buildAssertMessage, updateActionState } from '../libs/utils.js';
 import { RequestVector } from '../libs/Requester.js';
@@ -26,19 +24,15 @@ import {
     ZkProgramEnum,
 } from '../constants.js';
 import { ActionMask as _ActionMask } from './Actions.js';
-import { ErrorEnum, EventEnum } from './constants.js';
-import {
-    EMPTY_ADDRESS_MT,
-    ProcessedActions,
-    ZkAppRef,
-    verifyZkApp,
-} from './SharedStorage.js';
+import { ErrorEnum } from './constants.js';
+import { EMPTY_ADDRESS_MT, ZkAppRef, verifyZkApp } from './SharedStorage.js';
 import {
     Level1Witness as DkgLevel1Witness,
     calculateKeyIndex,
 } from './DKGStorage.js';
 import { DkgContract, KeyStatus, KeyStatusInput } from './DKG.js';
 import { Level1Witness } from './RequestStorage.js';
+import { ResponseContract } from './Response.js';
 
 export const enum RequestStatus {
     EMPTY,
@@ -64,9 +58,9 @@ export class Action extends Struct({
     requester: PublicKey,
     startTimestamp: UInt64,
     endTimestamp: UInt64,
-    R: RequestVector,
-    D: RequestVector,
-    actionType: ActionMask,
+    accumulatedR: RequestVector,
+    accumulatedM: RequestVector,
+    type: ActionMask,
 }) {
     static empty(): Action {
         return new Action({
@@ -75,9 +69,9 @@ export class Action extends Struct({
             requester: PublicKey.fromPrivateKey(PrivateKey.random()),
             startTimestamp: UInt64.zero,
             endTimestamp: UInt64.zero,
-            R: new RequestVector(),
-            D: new RequestVector(),
-            actionType: ActionMask.empty(),
+            accumulatedR: new RequestVector(),
+            accumulatedM: new RequestVector(),
+            type: ActionMask.empty(),
         });
     }
     static fromFields(input: Field[]): Action {
@@ -97,13 +91,17 @@ export class RollupRequestOutput extends Struct({
     initialRequestCounter: Field,
     initialKeyIndexRoot: Field,
     initialRequesterRoot: Field,
-    initialRequestStatusRoot: Field,
-    initialRequestPeriodRoot: Field,
+    initialStatusRoot: Field,
+    initialPeriodRoot: Field,
+    initialAccumulationRoot: Field,
+    initialActionState: Field,
     nextRequestCounter: Field,
     nextKeyIndexRoot: Field,
     nextRequesterRoot: Field,
-    nextRequestStatusRoot: Field,
-    nextRequestPeriodRoot: Field,
+    nextStatusRoot: Field,
+    nextPeriodRoot: Field,
+    nextAccumulationRoot: Field,
+    nextActionState: Field,
 }) {}
 
 export const RollupRequest = ZkProgram({
@@ -112,26 +110,32 @@ export const RollupRequest = ZkProgram({
     publicOutput: RollupRequestOutput,
     methods: {
         init: {
-            privateInputs: [Field, Field, Field, Field, Field],
+            privateInputs: [Field, Field, Field, Field, Field, Field, Field],
             method(
                 input: RollupRequestInput,
                 initialRequestCounter: Field,
                 initialKeyIndexRoot: Field,
                 initialRequesterRoot: Field,
-                initialRequestStatusRoot: Field,
-                initialRequestPeriodRoot: Field
+                initialStatusRoot: Field,
+                initialPeriodRoot: Field,
+                initialAccumulationRoot: Field,
+                initialActionState: Field
             ): RollupRequestOutput {
                 return new RollupRequestOutput({
                     initialRequestCounter: initialRequestCounter,
                     initialKeyIndexRoot: initialKeyIndexRoot,
                     initialRequesterRoot: initialRequesterRoot,
-                    initialRequestStatusRoot: initialRequestStatusRoot,
-                    initialRequestPeriodRoot: initialRequestPeriodRoot,
+                    initialStatusRoot: initialStatusRoot,
+                    initialPeriodRoot: initialPeriodRoot,
+                    initialAccumulationRoot: initialAccumulationRoot,
+                    initialActionState: initialActionState,
                     nextRequestCounter: initialRequestCounter,
                     nextKeyIndexRoot: initialKeyIndexRoot,
                     nextRequesterRoot: initialRequesterRoot,
-                    nextRequestStatusRoot: initialRequestStatusRoot,
-                    nextRequestPeriodRoot: initialRequestPeriodRoot,
+                    nextStatusRoot: initialStatusRoot,
+                    nextPeriodRoot: initialPeriodRoot,
+                    nextAccumulationRoot: initialAccumulationRoot,
+                    nextActionState: initialActionState,
                 });
             },
         },
@@ -151,8 +155,8 @@ export const RollupRequest = ZkProgram({
                 >,
                 keyIndexWitness: Level1Witness,
                 requesterWitness: Level1Witness,
-                requestStatusWitness: Level1Witness,
-                requestPeriodWitness: Level1Witness
+                statusWitness: Level1Witness,
+                periodWitness: Level1Witness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
@@ -197,7 +201,7 @@ export const RollupRequest = ZkProgram({
                 );
 
                 // Verify request status
-                input.action.actionType
+                input.action.type
                     .get(Field(ActionEnum.INITIALIZE))
                     .assertTrue(
                         buildAssertMessage(
@@ -206,10 +210,8 @@ export const RollupRequest = ZkProgram({
                             ErrorEnum.ACTION_TYPE
                         )
                     );
-                earlierProof.publicOutput.nextRequestStatusRoot.assertEquals(
-                    requestStatusWitness.calculateRoot(
-                        Field(RequestStatus.EMPTY)
-                    ),
+                earlierProof.publicOutput.nextStatusRoot.assertEquals(
+                    statusWitness.calculateRoot(Field(RequestStatus.EMPTY)),
                     buildAssertMessage(
                         RollupRequest.name,
                         RollupRequest.initialize.name,
@@ -217,7 +219,7 @@ export const RollupRequest = ZkProgram({
                     )
                 );
                 requestId.assertEquals(
-                    requestStatusWitness.calculateIndex(),
+                    statusWitness.calculateIndex(),
                     buildAssertMessage(
                         RollupRequest.name,
                         RollupRequest.initialize.name,
@@ -226,8 +228,8 @@ export const RollupRequest = ZkProgram({
                 );
 
                 // Verify request period
-                earlierProof.publicOutput.nextRequestPeriodRoot.assertEquals(
-                    requestPeriodWitness.calculateRoot(Field(0)),
+                earlierProof.publicOutput.nextPeriodRoot.assertEquals(
+                    periodWitness.calculateRoot(Field(0)),
                     buildAssertMessage(
                         RollupRequest.name,
                         RollupRequest.initialize.name,
@@ -235,7 +237,7 @@ export const RollupRequest = ZkProgram({
                     )
                 );
                 requestId.assertEquals(
-                    requestPeriodWitness.calculateIndex(),
+                    periodWitness.calculateIndex(),
                     buildAssertMessage(
                         RollupRequest.name,
                         RollupRequest.initialize.name,
@@ -251,16 +253,20 @@ export const RollupRequest = ZkProgram({
                 let nextRequesterRoot = keyIndexWitness.calculateRoot(
                     Poseidon.hash(input.action.requester.toFields())
                 );
-                let nextRequestStatusRoot = requestStatusWitness.calculateRoot(
+                let nextStatusRoot = statusWitness.calculateRoot(
                     Field(RequestStatus.INITIALIZED)
                 );
-                let nextRequestPeriodRoot = requestPeriodWitness.calculateRoot(
+                let nextPeriodRoot = periodWitness.calculateRoot(
                     Poseidon.hash(
                         [
                             input.action.startTimestamp.toFields(),
                             input.action.endTimestamp.toFields(),
                         ].flat()
                     )
+                );
+                let nextActionState = updateActionState(
+                    input.previousActionState,
+                    [Action.toFields(input.action)]
                 );
 
                 return new RollupRequestOutput({
@@ -270,15 +276,105 @@ export const RollupRequest = ZkProgram({
                         earlierProof.publicOutput.initialKeyIndexRoot,
                     initialRequesterRoot:
                         earlierProof.publicOutput.initialRequesterRoot,
-                    initialRequestStatusRoot:
-                        earlierProof.publicOutput.initialRequestStatusRoot,
-                    initialRequestPeriodRoot:
-                        earlierProof.publicOutput.initialRequestPeriodRoot,
+                    initialStatusRoot:
+                        earlierProof.publicOutput.initialStatusRoot,
+                    initialPeriodRoot:
+                        earlierProof.publicOutput.initialPeriodRoot,
+                    initialAccumulationRoot:
+                        earlierProof.publicOutput.initialAccumulationRoot,
+                    initialActionState:
+                        earlierProof.publicOutput.initialActionState,
                     nextRequestCounter: nextRequestCounter,
                     nextKeyIndexRoot: nextKeyIndexRoot,
                     nextRequesterRoot: nextRequesterRoot,
-                    nextRequestStatusRoot: nextRequestStatusRoot,
-                    nextRequestPeriodRoot: nextRequestPeriodRoot,
+                    nextStatusRoot: nextStatusRoot,
+                    nextPeriodRoot: nextPeriodRoot,
+                    nextAccumulationRoot:
+                        earlierProof.publicOutput.nextAccumulationRoot,
+                    nextActionState: nextActionState,
+                });
+            },
+        },
+        abort: {
+            privateInputs: [
+                SelfProof<RollupRequestInput, RollupRequestOutput>,
+                Level1Witness,
+            ],
+            method(
+                input: RollupRequestInput,
+                earlierProof: SelfProof<
+                    RollupRequestInput,
+                    RollupRequestOutput
+                >,
+                statusWitness: Level1Witness
+            ) {
+                // Verify earlier proof
+                earlierProof.verify();
+
+                // Verify request status
+                input.action.type
+                    .get(Field(ActionEnum.ABORT))
+                    .assertTrue(
+                        buildAssertMessage(
+                            RollupRequest.name,
+                            RollupRequest.initialize.name,
+                            ErrorEnum.ACTION_TYPE
+                        )
+                    );
+                earlierProof.publicOutput.nextStatusRoot.assertEquals(
+                    statusWitness.calculateRoot(
+                        Field(RequestStatus.INITIALIZED)
+                    ),
+                    buildAssertMessage(
+                        RollupRequest.name,
+                        RollupRequest.initialize.name,
+                        ErrorEnum.REQUEST_STATUS_ROOT
+                    )
+                );
+                input.action.requestId.assertEquals(
+                    statusWitness.calculateIndex(),
+                    buildAssertMessage(
+                        RollupRequest.name,
+                        RollupRequest.initialize.name,
+                        ErrorEnum.REQUEST_STATUS_INDEX
+                    )
+                );
+
+                // Calculate new state values
+                let nextStatusRoot = statusWitness.calculateRoot(
+                    Field(RequestStatus.INITIALIZED)
+                );
+                let nextActionState = updateActionState(
+                    input.previousActionState,
+                    [Action.toFields(input.action)]
+                );
+
+                return new RollupRequestOutput({
+                    initialRequestCounter:
+                        earlierProof.publicOutput.initialRequestCounter,
+                    initialKeyIndexRoot:
+                        earlierProof.publicOutput.initialKeyIndexRoot,
+                    initialRequesterRoot:
+                        earlierProof.publicOutput.initialRequesterRoot,
+                    initialStatusRoot:
+                        earlierProof.publicOutput.initialStatusRoot,
+                    initialPeriodRoot:
+                        earlierProof.publicOutput.initialPeriodRoot,
+                    initialAccumulationRoot:
+                        earlierProof.publicOutput.initialAccumulationRoot,
+                    initialActionState:
+                        earlierProof.publicOutput.initialActionState,
+                    nextRequestCounter:
+                        earlierProof.publicOutput.nextRequestCounter,
+                    nextKeyIndexRoot:
+                        earlierProof.publicOutput.nextKeyIndexRoot,
+                    nextRequesterRoot:
+                        earlierProof.publicOutput.nextRequesterRoot,
+                    nextStatusRoot: nextStatusRoot,
+                    nextPeriodRoot: earlierProof.publicOutput.nextPeriodRoot,
+                    nextAccumulationRoot:
+                        earlierProof.publicOutput.nextAccumulationRoot,
+                    nextActionState: nextActionState,
                 });
             },
         },
@@ -311,18 +407,24 @@ export class RequestContract extends SmartContract {
     /**
      * @description MT storing requests' status
      */
-    @state(Field) requestStatusRoot = State<Field>();
+    @state(Field) statusRoot = State<Field>();
 
     /**
      * @description MT storing requests' period
      */
-    @state(Field) requestPeriodRoot = State<Field>();
+    @state(Field) periodRoot = State<Field>();
+
+    /**
+     * @description MT storing accumulated R | M values
+     */
+    @state(Field) accumulationRoot = State<Field>();
+
+    /**
+     * @description Latest rolluped action's state
+     */
+    @state(Field) actionState = State<Field>();
 
     reducer = Reducer({ actionType: Action });
-
-    events = {
-        [EventEnum.PROCESSED]: ProcessedActions,
-    };
 
     init() {
         super.init();
@@ -330,8 +432,10 @@ export class RequestContract extends SmartContract {
         this.requestCounter.set(Field(0));
         this.keyIndexRoot.set(Field(0));
         this.requesterRoot.set(Field(0));
-        this.requestStatusRoot.set(Field(0));
-        this.requestPeriodRoot.set(Field(0));
+        this.statusRoot.set(Field(0));
+        this.periodRoot.set(Field(0));
+        this.accumulationRoot.set(Field(0));
+        this.actionState.set(Reducer.initialActionState);
     }
 
     /**
@@ -397,9 +501,9 @@ export class RequestContract extends SmartContract {
             requester,
             startTimestamp,
             endTimestamp,
-            R: new RequestVector(),
-            D: new RequestVector(),
-            actionType: ActionMask.createMask(Field(ActionEnum.INITIALIZE)),
+            accumulatedR: new RequestVector(),
+            accumulatedM: new RequestVector(),
+            type: ActionMask.createMask(Field(ActionEnum.INITIALIZE)),
         });
         this.reducer.dispatch(action);
 
@@ -415,13 +519,13 @@ export class RequestContract extends SmartContract {
      * @param requestId Request ID
      * @param requester Requester's address
      * @param requesterWitness Witness for proof of requester
-     * @param requestStatusWitness Witness for proof of request's status
+     * @param statusWitness Witness for proof of request's status
      */
     @method abort(
         requestId: Field,
         requester: PublicKey,
         requesterWitness: Level1Witness,
-        requestStatusWitness: Level1Witness
+        statusWitness: Level1Witness
     ) {
         // Verify requester
         this.verifyRequester(requestId, requester, requesterWitness);
@@ -430,7 +534,7 @@ export class RequestContract extends SmartContract {
         this.verifyRequestStatus(
             requestId,
             Field(RequestStatus.INITIALIZED),
-            requestStatusWitness
+            statusWitness
         );
 
         // Create and dispatch action
@@ -440,9 +544,9 @@ export class RequestContract extends SmartContract {
             requester,
             startTimestamp: UInt64.zero,
             endTimestamp: UInt64.zero,
-            R: new RequestVector(),
-            D: new RequestVector(),
-            actionType: ActionMask.createMask(Field(ActionEnum.ABORT)),
+            accumulatedR: new RequestVector(),
+            accumulatedM: new RequestVector(),
+            type: ActionMask.createMask(Field(ActionEnum.ABORT)),
         });
         this.reducer.dispatch(action);
     }
@@ -453,20 +557,22 @@ export class RequestContract extends SmartContract {
      * @param requester Requester's address
      * @param startTimestamp Timestamp for the start of request period
      * @param endTimestamp Timestamp for the end of request period
-     * @param R Final R value
+     * @param accumulatedR Final R value
+     * @param accumulatedM Final M value
      * @param requesterWitness Witness for proof of requester
-     * @param requestStatusWitness Witness for proof of request's status
-     * @param requestPeriodWitness Witness for proof of request's period
+     * @param statusWitness Witness for proof of request's status
+     * @param periodWitness Witness for proof of request's period
      */
     @method finalize(
         requestId: Field,
         requester: PublicKey,
         startTimestamp: UInt64,
         endTimestamp: UInt64,
-        R: RequestVector,
+        accumulatedR: RequestVector,
+        accumulatedM: RequestVector,
         requesterWitness: Level1Witness,
-        requestStatusWitness: Level1Witness,
-        requestPeriodWitness: Level1Witness
+        statusWitness: Level1Witness,
+        periodWitness: Level1Witness
     ) {
         // Verify requester
         this.verifyRequester(requestId, requester, requesterWitness);
@@ -475,7 +581,7 @@ export class RequestContract extends SmartContract {
         this.verifyRequestStatus(
             requestId,
             Field(RequestStatus.INITIALIZED),
-            requestStatusWitness
+            statusWitness
         );
 
         // Verify request period
@@ -491,7 +597,7 @@ export class RequestContract extends SmartContract {
             requestId,
             startTimestamp,
             endTimestamp,
-            requestPeriodWitness
+            periodWitness
         );
 
         // Create and dispatch action
@@ -501,27 +607,32 @@ export class RequestContract extends SmartContract {
             requester,
             startTimestamp,
             endTimestamp,
-            R,
-            D: new RequestVector(),
-            actionType: ActionMask.createMask(Field(ActionEnum.FINALIZE)),
+            accumulatedR,
+            accumulatedM,
+            type: ActionMask.createMask(Field(ActionEnum.FINALIZE)),
         });
         this.reducer.dispatch(action);
     }
 
-    @method resolve(requestId: Field, D: RequestVector, response: ZkAppRef) {
+    @method resolve(
+        requestId: Field,
+        finalizedD: RequestVector,
+        finalizedDWitness: Level1Witness,
+        response: ZkAppRef
+    ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
 
-        // Authorize Response Contract call
+        // Verify Response Contract address
         verifyZkApp(
-            RequestContract.Proof.name,
+            RequestContract.name,
             response,
             zkAppRoot,
             Field(ZkAppEnum.RESPONSE)
         );
-        // TODO: Need test for correctness
-        let update = AccountUpdate.create(response.address);
-        update.body.mayUseToken = AccountUpdate.MayUseToken.InheritFromParent;
+        let responseContract = new ResponseContract(response.address);
+
+        // Verify finalized D value
 
         // Create and dispatch action
         let action = new Action({
@@ -530,9 +641,9 @@ export class RequestContract extends SmartContract {
             requester: PublicKey.fromPrivateKey(PrivateKey.random()),
             startTimestamp: UInt64.zero,
             endTimestamp: UInt64.zero,
-            R: new RequestVector(),
-            D,
-            actionType: ActionMask.createMask(Field(ActionEnum.RESOLVE)),
+            accumulatedR: new RequestVector(),
+            accumulatedM: new RequestVector(),
+            type: ActionMask.createMask(Field(ActionEnum.RESOLVE)),
         });
         this.reducer.dispatch(action);
     }
@@ -581,7 +692,7 @@ export class RequestContract extends SmartContract {
         status: Field,
         witness: Level1Witness
     ) {
-        this.requestStatusRoot
+        this.statusRoot
             .getAndRequireEquals()
             .assertEquals(
                 witness.calculateRoot(status),
@@ -607,7 +718,7 @@ export class RequestContract extends SmartContract {
         endTimestamp: UInt64,
         witness: Level1Witness
     ) {
-        this.requestPeriodRoot
+        this.periodRoot
             .getAndRequireEquals()
             .assertEquals(
                 witness.calculateRoot(
@@ -642,9 +753,9 @@ export class RequestContract extends SmartContract {
 //         requestContract.resolve(
 //             new ResolveInput({
 //                 requestId: resolveInput.requestId,
-//                 D: resolveInput.D,
+//                 accumulatedM: resolveInput.D,
 //             })
 //         );
-//         requestContract.requestStatusRoot.set(Field(0));
+//         requestContract.statusRoot.set(Field(0));
 //     }
 // }

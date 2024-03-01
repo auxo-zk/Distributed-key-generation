@@ -35,7 +35,7 @@ import {
 import {
     Level1Witness,
     EMPTY_LEVEL_1_TREE as REQUESTER_LEVEL_1_TREE,
-} from './RequesterStorage.js';
+} from './RequestStorage.js';
 import { ErrorEnum, EventEnum } from './constants.js';
 
 import { CommitteeContract } from './Committee.js';
@@ -65,7 +65,7 @@ export class Action extends Struct({
 }
 
 export class AttachRequestOutput extends Struct({
-    requestCounter: Field,
+    taskCounter: Field,
     initialRequestIdRoot: Field,
     nextRequestIdRoot: Field,
 }) {}
@@ -76,9 +76,9 @@ export const AttachRequest = ZkProgram({
     methods: {
         firstStep: {
             privateInputs: [Field, Field],
-            method(requestCounter: Field, initialRequestIdRoot: Field) {
+            method(taskCounter: Field, initialRequestIdRoot: Field) {
                 return new AttachRequestOutput({
-                    requestCounter: requestCounter,
+                    taskCounter: taskCounter,
                     initialRequestIdRoot: initialRequestIdRoot,
                     nextRequestIdRoot: initialRequestIdRoot,
                 });
@@ -108,7 +108,7 @@ export const AttachRequest = ZkProgram({
                 );
 
                 // Verify a request has been initialized for this task
-                earlierProof.publicOutput.requestCounter.assertGreaterThan(
+                earlierProof.publicOutput.taskCounter.assertGreaterThan(
                     taskId,
                     buildAssertMessage(
                         AttachRequest.name,
@@ -128,7 +128,7 @@ export const AttachRequest = ZkProgram({
                 let nextRequestIdRoot = witness.calculateRoot(requestId);
 
                 return new AttachRequestOutput({
-                    requestCounter: earlierProof.publicOutput.requestCounter,
+                    taskCounter: earlierProof.publicOutput.taskCounter,
                     initialRequestIdRoot:
                         earlierProof.publicOutput.initialRequestIdRoot,
                     nextRequestIdRoot: nextRequestIdRoot,
@@ -260,7 +260,7 @@ export class RequesterContract extends SmartContract {
     /**
      * @description Number of initialized requests
      */
-    @state(Field) requestCounter = State<Field>();
+    @state(Field) taskCounter = State<Field>();
 
     /**
      * @description MT storing corresponding requests
@@ -271,11 +271,6 @@ export class RequesterContract extends SmartContract {
      * @description MT storing submission counter values for requests
      */
     @state(Field) submissionCounterRoot = State<Field>();
-
-    /**
-     * @description MT storing accumulated R | M values
-     */
-    @state(Field) accumulationRoot = State<Field>();
 
     /**
      * @description MT storing anonymous commitments
@@ -296,10 +291,9 @@ export class RequesterContract extends SmartContract {
     init() {
         super.init();
         this.zkAppRoot.set(EMPTY_ADDRESS_MT().getRoot());
-        this.requestCounter.set(Field(0));
+        this.taskCounter.set(Field(0));
         this.requestIdRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.submissionCounterRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
-        this.accumulationRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.commitmentRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.processRoot.set(EMPTY_ACTION_MT().getRoot());
     }
@@ -321,7 +315,7 @@ export class RequesterContract extends SmartContract {
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
-        let requestCounter = this.requestCounter.getAndRequireEquals();
+        let taskCounter = this.taskCounter.getAndRequireEquals();
 
         // Verify Request Contract address
         verifyZkApp(
@@ -345,7 +339,7 @@ export class RequesterContract extends SmartContract {
         );
 
         // Update state values
-        this.requestCounter.set(requestCounter.add(1));
+        this.taskCounter.set(taskCounter.add(1));
     }
 
     /**
@@ -355,13 +349,13 @@ export class RequesterContract extends SmartContract {
      */
     @method attachRequests(proof: AttachRequestProof) {
         // Get current state values
-        let requestCounter = this.requestCounter.getAndRequireEquals();
+        let taskCounter = this.taskCounter.getAndRequireEquals();
         let requestIdRoot = this.requestIdRoot.getAndRequireEquals();
 
         // Verify proof
         proof.verify();
-        proof.publicOutput.requestCounter.assertEquals(
-            requestCounter,
+        proof.publicOutput.taskCounter.assertEquals(
+            taskCounter,
             buildAssertMessage(
                 RequesterContract.name,
                 RequesterContract.prototype.attachRequests.name,

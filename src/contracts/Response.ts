@@ -385,6 +385,11 @@ export class ResponseContract extends SmartContract {
     @state(Field) contributionRoot = State<Field>();
 
     /**
+     * @description MT storing members' contributions
+     */
+    @state(Field) finalizedDRoot = State<Field>();
+
+    /**
      * @description Latest rolluped action's state
      */
     @state(Field) actionState = State<Field>();
