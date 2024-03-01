@@ -1,4 +1,4 @@
-import { Field, MerkleTree, MerkleWitness, Poseidon } from 'o1js';
+import { Field, MerkleTree, MerkleWitness } from 'o1js';
 import { INSTANCE_LIMITS } from '../constants.js';
 import { GenericStorage } from './GenericStorage.js';
 
@@ -14,21 +14,20 @@ export abstract class RequesterStorage<RawLeaf> extends GenericStorage<
     Level1Witness,
     never,
     never
-> {
+> {}
+
+export type RequestIdLeaf = Field;
+
+export class RequestIdStorage extends RequesterStorage<RequestIdLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
-            leaf: RawLeaf | Field;
+            leaf: RequestIdLeaf | Field;
             isRaw: boolean;
         }[]
     ) {
         super(EMPTY_LEVEL_1_TREE, undefined, leafs);
     }
-}
-
-export type RequestIdLeaf = Field;
-
-export class RequestIdStorage extends RequesterStorage<RequestIdLeaf> {
     static calculateLeaf(requestId: RequestIdLeaf): Field {
         return requestId;
     }
@@ -61,47 +60,19 @@ export class RequestIdStorage extends RequesterStorage<RequestIdLeaf> {
     }
 }
 
-export type AccumulationLeaf = {
-    accumulatedR: Field;
-    accumulatedM: Field;
-};
-
-export class AccumulationStorage extends RequesterStorage<AccumulationLeaf> {
-    static calculateLeaf(rawLeaf: AccumulationLeaf): Field {
-        return Poseidon.hash([rawLeaf.accumulatedR, rawLeaf.accumulatedM]);
-    }
-
-    calculateLeaf(rawLeaf: AccumulationLeaf): Field {
-        return AccumulationStorage.calculateLeaf(rawLeaf);
-    }
-
-    static calculateLevel1Index(taskId: Field): Field {
-        return taskId;
-    }
-
-    calculateLevel1Index(taskId: Field): Field {
-        return AccumulationStorage.calculateLevel1Index(taskId);
-    }
-
-    getWitness(level1Index: Field): Level1Witness {
-        return super.getWitness(level1Index) as Level1Witness;
-    }
-
-    updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
-        super.updateLeaf({ level1Index }, leaf);
-    }
-
-    updateRawLeaf(
-        { level1Index }: { level1Index: Field },
-        rawLeaf: AccumulationLeaf
-    ): void {
-        super.updateRawLeaf({ level1Index }, rawLeaf);
-    }
-}
-
 export type CommitmentLeaf = Field;
 
 export class CommitmentStorage extends RequesterStorage<CommitmentLeaf> {
+    constructor(
+        leafs?: {
+            level1Index: Field;
+            leaf: CommitmentLeaf | Field;
+            isRaw: boolean;
+        }[]
+    ) {
+        super(EMPTY_LEVEL_1_TREE, undefined, leafs);
+    }
+
     static calculateLeaf(commitment: CommitmentLeaf): Field {
         return commitment;
     }
