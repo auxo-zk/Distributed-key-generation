@@ -1,72 +1,74 @@
-# Distributed Key Generation (DKG)
+# DKG for Threshold Homomorphic Encryption
 
-<img src="https://i.ibb.co/rds9tdw/logo2.png" width="100" height="100">
+<p align="center">
+    <a href="http://auxo.fund/" target="blank"><img src="https://lh3.googleusercontent.com/u/0/drive-viewer/AKGpihbOeavm7ejNaJLr70jxI0YLtj_KzKk7pzjyfbrBPxKRCmXIhEmhLftyPX_ZgOTdpE_B9uoPmiyP1NhBTIShqW8rtQhusA=w2388-h1376" alt="Auxo Logo" /></a>
+</p>
 
-The **Distributed Key Generation** (DKG) protocol is a fundamental component of various applications that prioritize data privacy and security. It ensures the secure generation of asymmetric cryptographic keys in a distributed manner, preventing any single entity from having complete access to sensitive key information. Some of the applications that can benefit from DKG include:
+<p align="center">
+An On-chain Funding Platform with privacy-preserving features powered by ZKP.
+</p>
+<p align="center">
+    <a href="https://www.npmjs.com/org/auxo-dev" target="_blank"><img src="https://img.shields.io/npm/v/@auxo-dev/dkg.svg" alt="NPM Version" /></a>
+    <a href="https://www.npmjs.com/org/auxo-dev" target="_blank"><img src="https://img.shields.io/npm/l/@auxo-dev/dkg.svg" alt="Package License" /></a>
+    <a href="https://www.npmjs.com/org/auxo-dev" target="_blank"><img src="https://img.shields.io/npm/dm/@auxo-dev/dkg.svg" alt="NPM Downloads" /></a>
+    <a href="https://twitter.com/AuxoZk" target="_blank"><img src="https://img.shields.io/twitter/follow/AuxoZk.svg?style=social&label=Follow"></a>
+</p>
 
-1. **Private Voting**: DKG can be employed to create secure voting systems where individual votes remain confidential, preventing unauthorized access or manipulation.
+## Demo:
 
-2. **Private Funding**: Applications dealing with financial transactions and investments can use DKG to secure sensitive financial data.
+<a target="_blank" href="https://drive.google.com/drive/folders/1Daka6yzBgyefyieIH_h9K5WmjpYX0gfo?usp=drive_link">Videos</a> - <a target="_blank" href="https://committee.auxo.fund">Public Testnet (In-progress)</a>
+
+## Description
+
+The **Distributed Key Generation** (DKG) protocol is a fundamental cryptographic module in our platform. This protocol ensures the secure generation of asymmetric cryptographic keys in a distributed manner, preventing any single entity from having complete access to sensitive key information. The generated keys can be used by the **Threshold Homomorphic Encryption** service, which enable privacy-preserving features such as Private Funding or Private Voting on our platform.
+
+## Features
+
+1. **Committee Management**: Creation and configuration of a key generation committee with a security threshold of T / N members.
+
+2. **Key Generation**: Committee members contribute their random inputs and computation result to generate encryption public keys.
+
+3. **Key Usage**: Services can request to use generated keys for their use cases.
+
+4. **Threshold (Additive) Homomorphic Encryption**: This service allows an arbitrary number of users to encrypt their secret vectors and the sum vector can be computed without decrypting the encryption submissions. And the final results can only be computed after T / N members submitted their response contribution.
+
+## Applications
+
+This protocol can support various applications that prioritize data privacy and security. Some of the applications that can benefit from DKG include:
+
+1. **Private Funding**: Applications dealing with financial transactions and investments can use DKG to secure sensitive financial data.
+
+2. **Private Voting**: DKG can be employed to create secure voting systems where individual votes remain confidential, preventing unauthorized access or manipulation.
 
 3. **Social Recovery**: DKG can aid in securely recovering lost or forgotten passwords or keys without compromising user data privacy.
 
-## Demo (EVM):
-
-<a target="_blank" href="https://drive.google.com/file/d/1BLMdaG_SfAEusQINV2mpU4v390Zj6Yhd/view">Public Folder</a>
-
-## Architecture
-
-### Desired Properties:
-
-The DKG protocol implementation requires three critical properties:
-
--   **Homomorphism**: The ability to perform operations over ciphertexts, allowing value commitments from multiple participants to be combined into batched values.
--   **Verifiability**: Verification of the correctness of the encryption process, ensuring that a given value was encrypted accurately to a specific ciphertext.
--   **Robustness**: The system should withstand the failure of up to `N−T` validators, who may either fail to provide a decryption share or provide an invalid decryption share.
-
-### Workflow and Actors:
-
-<img src="https://i.ibb.co/Q99wg06/usecase1.png">
-
-1. **Chairperson**: The Chairperson is the one who create committee, defines parameters, including `T` (the number of committee members) and `N` (the minimum required active committee members to run the protocol).
-2. **Committee Member**: Dedicated members who serve the community by participating in the DKG mechanism. They contribute random sources for key generation and are essential for decryption processes. In a Threshold DKG scheme, trust relies on `T` out of `N` committee members.
-3. **Requester**: An individual or entity seeking to use the DKG protocol to secure their data. Requesters can request the public key generated by the council for data encryption.
-
-<img src="https://i.ibb.co/hdVxqPB/workflow1.png">
-<img src="https://i.ibb.co/DW9H7t6/process.png">
-
-### Contracts
-
--   **Committee**: The Committee smart contract allows the creation of DKG committee, which consists of a list of member (identified with their Mina public key) and a threshold config for the committee. These data are stored in on-chain through the roots of merkle trees defined as in the following diagram.
-    <img src="https://i.ibb.co/JxfxqQk/Committee.png" >
-
--   **DKG**: The DKG smart contract allows the creation of public keys, which is achieved after a 2-round contribution ceremony from all members in the committee. These public keys can then be requested to use in the Threshold Homomorphic Encryption module of other contract/zkApp. And in order to response to this request, T out of N (committee's threshold) members from the committee need to contribute their calculation to produce the final result. No information about the secret parts are exposed to the on-chain environment througout this process.
-    <img src="https://i.ibb.co/djbqCmJ/DKG.png">
-
--   **Request**: The Request contract allow a Requestor contract to request usage of a key generated by the DKG contract for their specific use cases, to track the request status, and to fetch the final result of the request. Initially, any requestor is able to create a request, additional whitelist or fee charging scheme are for the future work.
-    <img src="https://i.ibb.co/PrWyz5D/Request.png">
-
-### Contributions
-
-Besides the architecture design based on specified requirements, we introduce some additional contributions to the development of zkApps:
-
--   A multi-action reducer:
-
-    -   Enabling a smart contract to process multiple types of Action with the dispatch-reduce pattern.
-    -   Every action is dispatched
-    -   All pending actions are reduced into a merkle tree to ensure they are recored on-chain.
-    -   One can choose to execute a [set of] action with the similar type in any order they want [with recursive proof].
-
--   Different supporting libraries: <a target="_blank" href="https://github.com/auxo-zk/auxo-libs">@auxo-dev/auxo-libs</a>
-    -   Dynamic Array data type for Field, Scalar, Group, etc.
-    -   CustomScalar data type for efficient representation in Field[].
-    -   Bit255 data type for representing 255-bit string in encryption module.
-    -   IPFSHash data type.
-
 ## Future Work
 
-1. **Business Model**: Implementing a payment system where requesters pay for the usage of keys generated through the DKG protocol. This can enable sustainability and incentivize participation.
+1. **Fee Configuration**: Committees will soon be able to configure custom fee paid by other services for key usages.
 
-2. **Automation**: Exploring automation possibilities, i.e. Chainlink Automationg, to streamline and enhance the efficiency of the DKG protocol. This could include automating key generation processes and interactions with the smart contract.
+2. **Supports for other use cases**: Currently, our DKG protocol supports generation of public keys compatible to Pasta Curves and ElGamal encryption scheme based on those curves. We are open for partnership and collaboration to work on supporting other schemes and use cases.
 
-In summary, Distributed Key Generation (DKG) serves as a critical component in enhancing privacy and security in various applications. Its core properties of homomorphism, verifiability, and robustness ensure the secure generation and use of cryptographic keys, enabling applications such as private voting, private funding, and social recovery to thrive while preserving user data and decision confidentiality. As DKG continues to evolve, future work can focus on establishing sustainable business models and further automating the protocol to improve its efficiency and usability.
+3. **Public Docker Image**: This protocol and its application for user interaction requires the availability of some services: Reducer Service, REST Service, and Storage Service. These services are open-sourced and will be published as public docker images to allow anyone with interests to run and maintain by themselves.
+
+## How to build
+
+```sh
+npm run build
+```
+
+## How to run tests
+
+```sh
+npm run test
+npm run testw # watch mode
+```
+
+## How to run coverage
+
+```sh
+npm run coverage
+```
+
+## License
+
+[Apache-2.0](LICENSE)
