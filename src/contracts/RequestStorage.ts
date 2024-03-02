@@ -10,6 +10,7 @@ import {
 import { ResponseContribution } from '../libs/Committee.js';
 import { COMMITTEE_MAX_SIZE, INSTANCE_LIMITS } from '../constants.js';
 import { GenericStorage } from './GenericStorage.js';
+import { RequestVector } from '../libs/Requester.js';
 
 export const LEVEL1_TREE_HEIGHT =
     Math.ceil(Math.log2(INSTANCE_LIMITS.REQUEST)) + 1;
@@ -311,8 +312,8 @@ export class RequestPeriodStorage extends RequestStorage<RequestPeriodLeaf> {
 }
 
 export type AccumulationLeaf = {
-    accumulatedR: Field;
-    accumulatedM: Field;
+    accumulatedR: RequestVector;
+    accumulatedM: RequestVector;
 };
 
 export class AccumulationStorage extends RequestStorage<AccumulationLeaf> {
@@ -327,7 +328,10 @@ export class AccumulationStorage extends RequestStorage<AccumulationLeaf> {
     }
 
     static calculateLeaf(rawLeaf: AccumulationLeaf): Field {
-        return Poseidon.hash([rawLeaf.accumulatedR, rawLeaf.accumulatedM]);
+        return Poseidon.hash([
+            rawLeaf.accumulatedR.hash(),
+            rawLeaf.accumulatedM.hash(),
+        ]);
     }
 
     calculateLeaf(rawLeaf: AccumulationLeaf): Field {

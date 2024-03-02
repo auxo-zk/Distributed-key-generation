@@ -19,7 +19,11 @@ import {
     FullMTWitness as CommitteeFullWitness,
     Level1Witness as CommitteeLevel1Witness,
 } from './CommitteeStorage.js';
-import { FullMTWitness as DKGWitness, Level1Witness } from './DKGStorage.js';
+import {
+    FullMTWitness as DKGWitness,
+    Level1Witness,
+    calculateKeyIndex,
+} from './DKGStorage.js';
 import {
     FullMTWitness as RequestWitness,
     Level1Witness as RequestLevel1Witness,
@@ -31,13 +35,6 @@ import {
     CommitteeMemberInput,
     CommitteeContract,
 } from './Committee.js';
-import {
-    DkgContract,
-    KeyStatus,
-    KeyStatusInput,
-    calculateKeyIndex,
-} from './DKG.js';
-import { RequestContract, ResolveInput } from './Request.js';
 import { BatchDecryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
 import { Round2Contract } from './Round2.js';
@@ -151,10 +148,8 @@ export const FinalizeResponse = ZkProgram({
                 contributionWitness: RequestLevel1Witness
             ) {
                 // Verify there is no recorded contribution for the request
-                let [contributionRoot, contributionKey] =
-                    contributionWitness.computeRootAndKey(Field(0));
                 initialContributionRoot.assertEquals(
-                    contributionRoot,
+                    contributionWitness.calculateRoot(Field(0)),
                     buildAssertMessage(
                         FinalizeResponse.name,
                         'firstStep',
@@ -162,7 +157,7 @@ export const FinalizeResponse = ZkProgram({
                     )
                 );
                 requestId.assertEquals(
-                    contributionKey,
+                    contributionWitness.calculateIndex(),
                     buildAssertMessage(
                         FinalizeResponse.name,
                         'firstStep',
@@ -171,10 +166,9 @@ export const FinalizeResponse = ZkProgram({
                 );
 
                 // Record an empty level 2 tree
-                let nextContributionRoot =
-                    contributionWitness.computeRootAndKey(
-                        EMPTY_LEVEL_2_TREE().getRoot()
-                    )[0];
+                let nextContributionRoot = contributionWitness.calculateRoot(
+                    EMPTY_LEVEL_2_TREE().getRoot()
+                );
 
                 // Initialize dynamic vector D
                 let D = Provable.witness(
@@ -240,12 +234,10 @@ export const FinalizeResponse = ZkProgram({
                 );
 
                 // Verify the member's contribution witness
-                let [contributionRoot, contributionKey] =
-                    contributionWitness.level1.computeRootAndKey(
-                        contributionWitness.level2.calculateRoot(Field(0))
-                    );
                 earlierProof.publicOutput.nextContributionRoot.assertEquals(
-                    contributionRoot,
+                    contributionWitness.level1.calculateRoot(
+                        contributionWitness.level2.calculateRoot(Field(0))
+                    ),
                     buildAssertMessage(
                         FinalizeResponse.name,
                         'nextStep',
@@ -253,7 +245,7 @@ export const FinalizeResponse = ZkProgram({
                     )
                 );
                 input.action.requestId.assertEquals(
-                    contributionKey,
+                    contributionWitness.level1.calculateIndex(),
                     buildAssertMessage(
                         FinalizeResponse.name,
                         'nextStep',
@@ -271,11 +263,11 @@ export const FinalizeResponse = ZkProgram({
 
                 // Compute new contribution root
                 let nextContributionRoot =
-                    contributionWitness.level1.computeRootAndKey(
+                    contributionWitness.level1.calculateRoot(
                         contributionWitness.level2.calculateRoot(
                             input.action.contribution.hash()
                         )
-                    )[0];
+                    );
 
                 // Compute Lagrange coefficient
                 let lagrangeCoefficientMul = Provable.witness(
@@ -650,8 +642,8 @@ export class ResponseContract extends SmartContract {
     @method
     finalize(
         proof: FinalizeResponseProof,
+        finalizedDWitness: Level1Witness,
         committee: ZkAppRef,
-        request: ZkAppRef,
         settingWitness: CommitteeLevel1Witness
     ) {
         // Get current state values
@@ -667,16 +659,7 @@ export class ResponseContract extends SmartContract {
             Field(ZkAppEnum.COMMITTEE)
         );
 
-        // RequestContract
-        verifyZkApp(
-            Round2Contract.name,
-            request,
-            zkAppRoot,
-            Field(ZkAppEnum.REQUEST)
-        );
-
         const committeeContract = new CommitteeContract(committee.address);
-        const requestContract = new RequestContract(request.address);
 
         // Verify response proof
         proof.verify();
@@ -691,7 +674,7 @@ export class ResponseContract extends SmartContract {
         proof.publicOutput.initialProcessRoot.assertEquals(
             processRoot,
             buildAssertMessage(
-                Round2Contract.name,
+                ResponseContract.name,
                 'finalize',
                 ErrorEnum.PROCESS_ROOT
             )
@@ -699,10 +682,20 @@ export class ResponseContract extends SmartContract {
         proof.publicOutput.processedActions.length.assertEquals(
             proof.publicOutput.T,
             buildAssertMessage(
-                Round2Contract.name,
+                ResponseContract.name,
                 'finalize',
                 ErrorEnum.RES_CONTRIBUTION_THRESHOLD
             )
+        );
+
+        // Verify empty finalized D value
+        this.verifyFinalizedD(
+            proof.publicOutput.requestId,
+            proof.publicOutput.D,
+            finalizedDWitness
+        );
+        let nextFinalizedDRoot = finalizedDWitness.calculateRoot(
+            proof.publicOutput.D.hash()
         );
 
         // Verify committee config
@@ -717,20 +710,38 @@ export class ResponseContract extends SmartContract {
 
         // Set new states
         this.contributionRoot.set(proof.publicOutput.nextContributionRoot);
+        this.finalizedDRoot.set(nextFinalizedDRoot);
         this.processRoot.set(proof.publicOutput.nextProcessRoot);
-
-        // Create & dispatch action to RequestContract
-        requestContract.resolve(
-            new ResolveInput({
-                requestId: proof.publicOutput.requestId,
-                D: proof.publicOutput.D,
-            })
-        );
 
         // Emit events
         this.emitEvent(
             EventEnum.PROCESSED,
             proof.publicOutput.processedActions
+        );
+    }
+
+    verifyFinalizedD(
+        requestId: Field,
+        D: RequestVector,
+        witness: Level1Witness
+    ) {
+        this.finalizedDRoot
+            .getAndRequireEquals()
+            .assertEquals(
+                witness.calculateRoot(D.hash()),
+                buildAssertMessage(
+                    ResponseContract.name,
+                    ResponseContract.prototype.verifyFinalizedD.name,
+                    ErrorEnum.RES_D_ROOT
+                )
+            );
+        requestId.assertEquals(
+            witness.calculateIndex(),
+            buildAssertMessage(
+                ResponseContract.name,
+                ResponseContract.prototype.verifyFinalizedD.name,
+                ErrorEnum.RES_D_INDEX
+            )
         );
     }
 }

@@ -209,7 +209,7 @@ export class ReduceStorage {
 }
 
 export enum RollupStatus {
-    NOT_EXISTED,
+    RECORDED,
     ROLLUPED,
 }
 

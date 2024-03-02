@@ -1,4 +1,6 @@
 import {
+    Account,
+    AccountUpdate,
     Bool,
     Field,
     Poseidon,
@@ -82,7 +84,7 @@ export const Rollup = (name: string, ActionType: any) =>
 
                     // Check the non-existence of the action
                     let [root, key] = rollupWitness.computeRootAndKey(
-                        Field(RollupStatus.NOT_EXISTED)
+                        Field(RollupStatus.RECORDED)
                     );
                     root.assertEquals(
                         earlierProof.publicOutput.newRollupRoot,
@@ -139,6 +141,25 @@ export const rollup = (
     );
 };
 
+export const verifyRollup = (
+    programName: string,
+    actionState: Field,
+    root: Field,
+    witness: ActionWitness
+) => {
+    let [rollupRoot, rollupIndex] = witness.computeRootAndKey(
+        Field(RollupStatus.RECORDED)
+    );
+    root.assertEquals(
+        rollupRoot,
+        buildAssertMessage(programName, 'verifyRollup', ErrorEnum.ROLLUP_ROOT)
+    );
+    actionState.assertEquals(
+        rollupIndex,
+        buildAssertMessage(programName, 'verifyRollup', ErrorEnum.ROLLUP_INDEX)
+    );
+};
+
 export const processAction = (
     programName: string,
     actionState: Field,
@@ -160,6 +181,11 @@ export const processAction = (
     return witness.computeRootAndKey(Field(ProcessStatus.PROCESSED))[0];
 };
 
+export class RollupAction extends Struct({
+    actionHash: Field,
+    contractAddress: PublicKey,
+}) {}
+
 export const RecursiveRollup = Rollup('RecursiveRollup', Field);
 
 export class RollupProof extends ZkProgram.Proof(RecursiveRollup) {}
@@ -175,7 +201,12 @@ export class RollupContract extends SmartContract {
      */
     @state(Field) rollupRoot = State<Field>();
 
-    reducer = Reducer({ actionType: Field });
+    /**
+     * @description MT storing actions' counter values
+     */
+    @state(Field) counterRoot = State<Field>();
+
+    reducer = Reducer({ actionType: RollupAction });
 
     events = {
         [EventEnum.ROLLUPED]: Field,
@@ -189,9 +220,13 @@ export class RollupContract extends SmartContract {
 
     @method recordAction(actionHash: Field, address: PublicKey) {
         // Verify whitelist address (optional)
+        let update = AccountUpdate.create(address);
 
         // Create and dispatch action
-        let action = Poseidon.hash([actionHash, address.toFields()].flat());
+        let action = new RollupAction({
+            actionHash: actionHash,
+            contractAddress: address,
+        });
         this.reducer.dispatch(action);
     }
 

@@ -87,4 +87,6 @@ export enum ErrorEnum {
     RES_CONTRIBUTION_INDEX_L2 = 'Incorrect contribution MT level 2 index',
     RES_CONTRIBUTION_DIMENSION = 'Incorrect contribution dimension',
     RES_CONTRIBUTION_THRESHOLD = 'Incorrect number of contributions',
+    RES_D_ROOT = 'Incorrect D MT root',
+    RES_D_INDEX = 'Incorrect D MT index',
 }
