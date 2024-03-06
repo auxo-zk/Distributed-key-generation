@@ -14,7 +14,11 @@ import {
     ZkProgram,
     PrivateKey,
 } from 'o1js';
-import { buildAssertMessage, updateActionState } from '../libs/utils.js';
+import {
+    buildAssertMessage,
+    requireCaller,
+    updateActionState,
+} from '../libs/utils.js';
 import { RequestVector } from '../libs/Requester.js';
 import {
     REQUEST_FEE,
@@ -22,11 +26,7 @@ import {
     ZkAppEnum,
     ZkProgramEnum,
 } from '../constants.js';
-import {
-    ActionMask as _ActionMask,
-    processAction,
-    verifyRollup,
-} from './Actions.js';
+import { ActionMask as _ActionMask, processAction } from './Actions.js';
 import { ErrorEnum } from './constants.js';
 import {
     ActionWitness,
@@ -34,13 +34,12 @@ import {
     EMPTY_ADDRESS_MT,
     ZkAppRef,
     verifyZkApp,
-} from './SharedStorage.js';
+} from '../storages/SharedStorage.js';
+import { calculateKeyIndex } from '../storages/DKGStorage.js';
 import {
-    Level1Witness as DkgLevel1Witness,
-    calculateKeyIndex,
-} from './DKGStorage.js';
-import { DkgContract, KeyStatus, KeyStatusInput } from './DKG.js';
-import { EMPTY_LEVEL_1_TREE, Level1Witness } from './RequestStorage.js';
+    EMPTY_LEVEL_1_TREE,
+    Level1Witness,
+} from '../storages/RequestStorage.js';
 import { ResponseContract } from './Response.js';
 
 export const enum RequestStatus {
@@ -722,16 +721,10 @@ export class RequestContract extends SmartContract {
         keyId: Field,
         requester: PublicKey,
         startTimestamp: UInt64,
-        endTimestamp: UInt64,
-        dkg: ZkAppRef,
-        keyStatusWitness: DkgLevel1Witness
+        endTimestamp: UInt64
     ) {
-        // Get current state values
-        let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
-
-        // Verify Dkg Contract address
-        verifyZkApp(RequestContract.name, dkg, zkAppRoot, Field(ZkAppEnum.DKG));
-        const dkgContract = new DkgContract(dkg.address);
+        // Verify caller
+        requireCaller(requester, this);
 
         // Verify timestamp configuration
         startTimestamp.assertGreaterThanOrEqual(
@@ -752,16 +745,6 @@ export class RequestContract extends SmartContract {
                     ErrorEnum.REQUEST_PERIOD
                 )
             );
-
-        // Verify key status
-        dkgContract.verifyKeyStatus(
-            new KeyStatusInput({
-                committeeId: committeeId,
-                keyId: keyId,
-                status: Field(KeyStatus.ACTIVE),
-                witness: keyStatusWitness,
-            })
-        );
 
         // Create and dispatch action
         let action = new Action({
@@ -790,21 +773,9 @@ export class RequestContract extends SmartContract {
      * @param requesterWitness Witness for proof of requester
      * @param statusWitness Witness for proof of request's status
      */
-    @method abort(
-        requestId: Field,
-        requester: PublicKey,
-        requesterWitness: Level1Witness,
-        statusWitness: Level1Witness
-    ) {
-        // Verify requester
-        this.verifyRequester(requestId, requester, requesterWitness);
-
-        // Verify request status
-        this.verifyRequestStatus(
-            requestId,
-            Field(RequestStatus.INITIALIZED),
-            statusWitness
-        );
+    @method abort(requestId: Field, requester: PublicKey) {
+        // Verify caller
+        requireCaller(requester, this);
 
         // Create and dispatch action
         let action = new Action({
@@ -843,6 +814,9 @@ export class RequestContract extends SmartContract {
         statusWitness: Level1Witness,
         periodWitness: Level1Witness
     ) {
+        // Verify caller
+        requireCaller(requester, this);
+
         // Verify requester
         this.verifyRequester(requestId, requester, requesterWitness);
 

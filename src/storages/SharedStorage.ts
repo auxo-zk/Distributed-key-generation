@@ -15,7 +15,7 @@ import {
 } from '../constants.js';
 import { FieldDynamicArray } from '@auxo-dev/auxo-libs';
 import { buildAssertMessage } from '../libs/utils.js';
-import { ErrorEnum } from './constants.js';
+import { ErrorEnum } from '../contracts/constants.js';
 
 export const ADDRESS_TREE_HEIGHT = Math.ceil(Math.log2(ADDRESS_MAX_SIZE)) + 1;
 export class AddressMT extends MerkleTree {}
@@ -259,12 +259,12 @@ export class ActionStorage {
         return ActionStorage.calculateLeaf(status);
     }
 
-    static calculateIndex(actionState: Field): Field {
-        return actionState;
+    static calculateIndex(actionIndex: Field): Field {
+        return actionIndex;
     }
 
-    calculateIndex(actionState: Field): Field {
-        return ActionStorage.calculateIndex(actionState);
+    calculateIndex(actionIndex: Field): Field {
+        return ActionStorage.calculateIndex(actionIndex);
     }
 
     getWitness(index: Field): MerkleMapWitness {

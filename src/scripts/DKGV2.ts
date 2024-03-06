@@ -41,7 +41,7 @@
 // } from '../contracts/Round2.js';
 // import {
 //   Action as ResponseAction,
-//   CompleteResponse,
+//   FinalizeResponse,
 //   ReduceResponse,
 //   ResponseContract,
 //   ResponseInput,
@@ -95,7 +95,7 @@
 //   RArray,
 //   accumulateEncryption,
 //   generateEncryptionWithRandomInput,
-// } from '../libs/Requestor.js';
+// } from '../libs/Requester.js';
 // import { RequestContract, CreateRequest } from '../contracts/Request.js';
 // import { EMPTY_LEVEL_1_TREE as EMPTY_LEVEL_1_TREE_COMMITEE } from '../contracts/CommitteeStorage.js';
 // import { EMPTY_LEVEL_1_TREE as EMPTY_LEVEL_1_TREE_DKG } from '../contracts/DKGStorage.js';
@@ -542,7 +542,7 @@
 
 //     await compile(ReduceResponse, 'ReduceResponse', profiling);
 //     await compile(BatchDecryption, 'BatchDecryption', profiling);
-//     await compile(CompleteResponse, 'CompleteResponse', profiling);
+//     await compile(FinalizeResponse, 'FinalizeResponse', profiling);
 
 //     await compile(RollupCommittee, 'RollupCommittee', profiling);
 
@@ -1590,9 +1590,9 @@
 //   initialContributionRoot = responseContract.contributions.get();
 //   reduceStateRoot = responseContract.reduceState.get();
 
-//   console.log('Generate first step proof CompleteResponse...');
-//   if (profiling) DKGProfiler.start('CompleteResponse.firstStep');
-//   let completeProof = await CompleteResponse.firstStep(
+//   console.log('Generate first step proof FinalizeResponse...');
+//   if (profiling) DKGProfiler.start('FinalizeResponse.firstStep');
+//   let completeProof = await FinalizeResponse.firstStep(
 //     new ResponseInput({
 //       previousActionState: Field(0),
 //       action: ResponseAction.empty(),
@@ -1619,9 +1619,9 @@
 //   for (let i = 0; i < T; i++) {
 //     logMemUsage();
 //     let action = responseActions[i];
-//     console.log(`Generate step ${i + 1} proof CompleteResponse...`);
-//     if (profiling) DKGProfiler.start('CompleteResponse.nextStep');
-//     completeProof = await CompleteResponse.nextStep(
+//     console.log(`Generate step ${i + 1} proof FinalizeResponse...`);
+//     if (profiling) DKGProfiler.start('FinalizeResponse.nextStep');
+//     completeProof = await FinalizeResponse.nextStep(
 //       new ResponseInput({
 //         previousActionState: contracts[Contract.RESPONSE].actionStates[i],
 //         action: action,

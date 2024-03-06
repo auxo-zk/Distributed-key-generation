@@ -6,7 +6,7 @@ import {
     Poseidon,
     Struct,
 } from 'o1js';
-import { KeyStatus } from './DKG.js';
+import { KeyStatus } from '../contracts/DKG.js';
 import { Round1Contribution, Round2Contribution } from '../libs/Committee.js';
 import { COMMITTEE_MAX_SIZE, INSTANCE_LIMITS } from '../constants.js';
 

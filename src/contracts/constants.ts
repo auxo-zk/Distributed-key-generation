@@ -89,4 +89,8 @@ export enum ErrorEnum {
     RES_CONTRIBUTION_THRESHOLD = 'Incorrect number of contributions',
     RES_D_ROOT = 'Incorrect D MT root',
     RES_D_INDEX = 'Incorrect D MT index',
+
+    // RollupContract errors
+    ACTION_COUNTER_ROOT = 'Incorrect rollup counter MT root',
+    ACTION_COUNTER_INDEX = 'Incorrect rollup counter MT index',
 }

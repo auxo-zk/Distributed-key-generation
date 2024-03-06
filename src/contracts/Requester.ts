@@ -15,6 +15,8 @@ import {
     Void,
     Scalar,
     UInt64,
+    Gadgets,
+    PublicKey,
 } from 'o1js';
 import { CustomScalar } from '@auxo-dev/auxo-libs';
 import { buildAssertMessage, updateActionState } from '../libs/utils.js';
@@ -24,23 +26,27 @@ import {
     RequestVector,
     SecretVector,
 } from '../libs/Requester.js';
-import { RollupContract } from './Actions.js';
+import { RollupContract } from './Rollup.js';
 import {
     ActionWitness,
     EMPTY_ACTION_MT,
     EMPTY_ADDRESS_MT,
+    ProcessedActions,
+    RollupStatus,
     ZkAppRef,
     verifyZkApp,
-} from './SharedStorage.js';
+} from '../storages/SharedStorage.js';
 import {
     Level1Witness,
     EMPTY_LEVEL_1_TREE as REQUESTER_LEVEL_1_TREE,
-} from './RequestStorage.js';
+} from '../storages/RequestStorage.js';
 import { ErrorEnum, EventEnum } from './constants.js';
 
 import { CommitteeContract } from './Committee.js';
 import { RequestContract } from './Request.js';
-import { Level1Witness as DkgLevel1Witness } from './DKGStorage.js';
+import { Level1Witness as DkgLevel1Witness } from '../storages/DKGStorage.js';
+import { DkgContract, KeyStatus, KeyStatusInput } from './DKG.js';
+import { processAction } from './Actions.js';
 
 export class Action extends Struct({
     taskId: Field,
@@ -143,18 +149,18 @@ export class AttachRequestProof extends ZkProgram.Proof(AttachRequest) {}
 export class AccumulateEncryptionInput extends Struct({
     previousActionState: Field,
     action: Action,
+    actionId: Field,
 }) {}
 
 export class AccumulateEncryptionOutput extends Struct({
-    initialAccumulatedRRoot: Field,
-    initialAccumulatedMRoot: Field,
+    address: PublicKey,
+    requestId: Field,
+    rollupRoot: Field,
     initialProcessRoot: Field,
-    nextAccumulatedRRoot: Field,
-    nextAccumulatedMRoot: Field,
     nextProcessRoot: Field,
     sumR: RequestVector,
     sumM: RequestVector,
-    // cur_T: Field,        // unnecessary?
+    processedActions: ProcessedActions,
 }) {}
 
 export const AccumulateEncryption = ZkProgram({
@@ -163,22 +169,23 @@ export const AccumulateEncryption = ZkProgram({
     publicOutput: AccumulateEncryptionOutput,
     methods: {
         firstStep: {
-            privateInputs: [Field, Field, Field],
+            privateInputs: [PublicKey, Field, Field, Field],
             method(
                 input: AccumulateEncryptionInput,
-                initialAccumulatedRRoot: Field,
-                initialAccumulatedMRoot: Field,
+                address: PublicKey,
+                requestId: Field,
+                rollupRoot: Field,
                 initialProcessRoot: Field
             ) {
                 return new AccumulateEncryptionOutput({
-                    initialAccumulatedRRoot: initialAccumulatedRRoot,
-                    initialAccumulatedMRoot: initialAccumulatedMRoot,
+                    address: address,
+                    requestId: requestId,
+                    rollupRoot: rollupRoot,
                     initialProcessRoot: initialProcessRoot,
-                    nextAccumulatedRRoot: initialAccumulatedRRoot,
-                    nextAccumulatedMRoot: initialAccumulatedMRoot,
                     nextProcessRoot: initialProcessRoot,
                     sumR: new RequestVector(),
                     sumM: new RequestVector(),
+                    processedActions: new ProcessedActions(),
                 });
             },
         },
@@ -189,6 +196,7 @@ export const AccumulateEncryption = ZkProgram({
                     AccumulateEncryptionOutput
                 >,
                 ActionWitness,
+                ActionWitness,
             ],
 
             method(
@@ -197,26 +205,63 @@ export const AccumulateEncryption = ZkProgram({
                     AccumulateEncryptionInput,
                     AccumulateEncryptionOutput
                 >,
-                processRoot: ActionWitness
+                rollupWitness: ActionWitness,
+                processWitness: ActionWitness
             ) {
+                // Verify earlier proof
                 earlierProof.verify();
-                let requestId = input.action.requestId;
-                requestId.assertEquals(earlierProof.publicOutput.requestId);
 
-                let actionState = updateActionState(preActionState, [
-                    action.toFields(),
-                ]);
-
-                // It's status has to be REDUCED
-                let [root, key] = rollupStatusWitness.computeRootAndKey(
-                    Field(ActionStatus.REDUCED)
+                input.action.requestId.assertEquals(
+                    earlierProof.publicOutput.requestId,
+                    buildAssertMessage(
+                        AccumulateEncryption.name,
+                        AccumulateEncryption.nextStep.name,
+                        ErrorEnum.REQUEST_ID
+                    )
                 );
-                key.assertEquals(actionState);
-                root.assertEquals(earlierProof.publicOutput.finalStatusRoot);
 
-                // Update satus to ROLL_UPED
-                let [newRoot] = rollupStatusWitness.computeRootAndKey(
-                    Field(ActionStatus.ROLL_UPED)
+                // Verify action is rolluped
+                let actionIndex = Poseidon.hash(
+                    [
+                        earlierProof.publicOutput.address.toFields(),
+                        input.action.hash(),
+                        input.actionId,
+                    ].flat()
+                );
+                let [rollupRoot, rollupIndex] = rollupWitness.computeRootAndKey(
+                    Field(RollupStatus.ROLLUPED)
+                );
+                earlierProof.publicOutput.rollupRoot.assertEquals(
+                    rollupRoot,
+                    buildAssertMessage(
+                        AccumulateEncryption.name,
+                        AccumulateEncryption.nextStep.name,
+                        ErrorEnum.ROLLUP_ROOT
+                    )
+                );
+                actionIndex.assertEquals(
+                    rollupIndex,
+                    buildAssertMessage(
+                        AccumulateEncryption.name,
+                        AccumulateEncryption.nextStep.name,
+                        ErrorEnum.ROLLUP_INDEX
+                    )
+                );
+
+                // Calculate corresponding action state
+                let actionState = updateActionState(input.previousActionState, [
+                    Action.toFields(input.action),
+                ]);
+                let processedActions =
+                    earlierProof.publicOutput.processedActions;
+                processedActions.push(actionState);
+
+                // Verify the action isn't already processed
+                let nextProcessRoot = processAction(
+                    AccumulateEncryption.name,
+                    actionState,
+                    earlierProof.publicOutput.nextProcessRoot,
+                    processWitness
                 );
 
                 let sumR = earlierProof.publicOutput.sumR;
@@ -225,22 +270,24 @@ export const AccumulateEncryption = ZkProgram({
                 for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
                     sumR.set(
                         Field(i),
-                        sumR.get(Field(i)).add(action.R.get(Field(i)))
+                        sumR.get(Field(i)).add(input.action.R.get(Field(i)))
                     );
                     sumM.set(
                         Field(i),
-                        sumM.get(Field(i)).add(action.M.get(Field(i)))
+                        sumM.get(Field(i)).add(input.action.M.get(Field(i)))
                     );
                 }
 
-                return new RollupActionsOutput({
-                    requestId: requestId,
-                    sumR,
-                    sumM,
-                    cur_T: earlierProof.publicOutput.cur_T.add(Field(1)),
-                    initialStatusRoot:
-                        earlierProof.publicOutput.initialStatusRoot,
-                    finalStatusRoot: newRoot,
+                return new AccumulateEncryptionOutput({
+                    address: earlierProof.publicOutput.address,
+                    requestId: earlierProof.publicOutput.requestId,
+                    rollupRoot: earlierProof.publicOutput.rollupRoot,
+                    initialProcessRoot:
+                        earlierProof.publicOutput.initialProcessRoot,
+                    nextProcessRoot: nextProcessRoot,
+                    sumR: sumR,
+                    sumM: sumM,
+                    processedActions: processedActions,
                 });
             },
         },
@@ -268,11 +315,6 @@ export class RequesterContract extends SmartContract {
     @state(Field) requestIdRoot = State<Field>();
 
     /**
-     * @description MT storing submission counter values for requests
-     */
-    @state(Field) submissionCounterRoot = State<Field>();
-
-    /**
      * @description MT storing anonymous commitments
      */
     @state(Field) commitmentRoot = State<Field>();
@@ -285,7 +327,7 @@ export class RequesterContract extends SmartContract {
     reducer = Reducer({ actionType: Action });
 
     events = {
-        [EventEnum.ROLLUPED]: Field,
+        [EventEnum.PROCESSED]: Field,
     };
 
     init() {
@@ -293,7 +335,6 @@ export class RequesterContract extends SmartContract {
         this.zkAppRoot.set(EMPTY_ADDRESS_MT().getRoot());
         this.taskCounter.set(Field(0));
         this.requestIdRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
-        this.submissionCounterRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.commitmentRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.processRoot.set(EMPTY_ACTION_MT().getRoot());
     }
@@ -317,6 +358,9 @@ export class RequesterContract extends SmartContract {
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
         let taskCounter = this.taskCounter.getAndRequireEquals();
 
+        // Verify Dkg Contract address
+        verifyZkApp(RequestContract.name, dkg, zkAppRoot, Field(ZkAppEnum.DKG));
+
         // Verify Request Contract address
         verifyZkApp(
             RequesterContract.name,
@@ -325,7 +369,18 @@ export class RequesterContract extends SmartContract {
             Field(ZkAppEnum.REQUEST)
         );
 
+        const dkgContract = new DkgContract(dkg.address);
         const requestContract = new RequestContract(request.address);
+
+        // Verify key status
+        dkgContract.verifyKeyStatus(
+            new KeyStatusInput({
+                committeeId: committeeId,
+                keyId: keyId,
+                status: Field(KeyStatus.ACTIVE),
+                witness: keyStatusWitness,
+            })
+        );
 
         // Create and dispatch action in Request Contract
         requestContract.initialize(
@@ -333,9 +388,7 @@ export class RequesterContract extends SmartContract {
             keyId,
             this.address,
             startTimestamp,
-            endTimestamp,
-            dkg,
-            keyStatusWitness
+            endTimestamp
         );
 
         // Update state values
@@ -390,7 +443,7 @@ export class RequesterContract extends SmartContract {
         const requestContract = new RequestContract(request.address);
 
         // Create and dispatch action in Request Contract
-        requestContract.abort(requestId);
+        requestContract.abort(requestId, this.address);
     }
 
     @method submit(
@@ -399,11 +452,12 @@ export class RequesterContract extends SmartContract {
         secrets: SecretVector,
         randoms: RandomVector,
         publicKey: Group,
+        startTimestamp: UInt64,
+        endTimestamp: UInt64,
         committee: ZkAppRef,
         request: ZkAppRef,
         rollup: ZkAppRef,
-        keyWitness: DkgLevel1Witness,
-        requestStatusWitness: Level1Witness
+        periodWitness: Level1Witness
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -433,7 +487,15 @@ export class RequesterContract extends SmartContract {
         const requestContract = new RequestContract(request.address);
         const rollupContract = new RollupContract(rollup.address);
 
-        // Verify encryption key
+        // TODO: Verify encryption key
+
+        // TODO: Verify request period
+        this.network.timestamp
+            .getAndRequireEquals()
+            .assertGreaterThanOrEqual(startTimestamp);
+        this.network.timestamp
+            .getAndRequireEquals()
+            .assertLessThanOrEqual(endTimestamp);
 
         // Verify attached request
         requestIdRoot.assertEquals(
@@ -454,8 +516,6 @@ export class RequesterContract extends SmartContract {
                 ErrorEnum.REQUEST_VECTOR_DIM
             )
         );
-
-        // TO-DO requestContract.verifyRequestStatus(...)
 
         // Calculate encryption
         let dimension = secrets.length;
@@ -528,40 +588,48 @@ export class RequesterContract extends SmartContract {
     }
 
     @method accumulate(
-        proof: CreateRollupProof,
-        R_witness: MerkleMapWitness,
-        M_witness: MerkleMapWitness
+        proof: AccumulateEncryptionProof,
+        requestId: Field,
+        requestWitness: Level1Witness,
+        startTimestamp: UInt64,
+        endTimestamp: UInt64,
+        request: ZkAppRef,
+        rollup: ZkAppRef
     ) {
+        // Get current state values
+        let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
+        let requestIdRoot = this.requestIdRoot.getAndRequireEquals();
+
+        // Verify Request Contract address
+        verifyZkApp(
+            RequesterContract.name,
+            request,
+            zkAppRoot,
+            Field(ZkAppEnum.REQUEST)
+        );
+
+        // Verify Rollup Contract address
+        verifyZkApp(
+            RequesterContract.name,
+            rollup,
+            zkAppRoot,
+            Field(ZkAppEnum.ROLLUP)
+        );
+
+        const requestContract = new RequestContract(request.address);
+        const rollupContract = new RollupContract(rollup.address);
+
+        // Verify proof
         proof.verify();
 
-        let accumulatedRRoot = this.accumulatedRRoot.getAndRequireEquals();
-        let accumulatedMRoot = this.accumulatedMRoot.getAndRequireEquals();
-        let actionStatus = this.actionStatus.getAndRequireEquals();
-
-        actionStatus.assertEquals(proof.publicOutput.initialStatusRoot);
-        let [old_R_root, R_key] = R_witness.computeRootAndKey(Field(0));
-        let [old_M_root, M_key] = M_witness.computeRootAndKey(Field(0));
-
-        R_key.assertEquals(proof.publicOutput.requestId);
-        M_key.assertEquals(proof.publicOutput.requestId);
-
-        accumulatedRRoot.assertEquals(old_R_root);
-        accumulatedMRoot.assertEquals(old_M_root);
-
-        // to-do: adding check cur_T == T
-        let [new_R_root] = R_witness.computeRootAndKey(
-            proof.publicOutput.sumR.hash()
-        );
-        let [new_M_root] = M_witness.computeRootAndKey(
-            proof.publicOutput.sumM.hash()
-        );
-
-        // update on-chain state
-        this.accumulatedRRoot.set(new_R_root);
-        this.accumulatedMRoot.set(new_M_root);
-        this.actionStatus.set(proof.publicOutput.finalStatusRoot);
-
-        // to-do: request to Request contract
-        //...
+        // TODO: request to Request contract
+        // requestContract.finalize(
+        //     requestId,
+        //     this.address,
+        //     startTimestamp,
+        //     endTimestamp,
+        //     proof.publicOutput.sumR,
+        //     proof.publicOutput.sumM
+        // );
     }
 }

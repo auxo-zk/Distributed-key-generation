@@ -1,6 +1,6 @@
 export * as Constants from './constants.js';
 export * as Libs from './libs/index.js';
-export * as Storage from './contracts/storages.js';
+export * as Storage from './storages/index.js';
 export * as ZkApp from './contracts/index.js';
 
 export {
@@ -93,14 +93,12 @@ export {
     RequestStatus,
 
     // Structs
-    RequestInput,
-    UnRequestInput,
-    ResolveInput,
-    RollupStateOutput as RollupRequestOutput,
+    UpdateRequestInput,
+    UpdateRequestOutput,
 
     // Zk Programs
-    CreateRequest,
-    RequestProof as CreateRequestProof,
+    UpdateRequest,
+    UpdateRequestProof,
 
     // Smart Contract
     RequestContract,
@@ -109,30 +107,27 @@ export {
     ActionMask as RequestActionMask,
     Action as RequestAction,
     ActionEnum as RequestActions,
-    CreateRequestEvent,
 } from './contracts/Request.js';
 
 export {
     // Constants & Enums
-    ActionStatus as RequesterActionStatus,
 
     // Structs
-    CustomScalarArray,
-    RequesterInput,
-    ReduceOutput as ReduceRequestOutput,
-    RollupActionsOutput,
+    AttachRequestOutput,
+    AccumulateEncryptionInput,
+    AccumulateEncryptionOutput,
 
     // Zk Programs
-    CreateReduce,
-    CreateReduceProof,
-    CreateRollup,
-    CreateRollupProof,
+    AttachRequest,
+    AttachRequestProof,
+    AccumulateEncryption,
+    AccumulateEncryptionProof,
 
     // Smart Contract
     RequesterContract,
 
     // Actions & Events
-    RequesterAction,
+    Action as RequesterAction,
 } from './contracts/Requester.js';
 
 export {

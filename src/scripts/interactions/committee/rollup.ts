@@ -14,7 +14,7 @@ import {
     EMPTY_LEVEL_2_TREE,
     MemberStorage,
     SettingStorage,
-} from '../../../contracts/CommitteeStorage.js';
+} from '../../../storages/CommitteeStorage.js';
 import { COMMITTEE_MAX_SIZE } from '../../../constants.js';
 import { prepare } from '../prepare.js';
 

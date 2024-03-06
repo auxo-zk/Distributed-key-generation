@@ -9,7 +9,7 @@ import { prepare } from '../prepare.js';
 import {
     BatchDecryption,
     BatchEncryption,
-    CompleteResponse,
+    FinalizeResponse,
     CreateRequest,
     FinalizeRound1,
     FinalizeRound2,
@@ -25,7 +25,7 @@ import {
 import {
     ActionStatus,
     ReduceStorage,
-} from '../../../contracts/SharedStorage.js';
+} from '../../../storages/SharedStorage.js';
 
 async function main() {
     const { cache, feePayer } = await prepare();
@@ -42,7 +42,7 @@ async function main() {
     await compile(RequestContract, cache);
     await compile(ReduceResponse, cache);
     await compile(BatchDecryption, cache);
-    await compile(CompleteResponse, cache);
+    await compile(FinalizeResponse, cache);
     await compile(ResponseContract, cache);
     const responseAddress =
         'B62qoGfSCnimss8Cnt56BMDGUFmiBW4oiD28WfgHG5TuEHjkyv8QAdU';

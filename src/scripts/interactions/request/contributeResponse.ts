@@ -18,7 +18,7 @@ import { prepare } from '../prepare.js';
 import {
     BatchDecryption,
     BatchEncryption,
-    CompleteResponse,
+    FinalizeResponse,
     CreateRequest,
     FinalizeRound1,
     FinalizeRound2,
@@ -35,17 +35,17 @@ import {
 import {
     ActionStatus,
     ReduceStorage,
-} from '../../../contracts/SharedStorage.js';
-import { RArray } from '../../../libs/Requestor.js';
-import { ZkAppRef } from '../../../contracts/SharedStorage.js';
+} from '../../../storages/SharedStorage.js';
+import { RArray } from '../../../libs/Requester.js';
+import { ZkAppRef } from '../../../storages/SharedStorage.js';
 import {
     FullMTWitness as CommitteeFullWitness,
     Level1Witness as CommitteeLevel1Witness,
-} from '../../../contracts/CommitteeStorage.js';
+} from '../../../storages/CommitteeStorage.js';
 import {
     FullMTWitness as DKGWitness,
     Level1Witness,
-} from '../../../contracts/DKGStorage.js';
+} from '../../../storages/DKGStorage.js';
 
 import fs from 'fs';
 
@@ -124,7 +124,7 @@ async function main() {
     await compile(RequestContract, cache);
     await compile(ReduceResponse, cache);
     await compile(BatchDecryption, cache);
-    await compile(CompleteResponse, cache);
+    await compile(FinalizeResponse, cache);
     await compile(ResponseContract, cache);
 
     const requestAddress =
@@ -156,7 +156,6 @@ async function main() {
         },
         () => {
             responseContract.contribute(
-                Field(data.committeeId),
                 Field(data.keyId),
                 Field(data.requestId),
                 BatchDecryptionProof.fromJSON(data.decryptionProof),

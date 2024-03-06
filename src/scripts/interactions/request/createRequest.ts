@@ -1,8 +1,8 @@
 import { Field, Mina, PublicKey, Group, Scalar } from 'o1js';
 import { compile, fetchZkAppState, proveAndSend } from '../../helper/deploy.js';
 import { prepare } from '../prepare.js';
-import { KeyStatusStorage } from '../../../contracts/DKGStorage.js';
-import { KeyCounterStorage } from '../../../contracts/CommitteeStorage.js';
+import { KeyStatusStorage } from '../../../storages/DKGStorage.js';
+import { KeyCounterStorage } from '../../../storages/CommitteeStorage.js';
 import {
     RequestContract,
     RequestInput,
@@ -13,7 +13,7 @@ import {
     generateEncryptionWithRandomInput,
     accumulateEncryption,
     generateEncryption,
-} from '../../../libs/Requestor.js';
+} from '../../../libs/Requester.js';
 import { Constants } from '../../../index.js';
 import axios from 'axios';
 
@@ -41,7 +41,7 @@ async function main() {
 
     // Create request value
     let publicKey: Group = PublicKey.fromBase58(key.publicKey).toGroup();
-    let MINA = BigInt(Constants.FUNDING_UNIT); // 0.01 MINA
+    let MINA = BigInt(Constants.SECRET_UNIT); // 0.01 MINA
 
     /**
      * r1 = 12, 15, 18

@@ -21,17 +21,17 @@ import {
     ProcessedActions,
     ZkAppRef,
     verifyZkApp,
-} from './SharedStorage.js';
+} from '../storages/SharedStorage.js';
 import {
     EMPTY_LEVEL_1_TREE as COMMITTEE_LEVEL_1_TREE,
     FullMTWitness as CommitteeFullWitness,
     Level1Witness as CommitteeLevel1Witness,
-} from './CommitteeStorage.js';
+} from '../storages/CommitteeStorage.js';
 import {
     EMPTY_LEVEL_1_TREE as DKG_LEVEL_1_TREE,
     Level1Witness,
     calculateKeyIndex,
-} from './DKGStorage.js';
+} from '../storages/DKGStorage.js';
 import { INSTANCE_LIMITS, ZkAppEnum } from '../constants.js';
 import { ErrorEnum, EventEnum } from './constants.js';
 import {

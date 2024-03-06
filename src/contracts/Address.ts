@@ -1,6 +1,6 @@
 import { Field, Poseidon, SmartContract, State, method, state } from 'o1js';
 import { EventEnum } from './constants.js';
-import { EMPTY_ADDRESS_MT, ZkAppRef } from './SharedStorage.js';
+import { EMPTY_ADDRESS_MT, ZkAppRef } from '../storages/SharedStorage.js';
 
 export class AddressContract extends SmartContract {
     // MT of other zkApp address

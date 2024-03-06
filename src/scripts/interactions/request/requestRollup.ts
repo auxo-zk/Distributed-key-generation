@@ -5,7 +5,7 @@ import {
     RequestStatusStorage,
     RequesterStorage,
     Level1Witness,
-} from '../../../contracts/RequestStorage.js';
+} from '../../../storages/RequestStorage.js';
 import {
     RequestContract,
     RequestAction,

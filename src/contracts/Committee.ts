@@ -21,7 +21,7 @@ import {
     EMPTY_LEVEL_2_TREE,
     Level1Witness,
     FullMTWitness,
-} from './CommitteeStorage.js';
+} from '../storages/CommitteeStorage.js';
 import { MemberArray } from '../libs/Committee.js';
 import { ErrorEnum, EventEnum } from './constants.js';
 

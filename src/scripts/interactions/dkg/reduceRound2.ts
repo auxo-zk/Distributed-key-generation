@@ -19,7 +19,7 @@ import {
 import {
     ActionStatus,
     ReduceStorage,
-} from '../../../contracts/SharedStorage.js';
+} from '../../../storages/SharedStorage.js';
 
 async function main() {
     const { cache, feePayer } = await prepare();

@@ -20,14 +20,14 @@ import { buildAssertMessage, updateActionState } from '../libs/utils.js';
 import {
     FullMTWitness as CommitteeFullWitness,
     Level1Witness as CommitteeLevel1Witness,
-} from './CommitteeStorage.js';
+} from '../storages/CommitteeStorage.js';
 import {
     calculateKeyIndex,
     FullMTWitness as DKGWitness,
     EMPTY_LEVEL_1_TREE,
     EMPTY_LEVEL_2_TREE,
     Level1Witness,
-} from './DKGStorage.js';
+} from '../storages/DKGStorage.js';
 import {
     CommitteeConfigInput,
     CommitteeMemberInput,
@@ -57,7 +57,7 @@ import {
     ReduceWitness,
     verifyZkApp,
     ZkAppRef,
-} from './SharedStorage.js';
+} from '../storages/SharedStorage.js';
 import { processAction, rollup, Rollup } from './Actions.js';
 import { ErrorEnum, EventEnum } from './constants.js';
 

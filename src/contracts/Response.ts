@@ -18,18 +18,18 @@ import { buildAssertMessage, updateActionState } from '../libs/utils.js';
 import {
     FullMTWitness as CommitteeFullWitness,
     Level1Witness as CommitteeLevel1Witness,
-} from './CommitteeStorage.js';
+} from '../storages/CommitteeStorage.js';
 import {
     FullMTWitness as DKGWitness,
     Level1Witness,
     calculateKeyIndex,
-} from './DKGStorage.js';
+} from '../storages/DKGStorage.js';
 import {
     FullMTWitness as RequestWitness,
     Level1Witness as RequestLevel1Witness,
     EMPTY_LEVEL_1_TREE,
     EMPTY_LEVEL_2_TREE,
-} from './RequestStorage.js';
+} from '../storages/RequestStorage.js';
 import {
     CommitteeConfigInput,
     CommitteeMemberInput,
@@ -51,7 +51,7 @@ import {
     ProcessedActions,
     ZkAppRef,
     verifyZkApp,
-} from './SharedStorage.js';
+} from '../storages/SharedStorage.js';
 import { DArray, RArray, RequestVector } from '../libs/Requester.js';
 import { Rollup, processAction, rollup } from './Actions.js';
 import { ErrorEnum, EventEnum } from './constants.js';

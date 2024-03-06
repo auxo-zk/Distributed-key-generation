@@ -16,7 +16,7 @@ import {
     BatchEncryption,
 } from '../../contracts/Encryption.js';
 import {
-    CompleteResponse,
+    FinalizeResponse,
     ReduceResponse,
     ResponseContract,
 } from '../../contracts/Response.js';
@@ -42,7 +42,7 @@ async function main() {
 
     await compile(ReduceResponse, cache);
     await compile(BatchDecryption, cache);
-    await compile(CompleteResponse, cache);
+    await compile(FinalizeResponse, cache);
 
     await compile(CreateRequest, cache);
 

@@ -1,6 +1,10 @@
-import { Group, Scalar } from 'o1js';
-import { GroupDynamicArray, ScalarDynamicArray } from '@auxo-dev/auxo-libs';
-import { FUNDING_MAX, FUNDING_UNIT, REQUEST_MAX_SIZE } from '../constants.js';
+import { Field, Group, Nullifier, Poseidon, Scalar } from 'o1js';
+import {
+    FieldDynamicArray,
+    GroupDynamicArray,
+    ScalarDynamicArray,
+} from '@auxo-dev/auxo-libs';
+import { SECRET_MAX, SECRET_UNIT, REQUEST_MAX_SIZE } from '../constants.js';
 
 export class MArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class RArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
@@ -9,6 +13,7 @@ export class skArray extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
 export class RequestVector extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class SecretVector extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
 export class RandomVector extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
+export class CommitmentVector extends FieldDynamicArray(REQUEST_MAX_SIZE) {}
 
 export function calculatePublicKey(contributedPublicKeys: Group[]): Group {
     let result = Group.zero;
@@ -25,11 +30,14 @@ export function generateEncryption(
     r: Scalar[];
     R: Group[];
     M: Group[];
+    nullifier: Field;
+    commitment: Field;
 } {
     let dimension = vector.length;
     let r = new Array<Scalar>(dimension);
     let R = new Array<Group>(dimension);
     let M = new Array<Group>(dimension);
+    let index = -1;
     for (let i = 0; i < dimension; i++) {
         let random = Scalar.random();
         r[i] = random;
@@ -40,8 +48,16 @@ export function generateEncryption(
                       .scale(Scalar.from(vector[i]))
                       .add(publicKey.scale(random))
                 : Group.zero.add(publicKey.scale(random));
+        index = i;
     }
-    return { r, R, M };
+    if (index == -1) throw new Error('Incorrect secret vector');
+    let nullifier = Field.random();
+    let commitment = Poseidon.hash([
+        nullifier,
+        Field(index),
+        Field.from(vector[index]),
+    ]);
+    return { r, R, M, nullifier, commitment };
 }
 
 export function generateEncryptionWithRandomInput(
@@ -106,7 +122,7 @@ export function bruteForceResultVector(resultVector: Group[]): Scalar[] {
         let targetPoint = resultVector[i];
         while (!found) {
             let testingValue = Scalar.from(
-                coefficient[i] * BigInt(FUNDING_UNIT)
+                coefficient[i] * BigInt(SECRET_UNIT)
             );
             found = targetPoint
                 .sub(Group.generator.scale(testingValue))
@@ -116,7 +132,7 @@ export function bruteForceResultVector(resultVector: Group[]): Scalar[] {
             if (found) rawResult[i] = testingValue;
             else {
                 coefficient[i] += BigInt(1);
-                if (testingValue.toBigInt() == BigInt(FUNDING_MAX))
+                if (testingValue.toBigInt() == BigInt(SECRET_MAX))
                     throw new Error('No valid value found!');
             }
         }

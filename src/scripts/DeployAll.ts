@@ -43,7 +43,7 @@ import {
 } from '../contracts/Round2.js';
 import {
     Action as ResponseAction,
-    CompleteResponse,
+    FinalizeResponse,
     ReduceResponse,
     ResponseContract,
     ResponseInput,
@@ -54,7 +54,7 @@ import {
     AddressStorage,
     ReduceStorage,
     getZkAppRef,
-} from '../contracts/SharedStorage.js';
+} from '../storages/SharedStorage.js';
 import { ZkAppEnum, Contract } from '../constants.js';
 import {
     RequestContract,
@@ -281,7 +281,7 @@ async function main() {
 
         await compile(ReduceResponse, 'ReduceResponse', profiling);
         await compile(BatchDecryption, 'BatchDecryption', profiling);
-        await compile(CompleteResponse, 'CompleteResponse', profiling);
+        await compile(FinalizeResponse, 'FinalizeResponse', profiling);
 
         await compile(RollupCommittee, 'RollupCommittee', profiling);
 

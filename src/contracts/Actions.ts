@@ -21,7 +21,7 @@ import {
     EMPTY_ACTION_MT,
     ProcessStatus,
     RollupStatus,
-} from './SharedStorage.js';
+} from '../storages/SharedStorage.js';
 import { BoolDynamicArray } from '@auxo-dev/auxo-libs';
 
 export const ActionMask = (numActionTypes: number) => {
@@ -180,76 +180,3 @@ export const processAction = (
 
     return witness.computeRootAndKey(Field(ProcessStatus.PROCESSED))[0];
 };
-
-export class RollupAction extends Struct({
-    actionHash: Field,
-    contractAddress: PublicKey,
-}) {}
-
-export const RecursiveRollup = Rollup('RecursiveRollup', Field);
-
-export class RollupProof extends ZkProgram.Proof(RecursiveRollup) {}
-
-export class RollupContract extends SmartContract {
-    /**
-     * @description Latest rolluped action's state
-     */
-    @state(Field) actionState = State<Field>();
-
-    /**
-     * @description MT storing actions' rollup state
-     */
-    @state(Field) rollupRoot = State<Field>();
-
-    /**
-     * @description MT storing actions' counter values
-     */
-    @state(Field) counterRoot = State<Field>();
-
-    reducer = Reducer({ actionType: RollupAction });
-
-    events = {
-        [EventEnum.ROLLUPED]: Field,
-    };
-
-    init() {
-        super.init();
-        this.actionState.set(Reducer.initialActionState);
-        this.rollupRoot.set(EMPTY_ACTION_MT().getRoot());
-    }
-
-    @method recordAction(actionHash: Field, address: PublicKey) {
-        // Verify whitelist address (optional)
-        let update = AccountUpdate.create(address);
-
-        // Create and dispatch action
-        let action = new RollupAction({
-            actionHash: actionHash,
-            contractAddress: address,
-        });
-        this.reducer.dispatch(action);
-    }
-
-    @method rollup(proof: RollupProof) {
-        // Get current state values
-        let curActionState = this.actionState.getAndRequireEquals();
-        let rollupRoot = this.rollupRoot.getAndRequireEquals();
-        let lastActionState = this.account.actionState.getAndRequireEquals();
-
-        // Verify proof
-        proof.verify();
-        rollup(
-            RollupContract.name,
-            proof.publicOutput,
-            curActionState,
-            rollupRoot,
-            lastActionState
-        );
-
-        // Update state values
-        this.rollupRoot.set(proof.publicOutput.newRollupRoot);
-
-        // Emit events
-        this.emitEvent(EventEnum.ROLLUPED, lastActionState);
-    }
-}

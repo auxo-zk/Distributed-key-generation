@@ -24,17 +24,17 @@ import {
     PublicKeyStorage,
     Round1ContributionStorage,
     EMPTY_LEVEL_2_TREE,
-} from '../../../contracts/DKGStorage.js';
+} from '../../../storages/DKGStorage.js';
 import {
     Level1Witness as CommitteeLevel1Witness,
     SettingStorage,
-} from '../../../contracts/CommitteeStorage.js';
+} from '../../../storages/CommitteeStorage.js';
 import axios from 'axios';
 import {
     AddressWitness,
     ReduceWitness,
     ZkAppRef,
-} from '../../../contracts/SharedStorage.js';
+} from '../../../storages/SharedStorage.js';
 import { Round1Input } from '../../../contracts/Round1.js';
 import { ZkAppEnum } from '../../../constants.js';
 import { CArray } from '../../../libs/Committee.js';

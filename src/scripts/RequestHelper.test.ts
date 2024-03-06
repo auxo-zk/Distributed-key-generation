@@ -11,20 +11,20 @@ import {
 import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
 import {
-    RequestHelperContract,
-    RequestHelperInput,
+    RequesterContract,
+    RequesterInput,
     CreateReduce,
     CreateReduceProof,
     CustomScalarArray,
-    RequestHelperAction,
+    RequesterAction,
     CreateRollup,
-} from '../contracts/RequestHelper.js';
+} from '../contracts/Requester.js';
 
 import { CustomScalar } from '@auxo-dev/auxo-libs';
 
 const doProofs = false;
 
-describe('RequestHelper', () => {
+describe('Requester', () => {
     const logMemUsage = () => {
         console.log(
             'Current memory usage:',
@@ -49,13 +49,13 @@ describe('RequestHelper', () => {
     const doProofs = true;
     const profiling = true;
     const cache = Cache.FileSystem('./caches');
-    const RequestHelperProfile = getProfiler('Benchmark RequesterHelper');
+    const RequesterProfile = getProfiler('Benchmark RequesterHelper');
     let Local = Mina.LocalBlockchain({ proofsEnabled: doProofs });
     Mina.setActiveInstance(Local);
     let feePayerKey = Local.testAccounts[0].privateKey;
     let feePayer = Local.testAccounts[0].publicKey;
 
-    let requestHelperContract: RequestHelperContract;
+    let requestHelperContract: RequesterContract;
     let proof: CreateReduceProof;
 
     let length = 3;
@@ -79,8 +79,8 @@ describe('RequestHelper', () => {
         CustomScalar.fromScalar(Scalar.random())
     );
 
-    let input: RequestHelperInput[] = [
-        new RequestHelperInput({
+    let input: RequesterInput[] = [
+        new RequesterInput({
             committeeId: Field(1),
             keyId: Field(1),
             requetsTime: Field(1),
@@ -88,7 +88,7 @@ describe('RequestHelper', () => {
             secretVector: CustomScalarArray.from(randoms1),
             random: CustomScalarArray.from(r1),
         }),
-        new RequestHelperInput({
+        new RequesterInput({
             committeeId: Field(1),
             keyId: Field(1),
             requetsTime: Field(1),
@@ -96,7 +96,7 @@ describe('RequestHelper', () => {
             secretVector: CustomScalarArray.from(randoms2),
             random: CustomScalarArray.from(r2),
         }),
-        new RequestHelperInput({
+        new RequesterInput({
             committeeId: Field(1),
             keyId: Field(1),
             requetsTime: Field(1),
@@ -106,7 +106,7 @@ describe('RequestHelper', () => {
         }),
     ];
 
-    let actionsVip: RequestHelperAction[] = [];
+    let actionsVip: RequesterAction[] = [];
 
     let userInfor;
 
@@ -126,19 +126,17 @@ describe('RequestHelper', () => {
         console.timeEnd('CreateRollup.compile');
 
         if (doProofs) {
-            console.time('RequestHelperContract.compile');
-            console.log('RequestHelperContract.compile');
-            await RequestHelperContract.compile();
-            console.timeEnd('RequestHelperContract.compile');
+            console.time('RequesterContract.compile');
+            console.log('RequesterContract.compile');
+            await RequesterContract.compile();
+            console.timeEnd('RequesterContract.compile');
         } else {
-            RequestHelperContract.analyzeMethods();
+            RequesterContract.analyzeMethods();
         }
     });
 
-    it('deploy contract RequestHelper', async () => {
-        requestHelperContract = new RequestHelperContract(
-            addresses.requestHelper
-        );
+    it('deploy contract Requester', async () => {
+        requestHelperContract = new RequesterContract(addresses.requestHelper);
         let tx = await Mina.transaction(feePayer, () => {
             AccountUpdate.fundNewAccount(feePayer, 4);
             requestHelperContract.deploy();
@@ -173,30 +171,30 @@ describe('RequestHelper', () => {
         }
 
         actionsVip = myActionArray.map((item) =>
-            RequestHelperAction.fromFields(item)
+            RequesterAction.fromFields(item)
         );
 
         Provable.log('actionVip: ', actionsVip);
     });
 
     xit('reduce 3 tx', async () => {
-        // console.log('Create RequestHelper.firstStep...');
-        // RequestHelperProfile.start('RequestHelper.firstStep');
+        // console.log('Create Requester.firstStep...');
+        // RequesterProfile.start('Requester.firstStep');
         // proof = await CreateReduce.firstStep(
         //   requestHelperContract.actionState.get(),
         //   requestHelperContract.actionStatus.get()
         // );
-        // RequestHelperProfile.stop().store();
+        // RequesterProfile.stop().store();
         // expect(proof.publicOutput.initialActionState).toEqual(
         //   Reducer.initialActionState
         // );
         // for (let i = 0; i < actionsVip.length; i++) {}
-        // RequestHelperProfile.start('RequestHelper.nextstep');
+        // RequesterProfile.start('Requester.nextstep');
         // proof = await CreateReduce.firstStep(
         //   requestHelperContract.actionState.get(),
         //   requestHelperContract.actionStatus.get()
         // );
-        // RequestHelperProfile.stop().store();
+        // RequesterProfile.stop().store();
         // expect(proof.publicOutput.initialActionState).toEqual(
         //   Reducer.initialActionState
         // );
@@ -216,6 +214,6 @@ describe('RequestHelper', () => {
         //   }
         //   myActionArray.push(temp);
         // }
-        // action = myActionArray.map((item) => RequestHelperAction.fromFields(item));
+        // action = myActionArray.map((item) => RequesterAction.fromFields(item));
     });
 });

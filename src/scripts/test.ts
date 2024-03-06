@@ -13,12 +13,12 @@
 //   Mina,
 // } from 'o1js';
 // import * as Committee from '../libs/Committee.js';
-// import * as Requestor from '../libs/Requestor.js';
+// import * as Requester from '../libs/Requester.js';
 // import {
-//   RequestHelperContract,
-//   RequestHelperInput,
+//   RequesterContract,
+//   RequesterInput,
 //   CustomScalarArray,
-// } from '../contracts/RequestHelper.js';
+// } from '../contracts/Requester.js';
 // import { RequestVector } from '../contracts/Request.js';
 // import { CustomScalar, ScalarDynamicArray } from '@auxo-dev/auxo-libs';
 
@@ -123,23 +123,23 @@
 //   it('Should accumulate encryption', async () => {
 //     let publickey = Committee.calculatePublicKey(round1Contributions);
 //     for (let i = 0; i < plainVectors.length; i++) {
-//       let encryptedVector = Requestor.generateEncryptionWithRandomInput(
+//       let encryptedVector = Requester.generateEncryptionWithRandomInput(
 //         random,
 //         publickey,
 //         plainVectors[i]
 //       );
 
-//       let newRequestContract = new RequestHelperContract(
+//       let newRequestContract = new RequesterContract(
 //         PrivateKey.random().toPublicKey()
 //       );
 
 //       let contractValue = newRequestContract.request(
-//         new RequestHelperInput({
+//         new RequesterInput({
 //           committeeId: Field(0),
 //           keyId: Field(0),
 //           requetsTime: Field(0),
 //           committeePublicKey: PublicKey.fromGroup(publickey),
-//           // to-do wintess to check if it the right publickey
+//           // TODO: wintess to check if it the right publickey
 //           secretVector: plainScalar[i],
 //           random: scalarRandom,
 //         })
@@ -154,7 +154,7 @@
 //       //   M.push(encryptedVector.M);
 //     }
 
-//     // let accumulatedEncryption = Requestor.accumulateEncryption(R, M);
+//     // let accumulatedEncryption = Requester.accumulateEncryption(R, M);
 //     // sumR = accumulatedEncryption.sumR;
 //     // sumM = accumulatedEncryption.sumM;
 //     // Provable.log('sumR: ', sumR);

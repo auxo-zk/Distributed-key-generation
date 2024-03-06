@@ -12,7 +12,7 @@ import {
 import * as Committee from './Committee.js';
 import * as Requester from './Requester.js';
 import { Bit255 } from '@auxo-dev/auxo-libs';
-import { FUNDING_UNIT } from '../constants.js';
+import { SECRET_UNIT } from '../constants.js';
 
 describe('Committee', () => {
     let T = 1;
@@ -37,10 +37,10 @@ describe('Committee', () => {
     let sumD: Group[] = [];
     let responsedMembers = [1];
     const plainVectors = [
-        [10000n, 10000n, 10000n].map((e) => e * BigInt(FUNDING_UNIT)),
-        [40000n, 30000n, 20000n].map((e) => e * BigInt(FUNDING_UNIT)),
+        [10000n, 10000n, 10000n].map((e) => e * BigInt(SECRET_UNIT)),
+        [40000n, 30000n, 20000n].map((e) => e * BigInt(SECRET_UNIT)),
     ];
-    let result = [50000n, 40000n, 30000n].map((e) => e * BigInt(FUNDING_UNIT));
+    let result = [50000n, 40000n, 30000n].map((e) => e * BigInt(SECRET_UNIT));
     let resultVector: Group[];
 
     beforeAll(async () => {

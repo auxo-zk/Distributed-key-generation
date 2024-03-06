@@ -4,7 +4,7 @@ interface Storage<
     RawLeaf,
     Level1MT extends MerkleTree,
     Level1Witness,
-    Level2MT extends MerkleTree | object,
+    Level2MT extends MerkleTree,
     Level2Witness
 > {
     get root(): Field;
