@@ -1,19 +1,15 @@
 import { Field, Mina, PublicKey, Group, Scalar } from 'o1js';
 import { compile, fetchZkAppState, proveAndSend } from '../../helper/deploy.js';
 import { prepare } from '../prepare.js';
-import { KeyStatusStorage } from '../../../contracts/DKGStorage.js';
-import { KeyCounterStorage } from '../../../contracts/CommitteeStorage.js';
-import {
-    RequestContract,
-    RequestInput,
-    CreateRequest,
-    RequestVector,
-} from '../../../contracts/Request.js';
+import { KeyStatusStorage } from '../../../storages/DKGStorage.js';
+import { KeyCounterStorage } from '../../../storages/CommitteeStorage.js';
+import { RequestContract, UpdateRequest } from '../../../contracts/Request.js';
 import {
     generateEncryptionWithRandomInput,
     accumulateEncryption,
     generateEncryption,
-} from '../../../libs/Requestor.js';
+    RequestVector,
+} from '../../../libs/Requester.js';
 import { Constants } from '../../../index.js';
 import axios from 'axios';
 
@@ -23,7 +19,7 @@ async function main() {
     const keyId = Field(0);
 
     // Compile programs
-    await compile(CreateRequest, cache);
+    await compile(UpdateRequest, cache);
     await compile(RequestContract, cache);
     const requestAddress =
         'B62qjujctknmNAsUHEiRhxttm6vZ9ipSd5nfWP8ijGgHHcRzMDRHDcu';
@@ -41,7 +37,7 @@ async function main() {
 
     // Create request value
     let publicKey: Group = PublicKey.fromBase58(key.publicKey).toGroup();
-    let MINA = BigInt(Constants.FUNDING_UNIT); // 0.01 MINA
+    let MINA = BigInt(Constants.SECRET_UNIT); // 0.01 MINA
 
     /**
      * r1 = 12, 15, 18
@@ -65,26 +61,26 @@ async function main() {
 
     let totalValue = accumulateEncryption(R, M);
 
-    let input: RequestInput = new RequestInput({
-        committeeId,
-        keyId,
-        R: RequestVector.from(totalValue.sumR),
-    });
+    // let input: RequestInput = new RequestInput({
+    //     committeeId,
+    //     keyId,
+    //     R: RequestVector.from(totalValue.sumR),
+    // });
 
     // Fetch state and state
     await fetchZkAppState(requestAddress);
 
-    let tx = await Mina.transaction(
-        {
-            sender: feePayer.key.publicKey,
-            fee: feePayer.fee,
-            nonce: feePayer.nonce++,
-        },
-        () => {
-            requestContract.request(input);
-        }
-    );
-    await proveAndSend(tx, feePayer.key, 'RequestContract', 'request');
+    // let tx = await Mina.transaction(
+    //     {
+    //         sender: feePayer.key.publicKey,
+    //         fee: feePayer.fee,
+    //         nonce: feePayer.nonce++,
+    //     },
+    //     () => {
+    //         requestContract.request(input);
+    //     }
+    // );
+    // await proveAndSend(tx, feePayer.key, 'RequestContract', 'request');
 }
 
 main()

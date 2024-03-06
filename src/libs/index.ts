@@ -1,5 +1,5 @@
 import * as Committee from './Committee.js';
 import * as Elgamal from './Elgamal.js';
-import * as Requestor from './Requestor.js';
+import * as Requester from './Requester.js';
 
-export { Committee, Elgamal, Requestor };
+export { Committee, Elgamal, Requester };

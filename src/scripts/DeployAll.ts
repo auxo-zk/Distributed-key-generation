@@ -2,65 +2,37 @@ import {
     AccountUpdate,
     Cache,
     Field,
-    Group,
     Mina,
     PrivateKey,
-    Provable,
     PublicKey,
     Reducer,
-    Scalar,
     SmartContract,
     fetchAccount,
-    MerkleMap,
-    Poseidon,
 } from 'o1js';
 import fs from 'fs/promises';
 import { getProfiler } from './helper/profiler.js';
 import { Config, Key } from './helper/config.js';
+import { CommitteeContract, RollupCommittee } from '../contracts/Committee.js';
+import { DkgContract, RollupDkg } from '../contracts/DKG.js';
 import {
-    CommitteeContract,
-    CreateCommittee,
-    CommitteeAction,
-} from '../contracts/Committee.js';
-import {
-    Action as DKGAction,
-    DKGContract,
-    UpdateKey,
-} from '../contracts/DKG.js';
-import {
-    Action as Round1Action,
     FinalizeRound1,
-    ReduceRound1,
+    RollupRound1,
     Round1Contract,
-    Round1Input,
 } from '../contracts/Round1.js';
 import {
-    Action as Round2Action,
     FinalizeRound2,
-    ReduceRound2,
+    RollupRound2,
     Round2Contract,
-    Round2Input,
 } from '../contracts/Round2.js';
 import {
-    Action as ResponseAction,
-    CompleteResponse,
-    ReduceResponse,
+    FinalizeResponse,
+    RollupResponse,
     ResponseContract,
-    ResponseInput,
 } from '../contracts/Response.js';
 import { BatchDecryption, BatchEncryption } from '../contracts/Encryption.js';
-import {
-    ActionStatus,
-    AddressStorage,
-    ReduceStorage,
-    getZkAppRef,
-} from '../contracts/SharedStorage.js';
+import { AddressStorage } from '../storages/SharedStorage.js';
 import { ZkAppEnum, Contract } from '../constants.js';
-import {
-    RequestContract,
-    CreateRequest,
-    ActionEnum as ReqeustACtionEnum,
-} from '../contracts/Request.js';
+import { RequestContract, UpdateRequest } from '../contracts/Request.js';
 
 function waitConfig(time: number): Promise<void> {
     console.log('Wait time...');
@@ -233,7 +205,7 @@ async function main() {
                         case Contract.COMMITTEE:
                             return new CommitteeContract(key.publicKey);
                         case Contract.DKG:
-                            return new DKGContract(key.publicKey);
+                            return new DkgContract(key.publicKey);
                         case Contract.ROUND1:
                             return new Round1Contract(key.publicKey);
                         case Contract.ROUND2:
@@ -255,7 +227,7 @@ async function main() {
             })
     );
 
-    // DKGContract storage
+    // DkgContract storage
     let dkgAddressStorage = new AddressStorage();
 
     // Round1Contract storage
@@ -270,25 +242,25 @@ async function main() {
     await fetchAllContract(contracts);
 
     if (true) {
-        await compile(UpdateKey, 'UpdateKey', profiling);
+        await compile(RollupDkg, 'RollupDkg', profiling);
 
-        await compile(ReduceRound1, 'ReduceRound1', profiling);
+        await compile(RollupRound1, 'RollupRound1', profiling);
         await compile(FinalizeRound1, 'FinalizeRound1', profiling);
 
-        await compile(ReduceRound2, 'ReduceRound2', profiling);
+        await compile(RollupRound2, 'RollupRound2', profiling);
         await compile(BatchEncryption, 'BatchEncryption', profiling);
         await compile(FinalizeRound2, 'FinalizeRound2', profiling);
 
-        await compile(ReduceResponse, 'ReduceResponse', profiling);
+        await compile(RollupResponse, 'RollupResponse', profiling);
         await compile(BatchDecryption, 'BatchDecryption', profiling);
-        await compile(CompleteResponse, 'CompleteResponse', profiling);
+        await compile(FinalizeResponse, 'FinalizeResponse', profiling);
 
-        await compile(CreateCommittee, 'CreateCommittee', profiling);
+        await compile(RollupCommittee, 'RollupCommittee', profiling);
 
-        await compile(CreateRequest, 'CreateRequest', profiling);
+        await compile(UpdateRequest, 'UpdateRequest', profiling);
 
         await compile(CommitteeContract, 'CommitteeContract', profiling);
-        await compile(DKGContract, 'DKGContract', profiling);
+        await compile(DkgContract, 'DkgContract', profiling);
         await compile(Round1Contract, 'Round1Contract', profiling);
         await compile(Round2Contract, 'Round2Contract', profiling);
         await compile(ResponseContract, 'ResponseContract', profiling);
@@ -328,7 +300,7 @@ async function main() {
     // Deploy dkg contract
     await deploy(
         feePayerKey,
-        'DKGContract',
+        'DkgContract',
         [['zkApps', dkgAddressStorage.root]],
         fee,
         ++feePayerNonce
@@ -413,9 +385,9 @@ async function main() {
         () => {
             AccountUpdate.fundNewAccount(feePayerKey.publicKey);
             requestContract.deploy();
-            requestContract.responeContractAddress.set(
-                contracts[Contract.REQUEST].contract.address
-            );
+            // requestContract.responseContractAddress.set(
+            //     contracts[Contract.REQUEST].contract.address
+            // );
             let feePayerAccount = AccountUpdate.createSigned(
                 feePayerKey.publicKey
             );

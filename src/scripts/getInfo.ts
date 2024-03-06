@@ -1,61 +1,56 @@
-import { CommitteeContract, CreateCommittee } from '../contracts/Committee.js';
-import { DKGContract, UpdateKey } from '../contracts/DKG.js';
+import { CommitteeContract, RollupCommittee } from '../contracts/Committee.js';
+import { DkgContract, RollupDkg } from '../contracts/DKG.js';
 import { BatchDecryption, BatchEncryption } from '../contracts/Encryption.js';
-import { CreateRequest, RequestContract } from '../contracts/Request.js';
 import {
-    CreateReduce,
-    RequestHelperContract,
-} from '../contracts/RequestHelper.js';
-import {
-    CompleteResponse,
-    ReduceResponse,
+    FinalizeResponse,
+    RollupResponse,
     ResponseContract,
 } from '../contracts/Response.js';
 import {
     FinalizeRound1,
-    ReduceRound1,
+    RollupRound1,
     Round1Contract,
 } from '../contracts/Round1.js';
 import {
     FinalizeRound2,
-    ReduceRound2,
+    RollupRound2,
     Round2Contract,
 } from '../contracts/Round2.js';
 
 const PROGRAMS = {
     BatchEncryption,
     BatchDecryption,
-    CreateCommittee,
-    UpdateKey,
-    ReduceRound1,
+    RollupCommittee,
+    RollupDkg,
+    RollupRound1,
     FinalizeRound1,
-    ReduceRound2,
+    RollupRound2,
     FinalizeRound2,
-    ReduceResponse,
-    CompleteResponse,
-    // CreateRequest,
+    RollupResponse,
+    FinalizeResponse,
+    // UpdateRequest,
     // CreateRollupStatus,
     // RollupActions,
 };
 
 const CONTRACTS = {
     CommitteeContract,
-    DKGContract,
+    DkgContract,
     Round1Contract,
     Round2Contract,
     ResponseContract,
     // RequestContract,
-    // RequestHelperContract,
+    // RequesterContract,
 };
 
 const DEPENDENCIES = {
-    CommitteeContract: [CreateCommittee],
-    DKGContract: [UpdateKey],
-    Round1Contract: [ReduceRound1, FinalizeRound1],
-    Round2Contract: [ReduceRound2, BatchEncryption, FinalizeRound2],
-    ResponseContract: [ReduceResponse, BatchDecryption, CompleteResponse],
+    CommitteeContract: [RollupCommittee],
+    DkgContract: [RollupDkg],
+    Round1Contract: [RollupRound1, FinalizeRound1],
+    Round2Contract: [RollupRound2, BatchEncryption, FinalizeRound2],
+    ResponseContract: [RollupResponse, BatchDecryption, FinalizeResponse],
     RequestContract: [],
-    RequestHelperContract: [],
+    RequesterContract: [],
 };
 
 async function query(constraints = true, cacheFiles = false) {

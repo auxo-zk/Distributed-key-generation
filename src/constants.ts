@@ -1,12 +1,17 @@
 /**
- * The unit value for the funding amount
+ * Unit value for the encrypted secret
  */
-export const FUNDING_UNIT = 1e7;
+export const SECRET_UNIT = 1e7;
 
 /**
- * The maximum value for the funding amount
+ * Maximum value for the encrypted secret
  */
-export const FUNDING_MAX = 1e12;
+export const SECRET_MAX = 1e12;
+
+/**
+ * Fee charged for each request
+ */
+export const REQUEST_FEE = 1e9;
 
 /**
  * Maximum amount of zkApp address in storage
@@ -24,6 +29,16 @@ export const COMMITTEE_MAX_SIZE = 3;
 export const REQUEST_MAX_SIZE = 5;
 
 /**
+ * Minimum value for a request's period ~ 10 blocks
+ */
+export const REQUEST_MIN_PERIOD = 30 * 60 * 1000;
+
+/**
+ * Maximum value for number of contracts sharing rollup
+ */
+export const ROLLUP_BATCH_MAX_SIZE = 8;
+
+/**
  * Maximum amount for each entity
  */
 export const INSTANCE_LIMITS = {
@@ -31,6 +46,11 @@ export const INSTANCE_LIMITS = {
     KEY: 2 ** 3,
     REQUEST: 2 ** 3,
 };
+
+/**
+ * Maximum amount of action processed in a recursive proof
+ */
+export const ACTION_PROCESS_LIMITS = 8;
 
 /**
  * The size of an index value in bits for packing indexes array
@@ -45,8 +65,29 @@ export enum ZkAppEnum {
     DKG,
     ROUND1,
     ROUND2,
-    RESPONSE,
     REQUEST,
+    RESPONSE,
+    ROLLUP,
+    __LENGTH,
+}
+
+export enum ZkProgramEnum {
+    RollupCommittee = 'RollupCommittee',
+    RollupDkg = 'RollupDkg',
+    RollupRound1 = 'RollupRound1',
+    RollupRound2 = 'RollupRound2',
+    RollupRequest = 'RollupRequest',
+    RollupRequester = 'RollupRequester',
+    RollupResponse = 'RollupResponse',
+    RollupMulti = 'RollupMulti',
+
+    UpdateKey = 'UpdateKey',
+    FinalizeRound1 = 'FinalizeRound1',
+    FinalizeRound2 = 'FinalizeRound2',
+    FinalizeResponse = 'FinalizeResponse',
+    AttachRequest = 'AttachRequest',
+    UpdateRequest = 'UpdateRequest',
+    AccumulateEncryption = 'AccumulateEncryption',
 }
 
 /**
@@ -59,4 +100,5 @@ export enum Contract {
     ROUND2 = 'round2',
     RESPONSE = 'response',
     REQUEST = 'request',
+    ROLLUP = 'rollup',
 }

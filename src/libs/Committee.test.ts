@@ -10,9 +10,9 @@ import {
     Reducer,
 } from 'o1js';
 import * as Committee from './Committee.js';
-import * as Requestor from './Requestor.js';
+import * as Requester from './Requester.js';
 import { Bit255 } from '@auxo-dev/auxo-libs';
-import { FUNDING_UNIT } from '../constants.js';
+import { SECRET_UNIT } from '../constants.js';
 
 describe('Committee', () => {
     let T = 1;
@@ -37,10 +37,10 @@ describe('Committee', () => {
     let sumD: Group[] = [];
     let responsedMembers = [1];
     const plainVectors = [
-        [10000n, 10000n, 10000n].map((e) => e * BigInt(FUNDING_UNIT)),
-        [40000n, 30000n, 20000n].map((e) => e * BigInt(FUNDING_UNIT)),
+        [10000n, 10000n, 10000n].map((e) => e * BigInt(SECRET_UNIT)),
+        [40000n, 30000n, 20000n].map((e) => e * BigInt(SECRET_UNIT)),
     ];
-    let result = [50000n, 40000n, 30000n].map((e) => e * BigInt(FUNDING_UNIT));
+    let result = [50000n, 40000n, 30000n].map((e) => e * BigInt(SECRET_UNIT));
     let resultVector: Group[];
 
     beforeAll(async () => {
@@ -83,7 +83,7 @@ describe('Committee', () => {
 
     it('Should accumulate encryption', async () => {
         for (let i = 0; i < plainVectors.length; i++) {
-            let encryptedVector = Requestor.generateEncryption(
+            let encryptedVector = Requester.generateEncryption(
                 Committee.calculatePublicKey(round1Contributions),
                 plainVectors[i]
             );
@@ -91,7 +91,7 @@ describe('Committee', () => {
             M.push(encryptedVector.M);
         }
 
-        let accumulatedEncryption = Requestor.accumulateEncryption(R, M);
+        let accumulatedEncryption = Requester.accumulateEncryption(R, M);
         sumR = accumulatedEncryption.sumR;
         sumM = accumulatedEncryption.sumM;
     });
@@ -124,7 +124,7 @@ describe('Committee', () => {
 
     it('Should calculate result vector', async () => {
         sumD = Committee.accumulateResponses(responsedMembers, D);
-        resultVector = Requestor.getResultVector(sumD, sumM);
+        resultVector = Requester.getResultVector(sumD, sumM);
 
         for (let i = 0; i < result.length; i++) {
             let point = Group.generator.scale(Scalar.from(result[i]));
@@ -134,7 +134,7 @@ describe('Committee', () => {
     });
 
     it('Should brute force raw result correctly', async () => {
-        let rawResult = Requestor.bruteForceResultVector(resultVector);
+        let rawResult = Requester.bruteForceResultVector(resultVector);
         for (let i = 0; i < result.length; i++) {
             expect(rawResult[i].toBigInt()).toEqual(result[i]);
         }

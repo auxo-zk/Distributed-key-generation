@@ -9,15 +9,15 @@
 // import {
 //   BatchEncryption,
 //   CommitteeContract,
-//   CreateCommittee,
-//   DKGContract,
+//   RollupCommittee,
+//   DkgContract,
 //   FinalizeRound1,
 //   FinalizeRound2,
-//   ReduceRound1,
+//   RollupRound1,
 //   Round1Contract,
 //   Round2Action,
 //   Round2Contract,
-//   UpdateKey,
+//   RollupDkg,
 // } from '../../../index.js';
 // import {
 //   Level1Witness as DKGLevel1Witness,
@@ -33,25 +33,25 @@
 // import axios from 'axios';
 // import {
 //   AddressWitness,
-//   ReduceWitness,
+//   ActionWitness,
 //   ZkAppRef,
 // } from '../../../contracts/SharedStorage.js';
 // import { ZkAppEnum } from '../../../constants.js';
-// import { ReduceRound2, Round2Input } from '../../../contracts/Round2.js';
+// import { RollupRound2, FinalizeRound2Input } from '../../../contracts/Round2.js';
 // import { EncryptionHashArray } from '../../../libs/Committee.js';
 
 // async function main() {
 //   const { cache, feePayer } = await prepare();
 
 //   // Compile programs
-//   await compile(CreateCommittee, cache);
+//   await compile(RollupCommittee, cache);
 //   await compile(CommitteeContract, cache);
-//   await compile(UpdateKey, cache);
-//   await compile(DKGContract, cache);
-//   await compile(ReduceRound1, cache);
+//   await compile(RollupDkg, cache);
+//   await compile(DkgContract, cache);
+//   await compile(RollupRound1, cache);
 //   await compile(FinalizeRound1, cache);
 //   await compile(Round1Contract, cache);
-//   await compile(ReduceRound2, cache);
+//   await compile(RollupRound2, cache);
 //   await compile(BatchEncryption, cache);
 //   await compile(FinalizeRound2, cache);
 //   await compile(Round2Contract, cache);
@@ -128,7 +128,7 @@
 //     [...Array(committee.numberOfMembers).keys()].map(() => Field(0))
 //   );
 //   let proof = await FinalizeRound2.firstStep(
-//     new Round2Input({
+//     new FinalizeRound2Input({
 //       previousActionState: Field(0),
 //       action: Round2Action.empty(),
 //     }),
@@ -170,7 +170,7 @@
 //     let action = actions[i];
 //     console.log('FinalizeRound2.nextStep...');
 //     proof = await FinalizeRound2.nextStep(
-//       new Round2Input({
+//       new FinalizeRound2Input({
 //         previousActionState:
 //           i == 0 ? Reducer.initialActionState : actionHashes[i - 1],
 //         action: action,
@@ -183,7 +183,7 @@
 //         }),
 //         Round2ContributionStorage.calculateLevel2Index(action.memberId)
 //       ),
-//       ReduceWitness.fromJSON(reduce[actionHashes[i].toString()])
+//       ActionWitness.fromJSON(reduce[actionHashes[i].toString()])
 //     );
 //     console.log('Done');
 

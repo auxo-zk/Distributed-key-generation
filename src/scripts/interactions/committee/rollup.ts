@@ -5,7 +5,7 @@ import { fetchActions, fetchZkAppState } from '../../helper/deploy.js';
 import {
     CommitteeAction,
     CommitteeContract,
-    CreateCommittee,
+    RollupCommittee,
 } from '../../../contracts/Committee.js';
 import axios from 'axios';
 import { MemberArray } from '../../../libs/Committee.js';
@@ -14,7 +14,7 @@ import {
     EMPTY_LEVEL_2_TREE,
     MemberStorage,
     SettingStorage,
-} from '../../../contracts/CommitteeStorage.js';
+} from '../../../storages/CommitteeStorage.js';
 import { COMMITTEE_MAX_SIZE } from '../../../constants.js';
 import { prepare } from '../prepare.js';
 
@@ -30,7 +30,7 @@ async function main() {
     const toState = undefined;
 
     // Compile programs
-    await compile(CreateCommittee, cache);
+    await compile(RollupCommittee, cache);
     await compile(CommitteeContract, cache);
     const committeeAddress = process.env.BERKELEY_COMMITTEE_ADDRESS as string;
     console.log('Committee address:', committeeAddress);
@@ -43,7 +43,7 @@ async function main() {
     const committeeState = {
         nextCommitteeId: Field(rawState[0]),
         committeeTreeRoot: Field(rawState[1]),
-        settingTreeRoot: Field(rawState[2]),
+        settingRoot: Field(rawState[2]),
         actionState: Field(rawState[3]),
     };
     Provable.log('Committee states:', committeeState);
@@ -106,11 +106,11 @@ async function main() {
     actions.map((e) => Provable.log(e));
 
     // Prepare proofs
-    console.log('CreateCommittee.firstStep...');
-    let proof = await CreateCommittee.firstStep(
+    console.log('RollupCommittee.firstStep...');
+    let proof = await RollupCommittee.firstStep(
         committeeState.actionState,
         committeeState.committeeTreeRoot,
-        committeeState.settingTreeRoot,
+        committeeState.settingRoot,
         committeeState.nextCommitteeId
     );
     console.log('Done');
@@ -119,7 +119,7 @@ async function main() {
 
     for (let i = 0; i < reduceActions.length; i++) {
         let action = reduceActions[i];
-        console.log(`${i} - CreateCommittee.nextStep...`);
+        console.log(`${i} - RollupCommittee.nextStep...`);
         let memberWitness = memberStorage.getLevel1Witness(
             MemberStorage.calculateLevel1Index(
                 Field(i).add(committeeState.nextCommitteeId)
@@ -131,7 +131,7 @@ async function main() {
             )
         );
 
-        proof = await CreateCommittee.nextStep(
+        proof = await RollupCommittee.nextStep(
             proof,
             new CommitteeAction(action),
             memberWitness,
@@ -174,15 +174,10 @@ async function main() {
             nonce: feePayer.nonce++,
         },
         () => {
-            committeeContract.rollupIncrements(proof);
+            committeeContract.rollup(proof);
         }
     );
-    await proveAndSend(
-        tx,
-        feePayer.key,
-        'CommitteeContract',
-        'rollupIncrements'
-    );
+    await proveAndSend(tx, feePayer.key, 'CommitteeContract', 'rollup');
 }
 
 main()

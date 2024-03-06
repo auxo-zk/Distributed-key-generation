@@ -1,45 +1,40 @@
 export * as Constants from './constants.js';
 export * as Libs from './libs/index.js';
-export * as Storage from './contracts/storages.js';
+export * as Storage from './storages/index.js';
 export * as ZkApp from './contracts/index.js';
 
 export {
     // Structs
-    CheckMemberInput,
-    CheckConfigInput,
-    CreateCommitteeOutput,
+    CommitteeMemberInput,
+    CommitteeConfigInput,
+    RollupCommitteeOutput,
 
     // Zk Programs & Proofs
-    CreateCommittee,
-    CommitteeProof,
+    RollupCommittee,
+    RollupCommitteeProof,
 
     // Smart Contract
     CommitteeContract,
 
     // Actions & Events
     CommitteeAction,
-    EventEnum as CommitteeEvents,
 } from './contracts/Committee.js';
 
 export {
     // Constants & Enums
     KeyStatus,
 
-    // Structs
-    UpdateKeyOutput,
-
     // Zk Programs
-    UpdateKey,
-    UpdateKeyProof,
+    RollupDkg,
+    RollupDkgProof,
 
     // Smart Contract
-    DKGContract,
+    DkgContract,
 
     // Actions & Events
     ActionMask as DKGActionMask,
     Action as DKGAction,
     ActionEnum as DKGActions,
-    EventEnum as DKGEvents,
 } from './contracts/DKG.js';
 
 export {
@@ -59,13 +54,12 @@ export {
 
 export {
     // Structs
-    ReduceOutput as ReduceRound1Output,
-    Round1Input as FinalizeRound1Input,
-    Round1Output as FinalizeRound1Output,
+    FinalizeRound1Input,
+    FinalizeRound1Output,
 
     // Zk Programs
-    ReduceRound1,
-    ReduceRound1Proof,
+    RollupRound1,
+    RollupRound1Proof,
     FinalizeRound1,
     FinalizeRound1Proof,
 
@@ -74,18 +68,16 @@ export {
 
     // Actions & Events
     Action as Round1Action,
-    EventEnum as Round1Events,
 } from './contracts/Round1.js';
 
 export {
     // Structs
-    ReduceOutput as ReduceRound2Output,
-    Round2Input as FinalizeRound2Input,
-    Round2Output as FinalizeRound2Output,
+    FinalizeRound2Input,
+    FinalizeRound2Output,
 
     // Zk Programs
-    ReduceRound2,
-    ReduceRound2Proof,
+    RollupRound2,
+    RollupRound2Proof,
     FinalizeRound2,
     FinalizeRound2Proof,
 
@@ -94,76 +86,66 @@ export {
 
     // Actions & Events
     Action as Round2Action,
-    EventEnum as Round2Events,
 } from './contracts/Round2.js';
 
 export {
     // Constants & Enums
-    RequestStatusEnum as RequestStatus,
+    RequestStatus,
 
     // Structs
-    RequestInput,
-    UnRequestInput,
-    ResolveInput,
-    RollupStateOutput as RollupRequestOutput,
+    UpdateRequestInput,
+    UpdateRequestOutput,
 
     // Zk Programs
-    CreateRequest,
-    RequestProof as CreateRequestProof,
+    UpdateRequest,
+    UpdateRequestProof,
 
     // Smart Contract
     RequestContract,
 
     // Actions & Events
     ActionMask as RequestActionMask,
-    createActionMask,
-    RequestAction,
+    Action as RequestAction,
     ActionEnum as RequestActions,
-    EventEnum as RequestEvents,
-    CreateRequestEvent,
 } from './contracts/Request.js';
 
 export {
     // Constants & Enums
-    ActionStatus as RequestHelperActionStatus,
 
     // Structs
-    CustomScalarArray,
-    RequestHelperInput,
-    ReduceOutput as ReduceRequestOutput,
-    RollupActionsOutput,
+    AttachRequestOutput,
+    AccumulateEncryptionInput,
+    AccumulateEncryptionOutput,
 
     // Zk Programs
-    CreateReduce,
-    CreateReduceProof,
-    CreateRollup,
-    CreateRollupProof,
+    AttachRequest,
+    AttachRequestProof,
+    AccumulateEncryption,
+    AccumulateEncryptionProof,
 
     // Smart Contract
-    RequestHelperContract,
+    RequesterContract,
 
     // Actions & Events
-    RequestHelperAction,
-} from './contracts/RequestHelper.js';
+    Action as RequesterAction,
+} from './contracts/Requester.js';
 
 export {
     // Structs
-    ReduceOutput as ReduceResponseOutput,
-    ResponseInput as CompleteResponseInput,
-    ResponseOutput as CompleteResponseOutput,
+    FinalizeResponseInput,
+    FinalizeResponseOutput,
 
     // Zk Programs
-    ReduceResponse,
-    ReduceResponseProof,
-    CompleteResponse,
-    CompleteResponseProof,
+    RollupResponse,
+    RollupResponseProof,
+    FinalizeResponse,
+    FinalizeResponseProof,
 
     // Smart Contract
     ResponseContract,
 
     // Actions & Events
     Action as ResponseAction,
-    EventEnum as ResponseEvents,
 } from './contracts/Response.js';
 
 export {
@@ -185,4 +167,4 @@ export {
     accumulateEncryption,
     getResultVector,
     bruteForceResultVector,
-} from './libs/Requestor.js';
+} from './libs/Requester.js';

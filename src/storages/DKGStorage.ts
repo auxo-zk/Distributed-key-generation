@@ -6,7 +6,7 @@ import {
     Poseidon,
     Struct,
 } from 'o1js';
-import { KeyStatus } from './DKG.js';
+import { KeyStatus } from '../contracts/DKG.js';
 import { Round1Contribution, Round2Contribution } from '../libs/Committee.js';
 import { COMMITTEE_MAX_SIZE, INSTANCE_LIMITS } from '../constants.js';
 
@@ -23,6 +23,10 @@ export class FullMTWitness extends Struct({
     level1: Level1Witness,
     level2: Level2Witness,
 }) {}
+
+export function calculateKeyIndex(committeeId: Field, keyId: Field): Field {
+    return Field.from(BigInt(INSTANCE_LIMITS.KEY)).mul(committeeId).add(keyId);
+}
 
 export abstract class DKGStorage<RawLeaf> {
     private _level1: Level1MT;

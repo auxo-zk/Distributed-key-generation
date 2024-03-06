@@ -28,14 +28,16 @@ export async function compile(
     cache?: Cache,
     logMemory?: boolean,
     profiler?: Profiler
-): Promise<void> {
+): Promise<any> {
+    let compiled;
     if (logMemory) logMemUsage();
     console.log(`Compiling ${prg.name}...`);
     if (profiler) profiler.start(`${prg.name}.compile`);
-    if (cache) await prg.compile({ cache });
-    else await prg.compile();
+    if (cache) compiled = await prg.compile({ cache });
+    else compiled = await prg.compile();
     if (profiler) profiler.stop();
     console.log('Compiling done!');
+    return compiled;
 }
 
 export type ContractList = {

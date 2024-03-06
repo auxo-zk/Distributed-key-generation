@@ -8,7 +8,7 @@ import * as Round2 from './Round2.js';
 import * as Response from './Response.js';
 
 import * as Request from './Request.js';
-import * as RequestHelper from './RequestHelper.js';
+import * as Requester from './Requester.js';
 
 export {
     Committee,
@@ -18,5 +18,5 @@ export {
     Round2,
     Response,
     Request,
-    RequestHelper,
+    Requester,
 };
