@@ -33,7 +33,7 @@
 // import axios from 'axios';
 // import {
 //   AddressWitness,
-//   ReduceWitness,
+//   ActionWitness,
 //   ZkAppRef,
 // } from '../../../contracts/SharedStorage.js';
 // import { ZkAppEnum } from '../../../constants.js';
@@ -183,7 +183,7 @@
 //         }),
 //         Round2ContributionStorage.calculateLevel2Index(action.memberId)
 //       ),
-//       ReduceWitness.fromJSON(reduce[actionHashes[i].toString()])
+//       ActionWitness.fromJSON(reduce[actionHashes[i].toString()])
 //     );
 //     console.log('Done');
 

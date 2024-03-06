@@ -41,20 +41,12 @@ import {
 } from './DKG.js';
 import { BatchEncryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
+import { COMMITTEE_MAX_SIZE, ZkAppEnum, ZkProgramEnum } from '../constants.js';
 import {
-    COMMITTEE_MAX_SIZE,
-    INSTANCE_LIMITS,
-    ZkAppEnum,
-    ZkProgramEnum,
-} from '../constants.js';
-import {
-    ActionStatus,
     ActionWitness,
     EMPTY_ACTION_MT,
     EMPTY_ADDRESS_MT,
-    EMPTY_REDUCE_MT,
     ProcessedActions,
-    ReduceWitness,
     verifyZkApp,
     ZkAppRef,
 } from '../storages/SharedStorage.js';

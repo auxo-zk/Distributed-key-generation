@@ -39,6 +39,7 @@ import {
     Rollup,
     processAction,
     rollup,
+    ZkAppAction,
 } from './Actions.js';
 
 export const enum KeyStatus {
@@ -74,11 +75,14 @@ export class ActionMask extends _ActionMask(ActionEnum.__LENGTH) {}
  * @function hash Return the action's hash to append in the action state hash chain
  * @function toFields Return the action in the form of Fields[]
  */
-export class Action extends Struct({
-    committeeId: Field,
-    keyId: Field,
-    mask: ActionMask,
-}) {
+export class Action
+    extends Struct({
+        committeeId: Field,
+        keyId: Field,
+        mask: ActionMask,
+    })
+    implements ZkAppAction
+{
     static empty(): Action {
         return new Action({
             committeeId: Field(0),

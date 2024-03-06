@@ -6,7 +6,6 @@ import {
     method,
     Group,
     Reducer,
-    MerkleMapWitness,
     Struct,
     SelfProof,
     Poseidon,
@@ -15,7 +14,6 @@ import {
     Void,
     Scalar,
     UInt64,
-    Gadgets,
     PublicKey,
 } from 'o1js';
 import { CustomScalar } from '@auxo-dev/auxo-libs';

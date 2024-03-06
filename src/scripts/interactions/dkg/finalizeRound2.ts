@@ -33,7 +33,7 @@ import {
 import axios from 'axios';
 import {
     AddressWitness,
-    ReduceWitness,
+    ActionWitness,
     ZkAppRef,
 } from '../../../storages/SharedStorage.js';
 import { ZkAppEnum } from '../../../constants.js';
@@ -316,7 +316,7 @@ async function main() {
                 }),
                 Round2ContributionStorage.calculateLevel2Index(action.memberId)
             ),
-            ReduceWitness.fromJSON(
+            ActionWitness.fromJSON(
                 reduce[currentHashes[Number(action.memberId)].toString()]
             )
         );

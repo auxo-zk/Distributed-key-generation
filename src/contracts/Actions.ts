@@ -1,28 +1,16 @@
-import {
-    Account,
-    AccountUpdate,
-    Bool,
-    Field,
-    Poseidon,
-    PublicKey,
-    Reducer,
-    SelfProof,
-    SmartContract,
-    State,
-    Struct,
-    ZkProgram,
-    method,
-    state,
-} from 'o1js';
+import { Bool, Field, SelfProof, Struct, ZkProgram } from 'o1js';
 import { buildAssertMessage, updateActionState } from '../libs/utils.js';
-import { ErrorEnum, EventEnum } from './constants.js';
+import { ErrorEnum } from './constants.js';
 import {
     ActionWitness,
-    EMPTY_ACTION_MT,
     ProcessStatus,
     RollupStatus,
 } from '../storages/SharedStorage.js';
 import { BoolDynamicArray } from '@auxo-dev/auxo-libs';
+
+export interface ZkAppAction {
+    hash(): Field;
+}
 
 export const ActionMask = (numActionTypes: number) => {
     return class _ActionMask extends BoolDynamicArray(numActionTypes) {

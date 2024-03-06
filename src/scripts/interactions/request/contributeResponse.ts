@@ -33,8 +33,8 @@ import {
     BatchDecryptionProof,
 } from '../../../index.js';
 import {
-    ActionStatus,
-    ReduceStorage,
+    RollupStatus,
+    ActionStorage,
 } from '../../../storages/SharedStorage.js';
 import { RArray } from '../../../libs/Requester.js';
 import { ZkAppRef } from '../../../storages/SharedStorage.js';

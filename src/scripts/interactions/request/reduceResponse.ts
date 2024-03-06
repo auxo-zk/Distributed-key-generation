@@ -23,8 +23,8 @@ import {
     Round2Contract,
 } from '../../../index.js';
 import {
-    ActionStatus,
-    ReduceStorage,
+    RollupStatus,
+    ActionStorage,
 } from '../../../storages/SharedStorage.js';
 
 async function main() {
@@ -51,7 +51,7 @@ async function main() {
     );
 
     // Fetch storage trees
-    const reduceStorage = new ReduceStorage();
+    const reduceStorage = new ActionStorage();
 
     // Fetch state and actions
     const rawState = (await fetchZkAppState(responseAddress)) || [];
@@ -82,8 +82,8 @@ async function main() {
         Provable.log(`Reduced Action ${i}:`, action);
         console.log('Adding to storage tree...');
         reduceStorage.updateLeaf(
-            ReduceStorage.calculateIndex(actionHashes[i]),
-            ReduceStorage.calculateLeaf(ActionStatus.REDUCED)
+            ActionStorage.calculateIndex(actionHashes[i]),
+            ActionStorage.calculateLeaf(RollupStatus.ROLLUPED)
         );
         console.log('Done');
     });
@@ -110,8 +110,8 @@ async function main() {
         console.log('Done');
 
         reduceStorage.updateLeaf(
-            ReduceStorage.calculateIndex(actionHashes[nextActionId + i]),
-            ReduceStorage.calculateLeaf(ActionStatus.REDUCED)
+            ActionStorage.calculateIndex(actionHashes[nextActionId + i]),
+            ActionStorage.calculateLeaf(RollupStatus.ROLLUPED)
         );
     }
 

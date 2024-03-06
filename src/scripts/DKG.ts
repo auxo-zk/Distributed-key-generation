@@ -63,9 +63,9 @@
 //     Round2ContributionStorage,
 // } from '../storages/DKGStorage.js';
 // import {
-//     ActionStatus,
+//     RollupStatus,
 //     AddressStorage,
-//     ReduceStorage,
+//     ActionStorage,
 // } from '../storages/SharedStorage.js';
 // import {
 //     EncryptionHashArray,
@@ -424,19 +424,19 @@
 //     let dkgAddressStorage = new AddressStorage();
 
 //     // Round1Contract storage
-//     let round1ReduceStorage = new ReduceStorage();
+//     let round1ActionStorage = new ActionStorage();
 //     let round1ContributionStorage = new Round1ContributionStorage();
 //     let publicKeyStorage = new PublicKeyStorage();
 //     let round1AddressStorage = new AddressStorage();
 
 //     // Round2Contract storage
-//     let round2ReduceStorage = new ReduceStorage();
+//     let round2ActionStorage = new ActionStorage();
 //     let round2ContributionStorage = new Round2ContributionStorage();
 //     let encryptionStorage = new EncryptionStorage();
 //     let round2AddressStorage = new AddressStorage();
 
 //     // Response storage
-//     let responseReduceStorage = new ReduceStorage();
+//     let responseActionStorage = new ActionStorage();
 //     let responseContributionStorage = new ResponseContributionStorage();
 //     let responseAddressStorage = new AddressStorage();
 
@@ -860,18 +860,18 @@
 //         // reduceProof = await RollupRound1.nextStep(
 //         //   action,
 //         //   reduceProof,
-//         //   round1ReduceStorage.getWitness(
+//         //   round1ActionStorage.getWitness(
 //         //     contracts[Contract.ROUND1].actionStates[i + 1]
 //         //   )
 //         // );
 //         if (profiling) DKGProfiler.stop();
 //         console.log('DONE!');
 
-//         round1ReduceStorage.updateLeaf(
-//             round1ReduceStorage.calculateIndex(
+//         round1ActionStorage.updateLeaf(
+//             round1ActionStorage.calculateIndex(
 //                 contracts[Contract.ROUND1].actionStates[i + 1]
 //             ),
-//             round1ReduceStorage.calculateLeaf(ActionStatus.REDUCED)
+//             round1ActionStorage.calculateLeaf(RollupStatus.ROLLUPED)
 //         );
 //     }
 
@@ -963,7 +963,7 @@
 //         //     }),
 //         //     PublicKeyStorage.calculateLevel2Index(Field(i))
 //         //   ),
-//         //   round1ReduceStorage.getWitness(
+//         //   round1ActionStorage.getWitness(
 //         //     contracts[Contract.ROUND1].actionStates[i + 1]
 //         //   )
 //         // );
@@ -1183,18 +1183,18 @@
 //         // reduceProof2 = await RollupRound2.nextStep(
 //         //   action,
 //         //   reduceProof2,
-//         //   round2ReduceStorage.getWitness(
+//         //   round2ActionStorage.getWitness(
 //         //     contracts[Contract.ROUND2].actionStates[i + 1]
 //         //   )
 //         // );
 //         if (profiling) DKGProfiler.stop();
 //         console.log('DONE!');
 
-//         round2ReduceStorage.updateLeaf(
-//             round2ReduceStorage.calculateIndex(
+//         round2ActionStorage.updateLeaf(
+//             round2ActionStorage.calculateIndex(
 //                 contracts[Contract.ROUND2].actionStates[i + 1]
 //             ),
-//             round2ReduceStorage.calculateLeaf(ActionStatus.REDUCED)
+//             round2ActionStorage.calculateLeaf(RollupStatus.ROLLUPED)
 //         );
 //     }
 
@@ -1276,8 +1276,8 @@
 //         //     }),
 //         //     Round2ContributionStorage.calculateLevel2Index(action.memberId)
 //         //   ),
-//         //   round2ReduceStorage.getWitness(
-//         //     round2ReduceStorage.calculateIndex(
+//         //   round2ActionStorage.getWitness(
+//         //     round2ActionStorage.calculateIndex(
 //         //       contracts[Contract.ROUND2].actionStates[i + 1]
 //         //     )
 //         //   )
@@ -1570,18 +1570,18 @@
 //         // reduceProof3 = await RollupResponse.nextStep(
 //         //   action,
 //         //   reduceProof3,
-//         //   responseReduceStorage.getWitness(
+//         //   responseActionStorage.getWitness(
 //         //     contracts[Contract.RESPONSE].actionStates[i + 1]
 //         //   )
 //         // );
 //         if (profiling) DKGProfiler.stop();
 //         console.log('DONE!');
 
-//         responseReduceStorage.updateLeaf(
-//             responseReduceStorage.calculateIndex(
+//         responseActionStorage.updateLeaf(
+//             responseActionStorage.calculateIndex(
 //                 contracts[Contract.RESPONSE].actionStates[i + 1]
 //             ),
-//             responseReduceStorage.calculateLeaf(ActionStatus.REDUCED)
+//             responseActionStorage.calculateLeaf(RollupStatus.ROLLUPED)
 //         );
 //     }
 
@@ -1645,8 +1645,8 @@
 //                     action.memberId
 //                 )
 //             ),
-//             responseReduceStorage.getWitness(
-//                 responseReduceStorage.calculateIndex(
+//             responseActionStorage.getWitness(
+//                 responseActionStorage.calculateIndex(
 //                     contracts[Contract.RESPONSE].actionStates[i + 1]
 //                 )
 //             )
