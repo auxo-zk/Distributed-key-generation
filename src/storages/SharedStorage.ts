@@ -198,7 +198,7 @@ export class ReduceStorage {
         return ReduceStorage.calculateIndex(actionState);
     }
 
-    getWitness(index: Field): MerkleMapWitness {
+    getWitness(index: Field): ActionWitness {
         return this._actionMap.getWitness(index);
     }
 
@@ -267,7 +267,7 @@ export class ActionStorage {
         return ActionStorage.calculateIndex(actionIndex);
     }
 
-    getWitness(index: Field): MerkleMapWitness {
+    getWitness(index: Field): ActionWitness {
         return this._actionMap.getWitness(index);
     }
 

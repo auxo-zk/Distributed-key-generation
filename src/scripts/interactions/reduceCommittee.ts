@@ -15,7 +15,7 @@
 //   EMPTY_LEVEL_2_TREE,
 //   MemberStorage,
 //   SettingStorage,
-// } from '../../contracts/CommitteeStorage.js';
+// } from '../../storages/CommitteeStorage.js';
 
 // async function main() {
 //   const cache = Cache.FileSystem('./caches');

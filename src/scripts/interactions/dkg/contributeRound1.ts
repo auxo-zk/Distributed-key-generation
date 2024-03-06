@@ -12,7 +12,7 @@ import {
     RollupCommittee,
     DkgContract,
     FinalizeRound1,
-    ReduceRound1,
+    RollupRound1,
     Round1Action,
     Round1Contract,
     Round1Contribution,
@@ -35,7 +35,7 @@ import {
     ReduceWitness,
     ZkAppRef,
 } from '../../../storages/SharedStorage.js';
-import { Round1Input } from '../../../contracts/Round1.js';
+import { FinalizeRound1Input } from '../../../contracts/Round1.js';
 import { ZkAppEnum } from '../../../constants.js';
 import { CArray } from '../../../libs/Committee.js';
 
@@ -47,7 +47,7 @@ async function main() {
     await compile(CommitteeContract, cache);
     await compile(RollupDkg, cache);
     await compile(DkgContract, cache);
-    await compile(ReduceRound1, cache);
+    await compile(RollupRound1, cache);
     await compile(FinalizeRound1, cache);
     await compile(Round1Contract, cache);
     const committeeAddress =
@@ -214,7 +214,7 @@ async function main() {
 
     console.log('FinalizeRound1.firstStep...');
     let proof = await FinalizeRound1.firstStep(
-        new Round1Input({
+        new FinalizeRound1Input({
             previousActionState: Field(0),
             action: Round1Action.empty(),
         }),
@@ -263,7 +263,7 @@ async function main() {
         Provable.log(action);
         console.log('FinalizeRound1.nextStep...');
         proof = await FinalizeRound1.nextStep(
-            new Round1Input({
+            new FinalizeRound1Input({
                 previousActionState: previousHashes[Number(action.memberId)],
                 action: action,
             }),

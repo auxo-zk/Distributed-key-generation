@@ -8,7 +8,7 @@ import {
     fetchEvents,
 } from 'o1js';
 
-import { RequestAction } from '../contracts/Request.js';
+import { Action as RequestAction } from '../contracts/Request.js';
 
 const BERKELEY_URL = 'https://api.minascan.io/node/berkeley/v1/graphql',
     ARCHIVE_URL = 'https://api.minascan.io/archive/berkeley/v1/graphql/';

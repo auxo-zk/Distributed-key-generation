@@ -19,12 +19,12 @@ import {
     BatchDecryption,
     BatchEncryption,
     FinalizeResponse,
-    CreateRequest,
+    UpdateRequest,
     FinalizeRound1,
     FinalizeRound2,
-    ReduceResponse,
-    ReduceRound1,
-    ReduceRound2,
+    RollupResponse,
+    RollupRound1,
+    RollupRound2,
     RequestContract,
     ResponseContract,
     Round1Contract,
@@ -113,16 +113,16 @@ async function main() {
     );
 
     // Compile programs
-    await compile(ReduceRound1, cache);
+    await compile(RollupRound1, cache);
     await compile(FinalizeRound1, cache);
     await compile(Round1Contract, cache);
-    await compile(ReduceRound2, cache);
+    await compile(RollupRound2, cache);
     await compile(BatchEncryption, cache);
     await compile(FinalizeRound2, cache);
     await compile(Round2Contract, cache);
-    await compile(CreateRequest, cache);
+    await compile(UpdateRequest, cache);
     await compile(RequestContract, cache);
-    await compile(ReduceResponse, cache);
+    await compile(RollupResponse, cache);
     await compile(BatchDecryption, cache);
     await compile(FinalizeResponse, cache);
     await compile(ResponseContract, cache);

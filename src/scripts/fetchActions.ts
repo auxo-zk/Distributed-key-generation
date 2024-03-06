@@ -1,13 +1,6 @@
-import {
-    PublicKey,
-    Mina,
-    PrivateKey,
-    Field,
-    fetchAccount,
-    Provable,
-} from 'o1js';
+import { PublicKey, Mina, Field, Provable } from 'o1js';
 
-import { RequestAction } from '../contracts/Request.js';
+import { Action as RequestAction } from '../contracts/Request.js';
 
 // const BERKELEY_URL = 'https://api.minascan.io/node/berkeley/v1/graphql',
 //   ARCHIVE_URL = 'https://api.minascan.io/archive/berkeley/v1/graphql/';

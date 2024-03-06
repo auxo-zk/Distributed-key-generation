@@ -10,12 +10,12 @@ import {
     BatchDecryption,
     BatchEncryption,
     FinalizeResponse,
-    CreateRequest,
+    UpdateRequest,
     FinalizeRound1,
     FinalizeRound2,
-    ReduceResponse,
-    ReduceRound1,
-    ReduceRound2,
+    RollupResponse,
+    RollupRound1,
+    RollupRound2,
     RequestContract,
     ResponseAction,
     ResponseContract,
@@ -31,16 +31,16 @@ async function main() {
     const { cache, feePayer } = await prepare();
 
     // Compile programs
-    await compile(ReduceRound1, cache);
+    await compile(RollupRound1, cache);
     await compile(FinalizeRound1, cache);
     await compile(Round1Contract, cache);
-    await compile(ReduceRound2, cache);
+    await compile(RollupRound2, cache);
     await compile(BatchEncryption, cache);
     await compile(FinalizeRound2, cache);
     await compile(Round2Contract, cache);
-    await compile(CreateRequest, cache);
+    await compile(UpdateRequest, cache);
     await compile(RequestContract, cache);
-    await compile(ReduceResponse, cache);
+    await compile(RollupResponse, cache);
     await compile(BatchDecryption, cache);
     await compile(FinalizeResponse, cache);
     await compile(ResponseContract, cache);
@@ -88,8 +88,8 @@ async function main() {
         console.log('Done');
     });
 
-    console.log('ReduceResponse.firstStep...');
-    let proof = await ReduceResponse.firstStep(
+    console.log('RollupResponse.firstStep...');
+    let proof = await RollupResponse.firstStep(
         ResponseAction.empty(),
         responseState.reduceState,
         nextActionId == 0
@@ -101,12 +101,12 @@ async function main() {
     for (let i = 0; i < notReducedActions.length; i++) {
         let action = notReducedActions[i];
         Provable.log(`Reducing Action ${nextActionId + i}:`, action);
-        console.log('ReduceResponse.nextStep...');
-        proof = await ReduceResponse.nextStep(
-            action,
-            proof,
-            reduceStorage.getWitness(actionHashes[nextActionId + i])
-        );
+        console.log('RollupResponse.nextStep...');
+        // proof = await RollupResponse.nextStep(
+        //     action,
+        //     proof,
+        //     reduceStorage.getWitness(actionHashes[nextActionId + i])
+        // );
         console.log('Done');
 
         reduceStorage.updateLeaf(
@@ -122,7 +122,7 @@ async function main() {
             nonce: feePayer.nonce++,
         },
         () => {
-            responseContract.reduce(proof);
+            responseContract.rollup(proof);
         }
     );
     await proveAndSend(tx, feePayer.key, 'ResponseContract', 'reduce');

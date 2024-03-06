@@ -13,7 +13,7 @@ import {
     DkgContract,
     FinalizeRound1,
     FinalizeRound2,
-    ReduceRound1,
+    RollupRound1,
     Round1Contract,
     Round2Action,
     Round2Contract,
@@ -37,7 +37,10 @@ import {
     ZkAppRef,
 } from '../../../storages/SharedStorage.js';
 import { ZkAppEnum } from '../../../constants.js';
-import { ReduceRound2, Round2Input } from '../../../contracts/Round2.js';
+import {
+    RollupRound2,
+    FinalizeRound2Input,
+} from '../../../contracts/Round2.js';
 import {
     EncryptionHashArray,
     Round2Contribution,
@@ -54,10 +57,10 @@ async function main() {
     await compile(CommitteeContract, cache);
     await compile(RollupDkg, cache);
     await compile(DkgContract, cache);
-    await compile(ReduceRound1, cache);
+    await compile(RollupRound1, cache);
     await compile(FinalizeRound1, cache);
     await compile(Round1Contract, cache);
-    await compile(ReduceRound2, cache);
+    await compile(RollupRound2, cache);
     await compile(BatchEncryption, cache);
     await compile(FinalizeRound2, cache);
     await compile(Round2Contract, cache);
@@ -259,7 +262,7 @@ async function main() {
         [...Array(committee.numberOfMembers).keys()].map(() => Field(0))
     );
     let proof = await FinalizeRound2.firstStep(
-        new Round2Input({
+        new FinalizeRound2Input({
             previousActionState: Field(0),
             action: Round2Action.empty(),
         }),
@@ -301,7 +304,7 @@ async function main() {
         let action = orderedActions[i];
         console.log('FinalizeRound2.nextStep...');
         proof = await FinalizeRound2.nextStep(
-            new Round2Input({
+            new FinalizeRound2Input({
                 previousActionState: previousHashes[Number(action.memberId)],
                 action: action,
             }),

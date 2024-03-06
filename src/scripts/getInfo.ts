@@ -28,7 +28,7 @@ const PROGRAMS = {
     FinalizeRound2,
     RollupResponse,
     FinalizeResponse,
-    // CreateRequest,
+    // UpdateRequest,
     // CreateRollupStatus,
     // RollupActions,
 };
