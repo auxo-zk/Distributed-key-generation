@@ -9,13 +9,13 @@ import { prepare } from '../prepare.js';
 import {
     BatchDecryption,
     BatchEncryption,
-    CompleteResponse,
-    CreateRequest,
+    FinalizeResponse,
+    UpdateRequest,
     FinalizeRound1,
     FinalizeRound2,
-    ReduceResponse,
-    ReduceRound1,
-    ReduceRound2,
+    RollupResponse,
+    RollupRound1,
+    RollupRound2,
     RequestContract,
     ResponseAction,
     ResponseContract,
@@ -23,26 +23,26 @@ import {
     Round2Contract,
 } from '../../../index.js';
 import {
-    ActionStatus,
-    ReduceStorage,
-} from '../../../contracts/SharedStorage.js';
+    RollupStatus,
+    ActionStorage,
+} from '../../../storages/SharedStorage.js';
 
 async function main() {
     const { cache, feePayer } = await prepare();
 
     // Compile programs
-    await compile(ReduceRound1, cache);
+    await compile(RollupRound1, cache);
     await compile(FinalizeRound1, cache);
     await compile(Round1Contract, cache);
-    await compile(ReduceRound2, cache);
+    await compile(RollupRound2, cache);
     await compile(BatchEncryption, cache);
     await compile(FinalizeRound2, cache);
     await compile(Round2Contract, cache);
-    await compile(CreateRequest, cache);
+    await compile(UpdateRequest, cache);
     await compile(RequestContract, cache);
-    await compile(ReduceResponse, cache);
+    await compile(RollupResponse, cache);
     await compile(BatchDecryption, cache);
-    await compile(CompleteResponse, cache);
+    await compile(FinalizeResponse, cache);
     await compile(ResponseContract, cache);
     const responseAddress =
         'B62qoGfSCnimss8Cnt56BMDGUFmiBW4oiD28WfgHG5TuEHjkyv8QAdU';
@@ -51,7 +51,7 @@ async function main() {
     );
 
     // Fetch storage trees
-    const reduceStorage = new ReduceStorage();
+    const reduceStorage = new ActionStorage();
 
     // Fetch state and actions
     const rawState = (await fetchZkAppState(responseAddress)) || [];
@@ -82,14 +82,14 @@ async function main() {
         Provable.log(`Reduced Action ${i}:`, action);
         console.log('Adding to storage tree...');
         reduceStorage.updateLeaf(
-            ReduceStorage.calculateIndex(actionHashes[i]),
-            ReduceStorage.calculateLeaf(ActionStatus.REDUCED)
+            ActionStorage.calculateIndex(actionHashes[i]),
+            ActionStorage.calculateLeaf(RollupStatus.ROLLUPED)
         );
         console.log('Done');
     });
 
-    console.log('ReduceResponse.firstStep...');
-    let proof = await ReduceResponse.firstStep(
+    console.log('RollupResponse.firstStep...');
+    let proof = await RollupResponse.firstStep(
         ResponseAction.empty(),
         responseState.reduceState,
         nextActionId == 0
@@ -101,17 +101,17 @@ async function main() {
     for (let i = 0; i < notReducedActions.length; i++) {
         let action = notReducedActions[i];
         Provable.log(`Reducing Action ${nextActionId + i}:`, action);
-        console.log('ReduceResponse.nextStep...');
-        proof = await ReduceResponse.nextStep(
-            action,
-            proof,
-            reduceStorage.getWitness(actionHashes[nextActionId + i])
-        );
+        console.log('RollupResponse.nextStep...');
+        // proof = await RollupResponse.nextStep(
+        //     action,
+        //     proof,
+        //     reduceStorage.getWitness(actionHashes[nextActionId + i])
+        // );
         console.log('Done');
 
         reduceStorage.updateLeaf(
-            ReduceStorage.calculateIndex(actionHashes[nextActionId + i]),
-            ReduceStorage.calculateLeaf(ActionStatus.REDUCED)
+            ActionStorage.calculateIndex(actionHashes[nextActionId + i]),
+            ActionStorage.calculateLeaf(RollupStatus.ROLLUPED)
         );
     }
 
@@ -122,7 +122,7 @@ async function main() {
             nonce: feePayer.nonce++,
         },
         () => {
-            responseContract.reduce(proof);
+            responseContract.rollup(proof);
         }
     );
     await proveAndSend(tx, feePayer.key, 'ResponseContract', 'reduce');

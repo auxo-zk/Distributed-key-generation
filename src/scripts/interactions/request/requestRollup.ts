@@ -5,12 +5,12 @@ import {
     RequestStatusStorage,
     RequesterStorage,
     Level1Witness,
-} from '../../../contracts/RequestStorage.js';
+} from '../../../storages/RequestStorage.js';
 import {
     RequestContract,
-    RequestAction,
-    CreateRequest,
-    RequestStatusEnum,
+    Action as RequestAction,
+    UpdateRequest,
+    RequestStatus,
 } from '../../../contracts/Request.js';
 import axios from 'axios';
 import { prepare } from '../prepare.js';
@@ -19,7 +19,7 @@ async function main() {
     const { cache, feePayer } = await prepare();
 
     // Compile programs
-    await compile(CreateRequest, cache);
+    await compile(UpdateRequest, cache);
     await compile(RequestContract, cache);
     const requestAddress =
         'B62qjujctknmNAsUHEiRhxttm6vZ9ipSd5nfWP8ijGgHHcRzMDRHDcu';
@@ -82,55 +82,55 @@ async function main() {
         return RequestAction.fromFields(action);
     });
 
-    console.log('CreateRequest.firstStep...');
-    let proof = await CreateRequest.firstStep(
-        committeeState.actionState,
-        committeeState.requestStatusRoot,
-        committeeState.requesterRoot
-    );
+    // console.log('UpdateRequest.firstStep...');
+    // let proof = await UpdateRequest.firstStep(
+    //     committeeState.actionState,
+    //     committeeState.requestStatusRoot,
+    //     committeeState.requesterRoot
+    // );
 
-    const reduceActions = actions;
+    // const reduceActions = actions;
 
-    for (let i = 0; i < reduceActions.length; i++) {
-        let action = reduceActions[i];
-        console.log(`${i} - CreateRequest.nextStep...`);
+    // for (let i = 0; i < reduceActions.length; i++) {
+    //     let action = reduceActions[i];
+    //     console.log(`${i} - UpdateRequest.nextStep...`);
 
-        proof = await CreateRequest.nextStep(
-            proof,
-            action,
-            requestStatusStorage.getWitness(action.requestId),
-            requesterStorage.getWitness(action.requestId),
-            action.newRequester
-        );
-        console.log('Done');
+    //     proof = await UpdateRequest.nextStep(
+    //         proof,
+    //         action,
+    //         requestStatusStorage.getWitness(action.requestId),
+    //         requesterStorage.getWitness(action.requestId),
+    //         action.newRequester
+    //     );
+    //     console.log('Done');
 
-        ////// update local state:
-        requesterStorage.updateLeaf(
-            { level1Index: action.requestId },
-            requesterStorage.calculateLeaf(action.newRequester)
-        );
+    //     ////// update local state:
+    //     requesterStorage.updateLeaf(
+    //         { level1Index: action.requestId },
+    //         requesterStorage.calculateLeaf(action.newRequester)
+    //     );
 
-        // turn to request state
-        requestStatusStorage.updateLeaf(
-            { level1Index: action.requestId },
-            requestStatusStorage.calculateLeaf(
-                Field(RequestStatusEnum.REQUESTING)
-            )
-        );
-    }
+    //     // turn to request state
+    //     requestStatusStorage.updateLeaf(
+    //         { level1Index: action.requestId },
+    //         requestStatusStorage.calculateLeaf(
+    //             Field(RequestStatusEnum.REQUESTING)
+    //         )
+    //     );
+    // }
 
-    console.log('requestContract.rollupRequest: ');
-    let tx = await Mina.transaction(
-        {
-            sender: feePayer.key.publicKey,
-            fee: feePayer.fee,
-            nonce: feePayer.nonce++,
-        },
-        () => {
-            requestContract.rollupRequest(proof);
-        }
-    );
-    await proveAndSend(tx, feePayer.key, 'RequestContract', 'rollupRequest');
+    // console.log('requestContract.rollupRequest: ');
+    // let tx = await Mina.transaction(
+    //     {
+    //         sender: feePayer.key.publicKey,
+    //         fee: feePayer.fee,
+    //         nonce: feePayer.nonce++,
+    //     },
+    //     () => {
+    //         requestContract.rollup(proof);
+    //     }
+    // );
+    // await proveAndSend(tx, feePayer.key, 'RequestContract', 'rollupRequest');
 }
 
 main()

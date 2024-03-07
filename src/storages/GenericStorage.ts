@@ -1,23 +1,22 @@
-import { Field } from 'o1js';
+import { Field, MerkleTree } from 'o1js';
 
 interface Storage<
-    RawLeaf extends object,
-    Level1MT extends object,
-    Level1Witness extends object,
-    Level2MT extends object,
-    Level2Witness extends object
+    RawLeaf,
+    Level1MT extends MerkleTree,
+    Level1Witness,
+    Level2MT extends MerkleTree,
+    Level2Witness
 > {
-    level1: Level1MT;
-    level2s: { [key: string]: Level2MT };
-    leafs: { [key: string]: { raw: RawLeaf | undefined; leaf: Field } };
+    get root(): Field;
+    get level1(): Level1MT;
+    get level2s(): { [key: string]: Level2MT };
+    get leafs(): { [key: string]: { raw: RawLeaf | undefined; leaf: Field } };
 
     calculateLeaf(args: RawLeaf): Field;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     calculateLevel1Index(args: any): Field;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     calculateLevel2Index?(args: any): Field;
-    getLeafs(): Field[];
-    getRawLeafs(): (RawLeaf | undefined)[];
     getLevel1Witness(level1Index: Field): Level1Witness;
     getLevel2Witness?(level1Index: Field, level2Index: Field): Level2Witness;
     updateInternal?(level1Index: Field, level2: Level2MT): void;
@@ -37,74 +36,77 @@ interface Storage<
     ): void;
 }
 
-// type Witness = {
-//   isLeft: boolean;
-//   sibling: Field;
-// }[];
-
-// declare class MerkleTreeWitness extends CircuitValue {
-//   static height: number;
-//   path: Field[];
-//   isLeft: Bool[];
-//   height(): number;
-//   constructor(witness: Witness);
-//   calculateRoot(leaf: Field): Field;
-//   calculateIndex(): Field;
-// }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare type RawLeaf = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare type Level1MT = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare type Level2MT = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare type Level1Witness = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare type Level2Witness = any;
-declare type FullMTWitness = {
-    level1: Level1Witness;
-    leve2: Level2Witness;
-};
-
 export abstract class GenericStorage<
-    _RawLeaf extends object,
-    _Level1MT extends object,
-    _Level1Witness extends object,
-    _Level2MT extends object,
-    _Level2Witness extends object
+    RawLeaf,
+    Level1MT extends MerkleTree,
+    Level1MTWitness,
+    Level2MT extends MerkleTree,
+    Level2Witness
 > implements
-        Storage<_RawLeaf, _Level1MT, _Level1Witness, _Level2MT, _Level2Witness>
+        Storage<RawLeaf, Level1MT, Level1MTWitness, Level2MT, Level2Witness>
 {
     EMPTY_LEVEL_1_TREE?(): Level1MT;
     EMPTY_LEVEL_2_TREE?(): Level2MT;
-    level1: Level1MT;
-    level2s: { [key: string]: Level2MT };
-    leafs: { [key: string]: { raw: RawLeaf | undefined; leaf: Field } };
+    private _level1: Level1MT;
+    private _level2s: { [key: string]: Level2MT };
+    private _leafs: {
+        [key: string]: { raw: RawLeaf | undefined; leaf: Field };
+    };
 
     constructor(
         emptyLevel1Tree: () => Level1MT,
         emptyLevel2Tree?: () => Level2MT,
-        leafs?: { level1Index: Field; level2Index?: Field; rawLeaf: RawLeaf }[]
+        leafs?: {
+            level1Index: Field;
+            level2Index?: Field;
+            leaf: RawLeaf | Field;
+            isRaw: boolean;
+        }[]
     ) {
         this.EMPTY_LEVEL_1_TREE = emptyLevel1Tree;
-        this.level1 = this.EMPTY_LEVEL_1_TREE();
-        this.level2s = {};
-        this.leafs = {};
+        this._level1 = this.EMPTY_LEVEL_1_TREE();
+        this._level2s = {};
+        this._leafs = {};
         if (emptyLevel2Tree) {
             this.EMPTY_LEVEL_2_TREE = emptyLevel2Tree;
             if (leafs) {
                 for (let i = 0; i < leafs.length; i++) {
-                    this.updateRawLeaf(
-                        {
-                            level1Index: leafs[i].level1Index,
-                            level2Index: leafs[i].level2Index,
-                        },
-                        leafs[i].rawLeaf
-                    );
+                    if (leafs[i].isRaw) {
+                        this.updateRawLeaf(
+                            {
+                                level1Index: leafs[i].level1Index,
+                                level2Index: leafs[i].level2Index,
+                            },
+                            leafs[i].leaf as RawLeaf
+                        );
+                    } else {
+                        this.updateLeaf(
+                            {
+                                level1Index: leafs[i].level1Index,
+                                level2Index: leafs[i].level2Index,
+                            },
+                            leafs[i].leaf as Field
+                        );
+                    }
                 }
             }
         }
+    }
+
+    get root(): Field {
+        return this._level1.getRoot();
+    }
+
+    get level1(): Level1MT {
+        return this._level1;
+    }
+
+    get level2s(): { [key: string]: Level2MT } {
+        return this._level2s;
+    }
+
+    get leafs(): { [key: string]: { raw: RawLeaf | undefined; leaf: Field } } {
+        return this._leafs;
     }
 
     abstract calculateLeaf(args: RawLeaf): Field;
@@ -113,12 +115,14 @@ export abstract class GenericStorage<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     calculateLevel2Index?(args: any): Field;
 
-    getLevel1Witness(level1Index: Field): Level1Witness {
-        return this.level1.getWitness(level1Index.toBigInt()) as Level1Witness;
+    getLevel1Witness(level1Index: Field): Level1MTWitness {
+        return this._level1.getWitness(
+            level1Index.toBigInt()
+        ) as Level1MTWitness;
     }
 
     getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
-        let level2 = this.level2s[level1Index.toString()];
+        let level2 = this._level2s[level1Index.toString()];
         if (!this.EMPTY_LEVEL_2_TREE)
             throw new Error('This storage does not support Level2MT');
         if (level2 === undefined)
@@ -129,7 +133,12 @@ export abstract class GenericStorage<
     getWitness(
         level1Index: Field,
         level2Index?: Field
-    ): Level1Witness | FullMTWitness {
+    ):
+        | Level1MTWitness
+        | {
+              level1: Level1MTWitness;
+              level2: Level2Witness;
+          } {
         if (level2Index) {
             return {
                 level1: this.getLevel1Witness(level1Index),
@@ -140,19 +149,11 @@ export abstract class GenericStorage<
         }
     }
 
-    getLeafs(): Field[] {
-        return Object.values(this.leafs).map((e) => e.leaf);
-    }
-
-    getRawLeafs(): (RawLeaf | undefined)[] {
-        return Object.values(this.leafs).map((e) => e.raw);
-    }
-
     updateInternal(level1Index: Field, level2: Level2MT) {
-        Object.assign(this.level2s, {
+        Object.assign(this._level2s, {
             [level1Index.toString()]: level2,
         });
-        this.level1.setLeaf(level1Index.toBigInt(), level2.getRoot());
+        this._level1.setLeaf(level1Index.toBigInt(), level2.getRoot());
     }
 
     updateLeaf(
@@ -166,16 +167,16 @@ export abstract class GenericStorage<
         if (level2Index) {
             if (this.EMPTY_LEVEL_2_TREE) {
                 leafId += '-' + level2Index.toString();
-                let level2 = this.level2s[level1Index.toString()];
+                let level2 = this._level2s[level1Index.toString()];
                 if (level2 === undefined) level2 = this.EMPTY_LEVEL_2_TREE();
                 level2.setLeaf(level2Index.toBigInt(), leaf);
                 this.updateInternal(level1Index, level2);
             } else {
                 throw new Error('This storage does not support Level2MT');
             }
-        } else this.level1.setLeaf(level1Index.toBigInt(), leaf);
+        } else this._level1.setLeaf(level1Index.toBigInt(), leaf);
 
-        this.leafs[leafId] = {
+        this._leafs[leafId] = {
             raw: undefined,
             leaf: leaf,
         };
@@ -193,7 +194,7 @@ export abstract class GenericStorage<
         if (level2Index) {
             if (this.EMPTY_LEVEL_2_TREE) {
                 leafId += '-' + level2Index.toString();
-                let level2 = this.level2s[level1Index.toString()];
+                let level2 = this._level2s[level1Index.toString()];
                 if (level2 === undefined) level2 = this.EMPTY_LEVEL_2_TREE();
 
                 level2.setLeaf(level2Index.toBigInt(), leaf);
@@ -201,9 +202,9 @@ export abstract class GenericStorage<
             } else {
                 throw new Error('This storage does not support Level2MT');
             }
-        } else this.level1.setLeaf(level1Index.toBigInt(), leaf);
+        } else this._level1.setLeaf(level1Index.toBigInt(), leaf);
 
-        this.leafs[leafId] = {
+        this._leafs[leafId] = {
             raw: rawLeaf,
             leaf: leaf,
         };

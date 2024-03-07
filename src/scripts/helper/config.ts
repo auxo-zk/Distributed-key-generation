@@ -8,8 +8,8 @@ export type Config = {
             url: string;
             keyPath: string;
             fee: string;
-            feepayerKeyPath: string;
-            feepayerAlias: string;
+            feePayerKeyPath: string;
+            feePayerAlias: string;
         }
     >;
 };

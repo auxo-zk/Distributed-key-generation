@@ -9,14 +9,14 @@ import {
 import { prepare } from '../prepare.js';
 import {
     CommitteeContract,
-    CreateCommittee,
-    DKGContract,
+    RollupCommittee,
+    DkgContract,
     FinalizeRound1,
-    ReduceRound1,
+    RollupRound1,
     Round1Action,
     Round1Contract,
     Round1Contribution,
-    UpdateKey,
+    RollupDkg,
 } from '../../../index.js';
 import {
     Level1Witness as DKGLevel1Witness,
@@ -24,18 +24,18 @@ import {
     PublicKeyStorage,
     Round1ContributionStorage,
     EMPTY_LEVEL_2_TREE,
-} from '../../../contracts/DKGStorage.js';
+} from '../../../storages/DKGStorage.js';
 import {
     Level1Witness as CommitteeLevel1Witness,
     SettingStorage,
-} from '../../../contracts/CommitteeStorage.js';
+} from '../../../storages/CommitteeStorage.js';
 import axios from 'axios';
 import {
     AddressWitness,
-    ReduceWitness,
+    ActionWitness,
     ZkAppRef,
-} from '../../../contracts/SharedStorage.js';
-import { Round1Input } from '../../../contracts/Round1.js';
+} from '../../../storages/SharedStorage.js';
+import { FinalizeRound1Input } from '../../../contracts/Round1.js';
 import { ZkAppEnum } from '../../../constants.js';
 import { CArray } from '../../../libs/Committee.js';
 
@@ -43,11 +43,11 @@ async function main() {
     const { cache, feePayer } = await prepare();
 
     // Compile programs
-    await compile(CreateCommittee, cache);
+    await compile(RollupCommittee, cache);
     await compile(CommitteeContract, cache);
-    await compile(UpdateKey, cache);
-    await compile(DKGContract, cache);
-    await compile(ReduceRound1, cache);
+    await compile(RollupDkg, cache);
+    await compile(DkgContract, cache);
+    await compile(RollupRound1, cache);
     await compile(FinalizeRound1, cache);
     await compile(Round1Contract, cache);
     const committeeAddress =
@@ -214,7 +214,7 @@ async function main() {
 
     console.log('FinalizeRound1.firstStep...');
     let proof = await FinalizeRound1.firstStep(
-        new Round1Input({
+        new FinalizeRound1Input({
             previousActionState: Field(0),
             action: Round1Action.empty(),
         }),
@@ -263,7 +263,7 @@ async function main() {
         Provable.log(action);
         console.log('FinalizeRound1.nextStep...');
         proof = await FinalizeRound1.nextStep(
-            new Round1Input({
+            new FinalizeRound1Input({
                 previousActionState: previousHashes[Number(action.memberId)],
                 action: action,
             }),
@@ -282,7 +282,7 @@ async function main() {
                 }),
                 PublicKeyStorage.calculateLevel2Index(action.memberId)
             ),
-            ReduceWitness.fromJSON(
+            ActionWitness.fromJSON(
                 reduce[currentHashes[Number(action.memberId)].toString()]
             )
         );

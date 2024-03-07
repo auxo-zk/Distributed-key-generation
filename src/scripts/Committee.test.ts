@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
     Field,
     Reducer,
@@ -16,9 +17,9 @@ import randomAccounts from './helper/randomAccounts.js';
 import {
     CommitteeContract,
     CommitteeAction,
-    CreateCommittee,
-    CheckMemberInput,
-    CreateCommitteeOutput,
+    RollupCommittee,
+    CommitteeMemberInput,
+    RollupCommitteeOutput,
 } from '../contracts/Committee.js';
 import { IPFSHash } from '@auxo-dev/auxo-libs';
 import { MemberArray } from '../libs/Committee.js';
@@ -26,7 +27,7 @@ import {
     EMPTY_LEVEL_2_TREE,
     MemberStorage,
     SettingStorage,
-} from '../contracts/CommitteeStorage.js';
+} from '../storages/CommitteeStorage.js';
 
 describe('Committee', () => {
     const doProofs = false;
@@ -44,7 +45,7 @@ describe('Committee', () => {
     let feePayerKey: PrivateKey;
     let feePayer: PublicKey;
     let committeeContract: CommitteeContract;
-    let proof: Proof<Void, CreateCommitteeOutput>;
+    let proof: Proof<Void, RollupCommitteeOutput>;
     let myMemberArray1: MemberArray;
     let threshold1 = Field(1);
     let threshold2 = Field(2);
@@ -63,7 +64,7 @@ describe('Committee', () => {
         if (doProofs) {
             await CommitteeContract.compile();
         } else {
-            // CreateCommittee.analyzeMethods();
+            // RollupCommittee.analyzeMethods();
             CommitteeContract.analyzeMethods();
         }
 
@@ -78,10 +79,10 @@ describe('Committee', () => {
 
     it('compile proof', async () => {
         // compile proof
-        await CreateCommittee.compile();
+        await RollupCommittee.compile();
     });
 
-    xit('Create commitee consist of 2 people with threshhold 1, and test deploy DKG', async () => {
+    it('Create committee consist of 2 people with threshold 1, and test deploy DKG', async () => {
         let arrayAddress = [];
         arrayAddress.push(addresses.p1, addresses.p2);
         myMemberArray1 = new MemberArray(arrayAddress);
@@ -99,7 +100,7 @@ describe('Committee', () => {
         await tx.sign([feePayerKey]).send();
     });
 
-    xit('Create commitee consist of 3 people with threshhold 2', async () => {
+    it('Create committee consist of 3 people with threshold 2', async () => {
         let arrayAddress = [];
         arrayAddress.push(addresses.p3, addresses.p4, addresses.p5);
         myMemberArray2 = new MemberArray(arrayAddress);
@@ -117,9 +118,9 @@ describe('Committee', () => {
         await tx.sign([feePayerKey]).send();
     });
 
-    xit('create proof first step...', async () => {
+    it('create proof first step...', async () => {
         // create first step proof
-        proof = await CreateCommittee.firstStep(
+        proof = await RollupCommittee.firstStep(
             Reducer.initialActionState,
             memberStorage.root,
             settingStorage.root,
@@ -132,7 +133,7 @@ describe('Committee', () => {
     });
 
     xit('create proof next step 1...', async () => {
-        proof = await CreateCommittee.nextStep(
+        proof = await RollupCommittee.nextStep(
             proof,
             new CommitteeAction({
                 addresses: myMemberArray1,
@@ -147,9 +148,7 @@ describe('Committee', () => {
             Reducer.initialActionState
         );
 
-        ////// udpate data to local
-
-        // memberMerkleTree.set
+        // Update data to local
         tree1 = EMPTY_LEVEL_2_TREE();
         for (let i = 0; i < Number(myMemberArray1.length); i++) {
             tree1.setLeaf(
@@ -166,7 +165,7 @@ describe('Committee', () => {
     });
 
     xit('create proof next step 2...', async () => {
-        proof = await CreateCommittee.nextStep(
+        proof = await RollupCommittee.nextStep(
             proof,
             new CommitteeAction({
                 addresses: myMemberArray2,
@@ -180,9 +179,8 @@ describe('Committee', () => {
         expect(proof.publicOutput.initialActionState).toEqual(
             Reducer.initialActionState
         );
-        ////// udpate data to local
 
-        // memberMerkleTree.set
+        // Update data to local
         tree2 = EMPTY_LEVEL_2_TREE();
         for (let i = 0; i < Number(myMemberArray2.length); i++) {
             tree2.setLeaf(
@@ -198,19 +196,20 @@ describe('Committee', () => {
         );
     });
 
-    xit('committeeContract rollupIncrements', async () => {
+    xit('committeeContract rollup', async () => {
         let tx = await Mina.transaction(feePayer, () => {
-            committeeContract.rollupIncrements(proof);
+            committeeContract.rollup(proof);
         });
         await tx.prove();
         await tx.sign([feePayerKey]).send();
     });
 
     xit('check if p2 belong to committee 0', async () => {
-        // check if memerber belong to committeeId
-        let checkInput = new CheckMemberInput({
+        // Check if member belong to committeeId
+        let checkInput = new CommitteeMemberInput({
             address: addresses.p2,
-            commiteeId: Field(0),
+            committeeId: Field(0),
+            memberId: Field(1),
             memberWitness: memberStorage.getWitness(Field(0), Field(1)),
         });
         let tx = await Mina.transaction(feePayer, () => {
@@ -221,10 +220,11 @@ describe('Committee', () => {
     });
 
     xit('check if p2 belong to committee 1: to throw error', async () => {
-        // check if memerber belong to committeeId
-        let checkInput = new CheckMemberInput({
+        // Check if member belong to committeeId
+        let checkInput = new CommitteeMemberInput({
             address: addresses.p2,
-            commiteeId: Field(1),
+            committeeId: Field(1),
+            memberId: Field(1),
             memberWitness: memberStorage.getWitness(Field(1), Field(1)),
         });
         expect(() => {

@@ -6,7 +6,7 @@ import {
     GroupDynamicArray,
     PublicKeyDynamicArray,
 } from '@auxo-dev/auxo-libs';
-import { DArray } from './Requestor.js';
+import { DArray } from './Requester.js';
 import * as ElgamalECC from './Elgamal.js';
 import { COMMITTEE_MAX_SIZE } from '../constants.js';
 

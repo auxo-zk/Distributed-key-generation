@@ -8,14 +8,21 @@ import {
     PublicKey,
     Struct,
 } from 'o1js';
-import { ADDRESS_MAX_SIZE, ZkAppEnum } from '../constants.js';
+import {
+    ACTION_PROCESS_LIMITS,
+    ADDRESS_MAX_SIZE,
+    ZkAppEnum,
+} from '../constants.js';
+import { FieldDynamicArray } from '@auxo-dev/auxo-libs';
+import { buildAssertMessage } from '../libs/utils.js';
+import { ErrorEnum } from '../contracts/constants.js';
 
 export const ADDRESS_TREE_HEIGHT = Math.ceil(Math.log2(ADDRESS_MAX_SIZE)) + 1;
 export class AddressMT extends MerkleTree {}
 export class AddressWitness extends MerkleWitness(ADDRESS_TREE_HEIGHT) {}
 export const EMPTY_ADDRESS_MT = () => new AddressMT(ADDRESS_TREE_HEIGHT);
-export class ReduceWitness extends MerkleMapWitness {}
-export const EMPTY_REDUCE_MT = () => new MerkleMap();
+export class ActionWitness extends MerkleMapWitness {}
+export const EMPTY_ACTION_MT = () => new MerkleMap();
 
 export class ZkAppRef extends Struct({
     address: PublicKey,
@@ -117,23 +124,56 @@ export function getZkAppRef(
     });
 }
 
-export const enum ActionStatus {
-    NOT_EXISTED,
-    REDUCED,
+/**
+ * Verify the address of a zkApp
+ * @param ref Reference to a zkApp
+ * @param key Index of its address in MT
+ */
+export function verifyZkApp(
+    programName: string,
+    ref: ZkAppRef,
+    root: Field,
+    key: Field
+) {
+    root.assertEquals(
+        ref.witness.calculateRoot(Poseidon.hash(ref.address.toFields())),
+        buildAssertMessage(programName, 'verifyZkApp', ErrorEnum.ZKAPP_ROOT)
+    );
+
+    key.assertEquals(
+        ref.witness.calculateIndex(),
+        buildAssertMessage(programName, 'verifyZkApp', ErrorEnum.ZKAPP_INDEX)
+    );
 }
 
-export class ReduceStorage {
+export enum RollupStatus {
+    RECORDED,
+    ROLLUPED,
+}
+
+export enum ProcessStatus {
+    NOT_PROCESSED,
+    PROCESSED,
+}
+
+export class ProcessedActions extends FieldDynamicArray(
+    ACTION_PROCESS_LIMITS
+) {}
+
+export class ActionStorage {
     private _actionMap: MerkleMap;
     private _actions: { [key: string]: Field };
 
-    constructor(actions?: { actionState: Field; status: ActionStatus }[]) {
-        this._actionMap = EMPTY_REDUCE_MT();
+    constructor(
+        actions?: { actionState: Field; status: RollupStatus | ProcessStatus }[]
+    ) {
+        this._actionMap = EMPTY_ACTION_MT();
         this._actions = {};
         if (actions) {
             for (let i = 0; i < actions.length; i++) {
                 this.updateLeaf(
                     actions[i].actionState,
-                    ReduceStorage.calculateLeaf(actions[i].status)
+                    ActionStorage.calculateLeaf(actions[i].status)
                 );
             }
         }
@@ -151,23 +191,23 @@ export class ReduceStorage {
         return this._actions;
     }
 
-    static calculateLeaf(status: ActionStatus): Field {
+    static calculateLeaf(status: RollupStatus | ProcessStatus): Field {
         return Field(status);
     }
 
-    calculateLeaf(status: ActionStatus): Field {
-        return ReduceStorage.calculateLeaf(status);
+    calculateLeaf(status: RollupStatus | ProcessStatus): Field {
+        return ActionStorage.calculateLeaf(status);
     }
 
-    static calculateIndex(actionState: Field): Field {
-        return actionState;
+    static calculateIndex(actionIndex: Field): Field {
+        return actionIndex;
     }
 
-    calculateIndex(actionState: Field): Field {
-        return ReduceStorage.calculateIndex(actionState);
+    calculateIndex(actionIndex: Field): Field {
+        return ActionStorage.calculateIndex(actionIndex);
     }
 
-    getWitness(index: Field): MerkleMapWitness {
+    getWitness(index: Field): ActionWitness {
         return this._actionMap.getWitness(index);
     }
 
