@@ -13,8 +13,8 @@ import {
     method,
     state,
 } from 'o1js';
+import { Utils } from '@auxo-dev/auxo-libs';
 import { ResponseContribution } from '../libs/Committee.js';
-import { buildAssertMessage, updateActionState } from '../libs/utils.js';
 import {
     FullMTWitness as CommitteeFullWitness,
     Level1Witness as CommitteeLevel1Witness,
@@ -150,7 +150,7 @@ export const FinalizeResponse = ZkProgram({
                 // Verify there is no recorded contribution for the request
                 initialContributionRoot.assertEquals(
                     contributionWitness.calculateRoot(Field(0)),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeResponse.name,
                         'firstStep',
                         ErrorEnum.RES_CONTRIBUTION_ROOT
@@ -158,7 +158,7 @@ export const FinalizeResponse = ZkProgram({
                 );
                 requestId.assertEquals(
                     contributionWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeResponse.name,
                         'firstStep',
                         ErrorEnum.RES_CONTRIBUTION_INDEX_L1
@@ -182,7 +182,7 @@ export const FinalizeResponse = ZkProgram({
                 );
                 D.length.assertEquals(
                     requestDim,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeResponse.name,
                         'firstStep',
                         ErrorEnum.RES_CONTRIBUTION_DIMENSION
@@ -226,7 +226,7 @@ export const FinalizeResponse = ZkProgram({
                 // Verify contributionRoot using the same requestId
                 input.action.requestId.assertEquals(
                     earlierProof.publicOutput.requestId,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeResponse.name,
                         'nextStep',
                         ErrorEnum.REQUEST_ID
@@ -238,7 +238,7 @@ export const FinalizeResponse = ZkProgram({
                     contributionWitness.level1.calculateRoot(
                         contributionWitness.level2.calculateRoot(Field(0))
                     ),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeResponse.name,
                         'nextStep',
                         ErrorEnum.RES_CONTRIBUTION_ROOT
@@ -246,7 +246,7 @@ export const FinalizeResponse = ZkProgram({
                 );
                 input.action.requestId.assertEquals(
                     contributionWitness.level1.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeResponse.name,
                         'nextStep',
                         ErrorEnum.RES_CONTRIBUTION_INDEX_L1
@@ -254,7 +254,7 @@ export const FinalizeResponse = ZkProgram({
                 );
                 input.action.memberId.assertEquals(
                     contributionWitness.level2.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeResponse.name,
                         'nextStep',
                         ErrorEnum.RES_CONTRIBUTION_INDEX_L2
@@ -329,9 +329,10 @@ export const FinalizeResponse = ZkProgram({
                 }
 
                 // Calculate corresponding action state
-                let actionState = updateActionState(input.previousActionState, [
-                    Action.toFields(input.action),
-                ]);
+                let actionState = Utils.updateActionState(
+                    input.previousActionState,
+                    [Action.toFields(input.action)]
+                );
                 let processedActions =
                     earlierProof.publicOutput.processedActions;
                 processedActions.push(actionState);
@@ -496,7 +497,7 @@ export class ResponseContract extends SmartContract {
                         Poseidon.hash(proof.publicInput.publicKey.toFields())
                     )
                 ),
-                buildAssertMessage(
+                Utils.buildAssertMessage(
                     ResponseContract.name,
                     'contribute',
                     ErrorEnum.R1_CONTRIBUTION_ROOT
@@ -504,7 +505,7 @@ export class ResponseContract extends SmartContract {
             );
         keyIndex.assertEquals(
             publicKeyWitness.level1.calculateIndex(),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 ResponseContract.name,
                 'contribute',
                 ErrorEnum.R1_CONTRIBUTION_INDEX_L1
@@ -512,7 +513,7 @@ export class ResponseContract extends SmartContract {
         );
         memberId.assertEquals(
             publicKeyWitness.level2.calculateIndex(),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 ResponseContract.name,
                 'contribute',
                 ErrorEnum.R1_CONTRIBUTION_INDEX_L2
@@ -540,7 +541,7 @@ export class ResponseContract extends SmartContract {
                 encryptionWitness.level1.calculateRoot(
                     encryptionWitness.level2.calculateRoot(encryptionHashChain)
                 ),
-                buildAssertMessage(
+                Utils.buildAssertMessage(
                     ResponseContract.name,
                     'contribute',
                     ErrorEnum.ENCRYPTION_ROOT
@@ -548,7 +549,7 @@ export class ResponseContract extends SmartContract {
             );
         keyIndex.assertEquals(
             encryptionWitness.level1.calculateIndex(),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 ResponseContract.name,
                 'contribute',
                 ErrorEnum.ENCRYPTION_INDEX_L1
@@ -556,7 +557,7 @@ export class ResponseContract extends SmartContract {
         );
         memberId.assertEquals(
             encryptionWitness.level2.calculateIndex(),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 ResponseContract.name,
                 'contribute',
                 ErrorEnum.ENCRYPTION_INDEX_L2
@@ -569,7 +570,7 @@ export class ResponseContract extends SmartContract {
         });
         D.length.assertEquals(
             R.length,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 ResponseContract.name,
                 'contribute',
                 ErrorEnum.RES_CONTRIBUTION_DIMENSION
@@ -665,7 +666,7 @@ export class ResponseContract extends SmartContract {
         proof.verify();
         proof.publicOutput.initialContributionRoot.assertEquals(
             contributionRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 ResponseContract.name,
                 'finalize',
                 ErrorEnum.RES_CONTRIBUTION_ROOT
@@ -673,7 +674,7 @@ export class ResponseContract extends SmartContract {
         );
         proof.publicOutput.initialProcessRoot.assertEquals(
             processRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 ResponseContract.name,
                 'finalize',
                 ErrorEnum.PROCESS_ROOT
@@ -681,7 +682,7 @@ export class ResponseContract extends SmartContract {
         );
         proof.publicOutput.processedActions.length.assertEquals(
             proof.publicOutput.T,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 ResponseContract.name,
                 'finalize',
                 ErrorEnum.RES_CONTRIBUTION_THRESHOLD
@@ -729,7 +730,7 @@ export class ResponseContract extends SmartContract {
             .getAndRequireEquals()
             .assertEquals(
                 witness.calculateRoot(D.hash()),
-                buildAssertMessage(
+                Utils.buildAssertMessage(
                     ResponseContract.name,
                     ResponseContract.prototype.verifyFinalizedD.name,
                     ErrorEnum.RES_D_ROOT
@@ -737,7 +738,7 @@ export class ResponseContract extends SmartContract {
             );
         requestId.assertEquals(
             witness.calculateIndex(),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 ResponseContract.name,
                 ResponseContract.prototype.verifyFinalizedD.name,
                 ErrorEnum.RES_D_INDEX

@@ -1,26 +1,11 @@
-import { Bool, Field, SelfProof, Struct, ZkProgram } from 'o1js';
-import { buildAssertMessage, updateActionState } from '../libs/utils.js';
+import { Field, SelfProof, Struct, ZkProgram } from 'o1js';
+import { Utils } from '@auxo-dev/auxo-libs';
 import { ErrorEnum } from './constants.js';
 import {
     ActionWitness,
     ProcessStatus,
     RollupStatus,
 } from '../storages/SharedStorage.js';
-import { BoolDynamicArray } from '@auxo-dev/auxo-libs';
-
-export interface ZkAppAction {
-    hash(): Field;
-}
-
-export const ActionMask = (numActionTypes: number) => {
-    return class _ActionMask extends BoolDynamicArray(numActionTypes) {
-        static createMask(actionEnum: Field): _ActionMask {
-            let emptyMask = _ActionMask.empty();
-            emptyMask.set(actionEnum, Bool(true));
-            return emptyMask;
-        }
-    };
-};
 
 export class RollupOutput extends Struct({
     initialActionState: Field,
@@ -65,7 +50,7 @@ export const Rollup = (name: string, ActionType: any) =>
                     earlierProof.verify();
 
                     // Calculate corresponding action state
-                    let newActionState = updateActionState(
+                    let newActionState = Utils.updateActionState(
                         earlierProof.publicOutput.newActionState,
                         [ActionType.toFields(input)]
                     );
@@ -76,7 +61,7 @@ export const Rollup = (name: string, ActionType: any) =>
                     );
                     root.assertEquals(
                         earlierProof.publicOutput.newRollupRoot,
-                        buildAssertMessage(
+                        Utils.buildAssertMessage(
                             name,
                             'nextStep',
                             ErrorEnum.ROLLUP_ROOT
@@ -84,7 +69,7 @@ export const Rollup = (name: string, ActionType: any) =>
                     );
                     key.assertEquals(
                         newActionState,
-                        buildAssertMessage(
+                        Utils.buildAssertMessage(
                             name,
                             'nextStep',
                             ErrorEnum.ROLLUP_INDEX
@@ -113,7 +98,7 @@ export const rollup = (
 ) => {
     proofOutput.initialActionState.assertEquals(
         initialActionState,
-        buildAssertMessage(
+        Utils.buildAssertMessage(
             programName,
             'rollup',
             ErrorEnum.CURRENT_ACTION_STATE
@@ -121,11 +106,15 @@ export const rollup = (
     );
     proofOutput.initialRollupRoot.assertEquals(
         initialRollupRoot,
-        buildAssertMessage(programName, 'rollup', ErrorEnum.ROLLUP_ROOT)
+        Utils.buildAssertMessage(programName, 'rollup', ErrorEnum.ROLLUP_ROOT)
     );
     proofOutput.newActionState.assertEquals(
         newActionState,
-        buildAssertMessage(programName, 'rollup', ErrorEnum.LAST_ACTION_STATE)
+        Utils.buildAssertMessage(
+            programName,
+            'rollup',
+            ErrorEnum.LAST_ACTION_STATE
+        )
     );
 };
 
@@ -140,11 +129,19 @@ export const verifyRollup = (
     );
     root.assertEquals(
         rollupRoot,
-        buildAssertMessage(programName, 'verifyRollup', ErrorEnum.ROLLUP_ROOT)
+        Utils.buildAssertMessage(
+            programName,
+            'verifyRollup',
+            ErrorEnum.ROLLUP_ROOT
+        )
     );
     actionState.assertEquals(
         rollupIndex,
-        buildAssertMessage(programName, 'verifyRollup', ErrorEnum.ROLLUP_INDEX)
+        Utils.buildAssertMessage(
+            programName,
+            'verifyRollup',
+            ErrorEnum.ROLLUP_INDEX
+        )
     );
 };
 
@@ -159,11 +156,15 @@ export const processAction = (
     );
     root.assertEquals(
         previousRoot,
-        buildAssertMessage(programName, 'process', ErrorEnum.PROCESS_ROOT)
+        Utils.buildAssertMessage(programName, 'process', ErrorEnum.PROCESS_ROOT)
     );
     key.assertEquals(
         actionState,
-        buildAssertMessage(programName, 'process', ErrorEnum.PROCESS_INDEX)
+        Utils.buildAssertMessage(
+            programName,
+            'process',
+            ErrorEnum.PROCESS_INDEX
+        )
     );
 
     return witness.computeRootAndKey(Field(ProcessStatus.PROCESSED))[0];

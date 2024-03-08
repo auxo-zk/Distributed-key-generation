@@ -11,8 +11,8 @@ import {
     method,
     state,
 } from 'o1js';
+import { Utils } from '@auxo-dev/auxo-libs';
 import { CArray, Round1Contribution } from '../libs/Committee.js';
-import { buildAssertMessage, updateActionState } from '../libs/utils.js';
 import {
     FullMTWitness as CommitteeFullWitness,
     Level1Witness as CommitteeLevel1Witness,
@@ -122,7 +122,7 @@ export const FinalizeRound1 = ZkProgram({
                 // Verify and update empty contribution level 2 MT
                 initialContributionRoot.assertEquals(
                     contributionWitness.calculateRoot(Field(0)),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound1.name,
                         'firstStep',
                         ErrorEnum.R1_CONTRIBUTION_ROOT
@@ -131,7 +131,7 @@ export const FinalizeRound1 = ZkProgram({
 
                 keyIndex.assertEquals(
                     contributionWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound1.name,
                         'firstStep',
                         ErrorEnum.R1_CONTRIBUTION_INDEX_L1
@@ -145,7 +145,7 @@ export const FinalizeRound1 = ZkProgram({
                 // Verify and update empty public key level 2 MT
                 initialPublicKeyRoot.assertEquals(
                     publicKeyWitness.calculateRoot(Field(0)),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound1.name,
                         'firstStep',
                         ErrorEnum.ENC_PUBKEY_ROOT
@@ -153,7 +153,7 @@ export const FinalizeRound1 = ZkProgram({
                 );
                 keyIndex.assertEquals(
                     publicKeyWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound1.name,
                         'firstStep',
                         ErrorEnum.ENCRYPTION_INDEX_L1
@@ -200,7 +200,7 @@ export const FinalizeRound1 = ZkProgram({
                 earlierProof.verify();
                 input.action.contribution.C.length.assertEquals(
                     earlierProof.publicOutput.T,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound1.name,
                         'nextStep',
                         ErrorEnum.R1_CONTRIBUTION_VALUE
@@ -214,7 +214,7 @@ export const FinalizeRound1 = ZkProgram({
                 );
                 keyIndex.assertEquals(
                     earlierProof.publicOutput.keyIndex,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound1.name,
                         'nextStep',
                         ErrorEnum.R1_CONTRIBUTION_INDEX_INDEX
@@ -226,7 +226,7 @@ export const FinalizeRound1 = ZkProgram({
                     contributionWitness.level1.calculateRoot(
                         contributionWitness.level2.calculateRoot(Field(0))
                     ),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound1.name,
                         'nextStep',
                         ErrorEnum.R1_CONTRIBUTION_ROOT
@@ -234,7 +234,7 @@ export const FinalizeRound1 = ZkProgram({
                 );
                 keyIndex.assertEquals(
                     contributionWitness.level1.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound1.name,
                         'nextStep',
                         ErrorEnum.R1_CONTRIBUTION_INDEX_L1
@@ -242,7 +242,7 @@ export const FinalizeRound1 = ZkProgram({
                 );
                 input.action.memberId.assertEquals(
                     contributionWitness.level2.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound1.name,
                         'nextStep',
                         ErrorEnum.R1_CONTRIBUTION_INDEX_L2
@@ -262,7 +262,7 @@ export const FinalizeRound1 = ZkProgram({
                     publicKeyWitness.level1.calculateRoot(
                         publicKeyWitness.level2.calculateRoot(Field(0))
                     ),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound1.name,
                         'nextStep',
                         ErrorEnum.ENC_PUBKEY_ROOT
@@ -270,7 +270,7 @@ export const FinalizeRound1 = ZkProgram({
                 );
                 keyIndex.assertEquals(
                     publicKeyWitness.level1.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound1.name,
                         'nextStep',
                         ErrorEnum.ENC_PUBKEY_INDEX_L1
@@ -278,7 +278,7 @@ export const FinalizeRound1 = ZkProgram({
                 );
                 input.action.memberId.assertEquals(
                     publicKeyWitness.level2.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound1.name,
                         'nextStep',
                         ErrorEnum.ENC_PUBKEY_INDEX_L2
@@ -294,9 +294,10 @@ export const FinalizeRound1 = ZkProgram({
                 );
 
                 // Calculate corresponding action state
-                let actionState = updateActionState(input.previousActionState, [
-                    Action.toFields(input.action),
-                ]);
+                let actionState = Utils.updateActionState(
+                    input.previousActionState,
+                    [Action.toFields(input.action)]
+                );
                 let processedActions =
                     earlierProof.publicOutput.processedActions;
                 processedActions.push(actionState);
@@ -502,7 +503,7 @@ export class Round1Contract extends SmartContract {
         proof.verify();
         proof.publicOutput.processedActions.length.assertEquals(
             proof.publicOutput.N,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 Round1Contract.name,
                 'finalize',
                 ErrorEnum.R1_CONTRIBUTION_THRESHOLD
@@ -510,7 +511,7 @@ export class Round1Contract extends SmartContract {
         );
         proof.publicOutput.initialContributionRoot.assertEquals(
             contributionRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 Round1Contract.name,
                 'finalize',
                 ErrorEnum.R1_CONTRIBUTION_ROOT
@@ -518,7 +519,7 @@ export class Round1Contract extends SmartContract {
         );
         proof.publicOutput.initialPublicKeyRoot.assertEquals(
             publicKeyRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 Round1Contract.name,
                 'finalize',
                 ErrorEnum.ENC_PUBKEY_INDEX_L1
@@ -526,7 +527,7 @@ export class Round1Contract extends SmartContract {
         );
         proof.publicOutput.initialProcessRoot.assertEquals(
             processRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 Round1Contract.name,
                 'finalize',
                 ErrorEnum.PROCESS_ROOT

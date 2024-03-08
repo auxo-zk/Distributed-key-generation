@@ -13,8 +13,7 @@ import {
     PublicKey,
     Void,
 } from 'o1js';
-import { IpfsHash } from '@auxo-dev/auxo-libs';
-import { buildAssertMessage, updateActionState } from '../libs/utils.js';
+import { IpfsHash, Utils } from '@auxo-dev/auxo-libs';
 import { COMMITTEE_MAX_SIZE, ZkProgramEnum } from '../constants.js';
 import {
     EMPTY_LEVEL_1_TREE,
@@ -109,7 +108,7 @@ export const RollupCommittee = ZkProgram({
                 let memberKey = memberWitness.calculateIndex();
                 prevMemberRoot.assertEquals(
                     earlierProof.publicOutput.nextMemberRoot,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         RollupCommittee.name,
                         'nextStep',
                         ErrorEnum.MEMBER_ROOT
@@ -117,7 +116,7 @@ export const RollupCommittee = ZkProgram({
                 );
                 memberKey.assertEquals(
                     earlierProof.publicOutput.nextCommitteeId,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         RollupCommittee.name,
                         'nextStep',
                         ErrorEnum.MEMBER_INDEX_L1
@@ -129,7 +128,7 @@ export const RollupCommittee = ZkProgram({
                 let settingKey = settingWitness.calculateIndex();
                 prevSettingRoot.assertEquals(
                     earlierProof.publicOutput.nextSettingRoot,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         RollupCommittee.name,
                         'nextStep',
                         ErrorEnum.SETTING_ROOT
@@ -137,7 +136,7 @@ export const RollupCommittee = ZkProgram({
                 );
                 settingKey.assertEquals(
                     earlierProof.publicOutput.nextCommitteeId,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         RollupCommittee.name,
                         'nextStep',
                         ErrorEnum.SETTING_INDEX
@@ -174,7 +173,7 @@ export const RollupCommittee = ZkProgram({
                         earlierProof.publicOutput.initialSettingRoot,
                     initialCommitteeId:
                         earlierProof.publicOutput.initialCommitteeId,
-                    nextActionState: updateActionState(
+                    nextActionState: Utils.updateActionState(
                         earlierProof.publicOutput.nextActionState,
                         [CommitteeAction.toFields(input)]
                     ),
@@ -251,7 +250,7 @@ export class CommitteeContract extends SmartContract {
         // Verify current action state
         curActionState.assertEquals(
             proof.publicOutput.initialActionState,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 CommitteeContract.name,
                 'rollup',
                 ErrorEnum.CURRENT_ACTION_STATE
@@ -261,7 +260,7 @@ export class CommitteeContract extends SmartContract {
         // Verify current committee Id
         nextCommitteeId.assertEquals(
             proof.publicOutput.initialCommitteeId,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 CommitteeContract.name,
                 'rollup',
                 ErrorEnum.NEXT_COMMITTEE_ID
@@ -271,7 +270,7 @@ export class CommitteeContract extends SmartContract {
         // Verify current member root
         memberRoot.assertEquals(
             proof.publicOutput.initialMemberRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 CommitteeContract.name,
                 'rollup',
                 ErrorEnum.MEMBER_ROOT
@@ -281,7 +280,7 @@ export class CommitteeContract extends SmartContract {
         // Verify current setting root
         settingRoot.assertEquals(
             proof.publicOutput.initialSettingRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 CommitteeContract.name,
                 'rollup',
                 ErrorEnum.SETTING_ROOT
@@ -291,7 +290,7 @@ export class CommitteeContract extends SmartContract {
         // Verify last action state
         lastActionState.assertEquals(
             proof.publicOutput.nextActionState,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 CommitteeContract.name,
                 'rollup',
                 ErrorEnum.LAST_ACTION_STATE
@@ -324,7 +323,7 @@ export class CommitteeContract extends SmartContract {
                         MemberArray.hash(input.address)
                     )
                 ),
-                buildAssertMessage(
+                Utils.buildAssertMessage(
                     CommitteeContract.name,
                     'checkMember',
                     ErrorEnum.MEMBER_ROOT
@@ -332,7 +331,7 @@ export class CommitteeContract extends SmartContract {
             );
         input.committeeId.assertEquals(
             input.memberWitness.level1.calculateIndex(),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 CommitteeContract.name,
                 'checkMember',
                 ErrorEnum.MEMBER_INDEX_L1
@@ -340,7 +339,7 @@ export class CommitteeContract extends SmartContract {
         );
         input.memberId.assertEquals(
             input.memberWitness.level2.calculateIndex(),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 CommitteeContract.name,
                 'checkMember',
                 ErrorEnum.MEMBER_INDEX_L2
@@ -360,7 +359,7 @@ export class CommitteeContract extends SmartContract {
         const onChainRoot = this.settingRoot.getAndRequireEquals();
         root.assertEquals(
             onChainRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 CommitteeContract.name,
                 'checkConfig',
                 ErrorEnum.SETTING_ROOT
@@ -368,7 +367,7 @@ export class CommitteeContract extends SmartContract {
         );
         input.committeeId.assertEquals(
             _committeeId,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 CommitteeContract.name,
                 'checkConfig',
                 ErrorEnum.SETTING_INDEX

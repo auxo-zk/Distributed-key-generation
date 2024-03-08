@@ -11,7 +11,7 @@ import {
     Scalar,
     SmartContract,
 } from 'o1js';
-import { CustomScalar } from '@auxo-dev/auxo-libs';
+import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
 import fs from 'fs';
 import { getProfiler } from './helper/profiler.js';
 import { Config, Key } from './helper/config.js';
@@ -89,14 +89,13 @@ import {
     getRound1Contribution,
     getRound2Contribution,
 } from '../libs/Committee.js';
-import { ZkAppEnum, Contract } from '../constants.js';
+import { ZkAppEnum, Contract, INDEX_SIZE } from '../constants.js';
 import {
     RArray,
     accumulateEncryption,
     generateEncryption,
 } from '../libs/Requester.js';
 import { UpdateRequest, RequestContract } from '../contracts/Request.js';
-import { packIndexArray } from '../libs/utils.js';
 import { ResponseContributionStorage } from '../storages/RequestStorage.js';
 
 xdescribe('DKG', () => {
@@ -453,7 +452,7 @@ xdescribe('DKG', () => {
         let tx = await Mina.transaction(feePayerKey.publicKey, () => {
             AccountUpdate.fundNewAccount(feePayerKey.publicKey);
             requestContract.deploy();
-            // requestContract.responseContractAddress.set(
+            // requestContract.responeContractAddress.set(
             //     contracts[Contract.REQUEST].contract.address
             // );
             let feePayerAccount = AccountUpdate.createSigned(
@@ -1374,7 +1373,7 @@ xdescribe('DKG', () => {
             reduceStateRoot,
             requestId,
             Field(mockResult.length),
-            packIndexArray(responsedMembers),
+            Utils.packNumberArray(responsedMembers, INDEX_SIZE),
             responseContributionStorage.getLevel1Witness(
                 ResponseContributionStorage.calculateLevel1Index(requestId)
             )

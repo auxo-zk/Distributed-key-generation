@@ -11,7 +11,7 @@ import {
     SelfProof,
     ZkProgram,
 } from 'o1js';
-import { buildAssertMessage, updateActionState } from '../libs/utils.js';
+import { ActionMask as _ActionMask, Utils } from '@auxo-dev/auxo-libs';
 import { CommitteeMemberInput, CommitteeContract } from './Committee.js';
 import {
     ActionWitness,
@@ -33,14 +33,8 @@ import {
     calculateKeyIndex,
 } from '../storages/DKGStorage.js';
 import { INSTANCE_LIMITS, ZkAppEnum } from '../constants.js';
-import { ErrorEnum, EventEnum } from './constants.js';
-import {
-    ActionMask as _ActionMask,
-    Rollup,
-    processAction,
-    rollup,
-    ZkAppAction,
-} from './Actions.js';
+import { ErrorEnum, EventEnum, ZkAppAction } from './constants.js';
+import { Rollup, processAction, rollup } from './Actions.js';
 
 export const enum KeyStatus {
     EMPTY,
@@ -181,7 +175,7 @@ export const UpdateKey = ZkProgram({
 
                 prevStatus.assertNotEquals(
                     Field(KeyStatus.EMPTY),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateKey.name,
                         'nextStep',
                         ErrorEnum.KEY_STATUS_VALUE
@@ -189,7 +183,7 @@ export const UpdateKey = ZkProgram({
                 );
                 nextStatus.assertNotEquals(
                     Field(KeyStatus.ROUND_1_CONTRIBUTION),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateKey.name,
                         'nextStep',
                         ErrorEnum.KEY_STATUS_VALUE
@@ -203,7 +197,7 @@ export const UpdateKey = ZkProgram({
                 );
                 earlierProof.publicOutput.nextKeyStatusRoot.assertEquals(
                     keyStatusWitness.calculateRoot(prevStatus),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateKey.name,
                         'nextStep',
                         ErrorEnum.KEY_STATUS_ROOT
@@ -211,7 +205,7 @@ export const UpdateKey = ZkProgram({
                 );
                 keyIndex.assertEquals(
                     keyStatusWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateKey.name,
                         'nextStep',
                         ErrorEnum.KEY_STATUS_INDEX
@@ -223,9 +217,10 @@ export const UpdateKey = ZkProgram({
                     keyStatusWitness.calculateRoot(nextStatus);
 
                 // Calculate corresponding action state
-                let actionState = updateActionState(input.previousActionState, [
-                    Action.toFields(input.action),
-                ]);
+                let actionState = Utils.updateActionState(
+                    input.previousActionState,
+                    [Action.toFields(input.action)]
+                );
                 let processedActions =
                     earlierProof.publicOutput.processedActions;
                 processedActions.push(actionState);
@@ -275,7 +270,7 @@ export const UpdateKey = ZkProgram({
                 // Check the key's previous index
                 earlierProof.publicOutput.nextKeyCounterRoot.assertEquals(
                     keyCounterWitness.calculateRoot(currKeyId),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateKey.name,
                         'nextStepGeneration',
                         ErrorEnum.KEY_COUNTER_ROOT
@@ -283,7 +278,7 @@ export const UpdateKey = ZkProgram({
                 );
                 input.action.committeeId.assertEquals(
                     keyCounterWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateKey.name,
                         'nextStepGeneration',
                         ErrorEnum.KEY_COUNTER_INDEX
@@ -297,7 +292,7 @@ export const UpdateKey = ZkProgram({
                     Field.from(BigInt(INSTANCE_LIMITS.KEY)).mul(
                         input.action.committeeId.add(Field(1))
                     ),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateKey.name,
                         'nextStepGeneration',
                         ErrorEnum.KEY_COUNTER_LIMIT
@@ -312,7 +307,7 @@ export const UpdateKey = ZkProgram({
                 // Check the key's previous status
                 earlierProof.publicOutput.nextKeyStatusRoot.assertEquals(
                     keyStatusWitness.calculateRoot(Field(KeyStatus.EMPTY)),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateKey.name,
                         'nextStepGeneration',
                         ErrorEnum.KEY_STATUS_ROOT
@@ -320,7 +315,7 @@ export const UpdateKey = ZkProgram({
                 );
                 keyIndex.assertEquals(
                     keyStatusWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateKey.name,
                         'nextStepGeneration',
                         ErrorEnum.KEY_STATUS_INDEX
@@ -333,9 +328,10 @@ export const UpdateKey = ZkProgram({
                 );
 
                 // Calculate corresponding action state
-                let actionState = updateActionState(input.previousActionState, [
-                    Action.toFields(input.action),
-                ]);
+                let actionState = Utils.updateActionState(
+                    input.previousActionState,
+                    [Action.toFields(input.action)]
+                );
                 let processedActions =
                     earlierProof.publicOutput.processedActions;
                 processedActions.push(actionState);
@@ -347,7 +343,7 @@ export const UpdateKey = ZkProgram({
                     );
                 processRoot.assertEquals(
                     earlierProof.publicOutput.nextProcessRoot,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateKey.name,
                         'nextStep',
                         ErrorEnum.PROCESS_ROOT
@@ -355,7 +351,7 @@ export const UpdateKey = ZkProgram({
                 );
                 processKey.assertEquals(
                     actionState,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateKey.name,
                         'nextStep',
                         ErrorEnum.PROCESS_INDEX
@@ -475,7 +471,7 @@ export class DkgContract extends SmartContract {
             .equals(Field(ActionEnum.GENERATE_KEY))
             .or(actionType.equals(Field(ActionEnum.DEPRECATE_KEY)))
             .assertTrue(
-                buildAssertMessage(
+                Utils.buildAssertMessage(
                     DkgContract.name,
                     'committeeAction',
                     ErrorEnum.ACTION_TYPE
@@ -508,7 +504,7 @@ export class DkgContract extends SmartContract {
             .equals(Field(ActionEnum.FINALIZE_ROUND_1))
             .or(actionType.equals(Field(ActionEnum.FINALIZE_ROUND_2)))
             .assertTrue(
-                buildAssertMessage(
+                Utils.buildAssertMessage(
                     DkgContract.name,
                     'publicAction',
                     ErrorEnum.ACTION_TYPE
@@ -565,7 +561,7 @@ export class DkgContract extends SmartContract {
         proof.verify();
         proof.publicOutput.initialKeyCounterRoot.assertEquals(
             keyCounterRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 DkgContract.name,
                 'updateKeys',
                 ErrorEnum.KEY_COUNTER_ROOT
@@ -573,7 +569,7 @@ export class DkgContract extends SmartContract {
         );
         proof.publicOutput.initialKeyStatusRoot.assertEquals(
             keyStatusRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 DkgContract.name,
                 'updateKeys',
                 ErrorEnum.KEY_STATUS_ROOT
@@ -581,7 +577,7 @@ export class DkgContract extends SmartContract {
         );
         proof.publicOutput.initialProcessRoot.assertEquals(
             processRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 DkgContract.name,
                 'updateKeys',
                 ErrorEnum.PROCESS_ROOT
@@ -612,7 +608,7 @@ export class DkgContract extends SmartContract {
             .getAndRequireEquals()
             .assertEquals(
                 input.witness.calculateRoot(input.status),
-                buildAssertMessage(
+                Utils.buildAssertMessage(
                     DkgContract.name,
                     'verifyKeyStatus',
                     ErrorEnum.KEY_STATUS_ROOT
@@ -620,7 +616,7 @@ export class DkgContract extends SmartContract {
             );
         keyIndex.assertEquals(
             input.witness.calculateIndex(),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 DkgContract.name,
                 'verifyKeyStatus',
                 ErrorEnum.KEY_STATUS_INDEX

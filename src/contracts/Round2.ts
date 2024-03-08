@@ -11,12 +11,12 @@ import {
     Struct,
     ZkProgram,
 } from 'o1js';
+import { Utils } from '@auxo-dev/auxo-libs';
 import {
     EncryptionHashArray,
     PublicKeyArray,
     Round2Contribution,
 } from '../libs/Committee.js';
-import { buildAssertMessage, updateActionState } from '../libs/utils.js';
 import {
     FullMTWitness as CommitteeFullWitness,
     Level1Witness as CommitteeLevel1Witness,
@@ -138,7 +138,7 @@ export const FinalizeRound2 = ZkProgram({
                 // Verify there is no recorded contribution for the request
                 initialContributionRoot.assertEquals(
                     contributionWitness.calculateRoot(Field(0)),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound2.name,
                         'firstStep',
                         ErrorEnum.R2_CONTRIBUTION_ROOT
@@ -146,7 +146,7 @@ export const FinalizeRound2 = ZkProgram({
                 );
                 keyIndex.assertEquals(
                     contributionWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound2.name,
                         'firstStep',
                         ErrorEnum.R2_CONTRIBUTION_INDEX_L1
@@ -158,7 +158,7 @@ export const FinalizeRound2 = ZkProgram({
                             [...Array(Number(N)).keys()].map(() => Field(0))
                         ).hash()
                     ),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound2.name,
                         'firstStep',
                         ErrorEnum.INITIAL_ENCRYPTION_HASHES
@@ -202,7 +202,7 @@ export const FinalizeRound2 = ZkProgram({
                 earlierProof.verify();
                 input.action.memberId.assertEquals(
                     earlierProof.publicOutput.processedActions.length,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound2.name,
                         'nextStep',
                         ErrorEnum.R2_CONTRIBUTION_ORDER
@@ -210,7 +210,7 @@ export const FinalizeRound2 = ZkProgram({
                 );
                 input.action.contribution.c.length.assertEquals(
                     earlierProof.publicOutput.N,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound2.name,
                         'nextStep',
                         ErrorEnum.R2_CONTRIBUTION_VALUE
@@ -224,7 +224,7 @@ export const FinalizeRound2 = ZkProgram({
                 );
                 keyIndex.assertEquals(
                     earlierProof.publicOutput.keyIndex,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound2.name,
                         'nextStep',
                         ErrorEnum.R2_CONTRIBUTION_INDEX_INDEX
@@ -236,7 +236,7 @@ export const FinalizeRound2 = ZkProgram({
                     contributionWitness.level1.calculateRoot(
                         contributionWitness.level2.calculateRoot(Field(0))
                     ),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound2.name,
                         'nextStep',
                         ErrorEnum.R2_CONTRIBUTION_ROOT
@@ -244,7 +244,7 @@ export const FinalizeRound2 = ZkProgram({
                 );
                 keyIndex.assertEquals(
                     contributionWitness.level1.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound2.name,
                         'nextStep',
                         ErrorEnum.R2_CONTRIBUTION_INDEX_L1
@@ -252,7 +252,7 @@ export const FinalizeRound2 = ZkProgram({
                 );
                 input.action.memberId.assertEquals(
                     contributionWitness.level2.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         FinalizeRound2.name,
                         'nextStep',
                         ErrorEnum.R2_CONTRIBUTION_INDEX_L2
@@ -293,9 +293,10 @@ export const FinalizeRound2 = ZkProgram({
                 }
 
                 // Calculate corresponding action state
-                let actionState = updateActionState(input.previousActionState, [
-                    Action.toFields(input.action),
-                ]);
+                let actionState = Utils.updateActionState(
+                    input.previousActionState,
+                    [Action.toFields(input.action)]
+                );
                 let processedActions =
                     earlierProof.publicOutput.processedActions;
                 processedActions.push(actionState);
@@ -549,7 +550,7 @@ export class Round2Contract extends SmartContract {
         proof.verify();
         proof.publicOutput.initialContributionRoot.assertEquals(
             contributionRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 Round2Contract.name,
                 'finalize',
                 ErrorEnum.R2_CONTRIBUTION_ROOT
@@ -557,7 +558,7 @@ export class Round2Contract extends SmartContract {
         );
         proof.publicOutput.initialProcessRoot.assertEquals(
             processRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 Round2Contract.name,
                 'finalize',
                 ErrorEnum.PROCESS_ROOT
@@ -565,7 +566,7 @@ export class Round2Contract extends SmartContract {
         );
         proof.publicOutput.processedActions.length.assertEquals(
             proof.publicOutput.N,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 Round2Contract.name,
                 'finalize',
                 ErrorEnum.R2_CONTRIBUTION_THRESHOLD
@@ -610,7 +611,7 @@ export class Round2Contract extends SmartContract {
         });
         encryptionRoot.assertEquals(
             encryptionWitness.calculateRoot(Field(0)),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 Round2Contract.name,
                 'finalize',
                 ErrorEnum.ENCRYPTION_ROOT
@@ -618,7 +619,7 @@ export class Round2Contract extends SmartContract {
         );
         proof.publicOutput.keyIndex.assertEquals(
             encryptionWitness.calculateIndex(),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 Round2Contract.name,
                 'finalize',
                 ErrorEnum.ENCRYPTION_INDEX_L1

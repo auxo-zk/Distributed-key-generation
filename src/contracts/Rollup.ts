@@ -11,6 +11,7 @@ import {
     method,
     state,
 } from 'o1js';
+import { Utils } from '@auxo-dev/auxo-libs';
 import { ErrorEnum, EventEnum } from './constants.js';
 import {
     ActionWitness,
@@ -19,11 +20,6 @@ import {
 } from '../storages/SharedStorage.js';
 import { ZkProgramEnum } from '../constants.js';
 import { EMPTY_ROLLUP_MT, RollupWitness } from '../storages/RollupStorage.js';
-import {
-    buildAssertMessage,
-    requireCaller,
-    updateActionState,
-} from '../libs/utils.js';
 
 export class Action extends Struct({
     address: PublicKey,
@@ -81,7 +77,7 @@ export const Rollup = ZkProgram({
 
                 earlierProof.publicOutput.nextCounterRoot.assertEquals(
                     counterWitness.calculateRoot(counter),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         Rollup.name,
                         Rollup.nextStep.name,
                         ErrorEnum.ACTION_COUNTER_ROOT
@@ -89,7 +85,7 @@ export const Rollup = ZkProgram({
                 );
                 Poseidon.hash(input.address.toFields()).assertEquals(
                     counterWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         Rollup.name,
                         Rollup.nextStep.name,
                         ErrorEnum.ACTION_COUNTER_INDEX
@@ -107,7 +103,7 @@ export const Rollup = ZkProgram({
                 );
                 earlierProof.publicOutput.nextRollupRoot.assertEquals(
                     rollupRoot,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         Rollup.name,
                         Rollup.nextStep.name,
                         ErrorEnum.ROLLUP_ROOT
@@ -115,7 +111,7 @@ export const Rollup = ZkProgram({
                 );
                 actionIndex.assertEquals(
                     rollupIndex,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         Rollup.name,
                         Rollup.nextStep.name,
                         ErrorEnum.ROLLUP_INDEX
@@ -126,7 +122,7 @@ export const Rollup = ZkProgram({
                 );
 
                 // Calculate corresponding action state
-                let nextActionState = updateActionState(
+                let nextActionState = Utils.updateActionState(
                     earlierProof.publicOutput.nextActionState,
                     [Action.toFields(input)]
                 );
@@ -180,7 +176,7 @@ export class RollupContract extends SmartContract {
 
     @method recordAction(actionHash: Field, address: PublicKey) {
         // Verify caller address
-        requireCaller(address, this);
+        Utils.requireCaller(address, this);
 
         // Create & dispatch action
         let action = new Action({
@@ -201,7 +197,7 @@ export class RollupContract extends SmartContract {
         proof.verify();
         proof.publicOutput.initialActionState.assertEquals(
             curActionState,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RollupContract.name,
                 RollupContract.prototype.rollup.name,
                 ErrorEnum.CURRENT_ACTION_STATE
@@ -209,7 +205,7 @@ export class RollupContract extends SmartContract {
         );
         proof.publicOutput.initialCounterRoot.assertEquals(
             counterRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RollupContract.name,
                 RollupContract.prototype.rollup.name,
                 ErrorEnum.ACTION_COUNTER_ROOT
@@ -217,7 +213,7 @@ export class RollupContract extends SmartContract {
         );
         proof.publicOutput.initialRollupRoot.assertEquals(
             rollupRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RollupContract.name,
                 RollupContract.prototype.rollup.name,
                 ErrorEnum.ROLLUP_ROOT
@@ -225,7 +221,7 @@ export class RollupContract extends SmartContract {
         );
         proof.publicOutput.nextActionState.assertEquals(
             lastActionState,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RollupContract.name,
                 RollupContract.prototype.rollup.name,
                 ErrorEnum.LAST_ACTION_STATE

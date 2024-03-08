@@ -14,11 +14,7 @@ import {
     ZkProgram,
     PrivateKey,
 } from 'o1js';
-import {
-    buildAssertMessage,
-    requireCaller,
-    updateActionState,
-} from '../libs/utils.js';
+import { ActionMask as _ActionMask, Utils } from '@auxo-dev/auxo-libs';
 import { RequestVector } from '../libs/Requester.js';
 import {
     REQUEST_FEE,
@@ -26,7 +22,6 @@ import {
     ZkAppEnum,
     ZkProgramEnum,
 } from '../constants.js';
-import { ActionMask as _ActionMask, processAction } from './Actions.js';
 import { ErrorEnum } from './constants.js';
 import {
     ActionWitness,
@@ -41,6 +36,7 @@ import {
     Level1Witness,
 } from '../storages/RequestStorage.js';
 import { ResponseContract } from './Response.js';
+import { processAction } from './Actions.js';
 
 export const enum RequestStatus {
     EMPTY,
@@ -187,7 +183,7 @@ export const UpdateRequest = ZkProgram({
                 input.action.type
                     .get(Field(ActionEnum.INITIALIZE))
                     .assertTrue(
-                        buildAssertMessage(
+                        Utils.buildAssertMessage(
                             UpdateRequest.name,
                             UpdateRequest.initialize.name,
                             ErrorEnum.ACTION_TYPE
@@ -200,7 +196,7 @@ export const UpdateRequest = ZkProgram({
                 // Verify key index
                 earlierProof.publicOutput.nextKeyIndexRoot.assertEquals(
                     keyIndexWitness.calculateRoot(input.action.keyIndex),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.KEY_INDEX_ROOT
@@ -208,7 +204,7 @@ export const UpdateRequest = ZkProgram({
                 );
                 requestId.assertEquals(
                     keyIndexWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.KEY_INDEX_INDEX
@@ -218,7 +214,7 @@ export const UpdateRequest = ZkProgram({
                 // Verify empty requester
                 earlierProof.publicOutput.nextRequesterRoot.assertEquals(
                     requesterWitness.calculateRoot(Field(0)),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.REQUESTER_ROOT
@@ -226,7 +222,7 @@ export const UpdateRequest = ZkProgram({
                 );
                 requestId.assertEquals(
                     requesterWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.REQUESTER_INDEX
@@ -236,7 +232,7 @@ export const UpdateRequest = ZkProgram({
                 // Verify empty request status
                 earlierProof.publicOutput.nextStatusRoot.assertEquals(
                     statusWitness.calculateRoot(Field(RequestStatus.EMPTY)),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.REQUEST_STATUS_ROOT
@@ -244,7 +240,7 @@ export const UpdateRequest = ZkProgram({
                 );
                 requestId.assertEquals(
                     statusWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.REQUEST_STATUS_INDEX
@@ -254,7 +250,7 @@ export const UpdateRequest = ZkProgram({
                 // Verify empty request period
                 earlierProof.publicOutput.nextPeriodRoot.assertEquals(
                     periodWitness.calculateRoot(Field(0)),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.REQUEST_PERIOD_ROOT
@@ -262,7 +258,7 @@ export const UpdateRequest = ZkProgram({
                 );
                 requestId.assertEquals(
                     periodWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.REQUEST_PERIOD_INDEX
@@ -290,9 +286,10 @@ export const UpdateRequest = ZkProgram({
                 );
 
                 // Calculate corresponding action state
-                let actionState = updateActionState(input.previousActionState, [
-                    Action.toFields(input.action),
-                ]);
+                let actionState = Utils.updateActionState(
+                    input.previousActionState,
+                    [Action.toFields(input.action)]
+                );
 
                 // Verify the action is rolluped
                 // verifyRollup(UpdateRequest.name);
@@ -354,7 +351,7 @@ export const UpdateRequest = ZkProgram({
                 input.action.type
                     .get(Field(ActionEnum.ABORT))
                     .assertTrue(
-                        buildAssertMessage(
+                        Utils.buildAssertMessage(
                             UpdateRequest.name,
                             UpdateRequest.initialize.name,
                             ErrorEnum.ACTION_TYPE
@@ -366,7 +363,7 @@ export const UpdateRequest = ZkProgram({
                     statusWitness.calculateRoot(
                         Field(RequestStatus.INITIALIZED)
                     ),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.REQUEST_STATUS_ROOT
@@ -374,7 +371,7 @@ export const UpdateRequest = ZkProgram({
                 );
                 input.action.requestId.assertEquals(
                     statusWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.REQUEST_STATUS_INDEX
@@ -387,9 +384,10 @@ export const UpdateRequest = ZkProgram({
                 );
 
                 // Calculate corresponding action state
-                let actionState = updateActionState(input.previousActionState, [
-                    Action.toFields(input.action),
-                ]);
+                let actionState = Utils.updateActionState(
+                    input.previousActionState,
+                    [Action.toFields(input.action)]
+                );
 
                 // Verify the action isn't already processed
                 let nextProcessRoot = processAction(
@@ -453,7 +451,7 @@ export const UpdateRequest = ZkProgram({
                 input.action.type
                     .get(Field(ActionEnum.FINALIZE))
                     .assertTrue(
-                        buildAssertMessage(
+                        Utils.buildAssertMessage(
                             UpdateRequest.name,
                             UpdateRequest.initialize.name,
                             ErrorEnum.ACTION_TYPE
@@ -465,7 +463,7 @@ export const UpdateRequest = ZkProgram({
                     statusWitness.calculateRoot(
                         Field(RequestStatus.INITIALIZED)
                     ),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.REQUEST_STATUS_ROOT
@@ -473,7 +471,7 @@ export const UpdateRequest = ZkProgram({
                 );
                 input.action.requestId.assertEquals(
                     statusWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.REQUEST_STATUS_INDEX
@@ -483,7 +481,7 @@ export const UpdateRequest = ZkProgram({
                 // Verify empty accumulation value
                 earlierProof.publicOutput.nextAccumulationRoot.assertEquals(
                     accumulationWitness.calculateRoot(Field(0)),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.ACCUMULATION_ROOT
@@ -491,7 +489,7 @@ export const UpdateRequest = ZkProgram({
                 );
                 input.action.requestId.assertEquals(
                     accumulationWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.ACCUMULATION_INDEX
@@ -510,9 +508,10 @@ export const UpdateRequest = ZkProgram({
                 );
 
                 // Calculate corresponding action state
-                let actionState = updateActionState(input.previousActionState, [
-                    Action.toFields(input.action),
-                ]);
+                let actionState = Utils.updateActionState(
+                    input.previousActionState,
+                    [Action.toFields(input.action)]
+                );
 
                 // Verify the action isn't already processed
                 let nextProcessRoot = processAction(
@@ -573,7 +572,7 @@ export const UpdateRequest = ZkProgram({
                 input.action.type
                     .get(Field(ActionEnum.RESOLVE))
                     .assertTrue(
-                        buildAssertMessage(
+                        Utils.buildAssertMessage(
                             UpdateRequest.name,
                             UpdateRequest.initialize.name,
                             ErrorEnum.ACTION_TYPE
@@ -583,7 +582,7 @@ export const UpdateRequest = ZkProgram({
                 // Verify request is finalized
                 earlierProof.publicOutput.nextStatusRoot.assertEquals(
                     statusWitness.calculateRoot(Field(RequestStatus.FINALIZED)),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.REQUEST_STATUS_ROOT
@@ -591,7 +590,7 @@ export const UpdateRequest = ZkProgram({
                 );
                 input.action.requestId.assertEquals(
                     statusWitness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
                         ErrorEnum.REQUEST_STATUS_INDEX
@@ -604,9 +603,10 @@ export const UpdateRequest = ZkProgram({
                 );
 
                 // Calculate corresponding action state
-                let actionState = updateActionState(input.previousActionState, [
-                    Action.toFields(input.action),
-                ]);
+                let actionState = Utils.updateActionState(
+                    input.previousActionState,
+                    [Action.toFields(input.action)]
+                );
 
                 // Verify the action isn't already processed
                 let nextProcessRoot = processAction(
@@ -724,12 +724,12 @@ export class RequestContract extends SmartContract {
         endTimestamp: UInt64
     ) {
         // Verify caller
-        requireCaller(requester, this);
+        Utils.requireCaller(requester, this);
 
         // Verify timestamp configuration
         startTimestamp.assertGreaterThanOrEqual(
             this.network.timestamp.getAndRequireEquals(),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.initialize.name,
                 ErrorEnum.REQUEST_PERIOD
@@ -739,7 +739,7 @@ export class RequestContract extends SmartContract {
             .add(REQUEST_MIN_PERIOD)
             .assertLessThanOrEqual(
                 endTimestamp,
-                buildAssertMessage(
+                Utils.buildAssertMessage(
                     RequestContract.name,
                     RequestContract.prototype.initialize.name,
                     ErrorEnum.REQUEST_PERIOD
@@ -775,7 +775,7 @@ export class RequestContract extends SmartContract {
      */
     @method abort(requestId: Field, requester: PublicKey) {
         // Verify caller
-        requireCaller(requester, this);
+        Utils.requireCaller(requester, this);
 
         // Create and dispatch action
         let action = new Action({
@@ -815,7 +815,7 @@ export class RequestContract extends SmartContract {
         periodWitness: Level1Witness
     ) {
         // Verify caller
-        requireCaller(requester, this);
+        Utils.requireCaller(requester, this);
 
         // Verify requester
         this.verifyRequester(requestId, requester, requesterWitness);
@@ -830,7 +830,7 @@ export class RequestContract extends SmartContract {
         // Verify request period
         endTimestamp.assertGreaterThan(
             this.network.timestamp.getAndRequireEquals(),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.finalize.name,
                 ErrorEnum.REQUEST_PERIOD
@@ -915,7 +915,7 @@ export class RequestContract extends SmartContract {
         proof.verify();
         proof.publicOutput.initialRequestCounter.assertEquals(
             requestCounter,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.update.name,
                 ErrorEnum.REQUEST_COUNTER
@@ -923,7 +923,7 @@ export class RequestContract extends SmartContract {
         );
         proof.publicOutput.initialKeyIndexRoot.assertEquals(
             keyIndexRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.update.name,
                 ErrorEnum.KEY_INDEX_ROOT
@@ -931,7 +931,7 @@ export class RequestContract extends SmartContract {
         );
         proof.publicOutput.initialRequestCounter.assertEquals(
             requesterRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.update.name,
                 ErrorEnum.REQUESTER_ROOT
@@ -939,7 +939,7 @@ export class RequestContract extends SmartContract {
         );
         proof.publicOutput.initialStatusRoot.assertEquals(
             statusRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.update.name,
                 ErrorEnum.REQUEST_STATUS_ROOT
@@ -947,7 +947,7 @@ export class RequestContract extends SmartContract {
         );
         proof.publicOutput.initialPeriodRoot.assertEquals(
             periodRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.update.name,
                 ErrorEnum.REQUEST_PERIOD_ROOT
@@ -955,7 +955,7 @@ export class RequestContract extends SmartContract {
         );
         proof.publicOutput.initialAccumulationRoot.assertEquals(
             accumulationRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.update.name,
                 ErrorEnum.ACCUMULATION_ROOT
@@ -963,7 +963,7 @@ export class RequestContract extends SmartContract {
         );
         proof.publicOutput.initialProcessRoot.assertEquals(
             processRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.update.name,
                 ErrorEnum.PROCESS_ROOT
@@ -991,7 +991,7 @@ export class RequestContract extends SmartContract {
             .getAndRequireEquals()
             .assertEquals(
                 witness.calculateRoot(Poseidon.hash(requester.toFields())),
-                buildAssertMessage(
+                Utils.buildAssertMessage(
                     RequestContract.name,
                     RequestContract.prototype.verifyRequestStatus.name,
                     ErrorEnum.REQUESTER_ROOT
@@ -999,7 +999,7 @@ export class RequestContract extends SmartContract {
             );
         requestId.assertEquals(
             witness.calculateIndex(),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.verifyRequestStatus.name,
                 ErrorEnum.REQUESTER_INDEX
@@ -1016,7 +1016,7 @@ export class RequestContract extends SmartContract {
             .getAndRequireEquals()
             .assertEquals(
                 witness.calculateRoot(status),
-                buildAssertMessage(
+                Utils.buildAssertMessage(
                     RequestContract.name,
                     RequestContract.prototype.verifyRequestStatus.name,
                     ErrorEnum.REQUEST_STATUS_ROOT
@@ -1024,7 +1024,7 @@ export class RequestContract extends SmartContract {
             );
         requestId.assertEquals(
             witness.calculateIndex(),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.verifyRequestStatus.name,
                 ErrorEnum.REQUEST_STATUS_INDEX
@@ -1049,7 +1049,7 @@ export class RequestContract extends SmartContract {
                         ].flat()
                     )
                 ),
-                buildAssertMessage(
+                Utils.buildAssertMessage(
                     RequestContract.name,
                     RequestContract.prototype.verifyRequestPeriod.name,
                     ErrorEnum.REQUEST_PERIOD_ROOT
@@ -1057,7 +1057,7 @@ export class RequestContract extends SmartContract {
             );
         requestId.assertEquals(
             witness.calculateIndex(),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.verifyRequestPeriod.name,
                 ErrorEnum.REQUEST_PERIOD_INDEX

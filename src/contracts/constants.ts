@@ -1,3 +1,9 @@
+import { Field } from 'o1js';
+
+export type ZkAppAction = {
+    hash(): Field;
+};
+
 export enum EventEnum {
     ROLLUPED = 'actions-rolluped',
     PROCESSED = 'actions-processed',
