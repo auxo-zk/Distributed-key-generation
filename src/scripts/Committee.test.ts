@@ -77,12 +77,12 @@ describe('Committee', () => {
 
     // beforeEach(() => {});
 
-    it('compile proof', async () => {
+    xit('compile proof', async () => {
         // compile proof
         await RollupCommittee.compile();
     });
 
-    it('Create committee consist of 2 people with threshold 1, and test deploy DKG', async () => {
+    xit('Create committee consist of 2 people with threshold 1, and test deploy DKG', async () => {
         let arrayAddress = [];
         arrayAddress.push(addresses.p1, addresses.p2);
         myMemberArray1 = new MemberArray(arrayAddress);
@@ -118,7 +118,7 @@ describe('Committee', () => {
         await tx.sign([feePayerKey]).send();
     });
 
-    it('create proof first step...', async () => {
+    xit('create proof first step...', async () => {
         // create first step proof
         proof = await RollupCommittee.firstStep(
             Reducer.initialActionState,

@@ -672,7 +672,7 @@
 //     //   () => {
 //     //     AccountUpdate.fundNewAccount(feePayerKey.publicKey);
 //     //     requestContract.deploy();
-//     //     requestContract.responeContractAddress.set(
+//     //     requestContract.responseContractAddress.set(
 //     //       contracts[Contract.REQUEST].contract.address
 //     //     );
 //     //     let feePayerAccount = AccountUpdate.createSigned(feePayerKey.publicKey);

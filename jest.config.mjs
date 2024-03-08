@@ -8,7 +8,7 @@ export default {
       useESM: true,
     },
   },
-  testTimeout: 2_000_000,
+  testTimeout: 1_000_000,
   transform: {
     '^.+\\.(t)s$': 'ts-jest',
     '^.+\\.(j)s$': 'babel-jest',
@@ -17,7 +17,8 @@ export default {
   transformIgnorePatterns: [
     '<rootDir>/node_modules/(?!(tslib|o1js/node_modules/tslib))',
   ],
-  modulePathIgnorePatterns: ['<rootDir>/build/'],
+  modulePaths: ['<rootDir>/build/esm/'],
+  modulePathIgnorePatterns: ['<rootDir>/build/cjs'],
   moduleNameMapper: {
     '^(\\.{1,2}/.+)\\.js$': '$1',
   },

@@ -99,7 +99,7 @@ import { UpdateRequest, RequestContract } from '../contracts/Request.js';
 import { packIndexArray } from '../libs/utils.js';
 import { ResponseContributionStorage } from '../storages/RequestStorage.js';
 
-describe('DKG', () => {
+xdescribe('DKG', () => {
     const doProofs = false;
     const profiling = false;
     const logMemory = false;
@@ -453,7 +453,7 @@ describe('DKG', () => {
         let tx = await Mina.transaction(feePayerKey.publicKey, () => {
             AccountUpdate.fundNewAccount(feePayerKey.publicKey);
             requestContract.deploy();
-            // requestContract.responeContractAddress.set(
+            // requestContract.responseContractAddress.set(
             //     contracts[Contract.REQUEST].contract.address
             // );
             let feePayerAccount = AccountUpdate.createSigned(

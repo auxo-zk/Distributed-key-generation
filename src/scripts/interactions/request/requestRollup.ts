@@ -32,7 +32,7 @@ async function main() {
         requestStatusRoot: Field(rawState[0]),
         requesterRoot: Field(rawState[1]),
         actionState: Field(rawState[2]),
-        responeContractAddress: PublicKey.fromFields([
+        responseContractAddress: PublicKey.fromFields([
             rawState[3],
             rawState[4],
         ]),

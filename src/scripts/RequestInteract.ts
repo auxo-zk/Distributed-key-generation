@@ -79,8 +79,8 @@
 
 //     let { keys, addresses } = randomAccounts(
 //         'request',
-//         'respone',
-//         'rqter1',
+//         'response',
+//         'requester1',
 //         'rqteD1',
 //         'R1',
 //         'D1'
@@ -165,10 +165,10 @@
 //         () => {
 //             AccountUpdate.fundNewAccount(feePayer, 1);
 //             requestContract.deploy();
-//             requestContract.responeContractAddress.set(addresses.respone);
+//             requestContract.responseContractAddress.set(addresses.response);
 //         }
 //     );
-//     await tx.sign([feePayerKey, requestContractKey, keys.respone]).send();
+//     await tx.sign([feePayerKey, requestContractKey, keys.response]).send();
 //     await wait();
 //     await fetchAccount({ publicKey: requestContractAddress });
 
