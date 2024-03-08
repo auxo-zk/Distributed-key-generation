@@ -4,6 +4,7 @@ build
 coverage
 .husky
 caches
+*.yml
 
 # Editor
 .vscode
