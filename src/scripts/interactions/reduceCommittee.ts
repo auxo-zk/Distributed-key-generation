@@ -10,7 +10,7 @@
 // } from '../../contracts/Committee.js';
 // import axios from 'axios';
 // import { MemberArray } from '../../libs/Committee.js';
-// import { IPFSHash } from '@auxo-dev/auxo-libs';
+// import { IpfsHash } from '@auxo-dev/auxo-libs';
 // import {
 //   EMPTY_LEVEL_2_TREE,
 //   MemberStorage,
@@ -91,7 +91,7 @@
 //       new CommitteeAction({
 //         addresses: MemberArray.from(e.actions[0].slice(0, 7)),
 //         threshold: Field(e.actions[0][7]),
-//         ipfsHash: IPFSHash.fromFields(e.actions[0].slice(8)),
+//         ipfsHash: IpfsHash.fromFields(e.actions[0].slice(8)),
 //       })
 //   );
 

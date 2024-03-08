@@ -11,7 +11,7 @@
 // import { compile, proveAndSend, wait } from '../../helper/deploy.js';
 // import { fetchZkAppState } from '../../helper/deploy.js';
 // import { Config, Key } from '../../helper/config.js';
-// import { CustomScalar, IPFSHash } from '@auxo-dev/auxo-libs';
+// import { CustomScalar, IpfsHash } from '@auxo-dev/auxo-libs';
 // import {
 //     kMemberInput,
 //     CommitteeContract,
@@ -79,7 +79,7 @@
 //     let committeeAction = new CommitteeAction({
 //         addresses: myMemberArray1,
 //         threshold: Field(1),
-//         ipfsHash: IPFSHash.fromString(
+//         ipfsHash: IpfsHash.fromString(
 //             'QmeeuwKeiAYSMjpj6f1wLQmhbvzsqc1qaemkim5Mbd9v8v'
 //         ),
 //     });

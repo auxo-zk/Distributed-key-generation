@@ -13,7 +13,7 @@ import {
     PublicKey,
     Void,
 } from 'o1js';
-import { IPFSHash } from '@auxo-dev/auxo-libs';
+import { IpfsHash } from '@auxo-dev/auxo-libs';
 import { buildAssertMessage, updateActionState } from '../libs/utils.js';
 import { COMMITTEE_MAX_SIZE, ZkProgramEnum } from '../constants.js';
 import {
@@ -28,7 +28,7 @@ import { ErrorEnum, EventEnum } from './constants.js';
 export class CommitteeAction extends Struct({
     addresses: MemberArray,
     threshold: Field,
-    ipfsHash: IPFSHash,
+    ipfsHash: IpfsHash,
 }) {
     static fromFields(fields: Field[]): CommitteeAction {
         return super.fromFields(fields) as CommitteeAction;

@@ -9,7 +9,7 @@ import {
 } from '../../../contracts/Committee.js';
 import axios from 'axios';
 import { MemberArray } from '../../../libs/Committee.js';
-import { IPFSHash } from '@auxo-dev/auxo-libs';
+import { IpfsHash } from '@auxo-dev/auxo-libs';
 import {
     EMPTY_LEVEL_2_TREE,
     MemberStorage,
@@ -97,7 +97,7 @@ async function main() {
                 action.slice(0, COMMITTEE_MAX_SIZE * 2 + 1)
             ),
             threshold: Field(action[COMMITTEE_MAX_SIZE * 2 + 1]),
-            ipfsHash: IPFSHash.fromFields(
+            ipfsHash: IpfsHash.fromFields(
                 action.slice(COMMITTEE_MAX_SIZE * 2 + 2)
             ),
         });

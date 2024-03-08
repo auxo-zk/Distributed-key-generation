@@ -21,7 +21,7 @@ import {
     CommitteeMemberInput,
     RollupCommitteeOutput,
 } from '../contracts/Committee.js';
-import { IPFSHash } from '@auxo-dev/auxo-libs';
+import { IpfsHash } from '@auxo-dev/auxo-libs';
 import { MemberArray } from '../libs/Committee.js';
 import {
     EMPTY_LEVEL_2_TREE,
@@ -90,7 +90,7 @@ describe('Committee', () => {
         let action = new CommitteeAction({
             addresses: myMemberArray1,
             threshold: threshold1,
-            ipfsHash: IPFSHash.fromString('testing'),
+            ipfsHash: IpfsHash.fromString('testing'),
         });
 
         let tx = await Mina.transaction(feePayer, () => {
@@ -108,7 +108,7 @@ describe('Committee', () => {
         let action = new CommitteeAction({
             addresses: myMemberArray2,
             threshold: threshold2,
-            ipfsHash: IPFSHash.fromString('testing'),
+            ipfsHash: IpfsHash.fromString('testing'),
         });
 
         let tx = await Mina.transaction(feePayer, () => {
@@ -138,7 +138,7 @@ describe('Committee', () => {
             new CommitteeAction({
                 addresses: myMemberArray1,
                 threshold: threshold1,
-                ipfsHash: IPFSHash.fromString('testing'),
+                ipfsHash: IpfsHash.fromString('testing'),
             }),
             memberStorage.getLevel1Witness(Field(0)),
             settingStorage.getWitness(Field(0))
@@ -170,7 +170,7 @@ describe('Committee', () => {
             new CommitteeAction({
                 addresses: myMemberArray2,
                 threshold: threshold2,
-                ipfsHash: IPFSHash.fromString('testing'),
+                ipfsHash: IpfsHash.fromString('testing'),
             }),
             memberStorage.getLevel1Witness(Field(1)),
             settingStorage.getWitness(Field(1))

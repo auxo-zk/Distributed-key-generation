@@ -10,7 +10,7 @@ import {
     fetchAccount,
 } from 'o1js';
 import fs from 'fs';
-import { IPFSHash } from '@auxo-dev/auxo-libs';
+import { IpfsHash } from '@auxo-dev/auxo-libs';
 import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
 import {
@@ -114,7 +114,7 @@ async function main() {
         let action = new CommitteeAction({
             addresses: myMemberArray1,
             threshold: Field(1),
-            ipfsHash: IPFSHash.fromString('testing'),
+            ipfsHash: IpfsHash.fromString('testing'),
         });
         tx = await Mina.transaction(feePayer, () => {
             committeeContract.createCommittee(action);
@@ -141,7 +141,7 @@ async function main() {
         action = new CommitteeAction({
             addresses: myMemberArray2,
             threshold: Field(2),
-            ipfsHash: IPFSHash.fromString('testing'),
+            ipfsHash: IpfsHash.fromString('testing'),
         });
         tx = await Mina.transaction(feePayer, () => {
             committeeContract.createCommittee(action);
@@ -172,7 +172,7 @@ async function main() {
             new CommitteeAction({
                 addresses: myMemberArray1,
                 threshold: Field(1),
-                ipfsHash: IPFSHash.fromString('testing'),
+                ipfsHash: IpfsHash.fromString('testing'),
             }),
             new Level1Witness(
                 memberStorage.level1.getWitness(Field(0).toBigInt())
@@ -205,7 +205,7 @@ async function main() {
             new CommitteeAction({
                 addresses: myMemberArray2,
                 threshold: Field(2),
-                ipfsHash: IPFSHash.fromString('testing'),
+                ipfsHash: IpfsHash.fromString('testing'),
             }),
             new Level1Witness(
                 memberStorage.level1.getWitness(Field(1).toBigInt())
@@ -343,7 +343,7 @@ async function main() {
             let action = new CommitteeAction({
                 addresses: myMemberArray1,
                 threshold: Field(1),
-                ipfsHash: IPFSHash.fromString(
+                ipfsHash: IpfsHash.fromString(
                     'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
                 ),
             });
@@ -373,7 +373,7 @@ async function main() {
         //         new CommitteeAction({
         //             addresses: myMemberArray1,
         //             threshold: Field(1),
-        //             ipfsHash: IPFSHash.fromString(
+        //             ipfsHash: IpfsHash.fromString(
         //                 'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
         //             ),
         //         }),
