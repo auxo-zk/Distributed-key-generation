@@ -15,7 +15,7 @@
 // import fs from 'fs/promises';
 // import { getProfiler } from './helper/profiler.js';
 // import { Config, Key } from './helper/config.js';
-// import { CommitteeContract, RollupCommittee } from '../contracts/Committee.js';
+// import { CommitteeContract, UpdateCommittee } from '../contracts/Committee.js';
 // import {
 //     Action as DKGAction,
 //     ActionEnum,
@@ -521,7 +521,7 @@
 //         await compile(BatchDecryption, 'BatchDecryption', profiling);
 //         await compile(FinalizeResponse, 'FinalizeResponse', profiling);
 
-//         await compile(RollupCommittee, 'RollupCommittee', profiling);
+//         await compile(UpdateCommittee, 'UpdateCommittee', profiling);
 
 //         await compile(UpdateRequest, 'UpdateRequest', profiling);
 
@@ -724,8 +724,8 @@
 //     // await fetchAllContract(contracts);
 
 //     // console.log('Generate first step proof RollupDkg...');
-//     // if (profiling) DKGProfiler.start('RollupDkg.firstStep');
-//     // let updateKeyProof = await RollupDkg.firstStep(
+//     // if (profiling) DKGProfiler.start('RollupDkg.init');
+//     // let updateKeyProof = await RollupDkg.init(
 //     //   DKGAction.empty(),
 //     //   initialKeyCounter,
 //     //   initialKeyStatus,
@@ -737,8 +737,8 @@
 //     for (let i = 0; i < 1; i++) {
 //         let action = dkgActions[ActionEnum.GENERATE_KEY][i];
 //         console.log(`Generate step ${i + 1} proof RollupDkg...`);
-//         if (profiling) DKGProfiler.start('RollupDkg.nextStepGeneration');
-//         // updateKeyProof = await RollupDkg.nextStepGeneration(
+//         if (profiling) DKGProfiler.start('RollupDkg.generate');
+//         // updateKeyProof = await RollupDkg.generate(
 //         //   action,
 //         //   updateKeyProof,
 //         //   Field(i),
@@ -844,8 +844,8 @@
 //     // initialActionState = contracts[Contract.ROUND1].actionStates[0];
 
 //     console.log('Generate first step proof RollupRound1...');
-//     if (profiling) DKGProfiler.start('RollupRound1.firstStep');
-//     // let reduceProof = await RollupRound1.firstStep(
+//     if (profiling) DKGProfiler.start('RollupRound1.init');
+//     // let reduceProof = await RollupRound1.init(
 //     //   round1Actions[0],
 //     //   initialReduceState,
 //     //   initialActionState
@@ -892,8 +892,8 @@
 //     let reduceStateRoot = round1Contract.processRoot.get();
 
 //     console.log('Generate first step proof FinalizeRound1...');
-//     if (profiling) DKGProfiler.start('FinalizeRound1.firstStep');
-//     // let finalizeProof = await FinalizeRound1.firstStep(
+//     if (profiling) DKGProfiler.start('FinalizeRound1.init');
+//     // let finalizeProof = await FinalizeRound1.init(
 //     //   new FinalizeRound1Input({
 //     //     previousActionState: Field(0),
 //     //     action: Round1Action.empty(),
@@ -1038,8 +1038,8 @@
 //     // await fetchAllContract(contracts);
 
 //     console.log('Generate first step proof RollupDkg...');
-//     if (profiling) DKGProfiler.start('RollupDkg.firstStep');
-//     // let updateKeyProof = await RollupDkg.firstStep(
+//     if (profiling) DKGProfiler.start('RollupDkg.init');
+//     // let updateKeyProof = await RollupDkg.init(
 //     //   DKGAction.empty(),
 //     //   initialKeyCounter,
 //     //   initialKeyStatus,
@@ -1167,8 +1167,8 @@
 //     initialActionState = contracts[Contract.ROUND2].actionStates[0];
 
 //     console.log('Generate first step proof RollupRound2...');
-//     if (profiling) DKGProfiler.start('RollupRound2.firstStep');
-//     // let reduceProof2 = await RollupRound2.firstStep(
+//     if (profiling) DKGProfiler.start('RollupRound2.init');
+//     // let reduceProof2 = await RollupRound2.init(
 //     //   round2Actions[0],
 //     //   initialReduceState,
 //     //   initialActionState
@@ -1218,8 +1218,8 @@
 //     );
 
 //     console.log('Generate first step proof FinalizeRound2...');
-//     if (profiling) DKGProfiler.start('FinalizeRound2.firstStep');
-//     // let finalizeProof2 = await FinalizeRound2.firstStep(
+//     if (profiling) DKGProfiler.start('FinalizeRound2.init');
+//     // let finalizeProof2 = await FinalizeRound2.init(
 //     //   new FinalizeRound2Input({
 //     //     previousActionState: Field(0),
 //     //     action: Round2Action.empty(),
@@ -1357,8 +1357,8 @@
 //     // await fetchAllContract(contracts);
 
 //     console.log('Generate first step proof RollupDkg...');
-//     if (profiling) DKGProfiler.start('RollupDkg.firstStep');
-//     // let updateKeyProof = await RollupDkg.firstStep(
+//     if (profiling) DKGProfiler.start('RollupDkg.init');
+//     // let updateKeyProof = await RollupDkg.init(
 //     //   DKGAction.empty(),
 //     //   initialKeyCounter,
 //     //   initialKeyStatus,
@@ -1554,8 +1554,8 @@
 //     initialActionState = contracts[Contract.RESPONSE].actionStates[0];
 
 //     console.log('Generate first step proof RollupResponse...');
-//     if (profiling) DKGProfiler.start('RollupResponse.firstStep');
-//     // let reduceProof3 = await RollupResponse.firstStep(
+//     if (profiling) DKGProfiler.start('RollupResponse.init');
+//     // let reduceProof3 = await RollupResponse.init(
 //     //   responseActions[0],
 //     //   initialReduceState,
 //     //   initialActionState
@@ -1602,8 +1602,8 @@
 //     reduceStateRoot = responseContract.processRoot.get();
 
 //     console.log('Generate first step proof FinalizeResponse...');
-//     if (profiling) DKGProfiler.start('FinalizeResponse.firstStep');
-//     let completeProof = await FinalizeResponse.firstStep(
+//     if (profiling) DKGProfiler.start('FinalizeResponse.init');
+//     let completeProof = await FinalizeResponse.init(
 //         new FinalizeResponseInput({
 //             previousActionState: Field(0),
 //             action: ResponseAction.empty(),

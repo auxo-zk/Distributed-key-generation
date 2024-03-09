@@ -89,8 +89,8 @@
 //     });
 //     actions.map((e) => Provable.log(e));
 
-//     console.log('RollupDkg.firstStep...');
-//     let proof = await RollupDkg.firstStep(
+//     console.log('RollupDkg.init...');
+//     let proof = await RollupDkg.init(
 //         DKGAction.empty(),
 //         dkgState.keyCounter,
 //         dkgState.keyStatus,
@@ -102,8 +102,8 @@
 //         let action = actions[i];
 //         Provable.log('Action:', action);
 //         if (action.keyId.equals(Field(-1)).toBoolean()) {
-//             console.log('RollupDkg.nextStepGeneration...');
-//             proof = await RollupDkg.nextStepGeneration(
+//             console.log('RollupDkg.generate...');
+//             proof = await RollupDkg.generate(
 //                 action,
 //                 proof,
 //                 Field(keyCounters[Number(action.committeeId)]),

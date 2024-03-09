@@ -22,14 +22,14 @@ import {
 } from '../../contracts/Response.js';
 import {
     CommitteeContract,
-    RollupCommittee,
+    UpdateCommittee,
 } from '../../contracts/Committee.js';
 import { UpdateRequest, RequestContract } from '../../contracts/Request.js';
 
 async function main() {
     const cache = Cache.FileSystem('./caches');
     // const cache = "";
-    await compile(RollupCommittee, cache);
+    await compile(UpdateCommittee, cache);
 
     await compile(RollupDkg, cache);
 

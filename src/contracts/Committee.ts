@@ -22,33 +22,50 @@ import {
     FullMTWitness,
 } from '../storages/CommitteeStorage.js';
 import { MemberArray } from '../libs/Committee.js';
-import { ErrorEnum, EventEnum } from './constants.js';
+import { ErrorEnum, EventEnum, ZkAppAction } from './constants.js';
+import { rollup } from './Rollup.js';
 
-export class CommitteeAction extends Struct({
-    addresses: MemberArray,
-    threshold: Field,
-    ipfsHash: IpfsHash,
-}) {
-    static fromFields(fields: Field[]): CommitteeAction {
-        return super.fromFields(fields) as CommitteeAction;
+export {
+    Action as CommitteeAction,
+    CommitteeMemberInput,
+    CommitteeConfigInput,
+    UpdateCommitteeOutput,
+    UpdateCommittee,
+    UpdateCommitteeProof,
+    CommitteeContract,
+};
+
+class Action
+    extends Struct({
+        addresses: MemberArray,
+        threshold: Field,
+        ipfsHash: IpfsHash,
+    })
+    implements ZkAppAction
+{
+    static fromFields(fields: Field[]): Action {
+        return super.fromFields(fields) as Action;
+    }
+    hash(): Field {
+        return Poseidon.hash(Action.toFields(this));
     }
 }
 
-export class CommitteeMemberInput extends Struct({
+class CommitteeMemberInput extends Struct({
     address: PublicKey,
     committeeId: Field,
     memberId: Field,
     memberWitness: FullMTWitness,
 }) {}
 
-export class CommitteeConfigInput extends Struct({
+class CommitteeConfigInput extends Struct({
     N: Field,
     T: Field,
     committeeId: Field,
     settingWitness: Level1Witness,
 }) {}
 
-export class RollupCommitteeOutput extends Struct({
+class UpdateCommitteeOutput extends Struct({
     initialActionState: Field,
     initialMemberRoot: Field,
     initialSettingRoot: Field,
@@ -57,25 +74,21 @@ export class RollupCommitteeOutput extends Struct({
     nextMemberRoot: Field,
     nextSettingRoot: Field,
     nextCommitteeId: Field,
-}) {
-    hash(): Field {
-        return Poseidon.hash(RollupCommitteeOutput.toFields(this));
-    }
-}
+}) {}
 
-export const RollupCommittee = ZkProgram({
-    name: ZkProgramEnum.RollupCommittee,
-    publicOutput: RollupCommitteeOutput,
+const UpdateCommittee = ZkProgram({
+    name: ZkProgramEnum.UpdateCommittee,
+    publicOutput: UpdateCommitteeOutput,
     methods: {
-        firstStep: {
+        init: {
             privateInputs: [Field, Field, Field, Field],
             method(
                 initialActionState: Field,
                 initialMemberRoot: Field,
                 initialSettingRoot: Field,
                 initialCommitteeId: Field
-            ): RollupCommitteeOutput {
-                return new RollupCommitteeOutput({
+            ): UpdateCommitteeOutput {
+                return new UpdateCommitteeOutput({
                     initialActionState,
                     initialMemberRoot,
                     initialSettingRoot,
@@ -87,19 +100,19 @@ export const RollupCommittee = ZkProgram({
                 });
             },
         },
-        nextStep: {
+        update: {
             privateInputs: [
-                SelfProof<Void, RollupCommitteeOutput>,
-                CommitteeAction,
+                SelfProof<Void, UpdateCommitteeOutput>,
+                Action,
                 Level1Witness,
                 Level1Witness,
             ],
             method(
-                earlierProof: SelfProof<Void, RollupCommitteeOutput>,
-                input: CommitteeAction,
+                earlierProof: SelfProof<Void, UpdateCommitteeOutput>,
+                input: Action,
                 memberWitness: Level1Witness,
                 settingWitness: Level1Witness
-            ): RollupCommitteeOutput {
+            ): UpdateCommitteeOutput {
                 // Verify earlier proof
                 earlierProof.verify();
 
@@ -109,16 +122,16 @@ export const RollupCommittee = ZkProgram({
                 prevMemberRoot.assertEquals(
                     earlierProof.publicOutput.nextMemberRoot,
                     Utils.buildAssertMessage(
-                        RollupCommittee.name,
-                        'nextStep',
+                        UpdateCommittee.name,
+                        UpdateCommittee.update.name,
                         ErrorEnum.MEMBER_ROOT
                     )
                 );
                 memberKey.assertEquals(
                     earlierProof.publicOutput.nextCommitteeId,
                     Utils.buildAssertMessage(
-                        RollupCommittee.name,
-                        'nextStep',
+                        UpdateCommittee.name,
+                        UpdateCommittee.update.name,
                         ErrorEnum.MEMBER_INDEX_L1
                     )
                 );
@@ -129,16 +142,16 @@ export const RollupCommittee = ZkProgram({
                 prevSettingRoot.assertEquals(
                     earlierProof.publicOutput.nextSettingRoot,
                     Utils.buildAssertMessage(
-                        RollupCommittee.name,
-                        'nextStep',
+                        UpdateCommittee.name,
+                        UpdateCommittee.update.name,
                         ErrorEnum.SETTING_ROOT
                     )
                 );
                 settingKey.assertEquals(
                     earlierProof.publicOutput.nextCommitteeId,
                     Utils.buildAssertMessage(
-                        RollupCommittee.name,
-                        'nextStep',
+                        UpdateCommittee.name,
+                        UpdateCommittee.update.name,
                         ErrorEnum.SETTING_INDEX
                     )
                 );
@@ -164,7 +177,7 @@ export const RollupCommittee = ZkProgram({
                     Poseidon.hash([input.threshold, input.addresses.length])
                 );
 
-                return new RollupCommitteeOutput({
+                return new UpdateCommitteeOutput({
                     initialActionState:
                         earlierProof.publicOutput.initialActionState,
                     initialMemberRoot:
@@ -175,7 +188,7 @@ export const RollupCommittee = ZkProgram({
                         earlierProof.publicOutput.initialCommitteeId,
                     nextActionState: Utils.updateActionState(
                         earlierProof.publicOutput.nextActionState,
-                        [CommitteeAction.toFields(input)]
+                        [Action.toFields(input)]
                     ),
                     nextMemberRoot: nextMemberRoot,
                     nextSettingRoot: nextSettingRoot,
@@ -187,9 +200,18 @@ export const RollupCommittee = ZkProgram({
     },
 });
 
-export class RollupCommitteeProof extends ZkProgram.Proof(RollupCommittee) {}
+class UpdateCommitteeProof extends ZkProgram.Proof(UpdateCommittee) {}
 
-export class CommitteeContract extends SmartContract {
+/**
+ * @todo Prevent fake committee by spoofing IPFS hash
+ * @todo Replace struct with arguments array for method input
+ */
+class CommitteeContract extends SmartContract {
+    /**
+     * @description MT storing addresses of other zkApps
+     */
+    @state(Field) zkAppRoot = State<Field>();
+
     /**
      * @description Incremental value to keep track of committees
      */
@@ -201,16 +223,29 @@ export class CommitteeContract extends SmartContract {
     @state(Field) memberRoot = State<Field>();
 
     /**
-     * @description MT storing committees' threshold setting (T/N)
+     * @description MT storing committees' threshold config (T/N)
+     * @todo Change 'setting' to 'config'
      */
     @state(Field) settingRoot = State<Field>();
+
+    /**
+     * @description MT storing committees' key usage fee
+     * @todo To be implemented
+     */
+    @state(Field) feeRoot = State<Field>();
+
+    /**
+     * @description MT storing committees' fee receiver address
+     * @todo To be implemented
+     */
+    @state(Field) feeReceiverRoot = State<Field>();
 
     /**
      * @description Latest rolluped action's state
      */
     @state(Field) actionState = State<Field>();
 
-    reducer = Reducer({ actionType: CommitteeAction });
+    reducer = Reducer({ actionType: Action });
 
     events = {
         [EventEnum.ROLLUPED]: Field,
@@ -224,19 +259,45 @@ export class CommitteeContract extends SmartContract {
     }
 
     /**
-     * Create new committee
+     * Create a new DKG committee
      * @param action Committee's information
      */
-    @method createCommittee(action: CommitteeAction) {
+    @method createCommittee(action: Action) {
+        // Verify committee threshold
+        action.threshold.assertGreaterThan(
+            0,
+            Utils.buildAssertMessage(
+                CommitteeContract.name,
+                CommitteeContract.prototype.createCommittee.name,
+                ErrorEnum.COMMITTEE_THRESHOLD
+            )
+        );
         action.threshold.assertLessThanOrEqual(action.addresses.length);
+
+        // Verify committee members
+        for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+            for (let j = i + 1; j < COMMITTEE_MAX_SIZE; j++) {
+                Poseidon.hash(action.addresses.get(Field(i)).toFields())
+                    .equals(
+                        Poseidon.hash(action.addresses.get(Field(j)).toFields())
+                    )
+                    .assertFalse(
+                        Utils.buildAssertMessage(
+                            CommitteeContract.name,
+                            CommitteeContract.prototype.createCommittee.name,
+                            ErrorEnum.DUPLICATED_MEMBER
+                        )
+                    );
+            }
+        }
         this.reducer.dispatch(action);
     }
 
     /**
-     * Rollup committee actions
-     * @param proof Recursive rollup proof
+     * Update committees by rollup to the latest actions
+     * @param proof Verification proof
      */
-    @method rollup(proof: RollupCommitteeProof) {
+    @method updateCommittees(proof: UpdateCommitteeProof) {
         // Verify proof
         proof.verify();
 
@@ -247,53 +308,41 @@ export class CommitteeContract extends SmartContract {
         let settingRoot = this.settingRoot.getAndRequireEquals();
         let lastActionState = this.account.actionState.getAndRequireEquals();
 
-        // Verify current action state
-        curActionState.assertEquals(
-            proof.publicOutput.initialActionState,
-            Utils.buildAssertMessage(
-                CommitteeContract.name,
-                'rollup',
-                ErrorEnum.CURRENT_ACTION_STATE
-            )
+        // Verify rollup
+        rollup(
+            CommitteeContract.name,
+            proof.publicOutput,
+            curActionState,
+            lastActionState
         );
 
-        // Verify current committee Id
+        // Verify committee Id
         nextCommitteeId.assertEquals(
             proof.publicOutput.initialCommitteeId,
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                'rollup',
+                CommitteeContract.prototype.updateCommittees.name,
                 ErrorEnum.NEXT_COMMITTEE_ID
             )
         );
 
-        // Verify current member root
+        // Verify member root
         memberRoot.assertEquals(
             proof.publicOutput.initialMemberRoot,
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                'rollup',
+                CommitteeContract.prototype.updateCommittees.name,
                 ErrorEnum.MEMBER_ROOT
             )
         );
 
-        // Verify current setting root
+        // Verify setting root
         settingRoot.assertEquals(
             proof.publicOutput.initialSettingRoot,
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                'rollup',
+                CommitteeContract.prototype.updateCommittees.name,
                 ErrorEnum.SETTING_ROOT
-            )
-        );
-
-        // Verify last action state
-        lastActionState.assertEquals(
-            proof.publicOutput.nextActionState,
-            Utils.buildAssertMessage(
-                CommitteeContract.name,
-                'rollup',
-                ErrorEnum.LAST_ACTION_STATE
             )
         );
 
@@ -304,17 +353,14 @@ export class CommitteeContract extends SmartContract {
         this.settingRoot.set(proof.publicOutput.nextSettingRoot);
 
         // Emit rollup event
-        this.emitEvent(
-            EventEnum.ROLLUPED,
-            proof.publicOutput.nextCommitteeId.sub(Field(1))
-        );
+        this.emitEvent(EventEnum.ROLLUPED, lastActionState);
     }
 
     /**
      * Verify if an address is a member of a committee
      * @param input Verification input
      */
-    checkMember(input: CommitteeMemberInput) {
+    verifyMember(input: CommitteeMemberInput) {
         this.memberRoot
             .getAndRequireEquals()
             .assertEquals(
@@ -325,7 +371,7 @@ export class CommitteeContract extends SmartContract {
                 ),
                 Utils.buildAssertMessage(
                     CommitteeContract.name,
-                    'checkMember',
+                    'verifyMember',
                     ErrorEnum.MEMBER_ROOT
                 )
             );
@@ -333,7 +379,7 @@ export class CommitteeContract extends SmartContract {
             input.memberWitness.level1.calculateIndex(),
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                'checkMember',
+                'verifyMember',
                 ErrorEnum.MEMBER_INDEX_L1
             )
         );
@@ -341,7 +387,7 @@ export class CommitteeContract extends SmartContract {
             input.memberWitness.level2.calculateIndex(),
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                'checkMember',
+                'verifyMember',
                 ErrorEnum.MEMBER_INDEX_L2
             )
         );
@@ -351,7 +397,7 @@ export class CommitteeContract extends SmartContract {
      * Verify the setting of a committee
      * @param input Verification input
      */
-    checkConfig(input: CommitteeConfigInput) {
+    verifyConfig(input: CommitteeConfigInput) {
         input.N.assertGreaterThanOrEqual(input.T);
         let hashSetting = Poseidon.hash([input.T, input.N]);
         let root = input.settingWitness.calculateRoot(hashSetting);
@@ -361,7 +407,7 @@ export class CommitteeContract extends SmartContract {
             onChainRoot,
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                'checkConfig',
+                'verifyConfig',
                 ErrorEnum.SETTING_ROOT
             )
         );
@@ -369,7 +415,7 @@ export class CommitteeContract extends SmartContract {
             _committeeId,
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                'checkConfig',
+                'verifyConfig',
                 ErrorEnum.SETTING_INDEX
             )
         );

@@ -186,8 +186,8 @@
 //     await wait();
 //     await fetchAccount({ publicKey: requestContractAddress });
 
-//     console.log('Create UpdateRequest.firstStep requestInput1...');
-//     proof = await UpdateRequest.firstStep(
+//     console.log('Create UpdateRequest.init requestInput1...');
+//     proof = await UpdateRequest.init(
 //         requestContract.actionState.get(),
 //         requestStatusMap.getRoot(),
 //         requesterMap.getRoot()

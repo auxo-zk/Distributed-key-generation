@@ -1,4 +1,4 @@
-import { CommitteeContract, RollupCommittee } from '../contracts/Committee.js';
+import { CommitteeContract, UpdateCommittee } from '../contracts/Committee.js';
 import { DkgContract, RollupDkg } from '../contracts/DKG.js';
 import { BatchDecryption, BatchEncryption } from '../contracts/Encryption.js';
 import {
@@ -20,7 +20,7 @@ import {
 const PROGRAMS = {
     BatchEncryption,
     BatchDecryption,
-    RollupCommittee,
+    UpdateCommittee,
     RollupDkg,
     RollupRound1,
     FinalizeRound1,
@@ -44,7 +44,7 @@ const CONTRACTS = {
 };
 
 const DEPENDENCIES = {
-    CommitteeContract: [RollupCommittee],
+    CommitteeContract: [UpdateCommittee],
     DkgContract: [RollupDkg],
     Round1Contract: [RollupRound1, FinalizeRound1],
     Round2Contract: [RollupRound2, BatchEncryption, FinalizeRound2],
@@ -55,7 +55,7 @@ const DEPENDENCIES = {
 
 async function query(constraints = true, cacheFiles = false) {
     if (constraints) {
-        // TODO - Log table
+        // @todo - Log table
         console.log('Constraints list:');
         let constraints: { [key: string]: number } = {};
 
@@ -84,7 +84,7 @@ async function query(constraints = true, cacheFiles = false) {
     }
 
     if (cacheFiles) {
-        // TODO - Log table
+        // @todo - Log table
         console.log('Cache files list:');
         let cacheFiles: { [key: string]: string[] } = {};
 

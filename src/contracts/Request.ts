@@ -36,7 +36,7 @@ import {
     Level1Witness,
 } from '../storages/RequestStorage.js';
 import { ResponseContract } from './Response.js';
-import { processAction } from './Actions.js';
+import { processAction } from './Rollup.js';
 
 export const enum RequestStatus {
     EMPTY,
@@ -114,7 +114,7 @@ export const UpdateRequest = ZkProgram({
     publicInput: UpdateRequestInput,
     publicOutput: UpdateRequestOutput,
     methods: {
-        firstStep: {
+        init: {
             privateInputs: [
                 Field,
                 Field,
@@ -760,8 +760,8 @@ export class RequestContract extends SmartContract {
         this.reducer.dispatch(action);
 
         // Receive fee from Tx sender
-        // TODO: Consider between this.sender or requester
-        // TODO: Migrate from constant fee to dynamic fee configurable by committees
+        // @todo Consider between this.sender or requester
+        // @todo Migrate from constant fee to dynamic fee configurable by committees
         let _requester = AccountUpdate.createSigned(this.sender);
         _requester.send({ to: this, amount: UInt64.from(REQUEST_FEE) });
     }
@@ -978,7 +978,7 @@ export class RequestContract extends SmartContract {
 
     @method claimFee(requestId: Field, receiver: PublicKey) {
         // Send shared fee
-        // TODO: Consider between this.sender or requester
+        // @todo Consider between this.sender or requester
         this.send({ to: receiver, amount: UInt64.from(REQUEST_FEE) });
     }
 

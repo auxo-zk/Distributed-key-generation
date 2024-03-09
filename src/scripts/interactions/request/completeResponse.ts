@@ -9,7 +9,7 @@
 // import {
 //   BatchEncryption,
 //   CommitteeContract,
-//   RollupCommittee,
+//   UpdateCommittee,
 //   DkgContract,
 //   FinalizeRound1,
 //   FinalizeRound2,
@@ -44,7 +44,7 @@
 //   const { cache, feePayer } = await prepare();
 
 //   // Compile programs
-//   await compile(RollupCommittee, cache);
+//   await compile(UpdateCommittee, cache);
 //   await compile(CommitteeContract, cache);
 //   await compile(RollupDkg, cache);
 //   await compile(DkgContract, cache);
@@ -123,11 +123,11 @@
 //   const actionHashes: Field[] = rawActions.map((e) => Field(e.hash));
 //   Provable.log('Action hashes:', actionHashes);
 
-//   console.log('FinalizeRound2.firstStep...');
+//   console.log('FinalizeRound2.init...');
 //   let initialHashArray = new EncryptionHashArray(
 //     [...Array(committee.numberOfMembers).keys()].map(() => Field(0))
 //   );
-//   let proof = await FinalizeRound2.firstStep(
+//   let proof = await FinalizeRound2.init(
 //     new FinalizeRound2Input({
 //       previousActionState: Field(0),
 //       action: Round2Action.empty(),

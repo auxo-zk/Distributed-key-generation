@@ -12,21 +12,34 @@ import {
     state,
 } from 'o1js';
 import { Utils } from '@auxo-dev/auxo-libs';
-import { ErrorEnum, EventEnum } from './constants.js';
 import {
     ActionWitness,
     EMPTY_ACTION_MT,
+    ProcessStatus,
     RollupStatus,
 } from '../storages/SharedStorage.js';
-import { ZkProgramEnum } from '../constants.js';
 import { EMPTY_ROLLUP_MT, RollupWitness } from '../storages/RollupStorage.js';
+import { ErrorEnum, EventEnum } from './constants.js';
+import { ZkProgramEnum } from '../constants.js';
 
-export class Action extends Struct({
+export {
+    Action as RollupAction,
+    RollupOutput,
+    Rollup,
+    RollupProof,
+    RollupContract,
+    verifyRollup,
+    rollup,
+    rollupWithMT,
+    processAction,
+};
+
+class Action extends Struct({
     address: PublicKey,
     actionHash: Field,
 }) {}
 
-export class RollupOutput extends Struct({
+class RollupOutput extends Struct({
     initialCounterRoot: Field,
     initialRollupRoot: Field,
     initialActionState: Field,
@@ -35,12 +48,12 @@ export class RollupOutput extends Struct({
     nextActionState: Field,
 }) {}
 
-export const Rollup = ZkProgram({
-    name: ZkProgramEnum.RollupMulti,
+const Rollup = ZkProgram({
+    name: ZkProgramEnum.Rollup,
     publicInput: Action,
     publicOutput: RollupOutput,
     methods: {
-        firstStep: {
+        init: {
             privateInputs: [Field, Field, Field],
             method(
                 input: Action,
@@ -58,7 +71,7 @@ export const Rollup = ZkProgram({
                 });
             },
         },
-        nextStep: {
+        rollup: {
             privateInputs: [
                 SelfProof<Action, RollupOutput>,
                 Field,
@@ -79,7 +92,7 @@ export const Rollup = ZkProgram({
                     counterWitness.calculateRoot(counter),
                     Utils.buildAssertMessage(
                         Rollup.name,
-                        Rollup.nextStep.name,
+                        Rollup.rollup.name,
                         ErrorEnum.ACTION_COUNTER_ROOT
                     )
                 );
@@ -87,7 +100,7 @@ export const Rollup = ZkProgram({
                     counterWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         Rollup.name,
-                        Rollup.nextStep.name,
+                        Rollup.rollup.name,
                         ErrorEnum.ACTION_COUNTER_INDEX
                     )
                 );
@@ -105,7 +118,7 @@ export const Rollup = ZkProgram({
                     rollupRoot,
                     Utils.buildAssertMessage(
                         Rollup.name,
-                        Rollup.nextStep.name,
+                        Rollup.rollup.name,
                         ErrorEnum.ROLLUP_ROOT
                     )
                 );
@@ -113,7 +126,7 @@ export const Rollup = ZkProgram({
                     rollupIndex,
                     Utils.buildAssertMessage(
                         Rollup.name,
-                        Rollup.nextStep.name,
+                        Rollup.rollup.name,
                         ErrorEnum.ROLLUP_INDEX
                     )
                 );
@@ -143,9 +156,9 @@ export const Rollup = ZkProgram({
     },
 });
 
-export class RollupProof extends ZkProgram.Proof(Rollup) {}
+class RollupProof extends ZkProgram.Proof(Rollup) {}
 
-export class RollupContract extends SmartContract {
+class RollupContract extends SmartContract {
     /**
      * @description MT storing latest action state values
      */
@@ -174,6 +187,11 @@ export class RollupContract extends SmartContract {
         this.actionState.set(Reducer.initialActionState);
     }
 
+    /**
+     * Record an action from caller contract
+     * @param actionHash Action's hash
+     * @param address Caller's address
+     */
     @method recordAction(actionHash: Field, address: PublicKey) {
         // Verify caller address
         Utils.requireCaller(address, this);
@@ -186,6 +204,10 @@ export class RollupContract extends SmartContract {
         this.reducer.dispatch(action);
     }
 
+    /**
+     * Rollup actions to latest state
+     * @param proof Verification proof
+     */
     @method rollup(proof: RollupProof) {
         // Get current state values
         let curActionState = this.actionState.getAndRequireEquals();
@@ -195,36 +217,23 @@ export class RollupContract extends SmartContract {
 
         // Verify proof
         proof.verify();
-        proof.publicOutput.initialActionState.assertEquals(
+
+        // Verify rollup
+        rollupWithMT(
+            RollupContract.name,
+            proof.publicOutput,
             curActionState,
-            Utils.buildAssertMessage(
-                RollupContract.name,
-                RollupContract.prototype.rollup.name,
-                ErrorEnum.CURRENT_ACTION_STATE
-            )
+            lastActionState,
+            rollupRoot
         );
+
+        // Verify counter value
         proof.publicOutput.initialCounterRoot.assertEquals(
             counterRoot,
             Utils.buildAssertMessage(
                 RollupContract.name,
                 RollupContract.prototype.rollup.name,
                 ErrorEnum.ACTION_COUNTER_ROOT
-            )
-        );
-        proof.publicOutput.initialRollupRoot.assertEquals(
-            rollupRoot,
-            Utils.buildAssertMessage(
-                RollupContract.name,
-                RollupContract.prototype.rollup.name,
-                ErrorEnum.ROLLUP_ROOT
-            )
-        );
-        proof.publicOutput.nextActionState.assertEquals(
-            lastActionState,
-            Utils.buildAssertMessage(
-                RollupContract.name,
-                RollupContract.prototype.rollup.name,
-                ErrorEnum.LAST_ACTION_STATE
             )
         );
 
@@ -234,3 +243,115 @@ export class RollupContract extends SmartContract {
         this.actionState.set(proof.publicOutput.nextActionState);
     }
 }
+
+const verifyRollup = (
+    programName: string,
+    root: Field,
+    actionIndex: Field,
+    witness: ActionWitness
+) => {
+    let [rollupRoot, rollupIndex] = witness.computeRootAndKey(
+        Field(RollupStatus.RECORDED)
+    );
+    root.assertEquals(
+        rollupRoot,
+        Utils.buildAssertMessage(
+            programName,
+            'verifyRollup',
+            ErrorEnum.ROLLUP_ROOT
+        )
+    );
+    actionIndex.assertEquals(
+        rollupIndex,
+        Utils.buildAssertMessage(
+            programName,
+            'verifyRollup',
+            ErrorEnum.ROLLUP_INDEX
+        )
+    );
+};
+
+const rollup = (
+    programName: string,
+    proofOutput: {
+        initialActionState: Field;
+        nextActionState: Field;
+    },
+    initialActionState: Field,
+    nextActionState: Field
+) => {
+    proofOutput.initialActionState.assertEquals(
+        initialActionState,
+        Utils.buildAssertMessage(
+            programName,
+            'rollup',
+            ErrorEnum.CURRENT_ACTION_STATE
+        )
+    );
+    proofOutput.nextActionState.assertEquals(
+        nextActionState,
+        Utils.buildAssertMessage(
+            programName,
+            'rollup',
+            ErrorEnum.LAST_ACTION_STATE
+        )
+    );
+};
+
+const rollupWithMT = (
+    programName: string,
+    proofOutput: {
+        initialActionState: Field;
+        nextActionState: Field;
+        initialRollupRoot: Field;
+    },
+    initialActionState: Field,
+    nextActionState: Field,
+    initialRollupRoot: Field
+) => {
+    proofOutput.initialActionState.assertEquals(
+        initialActionState,
+        Utils.buildAssertMessage(
+            programName,
+            'rollup',
+            ErrorEnum.CURRENT_ACTION_STATE
+        )
+    );
+    proofOutput.nextActionState.assertEquals(
+        nextActionState,
+        Utils.buildAssertMessage(
+            programName,
+            'rollup',
+            ErrorEnum.LAST_ACTION_STATE
+        )
+    );
+    proofOutput.initialRollupRoot.assertEquals(
+        initialRollupRoot,
+        Utils.buildAssertMessage(programName, 'rollup', ErrorEnum.ROLLUP_ROOT)
+    );
+};
+
+const processAction = (
+    programName: string,
+    actionState: Field,
+    previousRoot: Field,
+    witness: ActionWitness
+): Field => {
+    let [root, key] = witness.computeRootAndKey(
+        Field(ProcessStatus.NOT_PROCESSED)
+    );
+    root.assertEquals(
+        previousRoot,
+        Utils.buildAssertMessage(programName, 'process', ErrorEnum.PROCESS_ROOT)
+    );
+    key.assertEquals(
+        actionState,
+        Utils.buildAssertMessage(
+            programName,
+            'process',
+            ErrorEnum.PROCESS_INDEX
+        )
+    );
+
+    return witness.computeRootAndKey(Field(ProcessStatus.PROCESSED))[0];
+};

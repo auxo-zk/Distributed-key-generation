@@ -25,7 +25,15 @@ export enum ErrorEnum {
     PROCESS_ROOT = 'Incorrect process MT root',
     PROCESS_INDEX = 'Incorrect process MT index',
 
+    // Elgamal Encryption
+    ELGAMAL_ENCRYPTION = 'Incorrect ElGamal encryption',
+    ELGAMAL_DECRYPTION = 'Incorrect ElGamal decryption',
+    ELGAMAL_BATCH_SIZE = 'Incorrect ElGamal batch size',
+    ELGAMAL_KEY = 'Incorrect ElGamal key',
+
     // CommitteeContract errors
+    COMMITTEE_THRESHOLD = 'Incorrect threshold setting',
+    DUPLICATED_MEMBER = 'Existed member',
     NEXT_COMMITTEE_ID = 'Incorrect next committee Id',
     MEMBER_ROOT = 'Incorrect member MT root',
     MEMBER_INDEX_L1 = 'Incorrect member MT level 1  index',
@@ -44,7 +52,7 @@ export enum ErrorEnum {
     // Round1Contract errors
     R1_CONTRIBUTION_THRESHOLD = 'Incorrect number of round 1 contributions',
     R1_CONTRIBUTION_VALUE = 'Incorrect round 1 contribution value',
-    R1_CONTRIBUTION_INDEX_INDEX = 'Incorrect key index',
+    R1_CONTRIBUTION_KEY_INDEX = 'Incorrect key index',
     R1_CONTRIBUTION_ROOT = 'Incorrect round 1 contribution MT root',
     R1_CONTRIBUTION_INDEX_L1 = 'Incorrect round 1 contribution MT level 1  index',
     R1_CONTRIBUTION_INDEX_L2 = 'Incorrect round 1 contribution MT level 2 index',
@@ -56,7 +64,7 @@ export enum ErrorEnum {
     R2_CONTRIBUTION_ORDER = 'Incorrect contribution order',
     R2_CONTRIBUTION_THRESHOLD = 'Incorrect number of contributions',
     R2_CONTRIBUTION_VALUE = 'Incorrect contribution value',
-    R2_CONTRIBUTION_INDEX_INDEX = 'Incorrect key index',
+    R2_CONTRIBUTION_KEY_INDEX = 'Incorrect key index',
     R2_CONTRIBUTION_ROOT = 'Incorrect contribution MT root',
     R2_CONTRIBUTION_INDEX_L1 = 'Incorrect contribution MT level 1  index',
     R2_CONTRIBUTION_INDEX_L2 = 'Incorrect contribution MT level 2 index',

@@ -88,8 +88,8 @@ async function main() {
         console.log('Done');
     });
 
-    console.log('RollupResponse.firstStep...');
-    let proof = await RollupResponse.firstStep(
+    console.log('RollupResponse.init...');
+    let proof = await RollupResponse.init(
         ResponseAction.empty(),
         responseState.reduceState,
         nextActionId == 0

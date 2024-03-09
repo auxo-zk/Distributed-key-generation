@@ -4,88 +4,56 @@ export * as Storage from './storages/index.js';
 export * as ZkApp from './contracts/index.js';
 
 export {
-    // Structs
+    CommitteeAction,
     CommitteeMemberInput,
     CommitteeConfigInput,
-    RollupCommitteeOutput,
-
-    // Zk Programs & Proofs
-    RollupCommittee,
-    RollupCommitteeProof,
-
-    // Smart Contract
+    UpdateCommitteeOutput,
+    UpdateCommittee,
+    UpdateCommitteeProof,
     CommitteeContract,
-
-    // Actions & Events
-    CommitteeAction,
 } from './contracts/Committee.js';
 
 export {
-    // Constants & Enums
     KeyStatus,
-
-    // Zk Programs
-    RollupDkg,
-    RollupDkgProof,
-
-    // Smart Contract
+    KeyStatusInput,
+    DkgActionEnum,
+    DkgActionMask,
+    DkgAction,
+    UpdateKeyInput,
+    UpdateKeyOutput,
+    UpdateKey,
+    UpdateKeyProof,
     DkgContract,
-
-    // Actions & Events
-    ActionMask as DKGActionMask,
-    Action as DKGAction,
-    ActionEnum as DKGActions,
 } from './contracts/DKG.js';
 
 export {
-    // Structs
     PlainArray,
     RandomArray,
     ElgamalInput,
+    Elgamal,
     BatchEncryptionInput,
-    BatchDecryptionInput,
-
-    // Zk Programs
     BatchEncryption,
     BatchEncryptionProof,
+    BatchDecryptionInput,
     BatchDecryption,
     BatchDecryptionProof,
 } from './contracts/Encryption.js';
 
 export {
-    // Structs
+    Round1Action,
     FinalizeRound1Input,
     FinalizeRound1Output,
-
-    // Zk Programs
-    RollupRound1,
-    RollupRound1Proof,
     FinalizeRound1,
     FinalizeRound1Proof,
-
-    // Smart Contract
     Round1Contract,
-
-    // Actions & Events
-    Action as Round1Action,
 } from './contracts/Round1.js';
 
 export {
-    // Structs
+    Round2Action,
     FinalizeRound2Input,
-    FinalizeRound2Output,
-
-    // Zk Programs
-    RollupRound2,
-    RollupRound2Proof,
     FinalizeRound2,
     FinalizeRound2Proof,
-
-    // Smart Contract
     Round2Contract,
-
-    // Actions & Events
-    Action as Round2Action,
 } from './contracts/Round2.js';
 
 export {
@@ -131,21 +99,11 @@ export {
 } from './contracts/Requester.js';
 
 export {
-    // Structs
+    ResponseAction,
     FinalizeResponseInput,
-    FinalizeResponseOutput,
-
-    // Zk Programs
-    RollupResponse,
-    RollupResponseProof,
     FinalizeResponse,
     FinalizeResponseProof,
-
-    // Smart Contract
     ResponseContract,
-
-    // Actions & Events
-    Action as ResponseAction,
 } from './contracts/Response.js';
 
 export {
@@ -168,3 +126,15 @@ export {
     getResultVector,
     bruteForceResultVector,
 } from './libs/Requester.js';
+
+export {
+    RollupAction,
+    RollupOutput,
+    Rollup,
+    RollupProof,
+    RollupContract,
+    verifyRollup,
+    rollup,
+    rollupWithMT,
+    processAction,
+} from './contracts/Rollup.js';

@@ -23,13 +23,12 @@ import {
     RequestVector,
     SecretVector,
 } from '../libs/Requester.js';
-import { RollupContract } from './Rollup.js';
+import { RollupContract, processAction, verifyRollup } from './Rollup.js';
 import {
     ActionWitness,
     EMPTY_ACTION_MT,
     EMPTY_ADDRESS_MT,
     ProcessedActions,
-    RollupStatus,
     ZkAppRef,
     verifyZkApp,
 } from '../storages/SharedStorage.js';
@@ -43,7 +42,6 @@ import { CommitteeContract } from './Committee.js';
 import { RequestContract } from './Request.js';
 import { Level1Witness as DkgLevel1Witness } from '../storages/DKGStorage.js';
 import { DkgContract, KeyStatus, KeyStatusInput } from './DKG.js';
-import { processAction } from './Actions.js';
 
 export class Action extends Struct({
     taskId: Field,
@@ -77,7 +75,7 @@ export const AttachRequest = ZkProgram({
     name: ZkProgramEnum.AttachRequest,
     publicOutput: AttachRequestOutput,
     methods: {
-        firstStep: {
+        init: {
             privateInputs: [Field, Field],
             method(taskCounter: Field, initialRequestIdRoot: Field) {
                 return new AttachRequestOutput({
@@ -165,7 +163,7 @@ export const AccumulateEncryption = ZkProgram({
     publicInput: AccumulateEncryptionInput,
     publicOutput: AccumulateEncryptionOutput,
     methods: {
-        firstStep: {
+        init: {
             privateInputs: [PublicKey, Field, Field, Field],
             method(
                 input: AccumulateEncryptionInput,
@@ -225,24 +223,11 @@ export const AccumulateEncryption = ZkProgram({
                         input.actionId,
                     ].flat()
                 );
-                let [rollupRoot, rollupIndex] = rollupWitness.computeRootAndKey(
-                    Field(RollupStatus.ROLLUPED)
-                );
-                earlierProof.publicOutput.rollupRoot.assertEquals(
-                    rollupRoot,
-                    Utils.buildAssertMessage(
-                        AccumulateEncryption.name,
-                        AccumulateEncryption.nextStep.name,
-                        ErrorEnum.ROLLUP_ROOT
-                    )
-                );
-                actionIndex.assertEquals(
-                    rollupIndex,
-                    Utils.buildAssertMessage(
-                        AccumulateEncryption.name,
-                        AccumulateEncryption.nextStep.name,
-                        ErrorEnum.ROLLUP_INDEX
-                    )
+                verifyRollup(
+                    AccumulateEncryption.name,
+                    earlierProof.publicOutput.rollupRoot,
+                    actionIndex,
+                    rollupWitness
                 );
 
                 // Calculate corresponding action state
@@ -485,9 +470,9 @@ export class RequesterContract extends SmartContract {
         const requestContract = new RequestContract(request.address);
         const rollupContract = new RollupContract(rollup.address);
 
-        // TODO: Verify encryption key
+        // @todo Verify encryption key
 
-        // TODO: Verify request period
+        // @todo Verify request period
         this.network.timestamp
             .getAndRequireEquals()
             .assertGreaterThanOrEqual(startTimestamp);
@@ -620,7 +605,7 @@ export class RequesterContract extends SmartContract {
         // Verify proof
         proof.verify();
 
-        // TODO: request to Request contract
+        // @todo request to Request contract
         // requestContract.finalize(
         //     requestId,
         //     this.address,

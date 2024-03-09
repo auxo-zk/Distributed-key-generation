@@ -16,7 +16,7 @@ import randomAccounts from './helper/randomAccounts.js';
 import {
     CommitteeContract,
     CommitteeAction,
-    RollupCommittee,
+    UpdateCommittee,
     CommitteeMemberInput,
 } from '../contracts/Committee.js';
 import {
@@ -85,14 +85,14 @@ async function main() {
         // the committeeContract account
         let committeeContract = new CommitteeContract(addresses.committee);
         if (doProofs) {
-            console.time('RollupCommittee.compile');
-            await RollupCommittee.compile();
-            console.timeEnd('RollupCommittee.compile');
+            console.time('UpdateCommittee.compile');
+            await UpdateCommittee.compile();
+            console.timeEnd('UpdateCommittee.compile');
             await CommitteeContract.compile();
         } else {
-            console.time('RollupCommittee.compile');
-            await RollupCommittee.compile();
-            console.timeEnd('RollupCommittee.compile');
+            console.time('UpdateCommittee.compile');
+            await UpdateCommittee.compile();
+            console.timeEnd('UpdateCommittee.compile');
             console.log('analyzeMethods...');
             CommitteeContract.analyzeMethods();
         }
@@ -156,8 +156,8 @@ async function main() {
 
         // create first step proof
         console.log('create proof first step...');
-        ActionCommitteeProfiler.start('RollupCommittee create fist step');
-        let proof = await RollupCommittee.firstStep(
+        ActionCommitteeProfiler.start('UpdateCommittee create fist step');
+        let proof = await UpdateCommittee.init(
             Reducer.initialActionState,
             memberStorage.level1.getRoot(),
             settingStorage.level1.getRoot(),
@@ -166,8 +166,8 @@ async function main() {
         ActionCommitteeProfiler.stop().store();
 
         console.log('create proof next step...');
-        ActionCommitteeProfiler.start('RollupCommittee create next step');
-        proof = await RollupCommittee.nextStep(
+        ActionCommitteeProfiler.start('UpdateCommittee create next step');
+        proof = await UpdateCommittee.update(
             proof,
             new CommitteeAction({
                 addresses: myMemberArray1,
@@ -199,8 +199,8 @@ async function main() {
         );
 
         console.log('create proof next step again...');
-        ActionCommitteeProfiler.start('RollupCommittee create next step');
-        proof = await RollupCommittee.nextStep(
+        ActionCommitteeProfiler.start('UpdateCommittee create next step');
+        proof = await UpdateCommittee.update(
             proof,
             new CommitteeAction({
                 addresses: myMemberArray2,
@@ -251,7 +251,7 @@ async function main() {
         );
 
         // check if memerber belong to committeeId
-        console.log('committeeContract.checkMember p2: ');
+        console.log('committeeContract.verifyMember p2: ');
         let checkInput = new CommitteeMemberInput({
             address: addresses.p2,
             committeeId: Field(0),
@@ -259,7 +259,7 @@ async function main() {
             memberWitness: memberStorage.getWitness(Field(0), Field(1)),
         });
         tx = await Mina.transaction(feePayer, () => {
-            committeeContract.checkMember(checkInput);
+            committeeContract.verifyMember(checkInput);
         });
         await tx.prove();
         await tx.sign([feePayerKey]).send();
@@ -299,8 +299,8 @@ async function main() {
 
         // compile proof
         if (actionn == 0 || actionn == 1 || actionn == 2) {
-            console.log('compile RollupCommittee...');
-            await RollupCommittee.compile();
+            console.log('compile UpdateCommittee...');
+            await UpdateCommittee.compile();
             console.log('compile Committee contract... ');
             await CommitteeContract.compile();
         }
@@ -361,14 +361,14 @@ async function main() {
         // if (actionn == 2) {
         //     // create first step proof
         //     console.log('create proof first step...');
-        //     let proof = await RollupCommittee.firstStep(
+        //     let proof = await UpdateCommittee.init(
         //         Reducer.initialActionState,
         //         EmptyMerkleMap.getRoot(),
         //         EmptyMerkleMap.getRoot(),
         //         committeeContract.nextCommitteeId.get()
         //     );
         //     console.log('create proof next step...');
-        //     proof = await RollupCommittee.nextStep(
+        //     proof = await UpdateCommittee.update(
         //         proof,
         //         new CommitteeAction({
         //             addresses: myMemberArray1,
@@ -394,7 +394,7 @@ async function main() {
 
         // if (actionn == 3) {
         //     // check if memerber belong to committeeId
-        //     console.log('committeeContract.checkMember p2: ');
+        //     console.log('committeeContract.verifyMember p2: ');
         //     let checkInput = new CommitteeMemberInput({
         //         address: p2Address,
         //         committeeId: Field(0),
@@ -406,7 +406,7 @@ async function main() {
         //     let tx = await Mina.transaction(
         //         { sender: feePayer, fee, nonce: currentNonce },
         //         () => {
-        //             committeeContract.checkMember(checkInput);
+        //             committeeContract.verifyMember(checkInput);
         //         }
         //     );
         //     console.log('tx.prove: ');
