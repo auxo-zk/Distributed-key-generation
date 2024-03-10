@@ -1,5 +1,6 @@
-import { Field, Group, Nullifier, Poseidon, Scalar } from 'o1js';
+import { Field, Group, Poseidon, Scalar } from 'o1js';
 import {
+    CustomScalar,
     FieldDynamicArray,
     GroupDynamicArray,
     ScalarDynamicArray,
@@ -10,10 +11,12 @@ export class MArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class RArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class DArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class skArray extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
-export class RequestVector extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
 export class SecretVector extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
 export class RandomVector extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
-export class CommitmentVector extends FieldDynamicArray(REQUEST_MAX_SIZE) {}
+export class RequestVector extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
+export class ResultVector extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
+export class NullifierArray extends FieldDynamicArray(REQUEST_MAX_SIZE) {}
+export class CommitmentArray extends FieldDynamicArray(REQUEST_MAX_SIZE) {}
 
 export function calculatePublicKey(contributedPublicKeys: Group[]): Group {
     let result = Group.zero;
@@ -30,8 +33,11 @@ export function generateEncryption(
     r: Scalar[];
     R: Group[];
     M: Group[];
-    nullifier: Field;
-    commitment: Field;
+    notes: {
+        index: Field;
+        nullifier: Field;
+        commitment: Field;
+    }[];
 } {
     let dimension = vector.length;
     let r = new Array<Scalar>(dimension);
@@ -51,13 +57,27 @@ export function generateEncryption(
         index = i;
     }
     if (index == -1) throw new Error('Incorrect secret vector');
-    let nullifier = Field.random();
-    let commitment = Poseidon.hash([
-        nullifier,
-        Field(index),
-        Field.from(vector[index]),
-    ]);
-    return { r, R, M, nullifier, commitment };
+
+    let notes = vector
+        .filter((e) => e > 0n)
+        .map((secret, _index) => {
+            let index = Field(_index);
+            let nullifier = Field.random();
+            let commitment = Poseidon.hash(
+                [
+                    nullifier,
+                    index,
+                    CustomScalar.fromScalar(Scalar.from(secret)).toFields(),
+                ].flat()
+            );
+            return {
+                index,
+                nullifier,
+                commitment,
+            };
+        });
+
+    return { r, R, M, notes };
 }
 
 export function generateEncryptionWithRandomInput(

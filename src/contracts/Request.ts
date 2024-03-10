@@ -9,73 +9,71 @@ import {
     Struct,
     SelfProof,
     Poseidon,
-    AccountUpdate,
     UInt64,
     ZkProgram,
     PrivateKey,
+    Provable,
+    Bool,
+    Group,
 } from 'o1js';
 import { ActionMask as _ActionMask, Utils } from '@auxo-dev/auxo-libs';
-import { RequestVector } from '../libs/Requester.js';
+import { RequestVector, ResultVector } from '../libs/Requester.js';
 import {
     REQUEST_FEE,
-    REQUEST_MIN_PERIOD,
+    REQUEST_MAX_SIZE,
     ZkAppEnum,
     ZkProgramEnum,
 } from '../constants.js';
-import { ErrorEnum } from './constants.js';
+import { ErrorEnum, ZkAppAction } from './constants.js';
 import {
-    ActionWitness,
-    EMPTY_ACTION_MT,
     EMPTY_ADDRESS_MT,
     ZkAppRef,
     verifyZkApp,
 } from '../storages/SharedStorage.js';
-import { calculateKeyIndex } from '../storages/DKGStorage.js';
 import {
     EMPTY_LEVEL_1_TREE,
     Level1Witness,
 } from '../storages/RequestStorage.js';
+import { rollup } from './Rollup.js';
 import { ResponseContract } from './Response.js';
-import { processAction } from './Rollup.js';
 
-export const enum RequestStatus {
-    EMPTY,
+export {
+    RequestStatus,
+    Action as RequestAction,
+    UpdateRequestInput,
+    UpdateRequestOutput,
+    UpdateRequest,
+    UpdateRequestProof,
+    RequestContract,
+};
+
+const enum RequestStatus {
     INITIALIZED,
-    FINALIZED,
     RESOLVED,
-    ABORTED,
+    EXPIRED,
 }
 
-export const enum ActionEnum {
-    INITIALIZE,
-    FINALIZE,
-    RESOLVE,
-    ABORT,
-    __LENGTH,
-}
-
-export class ActionMask extends _ActionMask(ActionEnum.__LENGTH) {}
-
-export class Action extends Struct({
-    keyIndex: Field,
-    requestId: Field,
-    requester: PublicKey,
-    startTimestamp: UInt64,
-    endTimestamp: UInt64,
-    accumulatedR: RequestVector,
-    accumulatedM: RequestVector,
-    type: ActionMask,
-}) {
+class Action
+    extends Struct({
+        requestId: Field,
+        keyIndex: Field,
+        taskId: Field,
+        accumulatedR: RequestVector,
+        accumulatedM: RequestVector,
+        resultVector: ResultVector,
+        expirationTimestamp: UInt64,
+    })
+    implements ZkAppAction
+{
     static empty(): Action {
         return new Action({
-            keyIndex: Field(0),
             requestId: Field(0),
-            requester: PublicKey.fromPrivateKey(PrivateKey.random()),
-            startTimestamp: UInt64.zero,
-            endTimestamp: UInt64.zero,
+            keyIndex: Field(0),
+            taskId: Field(0),
             accumulatedR: new RequestVector(),
             accumulatedM: new RequestVector(),
-            type: ActionMask.empty(),
+            resultVector: new ResultVector(),
+            expirationTimestamp: UInt64.zero,
         });
     }
     static fromFields(input: Field[]): Action {
@@ -86,72 +84,60 @@ export class Action extends Struct({
     }
 }
 
-export class UpdateRequestInput extends Struct({
-    previousActionState: Field,
-    action: Action,
-}) {}
+class UpdateRequestInput extends Action {}
 
-export class UpdateRequestOutput extends Struct({
+class UpdateRequestOutput extends Struct({
     initialRequestCounter: Field,
     initialKeyIndexRoot: Field,
     initialRequesterRoot: Field,
-    initialStatusRoot: Field,
-    initialPeriodRoot: Field,
     initialAccumulationRoot: Field,
-    initialProcessRoot: Field,
+    initialExpirationRoot: Field,
+    initialResultRoot: Field,
+    initialActionState: Field,
     nextRequestCounter: Field,
     nextKeyIndexRoot: Field,
     nextRequesterRoot: Field,
-    nextStatusRoot: Field,
-    nextPeriodRoot: Field,
     nextAccumulationRoot: Field,
-    nextProcessRoot: Field,
-    rollupRoot: Field,
+    nextExpirationRoot: Field,
+    nextResultRoot: Field,
+    nextActionState: Field,
 }) {}
 
-export const UpdateRequest = ZkProgram({
+/**
+ * @todo Prevent failure for duplicated resolve actions
+ */
+const UpdateRequest = ZkProgram({
     name: ZkProgramEnum.UpdateRequest,
     publicInput: UpdateRequestInput,
     publicOutput: UpdateRequestOutput,
     methods: {
         init: {
-            privateInputs: [
-                Field,
-                Field,
-                Field,
-                Field,
-                Field,
-                Field,
-                Field,
-                Field,
-            ],
+            privateInputs: [Field, Field, Field, Field, Field, Field, Field],
             method(
                 input: UpdateRequestInput,
                 initialRequestCounter: Field,
                 initialKeyIndexRoot: Field,
                 initialRequesterRoot: Field,
-                initialStatusRoot: Field,
-                initialPeriodRoot: Field,
                 initialAccumulationRoot: Field,
-                initialProcessRoot: Field,
-                rollupRoot: Field
+                initialExpirationRoot: Field,
+                initialResultRoot: Field,
+                initialActionState: Field
             ): UpdateRequestOutput {
                 return new UpdateRequestOutput({
                     initialRequestCounter: initialRequestCounter,
                     initialKeyIndexRoot: initialKeyIndexRoot,
                     initialRequesterRoot: initialRequesterRoot,
-                    initialStatusRoot: initialStatusRoot,
-                    initialPeriodRoot: initialPeriodRoot,
                     initialAccumulationRoot: initialAccumulationRoot,
-                    initialProcessRoot: initialProcessRoot,
+                    initialExpirationRoot: initialExpirationRoot,
+                    initialResultRoot: initialResultRoot,
+                    initialActionState: initialActionState,
                     nextRequestCounter: initialRequestCounter,
                     nextKeyIndexRoot: initialKeyIndexRoot,
                     nextRequesterRoot: initialRequesterRoot,
-                    nextStatusRoot: initialStatusRoot,
-                    nextPeriodRoot: initialPeriodRoot,
                     nextAccumulationRoot: initialAccumulationRoot,
-                    nextProcessRoot: initialProcessRoot,
-                    rollupRoot: rollupRoot,
+                    nextExpirationRoot: initialExpirationRoot,
+                    nextResultRoot: initialResultRoot,
+                    nextActionState: initialActionState,
                 });
             },
         },
@@ -162,7 +148,6 @@ export const UpdateRequest = ZkProgram({
                 Level1Witness,
                 Level1Witness,
                 Level1Witness,
-                ActionWitness,
             ],
             method(
                 input: UpdateRequestInput,
@@ -172,30 +157,18 @@ export const UpdateRequest = ZkProgram({
                 >,
                 keyIndexWitness: Level1Witness,
                 requesterWitness: Level1Witness,
-                statusWitness: Level1Witness,
-                periodWitness: Level1Witness,
-                processWitness: ActionWitness
+                accumulationWitness: Level1Witness,
+                expirationWitness: Level1Witness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
-
-                // Verify action type
-                input.action.type
-                    .get(Field(ActionEnum.INITIALIZE))
-                    .assertTrue(
-                        Utils.buildAssertMessage(
-                            UpdateRequest.name,
-                            UpdateRequest.initialize.name,
-                            ErrorEnum.ACTION_TYPE
-                        )
-                    );
 
                 // Calculate request ID
                 let requestId = earlierProof.publicOutput.nextRequestCounter;
 
                 // Verify key index
                 earlierProof.publicOutput.nextKeyIndexRoot.assertEquals(
-                    keyIndexWitness.calculateRoot(input.action.keyIndex),
+                    keyIndexWitness.calculateRoot(input.keyIndex),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
@@ -229,256 +202,7 @@ export const UpdateRequest = ZkProgram({
                     )
                 );
 
-                // Verify empty request status
-                earlierProof.publicOutput.nextStatusRoot.assertEquals(
-                    statusWitness.calculateRoot(Field(RequestStatus.EMPTY)),
-                    Utils.buildAssertMessage(
-                        UpdateRequest.name,
-                        UpdateRequest.initialize.name,
-                        ErrorEnum.REQUEST_STATUS_ROOT
-                    )
-                );
-                requestId.assertEquals(
-                    statusWitness.calculateIndex(),
-                    Utils.buildAssertMessage(
-                        UpdateRequest.name,
-                        UpdateRequest.initialize.name,
-                        ErrorEnum.REQUEST_STATUS_INDEX
-                    )
-                );
-
-                // Verify empty request period
-                earlierProof.publicOutput.nextPeriodRoot.assertEquals(
-                    periodWitness.calculateRoot(Field(0)),
-                    Utils.buildAssertMessage(
-                        UpdateRequest.name,
-                        UpdateRequest.initialize.name,
-                        ErrorEnum.REQUEST_PERIOD_ROOT
-                    )
-                );
-                requestId.assertEquals(
-                    periodWitness.calculateIndex(),
-                    Utils.buildAssertMessage(
-                        UpdateRequest.name,
-                        UpdateRequest.initialize.name,
-                        ErrorEnum.REQUEST_PERIOD_INDEX
-                    )
-                );
-
-                // Calculate new state values
-                let nextRequestCounter = requestId.add(1);
-                let nextKeyIndexRoot = keyIndexWitness.calculateRoot(
-                    input.action.keyIndex
-                );
-                let nextRequesterRoot = keyIndexWitness.calculateRoot(
-                    Poseidon.hash(input.action.requester.toFields())
-                );
-                let nextStatusRoot = statusWitness.calculateRoot(
-                    Field(RequestStatus.INITIALIZED)
-                );
-                let nextPeriodRoot = periodWitness.calculateRoot(
-                    Poseidon.hash(
-                        [
-                            input.action.startTimestamp.toFields(),
-                            input.action.endTimestamp.toFields(),
-                        ].flat()
-                    )
-                );
-
-                // Calculate corresponding action state
-                let actionState = Utils.updateActionState(
-                    input.previousActionState,
-                    [Action.toFields(input.action)]
-                );
-
-                // Verify the action is rolluped
-                // verifyRollup(UpdateRequest.name);
-
-                // Verify the action isn't already processed
-                let nextProcessRoot = processAction(
-                    UpdateRequest.name,
-                    actionState,
-                    earlierProof.publicOutput.nextProcessRoot,
-                    processWitness
-                );
-
-                return new UpdateRequestOutput({
-                    initialRequestCounter:
-                        earlierProof.publicOutput.initialRequestCounter,
-                    initialKeyIndexRoot:
-                        earlierProof.publicOutput.initialKeyIndexRoot,
-                    initialRequesterRoot:
-                        earlierProof.publicOutput.initialRequesterRoot,
-                    initialStatusRoot:
-                        earlierProof.publicOutput.initialStatusRoot,
-                    initialPeriodRoot:
-                        earlierProof.publicOutput.initialPeriodRoot,
-                    initialAccumulationRoot:
-                        earlierProof.publicOutput.initialAccumulationRoot,
-                    initialProcessRoot:
-                        earlierProof.publicOutput.initialProcessRoot,
-                    nextRequestCounter: nextRequestCounter,
-                    nextKeyIndexRoot: nextKeyIndexRoot,
-                    nextRequesterRoot: nextRequesterRoot,
-                    nextStatusRoot: nextStatusRoot,
-                    nextPeriodRoot: nextPeriodRoot,
-                    nextAccumulationRoot:
-                        earlierProof.publicOutput.nextAccumulationRoot,
-                    nextProcessRoot: nextProcessRoot,
-                    rollupRoot: earlierProof.publicOutput.rollupRoot,
-                });
-            },
-        },
-        abort: {
-            privateInputs: [
-                SelfProof<UpdateRequestInput, UpdateRequestOutput>,
-                Level1Witness,
-                ActionWitness,
-            ],
-            method(
-                input: UpdateRequestInput,
-                earlierProof: SelfProof<
-                    UpdateRequestInput,
-                    UpdateRequestOutput
-                >,
-                statusWitness: Level1Witness,
-                processWitness: ActionWitness
-            ) {
-                // Verify earlier proof
-                earlierProof.verify();
-
-                // Verify action type
-                input.action.type
-                    .get(Field(ActionEnum.ABORT))
-                    .assertTrue(
-                        Utils.buildAssertMessage(
-                            UpdateRequest.name,
-                            UpdateRequest.initialize.name,
-                            ErrorEnum.ACTION_TYPE
-                        )
-                    );
-
-                // Verify request is initialized but not finalized
-                earlierProof.publicOutput.nextStatusRoot.assertEquals(
-                    statusWitness.calculateRoot(
-                        Field(RequestStatus.INITIALIZED)
-                    ),
-                    Utils.buildAssertMessage(
-                        UpdateRequest.name,
-                        UpdateRequest.initialize.name,
-                        ErrorEnum.REQUEST_STATUS_ROOT
-                    )
-                );
-                input.action.requestId.assertEquals(
-                    statusWitness.calculateIndex(),
-                    Utils.buildAssertMessage(
-                        UpdateRequest.name,
-                        UpdateRequest.initialize.name,
-                        ErrorEnum.REQUEST_STATUS_INDEX
-                    )
-                );
-
-                // Calculate new state values
-                let nextStatusRoot = statusWitness.calculateRoot(
-                    Field(RequestStatus.FINALIZED)
-                );
-
-                // Calculate corresponding action state
-                let actionState = Utils.updateActionState(
-                    input.previousActionState,
-                    [Action.toFields(input.action)]
-                );
-
-                // Verify the action isn't already processed
-                let nextProcessRoot = processAction(
-                    UpdateRequest.name,
-                    actionState,
-                    earlierProof.publicOutput.nextProcessRoot,
-                    processWitness
-                );
-
-                return new UpdateRequestOutput({
-                    initialRequestCounter:
-                        earlierProof.publicOutput.initialRequestCounter,
-                    initialKeyIndexRoot:
-                        earlierProof.publicOutput.initialKeyIndexRoot,
-                    initialRequesterRoot:
-                        earlierProof.publicOutput.initialRequesterRoot,
-                    initialStatusRoot:
-                        earlierProof.publicOutput.initialStatusRoot,
-                    initialPeriodRoot:
-                        earlierProof.publicOutput.initialPeriodRoot,
-                    initialAccumulationRoot:
-                        earlierProof.publicOutput.initialAccumulationRoot,
-                    initialProcessRoot:
-                        earlierProof.publicOutput.initialProcessRoot,
-                    nextRequestCounter:
-                        earlierProof.publicOutput.nextRequestCounter,
-                    nextKeyIndexRoot:
-                        earlierProof.publicOutput.nextKeyIndexRoot,
-                    nextRequesterRoot:
-                        earlierProof.publicOutput.nextRequesterRoot,
-                    nextStatusRoot: nextStatusRoot,
-                    nextPeriodRoot: earlierProof.publicOutput.nextPeriodRoot,
-                    nextAccumulationRoot:
-                        earlierProof.publicOutput.nextAccumulationRoot,
-                    nextProcessRoot: nextProcessRoot,
-                    rollupRoot: earlierProof.publicOutput.rollupRoot,
-                });
-            },
-        },
-        finalize: {
-            privateInputs: [
-                SelfProof<UpdateRequestInput, UpdateRequestOutput>,
-                Level1Witness,
-                Level1Witness,
-                ActionWitness,
-            ],
-            method(
-                input: UpdateRequestInput,
-                earlierProof: SelfProof<
-                    UpdateRequestInput,
-                    UpdateRequestOutput
-                >,
-                statusWitness: Level1Witness,
-                accumulationWitness: Level1Witness,
-                processWitness: ActionWitness
-            ) {
-                // Verify earlier proof
-                earlierProof.verify();
-
-                // Verify action type
-                input.action.type
-                    .get(Field(ActionEnum.FINALIZE))
-                    .assertTrue(
-                        Utils.buildAssertMessage(
-                            UpdateRequest.name,
-                            UpdateRequest.initialize.name,
-                            ErrorEnum.ACTION_TYPE
-                        )
-                    );
-
-                // Verify request is initialized but not finalized
-                earlierProof.publicOutput.nextStatusRoot.assertEquals(
-                    statusWitness.calculateRoot(
-                        Field(RequestStatus.INITIALIZED)
-                    ),
-                    Utils.buildAssertMessage(
-                        UpdateRequest.name,
-                        UpdateRequest.initialize.name,
-                        ErrorEnum.REQUEST_STATUS_ROOT
-                    )
-                );
-                input.action.requestId.assertEquals(
-                    statusWitness.calculateIndex(),
-                    Utils.buildAssertMessage(
-                        UpdateRequest.name,
-                        UpdateRequest.initialize.name,
-                        ErrorEnum.REQUEST_STATUS_INDEX
-                    )
-                );
-
-                // Verify empty accumulation value
+                // Verify empty accumulation data
                 earlierProof.publicOutput.nextAccumulationRoot.assertEquals(
                     accumulationWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
@@ -487,7 +211,7 @@ export const UpdateRequest = ZkProgram({
                         ErrorEnum.ACCUMULATION_ROOT
                     )
                 );
-                input.action.requestId.assertEquals(
+                requestId.assertEquals(
                     accumulationWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
@@ -496,29 +220,46 @@ export const UpdateRequest = ZkProgram({
                     )
                 );
 
+                // Verify empty expiration timestamp
+                earlierProof.publicOutput.nextExpirationRoot.assertEquals(
+                    expirationWitness.calculateRoot(Field(0)),
+                    Utils.buildAssertMessage(
+                        UpdateRequest.name,
+                        UpdateRequest.initialize.name,
+                        ErrorEnum.REQUEST_EXP_ROOT
+                    )
+                );
+                requestId.assertEquals(
+                    expirationWitness.calculateIndex(),
+                    Utils.buildAssertMessage(
+                        UpdateRequest.name,
+                        UpdateRequest.initialize.name,
+                        ErrorEnum.REQUEST_EXP_INDEX
+                    )
+                );
+
                 // Calculate new state values
-                let nextStatusRoot = statusWitness.calculateRoot(
-                    Field(RequestStatus.FINALIZED)
+                let nextRequestCounter = requestId.add(1);
+                let nextKeyIndexRoot = keyIndexWitness.calculateRoot(
+                    input.keyIndex
+                );
+                let nextRequesterRoot = keyIndexWitness.calculateRoot(
+                    Poseidon.hash(input.requester.toFields())
                 );
                 let nextAccumulatedRoot = accumulationWitness.calculateRoot(
                     Poseidon.hash([
-                        input.action.accumulatedR.hash(),
-                        input.action.accumulatedM.hash(),
+                        input.accumulatedR.hash(),
+                        input.accumulatedM.hash(),
                     ])
+                );
+                let nextExpirationRoot = expirationWitness.calculateRoot(
+                    Poseidon.hash(input.expirationTimestamp.toFields())
                 );
 
                 // Calculate corresponding action state
-                let actionState = Utils.updateActionState(
-                    input.previousActionState,
-                    [Action.toFields(input.action)]
-                );
-
-                // Verify the action isn't already processed
-                let nextProcessRoot = processAction(
-                    UpdateRequest.name,
-                    actionState,
-                    earlierProof.publicOutput.nextProcessRoot,
-                    processWitness
+                let nextActionState = Utils.updateActionState(
+                    earlierProof.publicOutput.nextActionState,
+                    [Action.toFields(input)]
                 );
 
                 return new UpdateRequestOutput({
@@ -528,25 +269,21 @@ export const UpdateRequest = ZkProgram({
                         earlierProof.publicOutput.initialKeyIndexRoot,
                     initialRequesterRoot:
                         earlierProof.publicOutput.initialRequesterRoot,
-                    initialStatusRoot:
-                        earlierProof.publicOutput.initialStatusRoot,
-                    initialPeriodRoot:
-                        earlierProof.publicOutput.initialPeriodRoot,
                     initialAccumulationRoot:
                         earlierProof.publicOutput.initialAccumulationRoot,
-                    initialProcessRoot:
-                        earlierProof.publicOutput.initialProcessRoot,
-                    nextRequestCounter:
-                        earlierProof.publicOutput.nextRequestCounter,
-                    nextKeyIndexRoot:
-                        earlierProof.publicOutput.nextKeyIndexRoot,
-                    nextRequesterRoot:
-                        earlierProof.publicOutput.nextRequesterRoot,
-                    nextStatusRoot: nextStatusRoot,
-                    nextPeriodRoot: earlierProof.publicOutput.nextPeriodRoot,
+                    initialExpirationRoot:
+                        earlierProof.publicOutput.initialExpirationRoot,
+                    initialResultRoot:
+                        earlierProof.publicOutput.initialResultRoot,
+                    initialActionState:
+                        earlierProof.publicOutput.initialActionState,
+                    nextRequestCounter: nextRequestCounter,
+                    nextKeyIndexRoot: nextKeyIndexRoot,
+                    nextRequesterRoot: nextRequesterRoot,
                     nextAccumulationRoot: nextAccumulatedRoot,
-                    nextProcessRoot: nextProcessRoot,
-                    rollupRoot: earlierProof.publicOutput.rollupRoot,
+                    nextExpirationRoot: nextExpirationRoot,
+                    nextResultRoot: earlierProof.publicOutput.initialResultRoot,
+                    nextActionState: nextActionState,
                 });
             },
         },
@@ -554,7 +291,6 @@ export const UpdateRequest = ZkProgram({
             privateInputs: [
                 SelfProof<UpdateRequestInput, UpdateRequestOutput>,
                 Level1Witness,
-                ActionWitness,
             ],
             method(
                 input: UpdateRequestInput,
@@ -562,14 +298,13 @@ export const UpdateRequest = ZkProgram({
                     UpdateRequestInput,
                     UpdateRequestOutput
                 >,
-                statusWitness: Level1Witness,
-                processWitness: ActionWitness
+                resultWitness: Level1Witness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
 
                 // Verify action type
-                input.action.type
+                input.type
                     .get(Field(ActionEnum.RESOLVE))
                     .assertTrue(
                         Utils.buildAssertMessage(
@@ -579,41 +314,33 @@ export const UpdateRequest = ZkProgram({
                         )
                     );
 
-                // Verify request is finalized
-                earlierProof.publicOutput.nextStatusRoot.assertEquals(
-                    statusWitness.calculateRoot(Field(RequestStatus.FINALIZED)),
+                // Verify empty result
+                earlierProof.publicOutput.nextResultRoot.assertEquals(
+                    resultWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
-                        UpdateRequest.initialize.name,
-                        ErrorEnum.REQUEST_STATUS_ROOT
+                        UpdateRequest.resolve.name,
+                        ErrorEnum.REQUEST_RESULT_ROOT
                     )
                 );
-                input.action.requestId.assertEquals(
-                    statusWitness.calculateIndex(),
+                input.requestId.assertEquals(
+                    resultWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
-                        UpdateRequest.initialize.name,
-                        ErrorEnum.REQUEST_STATUS_INDEX
+                        UpdateRequest.resolve.name,
+                        ErrorEnum.REQUEST_RESULT_INDEX
                     )
                 );
 
                 // Calculate new state values
-                let nextStatusRoot = statusWitness.calculateRoot(
+                let nextResultRoot = resultWitness.calculateRoot(
                     Field(RequestStatus.RESOLVED)
                 );
 
                 // Calculate corresponding action state
-                let actionState = Utils.updateActionState(
-                    input.previousActionState,
-                    [Action.toFields(input.action)]
-                );
-
-                // Verify the action isn't already processed
-                let nextProcessRoot = processAction(
-                    UpdateRequest.name,
-                    actionState,
-                    earlierProof.publicOutput.nextProcessRoot,
-                    processWitness
+                let nextActionState = Utils.updateActionState(
+                    earlierProof.publicOutput.nextActionState,
+                    [Action.toFields(input)]
                 );
 
                 return new UpdateRequestOutput({
@@ -623,35 +350,35 @@ export const UpdateRequest = ZkProgram({
                         earlierProof.publicOutput.initialKeyIndexRoot,
                     initialRequesterRoot:
                         earlierProof.publicOutput.initialRequesterRoot,
-                    initialStatusRoot:
-                        earlierProof.publicOutput.initialStatusRoot,
-                    initialPeriodRoot:
-                        earlierProof.publicOutput.initialPeriodRoot,
                     initialAccumulationRoot:
                         earlierProof.publicOutput.initialAccumulationRoot,
-                    initialProcessRoot:
-                        earlierProof.publicOutput.initialProcessRoot,
+                    initialExpirationRoot:
+                        earlierProof.publicOutput.initialExpirationRoot,
+                    initialResultRoot:
+                        earlierProof.publicOutput.initialResultRoot,
+                    initialActionState:
+                        earlierProof.publicOutput.initialActionState,
                     nextRequestCounter:
                         earlierProof.publicOutput.nextRequestCounter,
                     nextKeyIndexRoot:
                         earlierProof.publicOutput.nextKeyIndexRoot,
                     nextRequesterRoot:
                         earlierProof.publicOutput.nextRequesterRoot,
-                    nextStatusRoot: nextStatusRoot,
-                    nextPeriodRoot: earlierProof.publicOutput.nextPeriodRoot,
                     nextAccumulationRoot:
                         earlierProof.publicOutput.nextAccumulationRoot,
-                    nextProcessRoot: nextProcessRoot,
-                    rollupRoot: earlierProof.publicOutput.rollupRoot,
+                    nextExpirationRoot:
+                        earlierProof.publicOutput.nextExpirationRoot,
+                    nextResultRoot: nextResultRoot,
+                    nextActionState: nextActionState,
                 });
             },
         },
     },
 });
 
-export class UpdateRequestProof extends ZkProgram.Proof(UpdateRequest) {}
+class UpdateRequestProof extends ZkProgram.Proof(UpdateRequest) {}
 
-export class RequestContract extends SmartContract {
+class RequestContract extends SmartContract {
     /**
      * @description MT storing addresses of other zkApps
      */
@@ -668,29 +395,29 @@ export class RequestContract extends SmartContract {
     @state(Field) keyIndexRoot = State<Field>();
 
     /**
-     * @description MT storing requests' address
+     * @description MT storing global taskId = Hash(requester | taskId)
      */
-    @state(Field) requesterRoot = State<Field>();
+    @state(Field) taskIdRoot = State<Field>();
 
     /**
-     * @description MT storing requests' status
-     */
-    @state(Field) statusRoot = State<Field>();
-
-    /**
-     * @description MT storing requests' period
-     */
-    @state(Field) periodRoot = State<Field>();
-
-    /**
-     * @description MT storing accumulated R | M values
+     * @description MT storing accumulated value = Hash(R | M)
      */
     @state(Field) accumulationRoot = State<Field>();
 
     /**
-     * @description MT storing actions' process state
+     * @description MT storing requests' expiration time = Hash(start | end)
      */
-    @state(Field) processRoot = State<Field>();
+    @state(Field) expirationRoot = State<Field>();
+
+    /**
+     * @description MT storing result values
+     */
+    @state(Field) resultRoot = State<Field>();
+
+    /**
+     * @description Latest rolluped action's state
+     */
+    @state(Field) actionState = State<Field>();
 
     reducer = Reducer({ actionType: Action });
 
@@ -699,176 +426,80 @@ export class RequestContract extends SmartContract {
         this.zkAppRoot.set(EMPTY_ADDRESS_MT().getRoot());
         this.requestCounter.set(Field(0));
         this.keyIndexRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
-        this.requesterRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
-        this.statusRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
-        this.periodRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
+        this.taskIdRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
         this.accumulationRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
-        this.processRoot.set(EMPTY_ACTION_MT().getRoot());
+        this.expirationRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
+        this.resultRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
+        this.actionState.set(Reducer.initialActionState);
     }
 
     /**
-     * Initialize a threshold homomorphic encryption request
-     * @param committeeId Committee ID
-     * @param keyId Committee's key ID
-     * @param requester Requester's address
-     * @param startTimestamp Timestamp for the start of request period
-     * @param endTimestamp Timestamp for the end of request period
-     * @param dkg Reference to Dkg Contract
-     * @param keyStatusWitness Witness for proof of key's status
+     * Initialize a threshold decryption request
+     * @param committeeId Committee Id
+     * @param keyIndex Unique key index
+     * @param taskId Request's unique taskId
+     * @param accumulatedR Accumulated R value
+     * @param accumulatedM Accumulated M value
+     * @param expirationPeriod Waiting period before the expiration of unresolved request
      */
     @method initialize(
-        committeeId: Field,
-        keyId: Field,
+        taskId: Field,
+        keyIndex: Field,
         requester: PublicKey,
-        startTimestamp: UInt64,
-        endTimestamp: UInt64
-    ) {
-        // Verify caller
-        Utils.requireCaller(requester, this);
-
-        // Verify timestamp configuration
-        startTimestamp.assertGreaterThanOrEqual(
-            this.network.timestamp.getAndRequireEquals(),
-            Utils.buildAssertMessage(
-                RequestContract.name,
-                RequestContract.prototype.initialize.name,
-                ErrorEnum.REQUEST_PERIOD
-            )
-        );
-        startTimestamp
-            .add(REQUEST_MIN_PERIOD)
-            .assertLessThanOrEqual(
-                endTimestamp,
-                Utils.buildAssertMessage(
-                    RequestContract.name,
-                    RequestContract.prototype.initialize.name,
-                    ErrorEnum.REQUEST_PERIOD
-                )
-            );
-
-        // Create and dispatch action
-        let action = new Action({
-            keyIndex: calculateKeyIndex(committeeId, keyId),
-            requestId: Field(0),
-            requester,
-            startTimestamp,
-            endTimestamp,
-            accumulatedR: new RequestVector(),
-            accumulatedM: new RequestVector(),
-            type: ActionMask.createMask(Field(ActionEnum.INITIALIZE)),
-        });
-        this.reducer.dispatch(action);
-
-        // Receive fee from Tx sender
-        // @todo Consider between this.sender or requester
-        // @todo Migrate from constant fee to dynamic fee configurable by committees
-        let _requester = AccountUpdate.createSigned(this.sender);
-        _requester.send({ to: this, amount: UInt64.from(REQUEST_FEE) });
-    }
-
-    /**
-     * Abort an initialized request
-     * @param requestId Request ID
-     * @param requester Requester's address
-     * @param requesterWitness Witness for proof of requester
-     * @param statusWitness Witness for proof of request's status
-     */
-    @method abort(requestId: Field, requester: PublicKey) {
-        // Verify caller
-        Utils.requireCaller(requester, this);
-
-        // Create and dispatch action
-        let action = new Action({
-            keyIndex: Field(0),
-            requestId,
-            requester,
-            startTimestamp: UInt64.zero,
-            endTimestamp: UInt64.zero,
-            accumulatedR: new RequestVector(),
-            accumulatedM: new RequestVector(),
-            type: ActionMask.createMask(Field(ActionEnum.ABORT)),
-        });
-        this.reducer.dispatch(action);
-    }
-
-    /**
-     * Finalize a request
-     * @param requestId Request ID
-     * @param requester Requester's address
-     * @param startTimestamp Timestamp for the start of request period
-     * @param endTimestamp Timestamp for the end of request period
-     * @param accumulatedR Final R value
-     * @param accumulatedM Final M value
-     * @param requesterWitness Witness for proof of requester
-     * @param statusWitness Witness for proof of request's status
-     * @param periodWitness Witness for proof of request's period
-     */
-    @method finalize(
-        requestId: Field,
-        requester: PublicKey,
-        startTimestamp: UInt64,
-        endTimestamp: UInt64,
         accumulatedR: RequestVector,
         accumulatedM: RequestVector,
-        requesterWitness: Level1Witness,
-        statusWitness: Level1Witness,
-        periodWitness: Level1Witness
+        expirationPeriod: UInt64
     ) {
         // Verify caller
         Utils.requireCaller(requester, this);
 
-        // Verify requester
-        this.verifyRequester(requestId, requester, requesterWitness);
-
-        // Verify request status
-        this.verifyRequestStatus(
-            requestId,
-            Field(RequestStatus.INITIALIZED),
-            statusWitness
-        );
-
-        // Verify request period
-        endTimestamp.assertGreaterThan(
-            this.network.timestamp.getAndRequireEquals(),
-            Utils.buildAssertMessage(
-                RequestContract.name,
-                RequestContract.prototype.finalize.name,
-                ErrorEnum.REQUEST_PERIOD
-            )
-        );
-        this.verifyRequestPeriod(
-            requestId,
-            startTimestamp,
-            endTimestamp,
-            periodWitness
-        );
-
         // Create and dispatch action
         let action = new Action({
-            keyIndex: Field(0),
-            requestId,
-            requester,
-            startTimestamp,
-            endTimestamp,
+            requestId: Field(-1),
+            keyIndex: keyIndex,
+            taskId: Poseidon.hash([requester.toFields(), taskId].flat()),
             accumulatedR,
             accumulatedM,
-            type: ActionMask.createMask(Field(ActionEnum.FINALIZE)),
+            resultVector: new ResultVector(),
+            expirationTimestamp: this.network.timestamp
+                .getAndRequireEquals()
+                .add(expirationPeriod),
         });
         this.reducer.dispatch(action);
     }
 
+    /**
+     * Resolve a request and update result
+     * @param expirationTimestamp Timestamp for the expiration of the request
+     * @param accumulatedR Accumulated R value
+     * @param accumulatedM Accumulated M value
+     * @param finalizedD Finalized response D value
+     * @param resultVector Decrypted result vector
+     * @param expirationWitness Witness for proof of expiration timestamp
+     * @param accumulationWitness Witness for proof of accumulation data
+     * @param finalizedDWitness Witness for proof of response data
+     * @param resultWitness Witness for proof of result
+     * @param response Reference to Response Contract
+     */
     @method resolve(
-        requestId: Field,
-        requester: PublicKey,
+        expirationTimestamp: UInt64,
+        accumulatedR: RequestVector,
+        accumulatedM: RequestVector,
         finalizedD: RequestVector,
-        requesterWitness: Level1Witness,
+        resultVector: ResultVector,
+        expirationWitness: Level1Witness,
+        accumulationWitness: Level1Witness,
         finalizedDWitness: Level1Witness,
+        resultWitness: Level1Witness,
         response: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
 
-        // Verify Response Contract address
+        let requestId = accumulationWitness.calculateIndex();
+
+        // Verify caller is Response Contract
+        Utils.requireCaller(response.address, this);
         verifyZkApp(
             RequestContract.name,
             response,
@@ -877,8 +508,22 @@ export class RequestContract extends SmartContract {
         );
         let responseContract = new ResponseContract(response.address);
 
-        // Verify requester
-        this.verifyRequester(requestId, requester, requesterWitness);
+        // Verify request status
+        this.verifyRequestStatus(
+            requestId,
+            Field(RequestStatus.INITIALIZED),
+            expirationTimestamp,
+            expirationWitness,
+            resultWitness
+        );
+
+        // Verify accumulation data
+        this.verifyAccumulationData(
+            requestId,
+            accumulatedR,
+            accumulatedM,
+            accumulationWitness
+        );
 
         // Verify finalized D value
         responseContract.verifyFinalizedD(
@@ -887,32 +532,61 @@ export class RequestContract extends SmartContract {
             finalizedDWitness
         );
 
+        // Verify result vector
+        for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
+            let index = Field(i);
+            let M = accumulatedM.get(index);
+            let D = finalizedD.get(index);
+            let result = resultVector.get(index);
+            Provable.if(
+                index.greaterThanOrEqual(finalizedD.length),
+                Bool(true),
+                M.sub(D).equals(Group.generator.scale(result.toScalar()))
+            ).assertTrue(
+                Utils.buildAssertMessage(
+                    RequestContract.name,
+                    RequestContract.prototype.resolve.name,
+                    ErrorEnum.REQUEST_RESULT
+                )
+            );
+        }
+
         // Create and dispatch action
         let action = new Action({
-            keyIndex: Field(0),
             requestId,
-            requester: requester,
-            startTimestamp: UInt64.zero,
-            endTimestamp: UInt64.zero,
+            keyIndex: Field(-1),
+            taskId: Field(-1),
             accumulatedR: new RequestVector(),
             accumulatedM: new RequestVector(),
-            type: ActionMask.createMask(Field(ActionEnum.RESOLVE)),
+            resultVector,
+            expirationTimestamp,
         });
         this.reducer.dispatch(action);
     }
 
+    /**
+     * Update requests by rollup to the latest actions
+     * @param proof Verification proof
+     */
     @method update(proof: UpdateRequestProof) {
         // Get current state values
+        let curActionState = this.actionState.getAndRequireEquals();
         let requestCounter = this.requestCounter.getAndRequireEquals();
         let keyIndexRoot = this.keyIndexRoot.getAndRequireEquals();
         let requesterRoot = this.requesterRoot.getAndRequireEquals();
-        let statusRoot = this.statusRoot.getAndRequireEquals();
-        let periodRoot = this.periodRoot.getAndRequireEquals();
         let accumulationRoot = this.accumulationRoot.getAndRequireEquals();
-        let processRoot = this.processRoot.getAndRequireEquals();
+        let expirationRoot = this.expirationRoot.getAndRequireEquals();
+        let resultRoot = this.resultRoot.getAndRequireEquals();
+        let lastActionState = this.account.actionState.getAndRequireEquals();
 
         // Verify proof
         proof.verify();
+        rollup(
+            RequestContract.name,
+            proof.publicOutput,
+            curActionState,
+            lastActionState
+        );
         proof.publicOutput.initialRequestCounter.assertEquals(
             requestCounter,
             Utils.buildAssertMessage(
@@ -937,22 +611,6 @@ export class RequestContract extends SmartContract {
                 ErrorEnum.REQUESTER_ROOT
             )
         );
-        proof.publicOutput.initialStatusRoot.assertEquals(
-            statusRoot,
-            Utils.buildAssertMessage(
-                RequestContract.name,
-                RequestContract.prototype.update.name,
-                ErrorEnum.REQUEST_STATUS_ROOT
-            )
-        );
-        proof.publicOutput.initialPeriodRoot.assertEquals(
-            periodRoot,
-            Utils.buildAssertMessage(
-                RequestContract.name,
-                RequestContract.prototype.update.name,
-                ErrorEnum.REQUEST_PERIOD_ROOT
-            )
-        );
         proof.publicOutput.initialAccumulationRoot.assertEquals(
             accumulationRoot,
             Utils.buildAssertMessage(
@@ -961,14 +619,31 @@ export class RequestContract extends SmartContract {
                 ErrorEnum.ACCUMULATION_ROOT
             )
         );
-        proof.publicOutput.initialProcessRoot.assertEquals(
-            processRoot,
+        proof.publicOutput.initialExpirationRoot.assertEquals(
+            expirationRoot,
             Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.update.name,
-                ErrorEnum.PROCESS_ROOT
+                ErrorEnum.REQUEST_EXP_ROOT
             )
         );
+        proof.publicOutput.initialResultRoot.assertEquals(
+            resultRoot,
+            Utils.buildAssertMessage(
+                RequestContract.name,
+                RequestContract.prototype.update.name,
+                ErrorEnum.REQUEST_RESULT_ROOT
+            )
+        );
+
+        // Update state values
+        this.requestCounter.set(proof.publicOutput.nextRequestCounter);
+        this.keyIndexRoot.set(proof.publicOutput.nextKeyIndexRoot);
+        this.requesterRoot.set(proof.publicOutput.nextRequesterRoot);
+        this.accumulationRoot.set(proof.publicOutput.nextAccumulationRoot);
+        this.expirationRoot.set(proof.publicOutput.nextExpirationRoot);
+        this.resultRoot.set(proof.publicOutput.nextResultRoot);
+        this.actionState.set(proof.publicOutput.nextActionState);
     }
 
     @method refund(requestId: Field, receiver: PublicKey) {
@@ -982,6 +657,39 @@ export class RequestContract extends SmartContract {
         this.send({ to: receiver, amount: UInt64.from(REQUEST_FEE) });
     }
 
+    /**
+     * Verify request's key index
+     * @param requestId Request Id
+     * @param keyIndex Corresponding key index
+     * @param witness Witness for proof of key index value
+     */
+    verifyKeyIndex(requestId: Field, keyIndex: Field, witness: Level1Witness) {
+        this.keyIndexRoot
+            .getAndRequireEquals()
+            .assertEquals(
+                witness.calculateRoot(keyIndex),
+                Utils.buildAssertMessage(
+                    RequestContract.name,
+                    RequestContract.prototype.verifyKeyIndex.name,
+                    ErrorEnum.KEY_INDEX_ROOT
+                )
+            );
+        requestId.assertEquals(
+            witness.calculateIndex(),
+            Utils.buildAssertMessage(
+                RequestContract.name,
+                RequestContract.prototype.verifyKeyIndex.name,
+                ErrorEnum.KEY_INDEX_INDEX
+            )
+        );
+    }
+
+    /**
+     * Verify requester's address
+     * @param requestId Request Id
+     * @param requester Requester's address
+     * @param witness Witness for proof of requester's address
+     */
     verifyRequester(
         requestId: Field,
         requester: PublicKey,
@@ -993,7 +701,7 @@ export class RequestContract extends SmartContract {
                 witness.calculateRoot(Poseidon.hash(requester.toFields())),
                 Utils.buildAssertMessage(
                     RequestContract.name,
-                    RequestContract.prototype.verifyRequestStatus.name,
+                    RequestContract.prototype.verifyRequester.name,
                     ErrorEnum.REQUESTER_ROOT
                 )
             );
@@ -1001,81 +709,131 @@ export class RequestContract extends SmartContract {
             witness.calculateIndex(),
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.verifyRequestStatus.name,
+                RequestContract.prototype.verifyRequester.name,
                 ErrorEnum.REQUESTER_INDEX
             )
         );
     }
 
+    /**
+     * Get request's current status
+     * @param requestId Request Id
+     * @param expirationTimestamp Timestamp for the expiration of the request
+     * @param expirationWitness Witness for proof of expiration timestamp
+     * @param resultWitness Witness for proof of result
+     * @returns
+     */
+    getRequestStatus(
+        requestId: Field,
+        expirationTimestamp: UInt64,
+        expirationWitness: Level1Witness,
+        resultWitness: Level1Witness
+    ): Field {
+        let isResolved = this.resultRoot
+            .getAndRequireEquals()
+            .equals(resultWitness.calculateRoot(Field(0)))
+            .not();
+        requestId.assertEquals(
+            resultWitness.calculateIndex(),
+            Utils.buildAssertMessage(
+                RequestContract.name,
+                RequestContract.prototype.getRequestStatus.name,
+                ErrorEnum.REQUEST_RESULT_INDEX
+            )
+        );
+        let isExpired = this.expirationRoot
+            .getAndRequireEquals()
+            .equals(
+                expirationWitness.calculateRoot(
+                    Poseidon.hash(expirationTimestamp.toFields())
+                )
+            )
+            .and(
+                this.network.timestamp
+                    .getAndRequireEquals()
+                    .greaterThan(expirationTimestamp)
+            );
+        requestId.assertEquals(
+            expirationWitness.calculateIndex(),
+            Utils.buildAssertMessage(
+                RequestContract.name,
+                RequestContract.prototype.getRequestStatus.name,
+                ErrorEnum.REQUEST_EXP_INDEX
+            )
+        );
+
+        return Provable.switch(
+            [
+                isResolved.or(isExpired).not(),
+                isResolved,
+                isResolved.not().and(isExpired),
+            ],
+            Field,
+            [
+                Field(RequestStatus.INITIALIZED),
+                Field(RequestStatus.RESOLVED),
+                Field(RequestStatus.EXPIRED),
+            ]
+        );
+    }
+
+    /**
+     * Verify request's status
+     * @param requestId Request Id
+     * @param status Expected status
+     * @param expirationTimestamp Timestamp for the expiration of the request
+     * @param expirationWitness Witness for proof of expiration timestamp
+     * @param resultWitness Witness for proof of result
+     */
     verifyRequestStatus(
         requestId: Field,
         status: Field,
-        witness: Level1Witness
+        expirationTimestamp: UInt64,
+        expirationWitness: Level1Witness,
+        resultWitness: Level1Witness
     ) {
-        this.statusRoot
-            .getAndRequireEquals()
-            .assertEquals(
-                witness.calculateRoot(status),
-                Utils.buildAssertMessage(
-                    RequestContract.name,
-                    RequestContract.prototype.verifyRequestStatus.name,
-                    ErrorEnum.REQUEST_STATUS_ROOT
-                )
-            );
-        requestId.assertEquals(
-            witness.calculateIndex(),
-            Utils.buildAssertMessage(
-                RequestContract.name,
-                RequestContract.prototype.verifyRequestStatus.name,
-                ErrorEnum.REQUEST_STATUS_INDEX
+        status.assertEquals(
+            this.getRequestStatus(
+                requestId,
+                expirationTimestamp,
+                resultWitness,
+                expirationWitness
             )
         );
     }
 
-    verifyRequestPeriod(
+    /**
+     * Verify accumulation data
+     * @param requestId Request Id
+     * @param accumulatedR Accumulated R value
+     * @param accumulatedM Accumulated M value
+     * @param witness Witness for proof of accumulation data
+     */
+    verifyAccumulationData(
         requestId: Field,
-        startTimestamp: UInt64,
-        endTimestamp: UInt64,
+        accumulatedR: RequestVector,
+        accumulatedM: RequestVector,
         witness: Level1Witness
     ) {
-        this.periodRoot
+        this.accumulationRoot
             .getAndRequireEquals()
             .assertEquals(
                 witness.calculateRoot(
-                    Poseidon.hash(
-                        [
-                            startTimestamp.toFields(),
-                            endTimestamp.toFields(),
-                        ].flat()
-                    )
+                    Poseidon.hash([accumulatedR.hash(), accumulatedM.hash()])
                 ),
                 Utils.buildAssertMessage(
                     RequestContract.name,
-                    RequestContract.prototype.verifyRequestPeriod.name,
-                    ErrorEnum.REQUEST_PERIOD_ROOT
+                    RequestContract.prototype.verifyAccumulationData.name,
+                    ErrorEnum.ACCUMULATION_ROOT
                 )
             );
         requestId.assertEquals(
             witness.calculateIndex(),
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.verifyRequestPeriod.name,
-                ErrorEnum.REQUEST_PERIOD_INDEX
+                RequestContract.prototype.verifyAccumulationData.name,
+                ErrorEnum.ACCUMULATION_INDEX
             )
         );
     }
 }
-
-// export class MockResponseContract extends SmartContract {
-//     @method
-//     resolve(address: PublicKey, resolveInput: ResolveInput) {
-//         const requestContract = new RequestContract(address);
-//         requestContract.resolve(
-//             new ResolveInput({
-//                 requestId: resolveInput.requestId,
-//                 accumulatedM: resolveInput.D,
-//             })
-//         );
-//         requestContract.statusRoot.set(Field(0));
-//     }
-// }

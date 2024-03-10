@@ -57,24 +57,13 @@ export {
 } from './contracts/Round2.js';
 
 export {
-    // Constants & Enums
     RequestStatus,
-
-    // Structs
+    RequestAction,
     UpdateRequestInput,
     UpdateRequestOutput,
-
-    // Zk Programs
     UpdateRequest,
     UpdateRequestProof,
-
-    // Smart Contract
     RequestContract,
-
-    // Actions & Events
-    ActionMask as RequestActionMask,
-    Action as RequestAction,
-    ActionEnum as RequestActions,
 } from './contracts/Request.js';
 
 export {

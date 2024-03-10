@@ -119,7 +119,7 @@ xdescribe('DKG', () => {
     let T = 1,
         N = 2;
     let members: Key[] = Local.testAccounts.slice(1, N + 1);
-    let responsedMembers = [0];
+    let respondedMembers = [0];
     let secrets: SecretPolynomial[] = [];
     let publicKeys: Group[] = [];
     let requestId = Field.random();
@@ -1199,7 +1199,7 @@ xdescribe('DKG', () => {
         sumM = accumulatedEncryption.sumM;
 
         for (let i = 0; i < T; i++) {
-            let memberId = responsedMembers[i];
+            let memberId = respondedMembers[i];
             let [contribution, ski] = getResponseContribution(
                 secrets[memberId],
                 memberId,
@@ -1255,7 +1255,7 @@ xdescribe('DKG', () => {
             );
 
             // let tx = await Mina.transaction(
-            //     members[responsedMembers[i]].publicKey,
+            //     members[respondedMembers[i]].publicKey,
             //     () => {
             //         responseContract.contribute(
             //             action.committeeId,
@@ -1300,7 +1300,7 @@ xdescribe('DKG', () => {
             // );
             // await proveAndSend(
             //     tx,
-            //     members[responsedMembers[i]],
+            //     members[respondedMembers[i]],
             //     'ResponseContract',
             //     'contribute'
             // );
@@ -1373,7 +1373,7 @@ xdescribe('DKG', () => {
             reduceStateRoot,
             requestId,
             Field(mockResult.length),
-            Utils.packNumberArray(responsedMembers, INDEX_SIZE),
+            Utils.packNumberArray(respondedMembers, INDEX_SIZE),
             responseContributionStorage.getLevel1Witness(
                 ResponseContributionStorage.calculateLevel1Index(requestId)
             )
@@ -1454,7 +1454,7 @@ xdescribe('DKG', () => {
         // });
         // await proveAndSend(tx, feePayerKey, 'ResponseContract', 'complete');
 
-        // let resultVector = getResultVector(responsedMembers, D, sumM);
+        // let resultVector = getResultVector(respondedMembers, D, sumM);
         // let result = Array<Group>(mockResult.length);
         // for (let i = 0; i < result.length; i++) {
         //   result[i] = sumM[i].sub(completeProof.publicOutput.D.get(Field(i)));

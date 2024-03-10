@@ -347,7 +347,7 @@
 
 //     const memberNonces: number[] = await Promise.all(promises);
 
-//     let responsedMembers = [0];
+//     let respondedMembers = [0];
 //     let secrets: SecretPolynomial[] = [];
 //     let randomInputs: Scalar[][] = [];
 //     randomInputs = [[Scalar.from(1)], [Scalar.from(2)]];
@@ -1425,7 +1425,7 @@
 //     sumM = accumulatedEncryption.sumM;
 
 //     for (let i = 0; i < T; i++) {
-//         let memberId = responsedMembers[i];
+//         let memberId = respondedMembers[i];
 //         let [contribution, ski] = getResponseContribution(
 //             secrets[memberId],
 //             memberId,
@@ -1535,7 +1535,7 @@
 //         // );
 //         // await proveAndSend(
 //         //   tx,
-//         //   members[responsedMembers[i]],
+//         //   members[respondedMembers[i]],
 //         //   'ResponseContract',
 //         //   'contribute'
 //         // );
@@ -1614,7 +1614,7 @@
 //         reduceStateRoot,
 //         requestId,
 //         Field(mockResult.length),
-//         packIndexArray(responsedMembers),
+//         packIndexArray(respondedMembers),
 //         responseContributionStorage.getLevel1Witness(
 //             ResponseContributionStorage.calculateLevel1Index(requestId)
 //         )
