@@ -6,7 +6,7 @@
 // import {
 //   CommitteeAction,
 //   CommitteeContract,
-//   RollupCommittee,
+//   UpdateCommittee,
 // } from '../../contracts/Committee.js';
 // import axios from 'axios';
 // import { MemberArray } from '../../libs/Committee.js';
@@ -72,7 +72,7 @@
 //   ]);
 //   // Provable.log('Member Level 1', memberLevel1);
 //   // Provable.log('Setting Level 1', settingLevel1);
-//   await compile(RollupCommittee, cache);
+//   await compile(UpdateCommittee, cache);
 //   // await compile(CommitteeContract, cache);
 
 //   const rawActions = await fetchCommitteeActions(
@@ -95,8 +95,8 @@
 //       })
 //   );
 
-//   console.log('RollupCommittee.firstStep...');
-//   let proof = await RollupCommittee.firstStep(
+//   console.log('UpdateCommittee.init...');
+//   let proof = await UpdateCommittee.init(
 //     Field(committeeState[0]),
 //     Field(committeeState[1]),
 //     Field(committeeState[2]),
@@ -108,7 +108,7 @@
 
 //   for (let i = 0; i < reduceActions.length; i++) {
 //     let action = reduceActions[i];
-//     console.log(`${i} - RollupCommittee.nextStep...`);
+//     console.log(`${i} - UpdateCommittee.nextStep...`);
 //     let memberWitness = memberStorage.getLevel1Witness(Field(i));
 //     let storageWitness = settingStorage.getWitness(Field(i));
 
@@ -120,7 +120,7 @@
 //     Provable.log('Member Witness:', memberWitness);
 //     Provable.log('Storage Witness:', storageWitness);
 
-//     proof = await RollupCommittee.nextStep(
+//     proof = await UpdateCommittee.nextStep(
 //       proof,
 //       action,
 //       memberWitness,

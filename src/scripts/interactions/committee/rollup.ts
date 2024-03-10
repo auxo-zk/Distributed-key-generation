@@ -5,7 +5,7 @@ import { fetchActions, fetchZkAppState } from '../../helper/deploy.js';
 import {
     CommitteeAction,
     CommitteeContract,
-    RollupCommittee,
+    UpdateCommittee,
 } from '../../../contracts/Committee.js';
 import axios from 'axios';
 import { MemberArray } from '../../../libs/Committee.js';
@@ -30,7 +30,7 @@ async function main() {
     const toState = undefined;
 
     // Compile programs
-    await compile(RollupCommittee, cache);
+    await compile(UpdateCommittee, cache);
     await compile(CommitteeContract, cache);
     const committeeAddress = process.env.BERKELEY_COMMITTEE_ADDRESS as string;
     console.log('Committee address:', committeeAddress);
@@ -106,8 +106,8 @@ async function main() {
     actions.map((e) => Provable.log(e));
 
     // Prepare proofs
-    console.log('RollupCommittee.firstStep...');
-    let proof = await RollupCommittee.firstStep(
+    console.log('UpdateCommittee.init...');
+    let proof = await UpdateCommittee.init(
         committeeState.actionState,
         committeeState.committeeTreeRoot,
         committeeState.settingRoot,
@@ -119,7 +119,7 @@ async function main() {
 
     for (let i = 0; i < reduceActions.length; i++) {
         let action = reduceActions[i];
-        console.log(`${i} - RollupCommittee.nextStep...`);
+        console.log(`${i} - UpdateCommittee.nextStep...`);
         let memberWitness = memberStorage.getLevel1Witness(
             MemberStorage.calculateLevel1Index(
                 Field(i).add(committeeState.nextCommitteeId)
@@ -131,7 +131,7 @@ async function main() {
             )
         );
 
-        proof = await RollupCommittee.nextStep(
+        proof = await UpdateCommittee.nextStep(
             proof,
             new CommitteeAction(action),
             memberWitness,

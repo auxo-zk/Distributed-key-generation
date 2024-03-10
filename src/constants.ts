@@ -72,15 +72,13 @@ export enum ZkAppEnum {
 }
 
 export enum ZkProgramEnum {
-    RollupCommittee = 'RollupCommittee',
-    RollupDkg = 'RollupDkg',
-    RollupRound1 = 'RollupRound1',
-    RollupRound2 = 'RollupRound2',
-    RollupRequest = 'RollupRequest',
-    RollupRequester = 'RollupRequester',
-    RollupResponse = 'RollupResponse',
-    RollupMulti = 'RollupMulti',
+    Elgamal = 'Elgamal',
+    BatchEncryption = 'BatchEncryption',
+    BatchDecryption = 'BatchDecryption',
 
+    Rollup = 'Rollup',
+
+    UpdateCommittee = 'UpdateCommittee',
     UpdateKey = 'UpdateKey',
     FinalizeRound1 = 'FinalizeRound1',
     FinalizeRound2 = 'FinalizeRound2',

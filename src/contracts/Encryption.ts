@@ -8,21 +8,40 @@ import {
     Struct,
     ZkProgram,
 } from 'o1js';
-import { Bit255, CustomScalar, ScalarDynamicArray } from '@auxo-dev/auxo-libs';
+import {
+    Bit255,
+    CustomScalar,
+    ScalarDynamicArray,
+    Utils,
+} from '@auxo-dev/auxo-libs';
 import { CArray, cArray, UArray } from '../libs/Committee.js';
-import { COMMITTEE_MAX_SIZE } from '../constants.js';
+import { COMMITTEE_MAX_SIZE, ZkProgramEnum } from '../constants.js';
+import { ErrorEnum } from './constants.js';
 
-export class PlainArray extends ScalarDynamicArray(COMMITTEE_MAX_SIZE) {}
-export class RandomArray extends ScalarDynamicArray(COMMITTEE_MAX_SIZE) {}
+export {
+    PlainArray,
+    RandomArray,
+    ElgamalInput,
+    Elgamal,
+    BatchEncryptionInput,
+    BatchEncryption,
+    BatchEncryptionProof,
+    BatchDecryptionInput,
+    BatchDecryption,
+    BatchDecryptionProof,
+};
 
-export class ElgamalInput extends Struct({
+class PlainArray extends ScalarDynamicArray(COMMITTEE_MAX_SIZE) {}
+class RandomArray extends ScalarDynamicArray(COMMITTEE_MAX_SIZE) {}
+
+class ElgamalInput extends Struct({
     pubKey: Group,
     c: Bit255,
     U: Group,
 }) {}
 
-export const Elgamal = ZkProgram({
-    name: 'elgamal',
+const Elgamal = ZkProgram({
+    name: ZkProgramEnum.Elgamal,
     publicInput: ElgamalInput,
     publicOutput: Bit255,
     methods: {
@@ -38,7 +57,15 @@ export const Elgamal = ZkProgram({
                 let kBits = Bit255.fromBits(k.toBits());
                 let plainBits = Bit255.fromScalar(plain);
                 let encrypted = Bit255.xor(kBits, plainBits);
-                encrypted.assertEquals(input.c);
+                encrypted.assertEquals(
+                    input.c
+                    // FIXME - remove comment after update auxo-libs
+                    // ,Utils.buildAssertMessage(
+                    //     Elgamal.name,
+                    //     Elgamal.encrypt.name,
+                    //     ErrorEnum.ELGAMAL_ENCRYPTION
+                    // )
+                );
                 return encrypted;
             },
         },
@@ -51,6 +78,11 @@ export const Elgamal = ZkProgram({
                 let decrypted = Bit255.xor(kBits, input.c);
                 CustomScalar.fromScalar(decrypted.toScalar()).assertEquals(
                     CustomScalar.fromScalar(plain)
+                    // ,Utils.buildAssertMessage(
+                    //     Elgamal.name,
+                    //     Elgamal.decrypt.name,
+                    //     ErrorEnum.ELGAMAL_DECRYPTION
+                    // )
                 );
                 return decrypted;
             },
@@ -58,15 +90,15 @@ export const Elgamal = ZkProgram({
     },
 });
 
-export class BatchEncryptionInput extends Struct({
+class BatchEncryptionInput extends Struct({
     publicKeys: CArray,
     c: cArray,
     U: UArray,
     memberId: Field,
 }) {}
 
-export const BatchEncryption = ZkProgram({
-    name: 'batch-encryption',
+const BatchEncryption = ZkProgram({
+    name: ZkProgramEnum.BatchEncryption,
     publicInput: BatchEncryptionInput,
     methods: {
         encrypt: {
@@ -77,8 +109,22 @@ export const BatchEncryption = ZkProgram({
                 randomValues: RandomArray
             ) {
                 let length = input.publicKeys.length;
-                input.c.length.assertEquals(length);
-                input.U.length.assertEquals(length);
+                input.c.length.assertEquals(
+                    length,
+                    Utils.buildAssertMessage(
+                        Elgamal.name,
+                        Elgamal.decrypt.name,
+                        ErrorEnum.ELGAMAL_BATCH_SIZE
+                    )
+                );
+                input.U.length.assertEquals(
+                    length,
+                    Utils.buildAssertMessage(
+                        Elgamal.name,
+                        Elgamal.decrypt.name,
+                        ErrorEnum.ELGAMAL_BATCH_SIZE
+                    )
+                );
 
                 for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
                     let iField = Field(i);
@@ -107,24 +153,30 @@ export const BatchEncryption = ZkProgram({
                         input.U.get(iField)
                             .equals(U)
                             .and(encrypted.equals(cipher))
-                    ).assertTrue();
+                    ).assertTrue(
+                        Utils.buildAssertMessage(
+                            Elgamal.name,
+                            Elgamal.decrypt.name,
+                            ErrorEnum.ELGAMAL_ENCRYPTION
+                        )
+                    );
                 }
             },
         },
     },
 });
 
-export class BatchEncryptionProof extends ZkProgram.Proof(BatchEncryption) {}
+class BatchEncryptionProof extends ZkProgram.Proof(BatchEncryption) {}
 
-export class BatchDecryptionInput extends Struct({
+class BatchDecryptionInput extends Struct({
     publicKey: Group,
     c: cArray,
     U: UArray,
     memberId: Field,
 }) {}
 
-export const BatchDecryption = ZkProgram({
-    name: 'batch-decryption',
+const BatchDecryption = ZkProgram({
+    name: ZkProgramEnum.BatchDecryption,
     publicInput: BatchDecryptionInput,
     publicOutput: Group,
     methods: {
@@ -136,8 +188,24 @@ export const BatchDecryption = ZkProgram({
                 privateKey: Scalar
             ) {
                 let length = input.c.length;
-                input.U.length.assertEquals(length);
-                Group.generator.scale(privateKey).assertEquals(input.publicKey);
+                input.U.length.assertEquals(
+                    length,
+                    Utils.buildAssertMessage(
+                        Elgamal.name,
+                        Elgamal.decrypt.name,
+                        ErrorEnum.ELGAMAL_BATCH_SIZE
+                    )
+                );
+                Group.generator
+                    .scale(privateKey)
+                    .assertEquals(
+                        input.publicKey,
+                        Utils.buildAssertMessage(
+                            Elgamal.name,
+                            Elgamal.decrypt.name,
+                            ErrorEnum.ELGAMAL_KEY
+                        )
+                    );
                 let ski = Group.generator.scale(Scalar.from(0n));
 
                 for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
@@ -162,7 +230,13 @@ export const BatchDecryption = ZkProgram({
                             head: decrypted.head,
                             tail: decrypted.tail,
                         }).equals(plain)
-                    ).assertTrue();
+                    ).assertTrue(
+                        Utils.buildAssertMessage(
+                            Elgamal.name,
+                            Elgamal.decrypt.name,
+                            ErrorEnum.ELGAMAL_DECRYPTION
+                        )
+                    );
 
                     ski.add(Group.generator.scale(decrypted.toScalar()));
                 }
@@ -172,4 +246,4 @@ export const BatchDecryption = ZkProgram({
     },
 });
 
-export class BatchDecryptionProof extends ZkProgram.Proof(BatchDecryption) {}
+class BatchDecryptionProof extends ZkProgram.Proof(BatchDecryption) {}

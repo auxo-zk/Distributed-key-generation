@@ -17,9 +17,9 @@ import randomAccounts from './helper/randomAccounts.js';
 import {
     CommitteeContract,
     CommitteeAction,
-    RollupCommittee,
+    UpdateCommittee,
     CommitteeMemberInput,
-    RollupCommitteeOutput,
+    UpdateCommitteeOutput,
 } from '../contracts/Committee.js';
 import { IpfsHash } from '@auxo-dev/auxo-libs';
 import { MemberArray } from '../libs/Committee.js';
@@ -45,7 +45,7 @@ describe('Committee', () => {
     let feePayerKey: PrivateKey;
     let feePayer: PublicKey;
     let committeeContract: CommitteeContract;
-    let proof: Proof<Void, RollupCommitteeOutput>;
+    let proof: Proof<Void, UpdateCommitteeOutput>;
     let myMemberArray1: MemberArray;
     let threshold1 = Field(1);
     let threshold2 = Field(2);
@@ -64,7 +64,7 @@ describe('Committee', () => {
         if (doProofs) {
             await CommitteeContract.compile();
         } else {
-            // RollupCommittee.analyzeMethods();
+            // UpdateCommittee.analyzeMethods();
             CommitteeContract.analyzeMethods();
         }
 
@@ -79,7 +79,7 @@ describe('Committee', () => {
 
     xit('compile proof', async () => {
         // compile proof
-        await RollupCommittee.compile();
+        await UpdateCommittee.compile();
     });
 
     xit('Create committee consist of 2 people with threshold 1, and test deploy DKG', async () => {
@@ -120,7 +120,7 @@ describe('Committee', () => {
 
     xit('create proof first step...', async () => {
         // create first step proof
-        proof = await RollupCommittee.firstStep(
+        proof = await UpdateCommittee.init(
             Reducer.initialActionState,
             memberStorage.root,
             settingStorage.root,
@@ -133,7 +133,7 @@ describe('Committee', () => {
     });
 
     xit('create proof next step 1...', async () => {
-        proof = await RollupCommittee.nextStep(
+        proof = await UpdateCommittee.update(
             proof,
             new CommitteeAction({
                 addresses: myMemberArray1,
@@ -165,7 +165,7 @@ describe('Committee', () => {
     });
 
     xit('create proof next step 2...', async () => {
-        proof = await RollupCommittee.nextStep(
+        proof = await UpdateCommittee.update(
             proof,
             new CommitteeAction({
                 addresses: myMemberArray2,
@@ -198,7 +198,7 @@ describe('Committee', () => {
 
     xit('committeeContract rollup', async () => {
         let tx = await Mina.transaction(feePayer, () => {
-            committeeContract.rollup(proof);
+            committeeContract.updateCommittees(proof);
         });
         await tx.prove();
         await tx.sign([feePayerKey]).send();
@@ -213,7 +213,7 @@ describe('Committee', () => {
             memberWitness: memberStorage.getWitness(Field(0), Field(1)),
         });
         let tx = await Mina.transaction(feePayer, () => {
-            committeeContract.checkMember(checkInput);
+            committeeContract.verifyMember(checkInput);
         });
         await tx.prove();
         await tx.sign([feePayerKey]).send();
@@ -228,7 +228,7 @@ describe('Committee', () => {
             memberWitness: memberStorage.getWitness(Field(1), Field(1)),
         });
         expect(() => {
-            committeeContract.checkMember(checkInput);
+            committeeContract.verifyMember(checkInput);
         }).toThrowError();
     });
 });

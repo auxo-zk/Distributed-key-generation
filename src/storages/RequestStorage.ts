@@ -123,7 +123,7 @@ export class CommitmentStorage extends RequestStorage<CommitmentLeaf> {
     }
 }
 
-// TODO: Consider changing to UInt64 for optimization
+// @todo Consider changing to UInt64 for optimization
 export type KeyIndexLeaf = Field;
 
 export class KeyIndexStorage extends RequestStorage<KeyIndexLeaf> {

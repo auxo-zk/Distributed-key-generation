@@ -16,21 +16,19 @@ import {
     UInt64,
     PublicKey,
 } from 'o1js';
-import { CustomScalar } from '@auxo-dev/auxo-libs';
-import { buildAssertMessage, updateActionState } from '../libs/utils.js';
+import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
 import { REQUEST_MAX_SIZE, ZkAppEnum, ZkProgramEnum } from '../constants.js';
 import {
     RandomVector,
     RequestVector,
     SecretVector,
 } from '../libs/Requester.js';
-import { RollupContract } from './Rollup.js';
+import { RollupContract, processAction, verifyRollup } from './Rollup.js';
 import {
     ActionWitness,
     EMPTY_ACTION_MT,
     EMPTY_ADDRESS_MT,
     ProcessedActions,
-    RollupStatus,
     ZkAppRef,
     verifyZkApp,
 } from '../storages/SharedStorage.js';
@@ -44,7 +42,6 @@ import { CommitteeContract } from './Committee.js';
 import { RequestContract } from './Request.js';
 import { Level1Witness as DkgLevel1Witness } from '../storages/DKGStorage.js';
 import { DkgContract, KeyStatus, KeyStatusInput } from './DKG.js';
-import { processAction } from './Actions.js';
 
 export class Action extends Struct({
     taskId: Field,
@@ -78,7 +75,7 @@ export const AttachRequest = ZkProgram({
     name: ZkProgramEnum.AttachRequest,
     publicOutput: AttachRequestOutput,
     methods: {
-        firstStep: {
+        init: {
             privateInputs: [Field, Field],
             method(taskCounter: Field, initialRequestIdRoot: Field) {
                 return new AttachRequestOutput({
@@ -104,7 +101,7 @@ export const AttachRequest = ZkProgram({
                 // Verify this task has not been attached with another request
                 earlierProof.publicOutput.nextRequestIdRoot.assertEquals(
                     witness.calculateRoot(Field(0)),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         AttachRequest.name,
                         AttachRequest.nextStep.name,
                         ErrorEnum.REQUEST_ID_ROOT
@@ -114,7 +111,7 @@ export const AttachRequest = ZkProgram({
                 // Verify a request has been initialized for this task
                 earlierProof.publicOutput.taskCounter.assertGreaterThan(
                     taskId,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         AttachRequest.name,
                         AttachRequest.nextStep.name,
                         ErrorEnum.REQUEST_ID_INDEX
@@ -122,7 +119,7 @@ export const AttachRequest = ZkProgram({
                 );
                 taskId.assertEquals(
                     witness.calculateIndex(),
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         AttachRequest.name,
                         AttachRequest.nextStep.name,
                         ErrorEnum.REQUEST_ID_INDEX
@@ -166,7 +163,7 @@ export const AccumulateEncryption = ZkProgram({
     publicInput: AccumulateEncryptionInput,
     publicOutput: AccumulateEncryptionOutput,
     methods: {
-        firstStep: {
+        init: {
             privateInputs: [PublicKey, Field, Field, Field],
             method(
                 input: AccumulateEncryptionInput,
@@ -211,7 +208,7 @@ export const AccumulateEncryption = ZkProgram({
 
                 input.action.requestId.assertEquals(
                     earlierProof.publicOutput.requestId,
-                    buildAssertMessage(
+                    Utils.buildAssertMessage(
                         AccumulateEncryption.name,
                         AccumulateEncryption.nextStep.name,
                         ErrorEnum.REQUEST_ID
@@ -226,30 +223,18 @@ export const AccumulateEncryption = ZkProgram({
                         input.actionId,
                     ].flat()
                 );
-                let [rollupRoot, rollupIndex] = rollupWitness.computeRootAndKey(
-                    Field(RollupStatus.ROLLUPED)
-                );
-                earlierProof.publicOutput.rollupRoot.assertEquals(
-                    rollupRoot,
-                    buildAssertMessage(
-                        AccumulateEncryption.name,
-                        AccumulateEncryption.nextStep.name,
-                        ErrorEnum.ROLLUP_ROOT
-                    )
-                );
-                actionIndex.assertEquals(
-                    rollupIndex,
-                    buildAssertMessage(
-                        AccumulateEncryption.name,
-                        AccumulateEncryption.nextStep.name,
-                        ErrorEnum.ROLLUP_INDEX
-                    )
+                verifyRollup(
+                    AccumulateEncryption.name,
+                    earlierProof.publicOutput.rollupRoot,
+                    actionIndex,
+                    rollupWitness
                 );
 
                 // Calculate corresponding action state
-                let actionState = updateActionState(input.previousActionState, [
-                    Action.toFields(input.action),
-                ]);
+                let actionState = Utils.updateActionState(
+                    input.previousActionState,
+                    [Action.toFields(input.action)]
+                );
                 let processedActions =
                     earlierProof.publicOutput.processedActions;
                 processedActions.push(actionState);
@@ -407,7 +392,7 @@ export class RequesterContract extends SmartContract {
         proof.verify();
         proof.publicOutput.taskCounter.assertEquals(
             taskCounter,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequesterContract.name,
                 RequesterContract.prototype.attachRequests.name,
                 ErrorEnum.REQUEST_COUNTER
@@ -415,7 +400,7 @@ export class RequesterContract extends SmartContract {
         );
         proof.publicOutput.initialRequestIdRoot.assertEquals(
             requestIdRoot,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequesterContract.name,
                 RequesterContract.prototype.attachRequests.name,
                 ErrorEnum.REQUEST_COUNTER
@@ -485,9 +470,9 @@ export class RequesterContract extends SmartContract {
         const requestContract = new RequestContract(request.address);
         const rollupContract = new RollupContract(rollup.address);
 
-        // TODO: Verify encryption key
+        // @todo Verify encryption key
 
-        // TODO: Verify request period
+        // @todo Verify request period
         this.network.timestamp
             .getAndRequireEquals()
             .assertGreaterThanOrEqual(startTimestamp);
@@ -498,7 +483,7 @@ export class RequesterContract extends SmartContract {
         // Verify attached request
         requestIdRoot.assertEquals(
             requestWitness.calculateRoot(requestId),
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequesterContract.name,
                 RequesterContract.prototype.submit.name,
                 ErrorEnum.REQUEST_ID_ROOT
@@ -508,7 +493,7 @@ export class RequesterContract extends SmartContract {
         // Verify secret vectors
         secrets.length.assertEquals(
             randoms.length,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequesterContract.name,
                 RequesterContract.prototype.submit.name,
                 ErrorEnum.REQUEST_VECTOR_DIM
@@ -533,7 +518,7 @@ export class RequesterContract extends SmartContract {
         );
         R.length.assertEquals(
             dimension,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequesterContract.name,
                 RequesterContract.prototype.submit.name,
                 ErrorEnum.REQUEST_VECTOR_DIM
@@ -541,7 +526,7 @@ export class RequesterContract extends SmartContract {
         );
         M.length.assertEquals(
             dimension,
-            buildAssertMessage(
+            Utils.buildAssertMessage(
                 RequesterContract.name,
                 RequesterContract.prototype.submit.name,
                 ErrorEnum.REQUEST_VECTOR_DIM
@@ -620,7 +605,7 @@ export class RequesterContract extends SmartContract {
         // Verify proof
         proof.verify();
 
-        // TODO: request to Request contract
+        // @todo request to Request contract
         // requestContract.finalize(
         //     requestId,
         //     this.address,

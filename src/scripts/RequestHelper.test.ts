@@ -174,9 +174,9 @@ describe('Requester', () => {
     // });
 
     // it('reduce 3 tx', async () => {
-    //     console.log('Create Requester.firstStep...');
-    //     RequesterProfile.start('Requester.firstStep');
-    //     proof = await CreateReduce.firstStep(
+    //     console.log('Create Requester.init...');
+    //     RequesterProfile.start('Requester.init');
+    //     proof = await CreateReduce.init(
     //         requestHelperContract.actionState.get(),
     //         requestHelperContract.actionStatus.get()
     //     );
@@ -186,7 +186,7 @@ describe('Requester', () => {
     //     );
     //     for (let i = 0; i < actionsVip.length; i++) {}
     //     RequesterProfile.start('Requester.nextstep');
-    //     proof = await CreateReduce.firstStep(
+    //     proof = await CreateReduce.init(
     //         requestHelperContract.actionState.get(),
     //         requestHelperContract.actionStatus.get()
     //     );

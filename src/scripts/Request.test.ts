@@ -136,9 +136,9 @@ describe('Testing Request Contract', () => {
     });
 
     // it('Create proof for requestInput1 and rollup', async () => {
-    //     console.log('Create UpdateRequest.firstStep requestInput1...');
-    //     ActionRequestProfiler.start('UpdateRequest.firstStep');
-    //     proof = await UpdateRequest.firstStep(
+    //     console.log('Create UpdateRequest.init requestInput1...');
+    //     ActionRequestProfiler.start('UpdateRequest.init');
+    //     proof = await UpdateRequest.init(
     //         requestContract.actionState.get(),
     //         requestStatusMap.getRoot(),
     //         requesterMap.getRoot()
@@ -209,7 +209,7 @@ describe('Testing Request Contract', () => {
 
     // it('Create proof for requestInput2 and rollup', async () => {
     //     console.log('Create proof for requestInput2 and rollup');
-    //     proof = await UpdateRequest.firstStep(
+    //     proof = await UpdateRequest.init(
     //         requestContract.actionState.get(),
     //         requestStatusMap.getRoot(),
     //         requesterMap.getRoot()

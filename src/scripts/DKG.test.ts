@@ -11,11 +11,11 @@ import {
     Scalar,
     SmartContract,
 } from 'o1js';
-import { CustomScalar } from '@auxo-dev/auxo-libs';
+import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
 import fs from 'fs';
 import { getProfiler } from './helper/profiler.js';
 import { Config, Key } from './helper/config.js';
-import { CommitteeContract, RollupCommittee } from '../contracts/Committee.js';
+import { CommitteeContract, UpdateCommittee } from '../contracts/Committee.js';
 import {
     Action as DkgAction,
     ActionMask as DkgActionMask,
@@ -89,14 +89,13 @@ import {
     getRound1Contribution,
     getRound2Contribution,
 } from '../libs/Committee.js';
-import { ZkAppEnum, Contract } from '../constants.js';
+import { ZkAppEnum, Contract, INDEX_SIZE } from '../constants.js';
 import {
     RArray,
     accumulateEncryption,
     generateEncryption,
 } from '../libs/Requester.js';
 import { UpdateRequest, RequestContract } from '../contracts/Request.js';
-import { packIndexArray } from '../libs/utils.js';
 import { ResponseContributionStorage } from '../storages/RequestStorage.js';
 
 xdescribe('DKG', () => {
@@ -343,7 +342,7 @@ xdescribe('DKG', () => {
         await compile(BatchDecryption, 'BatchDecryption', profiling);
         await compile(FinalizeResponse, 'FinalizeResponse', profiling);
 
-        await compile(RollupCommittee, 'RollupCommittee', profiling);
+        await compile(UpdateCommittee, 'UpdateCommittee', profiling);
 
         await compile(UpdateRequest, 'UpdateRequest', profiling);
 
@@ -453,7 +452,7 @@ xdescribe('DKG', () => {
         let tx = await Mina.transaction(feePayerKey.publicKey, () => {
             AccountUpdate.fundNewAccount(feePayerKey.publicKey);
             requestContract.deploy();
-            // requestContract.responseContractAddress.set(
+            // requestContract.responeContractAddress.set(
             //     contracts[Contract.REQUEST].contract.address
             // );
             let feePayerAccount = AccountUpdate.createSigned(
@@ -506,8 +505,8 @@ xdescribe('DKG', () => {
         }
 
         console.log('Generate first step proof RollupDkg...');
-        if (profiling) DKGProfiler.start('RollupDkg.firstStep');
-        let updateKeyProof = await UpdateKey.firstStep(
+        if (profiling) DKGProfiler.start('RollupDkg.init');
+        let updateKeyProof = await UpdateKey.init(
             new UpdateKeyInput({
                 previousActionState: Field(0),
                 action: DkgAction.empty(),
@@ -522,8 +521,8 @@ xdescribe('DKG', () => {
         for (let i = 0; i < 1; i++) {
             let action = dkgActions[ActionEnum.GENERATE_KEY][i];
             console.log(`Generate step ${i + 1} proof RollupDkg...`);
-            if (profiling) DKGProfiler.start('RollupDkg.nextStepGeneration');
-            // updateKeyProof = await UpdateKey.nextStepGeneration(
+            if (profiling) DKGProfiler.start('RollupDkg.generate');
+            // updateKeyProof = await UpdateKey.generate(
             //     new UpdateKeyInput({
             //         previousActionState: Field(0),
             //         action,
@@ -623,8 +622,8 @@ xdescribe('DKG', () => {
         let initialActionState = contracts[Contract.ROUND1].actionStates[0];
 
         console.log('Generate first step proof RollupRound1...');
-        if (profiling) DKGProfiler.start('RollupRound1.firstStep');
-        let reduceProof = await RollupRound1.firstStep(
+        if (profiling) DKGProfiler.start('RollupRound1.init');
+        let reduceProof = await RollupRound1.init(
             round1Actions[0],
             initialReduceState,
             initialActionState
@@ -668,8 +667,8 @@ xdescribe('DKG', () => {
         let reduceStateRoot = round1Contract.processRoot.get();
 
         console.log('Generate first step proof FinalizeRound1...');
-        if (profiling) DKGProfiler.start('FinalizeRound1.firstStep');
-        let finalizeProof = await FinalizeRound1.firstStep(
+        if (profiling) DKGProfiler.start('FinalizeRound1.init');
+        let finalizeProof = await FinalizeRound1.init(
             new FinalizeRound1Input({
                 previousActionState: Field(0),
                 action: Round1Action.empty(),
@@ -817,8 +816,8 @@ xdescribe('DKG', () => {
         );
 
         console.log('Generate first step proof RollupDkg...');
-        if (profiling) DKGProfiler.start('RollupDkg.firstStep');
-        let updateKeyProof = await RollupDkg.firstStep(
+        if (profiling) DKGProfiler.start('RollupDkg.init');
+        let updateKeyProof = await RollupDkg.init(
             DkgAction.empty(),
             initialKeyCounter,
             initialKeyStatus,
@@ -944,8 +943,8 @@ xdescribe('DKG', () => {
         let initialActionState = contracts[Contract.ROUND2].actionStates[0];
 
         console.log('Generate first step proof RollupRound2...');
-        if (profiling) DKGProfiler.start('RollupRound2.firstStep');
-        let reduceProof = await RollupRound2.firstStep(
+        if (profiling) DKGProfiler.start('RollupRound2.init');
+        let reduceProof = await RollupRound2.init(
             round2Actions[0],
             initialReduceState,
             initialActionState
@@ -991,8 +990,8 @@ xdescribe('DKG', () => {
         );
 
         console.log('Generate first step proof FinalizeRound2...');
-        if (profiling) DKGProfiler.start('FinalizeRound2.firstStep');
-        let finalizeProof = await FinalizeRound2.firstStep(
+        if (profiling) DKGProfiler.start('FinalizeRound2.init');
+        let finalizeProof = await FinalizeRound2.init(
             new FinalizeRound2Input({
                 previousActionState: Field(0),
                 action: Round2Action.empty(),
@@ -1136,8 +1135,8 @@ xdescribe('DKG', () => {
         );
 
         console.log('Generate first step proof RollupDkg...');
-        if (profiling) DKGProfiler.start('RollupDkg.firstStep');
-        let updateKeyProof = await RollupDkg.firstStep(
+        if (profiling) DKGProfiler.start('RollupDkg.init');
+        let updateKeyProof = await RollupDkg.init(
             DkgAction.empty(),
             initialKeyCounter,
             initialKeyStatus,
@@ -1318,8 +1317,8 @@ xdescribe('DKG', () => {
         let initialActionState = contracts[Contract.RESPONSE].actionStates[0];
 
         console.log('Generate first step proof RollupResponse...');
-        if (profiling) DKGProfiler.start('RollupResponse.firstStep');
-        let reduceProof = await RollupResponse.firstStep(
+        if (profiling) DKGProfiler.start('RollupResponse.init');
+        let reduceProof = await RollupResponse.init(
             responseActions[0],
             initialReduceState,
             initialActionState
@@ -1362,8 +1361,8 @@ xdescribe('DKG', () => {
         let reduceStateRoot = responseContract.processRoot.get();
 
         console.log('Generate first step proof FinalizeResponse...');
-        if (profiling) DKGProfiler.start('FinalizeResponse.firstStep');
-        let completeProof = await FinalizeResponse.firstStep(
+        if (profiling) DKGProfiler.start('FinalizeResponse.init');
+        let completeProof = await FinalizeResponse.init(
             new FinalizeResponseInput({
                 previousActionState: Field(0),
                 action: ResponseAction.empty(),
@@ -1374,7 +1373,7 @@ xdescribe('DKG', () => {
             reduceStateRoot,
             requestId,
             Field(mockResult.length),
-            packIndexArray(responsedMembers),
+            Utils.packNumberArray(responsedMembers, INDEX_SIZE),
             responseContributionStorage.getLevel1Witness(
                 ResponseContributionStorage.calculateLevel1Index(requestId)
             )

@@ -82,8 +82,8 @@ async function main() {
         return RequestAction.fromFields(action);
     });
 
-    // console.log('UpdateRequest.firstStep...');
-    // let proof = await UpdateRequest.firstStep(
+    // console.log('UpdateRequest.init...');
+    // let proof = await UpdateRequest.init(
     //     committeeState.actionState,
     //     committeeState.requestStatusRoot,
     //     committeeState.requesterRoot

@@ -1,9 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": "./",
-    "paths": {
-      "src/*": ["./src/*"]
-    },
     "target": "es2021",
     "module": "es2022",
     "lib": ["dom", "esnext"],

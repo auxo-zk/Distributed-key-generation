@@ -12,7 +12,7 @@ import {
 import fs from 'fs/promises';
 import { getProfiler } from './helper/profiler.js';
 import { Config, Key } from './helper/config.js';
-import { CommitteeContract, RollupCommittee } from '../contracts/Committee.js';
+import { CommitteeContract, UpdateCommittee } from '../contracts/Committee.js';
 import { DkgContract, RollupDkg } from '../contracts/DKG.js';
 import {
     FinalizeRound1,
@@ -255,7 +255,7 @@ async function main() {
         await compile(BatchDecryption, 'BatchDecryption', profiling);
         await compile(FinalizeResponse, 'FinalizeResponse', profiling);
 
-        await compile(RollupCommittee, 'RollupCommittee', profiling);
+        await compile(UpdateCommittee, 'UpdateCommittee', profiling);
 
         await compile(UpdateRequest, 'UpdateRequest', profiling);
 

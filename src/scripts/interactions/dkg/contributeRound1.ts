@@ -9,7 +9,7 @@ import {
 import { prepare } from '../prepare.js';
 import {
     CommitteeContract,
-    RollupCommittee,
+    UpdateCommittee,
     DkgContract,
     FinalizeRound1,
     RollupRound1,
@@ -43,7 +43,7 @@ async function main() {
     const { cache, feePayer } = await prepare();
 
     // Compile programs
-    await compile(RollupCommittee, cache);
+    await compile(UpdateCommittee, cache);
     await compile(CommitteeContract, cache);
     await compile(RollupDkg, cache);
     await compile(DkgContract, cache);
@@ -212,8 +212,8 @@ async function main() {
     console.log('Finalizing Actions:');
     actions.map((e) => Provable.log(e));
 
-    console.log('FinalizeRound1.firstStep...');
-    let proof = await FinalizeRound1.firstStep(
+    console.log('FinalizeRound1.init...');
+    let proof = await FinalizeRound1.init(
         new FinalizeRound1Input({
             previousActionState: Field(0),
             action: Round1Action.empty(),

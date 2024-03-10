@@ -4,7 +4,7 @@
 // import {
 //     CommitteeMemberInput,
 //     CommitteeContract,
-//     RollupCommittee,
+//     UpdateCommittee,
 // } from '../../../contracts/Committee.js';
 // import axios from 'axios';
 // import { MemberArray } from '../../../libs/Committee.js';
@@ -22,7 +22,7 @@
 //     const { cache, feePayer } = await prepare();
 
 //     // Compile programs
-//     await compile(RollupCommittee, cache);
+//     await compile(UpdateCommittee, cache);
 //     await compile(CommitteeContract, cache);
 //     const committeeAddress =
 //         'B62qiYCgNQhu1KddDQZs7HL8cLqRd683YufYX1BNceZ6BHnC1qfEcJ9';
@@ -73,7 +73,7 @@
 //     Provable.log(memberStorage.root);
 //     Provable.log(settingStorage.root);
 
-//     console.log('committeeContract.checkMember: ');
+//     console.log('committeeContract.verifyMember: ');
 //     const committeeId = Field(3);
 //     const memberId = Field(0);
 //     let input = new CommitteeMemberInput({
@@ -130,8 +130,8 @@
 //             )
 //         )
 //     );
-//     let checkMember = await committeeContract.checkMember(input);
-//     Provable.log('Is member:', checkMember);
+//     let verifyMember = await committeeContract.verifyMember(input);
+//     Provable.log('Is member:', verifyMember);
 // }
 
 // main()
