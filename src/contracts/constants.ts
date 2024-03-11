@@ -48,6 +48,8 @@ export enum ErrorEnum {
     KEY_STATUS_ROOT = 'Incorrect key status MT root',
     KEY_STATUS_INDEX = 'Incorrect key status MT index',
     KEY_STATUS_VALUE = 'Incorrect key status value',
+    KEY_ROOT = 'Incorrect key MT root',
+    KEY_INDEX = 'Incorrect key MT index',
 
     // Round1Contract errors
     R1_CONTRIBUTION_THRESHOLD = 'Incorrect number of round 1 contributions',
@@ -78,21 +80,27 @@ export enum ErrorEnum {
     REQUEST_COUNTER = 'Incorrect request counter',
     REQUEST_ID_ROOT = 'Incorrect request Id MT root',
     REQUEST_ID_INDEX = 'Incorrect request Id MT index',
-    ACCUMULATION_ROOT = 'Incorrect accumulation Id MT root',
-    ACCUMULATION_INDEX = 'Incorrect accumulation Id MT index',
+    COMMITMENT_COUNTER = 'Incorrect commitment counter',
     COMMITMENT_ROOT = 'Incorrect commitment Id MT root',
     COMMITMENT_INDEX = 'Incorrect commitment Id MT index',
-
-    // RequestContract errors
-    REQUESTER_ROOT = 'Incorrect requester MT root',
-    REQUESTER_INDEX = 'Incorrect requester MT index',
-    KEY_INDEX_ROOT = 'Incorrect key index MT root',
-    KEY_INDEX_INDEX = 'Incorrect key index MT index',
-    REQUEST_STATUS_ROOT = 'Incorrect request status MT root',
-    REQUEST_STATUS_INDEX = 'Incorrect request status MT index',
     REQUEST_PERIOD = 'Incorrect period for the request',
     REQUEST_PERIOD_ROOT = 'Incorrect request period MT root',
     REQUEST_PERIOD_INDEX = 'Incorrect request period MT index',
+
+    // RequestContract errors
+    TASK_ID = 'Incorrect request Id',
+    TASK_ID_ROOT = 'Incorrect task Id MT root',
+    TASK_ID_INDEX = 'Incorrect task Id MT index',
+    KEY_INDEX_ROOT = 'Incorrect key index MT root',
+    KEY_INDEX_INDEX = 'Incorrect key index MT index',
+    REQUEST_STATUS = 'Incorrect request status',
+    ACCUMULATION_ROOT = 'Incorrect accumulation Id MT root',
+    ACCUMULATION_INDEX = 'Incorrect accumulation Id MT index',
+    REQUEST_EXP_ROOT = 'Incorrect request expiration MT root',
+    REQUEST_EXP_INDEX = 'Incorrect request expiration MT index',
+    REQUEST_RESULT = 'Incorrect request result',
+    REQUEST_RESULT_ROOT = 'Incorrect request result MT root',
+    REQUEST_RESULT_INDEX = 'Incorrect request result MT index',
 
     // ResponseContract errors
     REQUEST_ID = 'Incorrect request Id',

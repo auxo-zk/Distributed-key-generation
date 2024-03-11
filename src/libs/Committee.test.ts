@@ -35,7 +35,7 @@ describe('Committee', () => {
     let sumR: Group[] = [];
     let sumM: Group[] = [];
     let sumD: Group[] = [];
-    let responsedMembers = [1];
+    let respondedMembers = [1];
     const plainVectors = [
         [10000n, 10000n, 10000n].map((e) => e * BigInt(SECRET_UNIT)),
         [40000n, 30000n, 20000n].map((e) => e * BigInt(SECRET_UNIT)),
@@ -98,10 +98,10 @@ describe('Committee', () => {
 
     it('Should generate response contribution', async () => {
         for (let i = 0; i < T; i++) {
-            let member = committees[responsedMembers[i]];
+            let member = committees[respondedMembers[i]];
             let round2Data: Committee.Round2Data[] = round2Contributions.map(
                 (contribution, index) =>
-                    index == committees[responsedMembers[i]].memberId
+                    index == committees[respondedMembers[i]].memberId
                         ? { c: Bit255.fromBigInt(0n), U: Group.zero }
                         : {
                               c: contribution.c.values[member.memberId],
@@ -110,12 +110,12 @@ describe('Committee', () => {
                 {}
             );
             let responseContribution = Committee.getResponseContribution(
-                committees[responsedMembers[i]].secretPolynomial,
-                committees[responsedMembers[i]].memberId,
+                committees[respondedMembers[i]].secretPolynomial,
+                committees[respondedMembers[i]].memberId,
                 round2Data,
                 sumR
             )[0];
-            committees[responsedMembers[i]].responseContribution =
+            committees[respondedMembers[i]].responseContribution =
                 responseContribution;
             responseContributions.push(responseContribution);
             D.push(responseContribution.D.values);
@@ -123,7 +123,7 @@ describe('Committee', () => {
     });
 
     it('Should calculate result vector', async () => {
-        sumD = Committee.accumulateResponses(responsedMembers, D);
+        sumD = Committee.accumulateResponses(respondedMembers, D);
         resultVector = Requester.getResultVector(sumD, sumM);
 
         for (let i = 0; i < result.length; i++) {

@@ -57,45 +57,22 @@ export {
 } from './contracts/Round2.js';
 
 export {
-    // Constants & Enums
     RequestStatus,
-
-    // Structs
+    RequestAction,
     UpdateRequestInput,
     UpdateRequestOutput,
-
-    // Zk Programs
     UpdateRequest,
     UpdateRequestProof,
-
-    // Smart Contract
     RequestContract,
-
-    // Actions & Events
-    ActionMask as RequestActionMask,
-    Action as RequestAction,
-    ActionEnum as RequestActions,
 } from './contracts/Request.js';
 
 export {
-    // Constants & Enums
-
-    // Structs
-    AttachRequestOutput,
+    RequesterAction,
     AccumulateEncryptionInput,
     AccumulateEncryptionOutput,
-
-    // Zk Programs
-    AttachRequest,
-    AttachRequestProof,
     AccumulateEncryption,
     AccumulateEncryptionProof,
-
-    // Smart Contract
     RequesterContract,
-
-    // Actions & Events
-    Action as RequesterAction,
 } from './contracts/Requester.js';
 
 export {
@@ -105,6 +82,18 @@ export {
     FinalizeResponseProof,
     ResponseContract,
 } from './contracts/Response.js';
+
+export {
+    RollupAction,
+    RollupOutput,
+    Rollup,
+    RollupProof,
+    RollupContract,
+    verifyRollup,
+    rollup,
+    rollupWithMT,
+    processAction,
+} from './contracts/Rollup.js';
 
 export {
     SecretPolynomial,
@@ -126,15 +115,3 @@ export {
     getResultVector,
     bruteForceResultVector,
 } from './libs/Requester.js';
-
-export {
-    RollupAction,
-    RollupOutput,
-    Rollup,
-    RollupProof,
-    RollupContract,
-    verifyRollup,
-    rollup,
-    rollupWithMT,
-    processAction,
-} from './contracts/Rollup.js';

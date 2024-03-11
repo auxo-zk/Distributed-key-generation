@@ -16,7 +16,6 @@ import randomAccounts from './helper/randomAccounts.js';
 import {
     RequestContract,
     UpdateRequest,
-    ActionEnum,
     RequestStatus,
     UpdateRequestProof,
 } from '../contracts/Request.js';

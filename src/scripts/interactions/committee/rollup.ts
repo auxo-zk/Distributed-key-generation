@@ -131,7 +131,7 @@ async function main() {
             )
         );
 
-        proof = await UpdateCommittee.nextStep(
+        proof = await UpdateCommittee.update(
             proof,
             new CommitteeAction(action),
             memberWitness,
@@ -174,7 +174,7 @@ async function main() {
             nonce: feePayer.nonce++,
         },
         () => {
-            committeeContract.rollup(proof);
+            committeeContract.updateCommittees(proof);
         }
     );
     await proveAndSend(tx, feePayer.key, 'CommitteeContract', 'rollup');

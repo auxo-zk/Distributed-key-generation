@@ -34,6 +34,11 @@ export const REQUEST_MAX_SIZE = 5;
 export const REQUEST_MIN_PERIOD = 30 * 60 * 1000;
 
 /**
+ * Waiting period before the expiration of a request ~ 100 blocks
+ */
+export const REQUEST_EXPIRATION = 300 * 60 * 1000;
+
+/**
  * Maximum value for number of contracts sharing rollup
  */
 export const ROLLUP_BATCH_MAX_SIZE = 8;

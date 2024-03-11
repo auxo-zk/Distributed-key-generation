@@ -11,6 +11,7 @@ import {
     SelfProof,
     ZkProgram,
     PublicKey,
+    Group,
 } from 'o1js';
 import { ActionMask as _ActionMask, Utils } from '@auxo-dev/auxo-libs';
 import { CommitteeMemberInput, CommitteeContract } from './Committee.js';
@@ -699,6 +700,33 @@ class DkgContract extends SmartContract {
                 DkgContract.name,
                 DkgContract.prototype.verifyKeyStatus.name,
                 ErrorEnum.KEY_STATUS_INDEX
+            )
+        );
+    }
+
+    /**
+     * Verify a generated key
+     * @param keyIndex Unique key index
+     * @param key Generated value as Group
+     * @param witness Witness for proof of generated key
+     */
+    verifyKey(keyIndex: Field, key: Group, witness: Level1Witness) {
+        this.keyRoot
+            .getAndRequireEquals()
+            .assertEquals(
+                witness.calculateRoot(Poseidon.hash(key.toFields())),
+                Utils.buildAssertMessage(
+                    DkgContract.name,
+                    DkgContract.prototype.verifyKey.name,
+                    ErrorEnum.KEY_ROOT
+                )
+            );
+        keyIndex.assertEquals(
+            witness.calculateIndex(),
+            Utils.buildAssertMessage(
+                DkgContract.name,
+                DkgContract.prototype.verifyKey.name,
+                ErrorEnum.KEY_INDEX
             )
         );
     }

@@ -23,6 +23,7 @@ import {
 import {
     FullMTWitness as DKGWitness,
     Level1Witness,
+    calculateKeyIndex,
 } from '../storages/DKGStorage.js';
 import {
     FullMTWitness as RequestWitness,
@@ -56,6 +57,7 @@ import {
 import { DArray, RArray, RequestVector } from '../libs/Requester.js';
 import { ErrorEnum, EventEnum, ZkAppAction } from './constants.js';
 import { RollupContract, processAction, verifyRollup } from './Rollup.js';
+import { RequestContract } from './Request.js';
 
 export {
     Action as ResponseAction,
@@ -449,9 +451,11 @@ class ResponseContract extends SmartContract {
         memberWitness: CommitteeFullWitness,
         publicKeyWitness: DKGWitness,
         encryptionWitness: DKGWitness,
+        keyIndexWitness: RequestLevel1Witness,
         committee: ZkAppRef,
         round1: ZkAppRef,
         round2: ZkAppRef,
+        request: ZkAppRef,
         rollup: ZkAppRef
     ) {
         // Get current state values
@@ -487,6 +491,14 @@ class ResponseContract extends SmartContract {
         // Verify Rollup Contract address
         verifyZkApp(
             ResponseContract.name,
+            request,
+            zkAppRoot,
+            Field(ZkAppEnum.REQUEST)
+        );
+
+        // Verify Rollup Contract address
+        verifyZkApp(
+            ResponseContract.name,
             rollup,
             zkAppRoot,
             Field(ZkAppEnum.ROLLUP)
@@ -495,6 +507,7 @@ class ResponseContract extends SmartContract {
         const committeeContract = new CommitteeContract(committee.address);
         const round1Contract = new Round1Contract(round1.address);
         const round2Contract = new Round2Contract(round2.address);
+        const requestContract = new RequestContract(round2.address);
         const rollupContract = new RollupContract(rollup.address);
 
         // Verify decryption proof
@@ -553,6 +566,13 @@ class ResponseContract extends SmartContract {
             encryptionWitness
         );
 
+        // Verify request Id
+        requestContract.verifyKeyIndex(
+            requestId,
+            calculateKeyIndex(committeeId, keyId),
+            keyIndexWitness
+        );
+
         // Compute response
         let D = Provable.witness(DArray, () => {
             return new DArray(R.values.slice(0, Number(R.length)));
@@ -582,10 +602,10 @@ class ResponseContract extends SmartContract {
 
         // Create & dispatch action to DkgContract
         let action = new Action({
-            committeeId: committeeId,
-            keyId: keyId,
-            memberId: memberId,
-            requestId: requestId,
+            committeeId,
+            keyId,
+            memberId,
+            requestId,
             contribution: new ResponseContribution({
                 D: D,
             }),
@@ -608,8 +628,8 @@ class ResponseContract extends SmartContract {
     finalize(
         proof: FinalizeResponseProof,
         finalizedDWitness: Level1Witness,
-        committee: ZkAppRef,
         settingWitness: CommitteeLevel1Witness,
+        committee: ZkAppRef,
         rollup: ZkAppRef
     ) {
         // Get current state values

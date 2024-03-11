@@ -15,7 +15,7 @@
     "scripts": {
         "build": "tsc --build tsconfig.json tsconfig.cjs.json tsconfig.types.json && ./fix-export.sh",
         "build:no-scripts": "tsc --build tsconfig.noscripts.json",
-        "scripts": "tsc --build tsconfig.json tsconfig.cjs.json tsconfig.types.json && ./fix-export.sh && node",
+        "scripts": "tsc --build tsconfig.json tsconfig.cjs.json tsconfig.types.json && ./fix-export.sh && node build/esm/src/scripts/$npm_config_name",
         "buildw": "tsc --watch",
         "coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
         "format": "prettier --write --ignore-unknown **/*",
@@ -67,7 +67,7 @@
         "zkapp-cli": "^0.15.0"
     },
     "dependencies": {
-        "@auxo-dev/auxo-libs": "0.4.4",
+        "@auxo-dev/auxo-libs": "0.4.6",
         "o1js": "0.17.0"
     }
 }
