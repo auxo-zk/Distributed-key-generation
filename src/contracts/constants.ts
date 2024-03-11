@@ -48,6 +48,8 @@ export enum ErrorEnum {
     KEY_STATUS_ROOT = 'Incorrect key status MT root',
     KEY_STATUS_INDEX = 'Incorrect key status MT index',
     KEY_STATUS_VALUE = 'Incorrect key status value',
+    KEY_ROOT = 'Incorrect key MT root',
+    KEY_INDEX = 'Incorrect key MT index',
 
     // Round1Contract errors
     R1_CONTRIBUTION_THRESHOLD = 'Incorrect number of round 1 contributions',
@@ -78,6 +80,7 @@ export enum ErrorEnum {
     REQUEST_COUNTER = 'Incorrect request counter',
     REQUEST_ID_ROOT = 'Incorrect request Id MT root',
     REQUEST_ID_INDEX = 'Incorrect request Id MT index',
+    COMMITMENT_COUNTER = 'Incorrect commitment counter',
     COMMITMENT_ROOT = 'Incorrect commitment Id MT root',
     COMMITMENT_INDEX = 'Incorrect commitment Id MT index',
     REQUEST_PERIOD = 'Incorrect period for the request',
@@ -85,8 +88,9 @@ export enum ErrorEnum {
     REQUEST_PERIOD_INDEX = 'Incorrect request period MT index',
 
     // RequestContract errors
-    REQUESTER_ROOT = 'Incorrect requester MT root',
-    REQUESTER_INDEX = 'Incorrect requester MT index',
+    TASK_ID = 'Incorrect request Id',
+    TASK_ID_ROOT = 'Incorrect task Id MT root',
+    TASK_ID_INDEX = 'Incorrect task Id MT index',
     KEY_INDEX_ROOT = 'Incorrect key index MT root',
     KEY_INDEX_INDEX = 'Incorrect key index MT index',
     REQUEST_STATUS = 'Incorrect request status',

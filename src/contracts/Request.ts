@@ -11,12 +11,11 @@ import {
     Poseidon,
     UInt64,
     ZkProgram,
-    PrivateKey,
     Provable,
     Bool,
     Group,
 } from 'o1js';
-import { ActionMask as _ActionMask, Utils } from '@auxo-dev/auxo-libs';
+import { Utils } from '@auxo-dev/auxo-libs';
 import { RequestVector, ResultVector } from '../libs/Requester.js';
 import {
     REQUEST_FEE,
@@ -89,14 +88,14 @@ class UpdateRequestInput extends Action {}
 class UpdateRequestOutput extends Struct({
     initialRequestCounter: Field,
     initialKeyIndexRoot: Field,
-    initialRequesterRoot: Field,
+    initialTaskIdRoot: Field,
     initialAccumulationRoot: Field,
     initialExpirationRoot: Field,
     initialResultRoot: Field,
     initialActionState: Field,
     nextRequestCounter: Field,
     nextKeyIndexRoot: Field,
-    nextRequesterRoot: Field,
+    nextTaskIdRoot: Field,
     nextAccumulationRoot: Field,
     nextExpirationRoot: Field,
     nextResultRoot: Field,
@@ -117,7 +116,7 @@ const UpdateRequest = ZkProgram({
                 input: UpdateRequestInput,
                 initialRequestCounter: Field,
                 initialKeyIndexRoot: Field,
-                initialRequesterRoot: Field,
+                initialTaskIdRoot: Field,
                 initialAccumulationRoot: Field,
                 initialExpirationRoot: Field,
                 initialResultRoot: Field,
@@ -126,14 +125,14 @@ const UpdateRequest = ZkProgram({
                 return new UpdateRequestOutput({
                     initialRequestCounter: initialRequestCounter,
                     initialKeyIndexRoot: initialKeyIndexRoot,
-                    initialRequesterRoot: initialRequesterRoot,
+                    initialTaskIdRoot: initialTaskIdRoot,
                     initialAccumulationRoot: initialAccumulationRoot,
                     initialExpirationRoot: initialExpirationRoot,
                     initialResultRoot: initialResultRoot,
                     initialActionState: initialActionState,
                     nextRequestCounter: initialRequestCounter,
                     nextKeyIndexRoot: initialKeyIndexRoot,
-                    nextRequesterRoot: initialRequesterRoot,
+                    nextTaskIdRoot: initialTaskIdRoot,
                     nextAccumulationRoot: initialAccumulationRoot,
                     nextExpirationRoot: initialExpirationRoot,
                     nextResultRoot: initialResultRoot,
@@ -156,19 +155,29 @@ const UpdateRequest = ZkProgram({
                     UpdateRequestOutput
                 >,
                 keyIndexWitness: Level1Witness,
-                requesterWitness: Level1Witness,
+                taskIdWitness: Level1Witness,
                 accumulationWitness: Level1Witness,
                 expirationWitness: Level1Witness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
 
+                // Verify action type
+                input.requestId.assertEquals(
+                    Field(-1),
+                    Utils.buildAssertMessage(
+                        UpdateRequest.name,
+                        UpdateRequest.initialize.name,
+                        ErrorEnum.ACTION_TYPE
+                    )
+                );
+
                 // Calculate request ID
                 let requestId = earlierProof.publicOutput.nextRequestCounter;
 
-                // Verify key index
+                // Verify empty key index
                 earlierProof.publicOutput.nextKeyIndexRoot.assertEquals(
-                    keyIndexWitness.calculateRoot(input.keyIndex),
+                    keyIndexWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
@@ -184,21 +193,21 @@ const UpdateRequest = ZkProgram({
                     )
                 );
 
-                // Verify empty requester
-                earlierProof.publicOutput.nextRequesterRoot.assertEquals(
-                    requesterWitness.calculateRoot(Field(0)),
+                // Verify empty task Id
+                earlierProof.publicOutput.nextTaskIdRoot.assertEquals(
+                    taskIdWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
-                        ErrorEnum.REQUESTER_ROOT
+                        ErrorEnum.TASK_ID_ROOT
                     )
                 );
                 requestId.assertEquals(
-                    requesterWitness.calculateIndex(),
+                    taskIdWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
-                        ErrorEnum.REQUESTER_INDEX
+                        ErrorEnum.TASK_ID_INDEX
                     )
                 );
 
@@ -243,8 +252,8 @@ const UpdateRequest = ZkProgram({
                 let nextKeyIndexRoot = keyIndexWitness.calculateRoot(
                     input.keyIndex
                 );
-                let nextRequesterRoot = keyIndexWitness.calculateRoot(
-                    Poseidon.hash(input.requester.toFields())
+                let nextTaskIdRoot = taskIdWitness.calculateRoot(
+                    Poseidon.hash(input.taskId.toFields())
                 );
                 let nextAccumulatedRoot = accumulationWitness.calculateRoot(
                     Poseidon.hash([
@@ -267,8 +276,8 @@ const UpdateRequest = ZkProgram({
                         earlierProof.publicOutput.initialRequestCounter,
                     initialKeyIndexRoot:
                         earlierProof.publicOutput.initialKeyIndexRoot,
-                    initialRequesterRoot:
-                        earlierProof.publicOutput.initialRequesterRoot,
+                    initialTaskIdRoot:
+                        earlierProof.publicOutput.initialTaskIdRoot,
                     initialAccumulationRoot:
                         earlierProof.publicOutput.initialAccumulationRoot,
                     initialExpirationRoot:
@@ -279,7 +288,7 @@ const UpdateRequest = ZkProgram({
                         earlierProof.publicOutput.initialActionState,
                     nextRequestCounter: nextRequestCounter,
                     nextKeyIndexRoot: nextKeyIndexRoot,
-                    nextRequesterRoot: nextRequesterRoot,
+                    nextTaskIdRoot: nextTaskIdRoot,
                     nextAccumulationRoot: nextAccumulatedRoot,
                     nextExpirationRoot: nextExpirationRoot,
                     nextResultRoot: earlierProof.publicOutput.initialResultRoot,
@@ -304,15 +313,14 @@ const UpdateRequest = ZkProgram({
                 earlierProof.verify();
 
                 // Verify action type
-                input.type
-                    .get(Field(ActionEnum.RESOLVE))
-                    .assertTrue(
-                        Utils.buildAssertMessage(
-                            UpdateRequest.name,
-                            UpdateRequest.initialize.name,
-                            ErrorEnum.ACTION_TYPE
-                        )
-                    );
+                input.taskId.assertEquals(
+                    Field(-1),
+                    Utils.buildAssertMessage(
+                        UpdateRequest.name,
+                        UpdateRequest.initialize.name,
+                        ErrorEnum.ACTION_TYPE
+                    )
+                );
 
                 // Verify empty result
                 earlierProof.publicOutput.nextResultRoot.assertEquals(
@@ -334,7 +342,7 @@ const UpdateRequest = ZkProgram({
 
                 // Calculate new state values
                 let nextResultRoot = resultWitness.calculateRoot(
-                    Field(RequestStatus.RESOLVED)
+                    input.resultVector.hash()
                 );
 
                 // Calculate corresponding action state
@@ -348,8 +356,8 @@ const UpdateRequest = ZkProgram({
                         earlierProof.publicOutput.initialRequestCounter,
                     initialKeyIndexRoot:
                         earlierProof.publicOutput.initialKeyIndexRoot,
-                    initialRequesterRoot:
-                        earlierProof.publicOutput.initialRequesterRoot,
+                    initialTaskIdRoot:
+                        earlierProof.publicOutput.initialTaskIdRoot,
                     initialAccumulationRoot:
                         earlierProof.publicOutput.initialAccumulationRoot,
                     initialExpirationRoot:
@@ -362,8 +370,7 @@ const UpdateRequest = ZkProgram({
                         earlierProof.publicOutput.nextRequestCounter,
                     nextKeyIndexRoot:
                         earlierProof.publicOutput.nextKeyIndexRoot,
-                    nextRequesterRoot:
-                        earlierProof.publicOutput.nextRequesterRoot,
+                    nextTaskIdRoot: earlierProof.publicOutput.nextTaskIdRoot,
                     nextAccumulationRoot:
                         earlierProof.publicOutput.nextAccumulationRoot,
                     nextExpirationRoot:
@@ -573,7 +580,7 @@ class RequestContract extends SmartContract {
         let curActionState = this.actionState.getAndRequireEquals();
         let requestCounter = this.requestCounter.getAndRequireEquals();
         let keyIndexRoot = this.keyIndexRoot.getAndRequireEquals();
-        let requesterRoot = this.requesterRoot.getAndRequireEquals();
+        let taskIdRoot = this.taskIdRoot.getAndRequireEquals();
         let accumulationRoot = this.accumulationRoot.getAndRequireEquals();
         let expirationRoot = this.expirationRoot.getAndRequireEquals();
         let resultRoot = this.resultRoot.getAndRequireEquals();
@@ -603,12 +610,12 @@ class RequestContract extends SmartContract {
                 ErrorEnum.KEY_INDEX_ROOT
             )
         );
-        proof.publicOutput.initialRequestCounter.assertEquals(
-            requesterRoot,
+        proof.publicOutput.initialTaskIdRoot.assertEquals(
+            taskIdRoot,
             Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.update.name,
-                ErrorEnum.REQUESTER_ROOT
+                ErrorEnum.TASK_ID_ROOT
             )
         );
         proof.publicOutput.initialAccumulationRoot.assertEquals(
@@ -639,7 +646,7 @@ class RequestContract extends SmartContract {
         // Update state values
         this.requestCounter.set(proof.publicOutput.nextRequestCounter);
         this.keyIndexRoot.set(proof.publicOutput.nextKeyIndexRoot);
-        this.requesterRoot.set(proof.publicOutput.nextRequesterRoot);
+        this.taskIdRoot.set(proof.publicOutput.nextTaskIdRoot);
         this.accumulationRoot.set(proof.publicOutput.nextAccumulationRoot);
         this.expirationRoot.set(proof.publicOutput.nextExpirationRoot);
         this.resultRoot.set(proof.publicOutput.nextResultRoot);
@@ -687,30 +694,34 @@ class RequestContract extends SmartContract {
     /**
      * Verify requester's address
      * @param requestId Request Id
-     * @param requester Requester's address
+     * @param address Requester's address
+     * @param taskId Requester's taskId
      * @param witness Witness for proof of requester's address
      */
-    verifyRequester(
+    verifyTaskId(
         requestId: Field,
-        requester: PublicKey,
+        address: PublicKey,
+        taskId: Field,
         witness: Level1Witness
     ) {
-        this.requesterRoot
+        this.taskIdRoot
             .getAndRequireEquals()
             .assertEquals(
-                witness.calculateRoot(Poseidon.hash(requester.toFields())),
+                witness.calculateRoot(
+                    Poseidon.hash([address.toFields(), taskId].flat())
+                ),
                 Utils.buildAssertMessage(
                     RequestContract.name,
-                    RequestContract.prototype.verifyRequester.name,
-                    ErrorEnum.REQUESTER_ROOT
+                    RequestContract.prototype.verifyTaskId.name,
+                    ErrorEnum.TASK_ID_ROOT
                 )
             );
         requestId.assertEquals(
             witness.calculateIndex(),
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.verifyRequester.name,
-                ErrorEnum.REQUESTER_INDEX
+                RequestContract.prototype.verifyTaskId.name,
+                ErrorEnum.TASK_ID_INDEX
             )
         );
     }
