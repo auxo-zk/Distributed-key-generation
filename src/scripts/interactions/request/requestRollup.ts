@@ -8,7 +8,7 @@ import {
 } from '../../../storages/RequestStorage.js';
 import {
     RequestContract,
-    Action as RequestAction,
+    RequestAction,
     UpdateRequest,
     RequestStatus,
 } from '../../../contracts/Request.js';
