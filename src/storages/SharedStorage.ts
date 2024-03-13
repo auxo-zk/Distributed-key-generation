@@ -1,7 +1,5 @@
 import {
     Field,
-    MerkleMap,
-    MerkleMapWitness,
     MerkleTree,
     MerkleWitness,
     Poseidon,
@@ -10,58 +8,55 @@ import {
 } from 'o1js';
 import {
     ACTION_PROCESS_LIMITS,
-    ADDRESS_MAX_SIZE,
-    COMMITTEE_MAX_SIZE,
+    INSTANCE_LIMITS,
     ZkAppEnum,
 } from '../constants.js';
 import { FieldDynamicArray, Utils } from '@auxo-dev/auxo-libs';
 import { ErrorEnum } from '../contracts/constants.js';
+import { GenericStorage } from './GenericStorage.js';
 
-export const ADDRESS_TREE_HEIGHT = Math.ceil(Math.log2(ADDRESS_MAX_SIZE)) + 1;
+export const ADDRESS_TREE_HEIGHT =
+    Math.ceil(Math.log2(INSTANCE_LIMITS.ADDRESS)) + 1;
 export class AddressMT extends MerkleTree {}
 export class AddressWitness extends MerkleWitness(ADDRESS_TREE_HEIGHT) {}
 export const EMPTY_ADDRESS_MT = () => new AddressMT(ADDRESS_TREE_HEIGHT);
-export class ActionWitness extends MerkleMapWitness {}
-export const EMPTY_ACTION_MT = () => new MerkleMap();
+
+export const ACTION_TREE_HEIGHT =
+    Math.ceil(Math.log2(INSTANCE_LIMITS.ACTION)) + 1;
+export class ActionMT extends MerkleTree {}
+export class ActionWitness extends MerkleWitness(ACTION_TREE_HEIGHT) {}
+export const EMPTY_ACTION_MT = () => new ActionMT(ACTION_TREE_HEIGHT);
 
 export class ZkAppRef extends Struct({
     address: PublicKey,
     witness: AddressWitness,
 }) {}
 
-export class AddressStorage {
-    private _addressMap: AddressMT;
-    private _addresses: {
-        [key: string]: { raw: PublicKey | undefined; leaf: Field };
-    };
-
+export class AddressStorage extends GenericStorage<
+    PublicKey,
+    AddressMT,
+    AddressWitness,
+    undefined,
+    undefined
+> {
     constructor(
-        addresses?: { index: ZkAppEnum | number; address: PublicKey }[]
+        leafs?: {
+            level1Index: Field;
+            leaf: PublicKey | Field;
+            isRaw: boolean;
+        }[]
     ) {
-        this._addressMap = EMPTY_ADDRESS_MT();
-        this._addresses = {};
-        if (addresses) {
-            for (let i = 0; i < addresses.length; i++) {
-                this.updateAddress(
-                    AddressStorage.calculateIndex(addresses[i].index),
-                    addresses[i].address
-                );
-            }
-        }
-    }
-
-    get root(): Field {
-        return this._addressMap.getRoot();
+        super(EMPTY_ADDRESS_MT, undefined, leafs);
     }
 
     get addressMap(): AddressMT {
-        return this._addressMap;
+        return this.level1;
     }
 
     get addresses(): {
         [key: string]: { raw: PublicKey | undefined; leaf: Field };
     } {
-        return this._addresses;
+        return this.leafs;
     }
 
     static calculateLeaf(address: PublicKey): Field {
@@ -72,8 +67,16 @@ export class AddressStorage {
         return AddressStorage.calculateLeaf(address);
     }
 
-    static calculateIndex(index: ZkAppEnum | number): Field {
+    static calculateLevel1Index(index: ZkAppEnum | number): Field {
         return Field(index);
+    }
+
+    calculateLevel1Index(index: ZkAppEnum | number): Field {
+        return AddressStorage.calculateLevel1Index(index);
+    }
+
+    static calculateIndex(index: ZkAppEnum | number): Field {
+        return AddressStorage.calculateLevel1Index(index);
     }
 
     calculateIndex(index: ZkAppEnum | number): Field {
@@ -81,26 +84,15 @@ export class AddressStorage {
     }
 
     getWitness(index: Field): AddressWitness {
-        return new AddressWitness(
-            this._addressMap.getWitness(index.toBigInt())
-        );
+        return super.getWitness(index) as AddressWitness;
     }
 
-    updateLeaf(index: Field, leaf: Field): void {
-        this._addressMap.setLeaf(index.toBigInt(), leaf);
-        this._addresses[index.toString()] = {
-            raw: undefined,
-            leaf: leaf,
-        };
+    updateAddressLeaf(index: Field, leaf: Field): void {
+        super.updateLeaf({ level1Index: index }, leaf);
     }
 
     updateAddress(index: Field, address: PublicKey) {
-        let leaf = this.calculateLeaf(address);
-        this._addressMap.setLeaf(index.toBigInt(), leaf);
-        this._addresses[index.toString()] = {
-            raw: address,
-            leaf: leaf,
-        };
+        super.updateRawLeaf({ level1Index: index }, address);
     }
 
     getZkAppRef(index: ZkAppEnum | number, address: PublicKey) {
@@ -154,77 +146,79 @@ export function verifyZkApp(
     );
 }
 
-export enum RollupStatus {
-    RECORDED,
-    ROLLUPED,
-}
-
-export enum ProcessStatus {
-    NOT_PROCESSED,
-    PROCESSED,
-}
-
 export class ProcessedContributions extends FieldDynamicArray(
-    COMMITTEE_MAX_SIZE
+    INSTANCE_LIMITS.MEMBER
 ) {}
 
 export class ProcessedActions extends FieldDynamicArray(
     ACTION_PROCESS_LIMITS
 ) {}
 
-export class ActionStorage {
-    private _actionMap: MerkleMap;
-    private _actions: { [key: string]: Field };
-
+export class ActionStorageV1 extends GenericStorage<
+    Field,
+    ActionMT,
+    ActionWitness,
+    undefined,
+    undefined
+> {
     constructor(
-        actions?: { actionState: Field; status: RollupStatus | ProcessStatus }[]
+        leafs?: {
+            level1Index: Field;
+            leaf: Field | Field;
+            isRaw: boolean;
+        }[]
     ) {
-        this._actionMap = EMPTY_ACTION_MT();
-        this._actions = {};
-        if (actions) {
-            for (let i = 0; i < actions.length; i++) {
-                this.updateLeaf(
-                    actions[i].actionState,
-                    ActionStorage.calculateLeaf(actions[i].status)
-                );
-            }
-        }
+        super(EMPTY_ACTION_MT, undefined, leafs);
     }
 
-    get root(): Field {
-        return this._actionMap.getRoot();
+    get actionMap() {
+        return this.level1;
     }
 
-    get actionMap(): MerkleMap {
-        return this._actionMap;
+    get actions(): { [key: string]: { leaf: Field } } {
+        return this.leafs;
     }
 
-    get actions(): { [key: string]: Field } {
-        return this._actions;
+    static calculateLeaf(nextActionState: Field): Field {
+        return Field(nextActionState);
     }
 
-    static calculateLeaf(status: RollupStatus | ProcessStatus): Field {
-        return Field(status);
+    calculateLeaf(nextActionState: Field): Field {
+        return ActionStorageV1.calculateLeaf(nextActionState);
     }
 
-    calculateLeaf(status: RollupStatus | ProcessStatus): Field {
-        return ActionStorage.calculateLeaf(status);
-    }
-
-    static calculateIndex(actionIndex: Field): Field {
+    static calculateLevel1Index(actionIndex: Field): Field {
         return actionIndex;
     }
 
+    calculateLevel1Index(actionIndex: Field): Field {
+        return ActionStorageV1.calculateLevel1Index(actionIndex);
+    }
+
+    static calculateIndex(actionIndex: Field): Field {
+        return ActionStorageV1.calculateLevel1Index(actionIndex);
+    }
+
     calculateIndex(actionIndex: Field): Field {
-        return ActionStorage.calculateIndex(actionIndex);
+        return ActionStorageV1.calculateIndex(actionIndex);
     }
 
     getWitness(index: Field): ActionWitness {
-        return this._actionMap.getWitness(index);
+        return super.getWitness(index) as ActionWitness;
     }
 
-    updateLeaf(index: Field, leaf: Field): void {
-        this._actionMap.set(index, leaf);
-        this._actions[index.toString()] = leaf;
+    updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
+        super.updateLeaf({ level1Index }, leaf);
+    }
+
+    updateRawLeaf(
+        { level1Index }: { level1Index: Field },
+        rawLeaf: Field
+    ): void {
+        super.updateRawLeaf({ level1Index }, rawLeaf);
+    }
+
+    updateAction(index: Field, nextActionState: Field): void {
+        super.updateRawLeaf({ level1Index: index }, nextActionState);
     }
 }

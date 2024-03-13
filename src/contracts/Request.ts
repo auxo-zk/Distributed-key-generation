@@ -18,8 +18,8 @@ import {
 import { Utils } from '@auxo-dev/auxo-libs';
 import { RequestVector, ResultVector } from '../libs/Requester.js';
 import {
+    INSTANCE_LIMITS,
     REQUEST_FEE,
-    REQUEST_MAX_SIZE,
     ZkAppEnum,
     ZkProgramEnum,
 } from '../constants.js';
@@ -540,7 +540,7 @@ class RequestContract extends SmartContract {
         );
 
         // Verify result vector
-        for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
+        for (let i = 0; i < INSTANCE_LIMITS.DIMENSION; i++) {
             let index = Field(i);
             let M = accumulatedM.get(index);
             let D = finalizedD.get(index);

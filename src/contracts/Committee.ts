@@ -14,7 +14,7 @@ import {
     Void,
 } from 'o1js';
 import { IpfsHash, Utils } from '@auxo-dev/auxo-libs';
-import { COMMITTEE_MAX_SIZE, ZkProgramEnum } from '../constants.js';
+import { INSTANCE_LIMITS, ZkProgramEnum } from '../constants.js';
 import {
     EMPTY_LEVEL_1_TREE,
     EMPTY_LEVEL_2_TREE,
@@ -158,7 +158,7 @@ const UpdateCommittee = ZkProgram({
 
                 // Create new level 2 MT for committee members' public keys
                 let level2MT = EMPTY_LEVEL_2_TREE();
-                for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+                for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
                     let value = Provable.if(
                         Field(i).greaterThanOrEqual(input.addresses.length),
                         Field(0),
@@ -275,8 +275,8 @@ class CommitteeContract extends SmartContract {
         action.threshold.assertLessThanOrEqual(action.addresses.length);
 
         // Verify committee members
-        for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
-            for (let j = i + 1; j < COMMITTEE_MAX_SIZE; j++) {
+        for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
+            for (let j = i + 1; j < INSTANCE_LIMITS.MEMBER; j++) {
                 Poseidon.hash(action.addresses.get(Field(i)).toFields())
                     .equals(
                         Poseidon.hash(action.addresses.get(Field(j)).toFields())

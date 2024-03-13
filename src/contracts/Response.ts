@@ -3,7 +3,6 @@ import {
     Group,
     Poseidon,
     Provable,
-    PublicKey,
     Reducer,
     Scalar,
     SelfProof,
@@ -39,13 +38,7 @@ import {
 import { BatchDecryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
 import { Round2Contract } from './Round2.js';
-import {
-    COMMITTEE_MAX_SIZE,
-    INSTANCE_LIMITS,
-    REQUEST_MAX_SIZE,
-    ZkAppEnum,
-    ZkProgramEnum,
-} from '../constants.js';
+import { INSTANCE_LIMITS, ZkAppEnum, ZkProgramEnum } from '../constants.js';
 import {
     ActionWitness,
     EMPTY_ACTION_MT,
@@ -58,6 +51,10 @@ import { DArray, RArray, RequestVector } from '../libs/Requester.js';
 import { ErrorEnum, EventEnum, ZkAppAction } from './constants.js';
 import { RollupContract, processAction, verifyRollup } from './Rollup.js';
 import { RequestContract } from './Request.js';
+import {
+    RollupWitness,
+    calculateActionIndex,
+} from '../storages/RollupStorage.js';
 
 export {
     Action as ResponseAction,
@@ -101,7 +98,6 @@ class FinalizeResponseInput extends Struct({
 }) {}
 
 class FinalizeResponseOutput extends Struct({
-    address: PublicKey,
     rollupRoot: Field,
     T: Field,
     N: Field,
@@ -127,7 +123,6 @@ const FinalizeResponse = ZkProgram({
     methods: {
         init: {
             privateInputs: [
-                PublicKey,
                 Field,
                 Field,
                 Field,
@@ -140,7 +135,6 @@ const FinalizeResponse = ZkProgram({
             ],
             method(
                 input: FinalizeResponseInput,
-                address: PublicKey,
                 rollupRoot: Field,
                 T: Field,
                 N: Field,
@@ -192,21 +186,20 @@ const FinalizeResponse = ZkProgram({
                         ErrorEnum.RES_CONTRIBUTION_DIMENSION
                     )
                 );
-                for (let i = 0; i < REQUEST_MAX_SIZE; i++)
+                for (let i = 0; i < INSTANCE_LIMITS.DIMENSION; i++)
                     D.set(Field(i), Group.zero);
 
                 return new FinalizeResponseOutput({
-                    address: address,
-                    rollupRoot: rollupRoot,
-                    T: T,
-                    N: N,
-                    initialContributionRoot: initialContributionRoot,
-                    initialProcessRoot: initialProcessRoot,
-                    nextContributionRoot: nextContributionRoot,
+                    rollupRoot,
+                    T,
+                    N,
+                    initialContributionRoot,
+                    initialProcessRoot,
+                    nextContributionRoot,
                     nextProcessRoot: initialProcessRoot,
-                    requestId: requestId,
-                    D: D,
-                    indexList: indexList,
+                    requestId,
+                    D,
+                    indexList,
                     processedActions: new ProcessedContributions(),
                 });
             },
@@ -215,7 +208,7 @@ const FinalizeResponse = ZkProgram({
             privateInputs: [
                 SelfProof<FinalizeResponseInput, FinalizeResponseOutput>,
                 RequestWitness,
-                ActionWitness,
+                RollupWitness,
                 ActionWitness,
             ],
             method(
@@ -225,7 +218,7 @@ const FinalizeResponse = ZkProgram({
                     FinalizeResponseOutput
                 >,
                 contributionWitness: RequestWitness,
-                rollupWitness: ActionWitness,
+                rollupWitness: RollupWitness,
                 processWitness: ActionWitness
             ) {
                 // Verify earlier proof
@@ -306,7 +299,7 @@ const FinalizeResponse = ZkProgram({
 
                 // Compute D values
                 let D = earlierProof.publicOutput.D;
-                for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
+                for (let i = 0; i < INSTANCE_LIMITS.DIMENSION; i++) {
                     let Di = D.get(Field(i));
                     let di = input.action.contribution.D.get(Field(i));
                     di = Provable.if(
@@ -337,17 +330,15 @@ const FinalizeResponse = ZkProgram({
                 }
 
                 // Verify action is rolluped
-                let actionIndex = Poseidon.hash(
-                    [
-                        earlierProof.publicOutput.address.toFields(),
-                        input.action.hash(),
-                        input.actionId,
-                    ].flat()
+                let actionIndex = calculateActionIndex(
+                    Field(ZkAppEnum.RESPONSE),
+                    input.actionId
                 );
                 verifyRollup(
                     FinalizeResponse.name,
-                    earlierProof.publicOutput.rollupRoot,
                     actionIndex,
+                    input.action.hash(),
+                    earlierProof.publicOutput.rollupRoot,
                     rollupWitness
                 );
 
@@ -363,13 +354,13 @@ const FinalizeResponse = ZkProgram({
                 // Verify the action isn't already processed
                 let nextProcessRoot = processAction(
                     FinalizeResponse.name,
+                    input.actionId,
                     actionState,
                     earlierProof.publicOutput.nextProcessRoot,
                     processWitness
                 );
 
                 return new FinalizeResponseOutput({
-                    address: earlierProof.publicOutput.address,
                     rollupRoot: earlierProof.publicOutput.rollupRoot,
                     T: earlierProof.publicOutput.T,
                     N: earlierProof.publicOutput.N,
@@ -456,7 +447,8 @@ class ResponseContract extends SmartContract {
         round1: ZkAppRef,
         round2: ZkAppRef,
         request: ZkAppRef,
-        rollup: ZkAppRef
+        rollup: ZkAppRef,
+        selfRef: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -545,7 +537,7 @@ class ResponseContract extends SmartContract {
 
         // Verify round 2 encryptions (hashes)
         let encryptionHashChain = Field(0);
-        for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+        for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
             encryptionHashChain = Provable.if(
                 Field(i).greaterThanOrEqual(proof.publicInput.c.length),
                 encryptionHashChain,
@@ -585,7 +577,7 @@ class ResponseContract extends SmartContract {
                 ErrorEnum.RES_CONTRIBUTION_DIMENSION
             )
         );
-        for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
+        for (let i = 0; i < INSTANCE_LIMITS.DIMENSION; i++) {
             let Ri = R.get(Field(i));
             Group.generator.scale(ski).equals(proof.publicOutput);
             D.set(
@@ -613,7 +605,8 @@ class ResponseContract extends SmartContract {
         this.reducer.dispatch(action);
 
         // Record action for rollup
-        rollupContract.recordAction(action.hash(), this.address);
+        selfRef.address.assertEquals(this.address);
+        rollupContract.recordAction(action.hash(), selfRef);
     }
 
     /**
@@ -659,7 +652,6 @@ class ResponseContract extends SmartContract {
 
         // Verify response proof
         proof.verify();
-        proof.publicOutput.address.assertEquals(this.address);
         proof.publicOutput.rollupRoot.assertEquals(
             rollupContract.rollupRoot.getAndRequireEquals(),
             Utils.buildAssertMessage(

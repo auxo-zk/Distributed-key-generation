@@ -13,6 +13,7 @@ export enum ErrorEnum {
     // Address errors
     ZKAPP_ROOT = 'Incorrect zkApp MT root',
     ZKAPP_INDEX = 'Incorrect zkApp MT index',
+    ZKAPP_ADDRESS = 'Incorrect zkApp address',
 
     // Action errors
     ACTION_TYPE = 'Incorrect action type',

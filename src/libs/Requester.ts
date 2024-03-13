@@ -5,18 +5,30 @@ import {
     GroupDynamicArray,
     ScalarDynamicArray,
 } from '@auxo-dev/auxo-libs';
-import { SECRET_MAX, SECRET_UNIT, REQUEST_MAX_SIZE } from '../constants.js';
+import { INSTANCE_LIMITS, SECRET_MAX, SECRET_UNIT } from '../constants.js';
 
-export class MArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
-export class RArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
-export class DArray extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
-export class skArray extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
-export class SecretVector extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
-export class RandomVector extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
-export class RequestVector extends GroupDynamicArray(REQUEST_MAX_SIZE) {}
-export class ResultVector extends ScalarDynamicArray(REQUEST_MAX_SIZE) {}
-export class NullifierArray extends FieldDynamicArray(REQUEST_MAX_SIZE) {}
-export class CommitmentArray extends FieldDynamicArray(REQUEST_MAX_SIZE) {}
+export class MArray extends GroupDynamicArray(INSTANCE_LIMITS.DIMENSION) {}
+export class RArray extends GroupDynamicArray(INSTANCE_LIMITS.DIMENSION) {}
+export class DArray extends GroupDynamicArray(INSTANCE_LIMITS.DIMENSION) {}
+export class skArray extends ScalarDynamicArray(INSTANCE_LIMITS.DIMENSION) {}
+export class SecretVector extends ScalarDynamicArray(
+    INSTANCE_LIMITS.DIMENSION
+) {}
+export class RandomVector extends ScalarDynamicArray(
+    INSTANCE_LIMITS.DIMENSION
+) {}
+export class RequestVector extends GroupDynamicArray(
+    INSTANCE_LIMITS.DIMENSION
+) {}
+export class ResultVector extends ScalarDynamicArray(
+    INSTANCE_LIMITS.DIMENSION
+) {}
+export class NullifierArray extends FieldDynamicArray(
+    INSTANCE_LIMITS.DIMENSION
+) {}
+export class CommitmentArray extends FieldDynamicArray(
+    INSTANCE_LIMITS.DIMENSION
+) {}
 
 export function calculatePublicKey(contributedPublicKeys: Group[]): Group {
     let result = Group.zero;

@@ -1,6 +1,3 @@
-import fs from 'fs/promises';
-import { Cache } from 'o1js';
-import { Utils } from '@auxo-dev/auxo-libs';
 import { Rollup, RollupContract } from '../../contracts/Rollup.js';
 import {
     CommitteeContract,
@@ -49,6 +46,7 @@ async function main() {
     ];
 
     let info: any[] = [];
+    let error: any[] = [];
 
     for (let i = 0; i < programs.length; i++) {
         let prg = programs[i];
@@ -56,6 +54,7 @@ async function main() {
         try {
             analysis = await prg.analyzeMethods();
         } catch {
+            error.push(prg.name);
             continue;
         }
         Object.entries(analysis).map(([key, value]: [string, any]) => {
@@ -68,7 +67,10 @@ async function main() {
         });
     }
 
+    console.log('Successfully compile:');
     console.table(info, ['program', 'method', 'constraints', 'digest']);
+
+    console.log('Errors:', error);
 }
 
 main()

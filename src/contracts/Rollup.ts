@@ -1,7 +1,6 @@
 import {
     Field,
     Poseidon,
-    PublicKey,
     Reducer,
     SelfProof,
     SmartContract,
@@ -13,14 +12,15 @@ import {
 } from 'o1js';
 import { Utils } from '@auxo-dev/auxo-libs';
 import {
-    ActionWitness,
-    EMPTY_ACTION_MT,
-    ProcessStatus,
-    RollupStatus,
-} from '../storages/SharedStorage.js';
-import { EMPTY_ROLLUP_MT, RollupWitness } from '../storages/RollupStorage.js';
+    EMPTY_ROLLUP_COUNTER_MT,
+    EMPTY_ROLLUP_MT,
+    RollupCounterWitness,
+    RollupWitness,
+    calculateActionIndex,
+} from '../storages/RollupStorage.js';
 import { ErrorEnum, EventEnum } from './constants.js';
 import { ZkProgramEnum } from '../constants.js';
+import { ZkAppRef } from '../storages/SharedStorage.js';
 
 export {
     Action as RollupAction,
@@ -28,14 +28,14 @@ export {
     Rollup,
     RollupProof,
     RollupContract,
-    verifyRollup,
     rollup,
     rollupWithMT,
+    verifyRollup,
     processAction,
 };
 
 class Action extends Struct({
-    address: PublicKey,
+    zkAppIndex: Field,
     actionHash: Field,
 }) {}
 
@@ -75,19 +75,20 @@ const Rollup = ZkProgram({
             privateInputs: [
                 SelfProof<Action, RollupOutput>,
                 Field,
+                RollupCounterWitness,
                 RollupWitness,
-                ActionWitness,
             ],
             method(
                 input: Action,
                 earlierProof: SelfProof<Action, RollupOutput>,
                 counter: Field,
-                counterWitness: RollupWitness,
-                rollupWitness: ActionWitness
+                counterWitness: RollupCounterWitness,
+                rollupWitness: RollupWitness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
 
+                // Verify zkApp's action counter
                 earlierProof.publicOutput.nextCounterRoot.assertEquals(
                     counterWitness.calculateRoot(counter),
                     Utils.buildAssertMessage(
@@ -96,7 +97,7 @@ const Rollup = ZkProgram({
                         ErrorEnum.ACTION_COUNTER_ROOT
                     )
                 );
-                Poseidon.hash(input.address.toFields()).assertEquals(
+                input.zkAppIndex.assertEquals(
                     counterWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         Rollup.name,
@@ -108,14 +109,13 @@ const Rollup = ZkProgram({
                     counter.add(1)
                 );
 
-                let actionIndex = Poseidon.hash(
-                    [input.address.toFields(), input.actionHash, counter].flat()
-                );
-                let [rollupRoot, rollupIndex] = rollupWitness.computeRootAndKey(
-                    Field(RollupStatus.RECORDED)
+                // Verify empty action
+                let actionIndex = calculateActionIndex(
+                    input.zkAppIndex,
+                    counter
                 );
                 earlierProof.publicOutput.nextRollupRoot.assertEquals(
-                    rollupRoot,
+                    rollupWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         Rollup.name,
                         Rollup.rollup.name,
@@ -123,15 +123,15 @@ const Rollup = ZkProgram({
                     )
                 );
                 actionIndex.assertEquals(
-                    rollupIndex,
+                    rollupWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         Rollup.name,
                         Rollup.rollup.name,
                         ErrorEnum.ROLLUP_INDEX
                     )
                 );
-                let [nextRollupRoot] = rollupWitness.computeRootAndKey(
-                    Field(RollupStatus.ROLLUPED)
+                let nextRollupRoot = rollupWitness.calculateRoot(
+                    input.actionHash
                 );
 
                 // Calculate corresponding action state
@@ -160,6 +160,11 @@ class RollupProof extends ZkProgram.Proof(Rollup) {}
 
 class RollupContract extends SmartContract {
     /**
+     * @description MT storing addresses of other zkApps
+     */
+    @state(Field) zkAppRoot = State<Field>();
+
+    /**
      * @description MT storing latest action state values
      */
     @state(Field) counterRoot = State<Field>();
@@ -182,8 +187,8 @@ class RollupContract extends SmartContract {
 
     init() {
         super.init();
-        this.counterRoot.set(EMPTY_ROLLUP_MT().getRoot());
-        this.rollupRoot.set(EMPTY_ACTION_MT().getRoot());
+        this.counterRoot.set(EMPTY_ROLLUP_COUNTER_MT().getRoot());
+        this.rollupRoot.set(EMPTY_ROLLUP_MT().getRoot());
         this.actionState.set(Reducer.initialActionState);
     }
 
@@ -192,14 +197,26 @@ class RollupContract extends SmartContract {
      * @param actionHash Action's hash
      * @param address Caller's address
      */
-    @method recordAction(actionHash: Field, address: PublicKey) {
-        // Verify caller address
-        Utils.requireCaller(address, this);
+    @method recordAction(actionHash: Field, zkApp: ZkAppRef) {
+        // Verify registered caller address
+        Utils.requireCaller(zkApp.address, this);
+        this.zkAppRoot
+            .getAndRequireEquals()
+            .assertEquals(
+                zkApp.witness.calculateRoot(
+                    Poseidon.hash(zkApp.address.toFields())
+                ),
+                Utils.buildAssertMessage(
+                    RollupContract.name,
+                    'verifyZkApp',
+                    ErrorEnum.ZKAPP_ROOT
+                )
+            );
 
         // Create & dispatch action
         let action = new Action({
+            zkAppIndex: zkApp.witness.calculateIndex(),
             actionHash,
-            address,
         });
         this.reducer.dispatch(action);
     }
@@ -242,36 +259,29 @@ class RollupContract extends SmartContract {
         this.rollupRoot.set(proof.publicOutput.nextRollupRoot);
         this.actionState.set(proof.publicOutput.nextActionState);
     }
+
+    /**
+     * Verify an action has been rolluped
+     * @param actionIndex Unique action index
+     * @param actionHash Action's hash
+     * @param witness Witness for proof of action rollup
+     */
+    verifyRollup(
+        actionIndex: Field,
+        actionHash: Field,
+        witness: RollupWitness
+    ) {
+        verifyRollup(
+            RollupContract.name,
+            actionIndex,
+            actionHash,
+            this.rollupRoot.getAndRequireEquals(),
+            witness
+        );
+    }
 }
 
-const verifyRollup = (
-    programName: string,
-    root: Field,
-    actionIndex: Field,
-    witness: ActionWitness
-) => {
-    let [rollupRoot, rollupIndex] = witness.computeRootAndKey(
-        Field(RollupStatus.RECORDED)
-    );
-    root.assertEquals(
-        rollupRoot,
-        Utils.buildAssertMessage(
-            programName,
-            'verifyRollup',
-            ErrorEnum.ROLLUP_ROOT
-        )
-    );
-    actionIndex.assertEquals(
-        rollupIndex,
-        Utils.buildAssertMessage(
-            programName,
-            'verifyRollup',
-            ErrorEnum.ROLLUP_INDEX
-        )
-    );
-};
-
-const rollup = (
+function rollup(
     programName: string,
     proofOutput: {
         initialActionState: Field;
@@ -279,7 +289,7 @@ const rollup = (
     },
     initialActionState: Field,
     nextActionState: Field
-) => {
+) {
     proofOutput.initialActionState.assertEquals(
         initialActionState,
         Utils.buildAssertMessage(
@@ -296,9 +306,9 @@ const rollup = (
             ErrorEnum.LAST_ACTION_STATE
         )
     );
-};
+}
 
-const rollupWithMT = (
+function rollupWithMT(
     programName: string,
     proofOutput: {
         initialActionState: Field;
@@ -308,7 +318,7 @@ const rollupWithMT = (
     initialActionState: Field,
     nextActionState: Field,
     initialRollupRoot: Field
-) => {
+) {
     proofOutput.initialActionState.assertEquals(
         initialActionState,
         Utils.buildAssertMessage(
@@ -329,23 +339,46 @@ const rollupWithMT = (
         initialRollupRoot,
         Utils.buildAssertMessage(programName, 'rollup', ErrorEnum.ROLLUP_ROOT)
     );
-};
+}
 
-const processAction = (
+function verifyRollup(
     programName: string,
+    actionIndex: Field,
+    actionHash: Field,
+    root: Field,
+    witness: RollupWitness
+) {
+    root.assertEquals(
+        witness.calculateRoot(actionHash),
+        Utils.buildAssertMessage(
+            programName,
+            'verifyRollup',
+            ErrorEnum.ROLLUP_ROOT
+        )
+    );
+    actionIndex.assertEquals(
+        witness.calculateIndex(),
+        Utils.buildAssertMessage(
+            programName,
+            'verifyRollup',
+            ErrorEnum.ROLLUP_INDEX
+        )
+    );
+}
+
+function processAction(
+    programName: string,
+    actionId: Field,
     actionState: Field,
     previousRoot: Field,
-    witness: ActionWitness
-): Field => {
-    let [root, key] = witness.computeRootAndKey(
-        Field(ProcessStatus.NOT_PROCESSED)
-    );
-    root.assertEquals(
-        previousRoot,
+    witness: RollupWitness
+): Field {
+    previousRoot.assertEquals(
+        witness.calculateRoot(Field(0)),
         Utils.buildAssertMessage(programName, 'process', ErrorEnum.PROCESS_ROOT)
     );
-    key.assertEquals(
-        actionState,
+    actionId.assertEquals(
+        witness.calculateIndex(),
         Utils.buildAssertMessage(
             programName,
             'process',
@@ -353,5 +386,5 @@ const processAction = (
         )
     );
 
-    return witness.computeRootAndKey(Field(ProcessStatus.PROCESSED))[0];
-};
+    return witness.calculateRoot(actionState);
+}

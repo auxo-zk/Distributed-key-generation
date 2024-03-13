@@ -15,7 +15,7 @@ import {
     MemberStorage,
     SettingStorage,
 } from '../../../storages/CommitteeStorage.js';
-import { COMMITTEE_MAX_SIZE } from '../../../constants.js';
+import { INSTANCE_LIMITS } from '../../../constants.js';
 import { prepare } from '../prepare.js';
 
 async function main() {
@@ -94,11 +94,11 @@ async function main() {
         let action: Field[] = e.actions[0].map((e) => Field(e));
         return new CommitteeAction({
             addresses: MemberArray.fromFields(
-                action.slice(0, COMMITTEE_MAX_SIZE * 2 + 1)
+                action.slice(0, INSTANCE_LIMITS.MEMBER * 2 + 1)
             ),
-            threshold: Field(action[COMMITTEE_MAX_SIZE * 2 + 1]),
+            threshold: Field(action[INSTANCE_LIMITS.MEMBER * 2 + 1]),
             ipfsHash: IpfsHash.fromFields(
-                action.slice(COMMITTEE_MAX_SIZE * 2 + 2)
+                action.slice(INSTANCE_LIMITS.MEMBER * 2 + 2)
             ),
         });
     });

@@ -15,7 +15,7 @@ import {
     Utils,
 } from '@auxo-dev/auxo-libs';
 import { CArray, cArray, UArray } from '../libs/Committee.js';
-import { COMMITTEE_MAX_SIZE, ZkProgramEnum } from '../constants.js';
+import { INSTANCE_LIMITS, ZkProgramEnum } from '../constants.js';
 import { ErrorEnum } from './constants.js';
 
 export {
@@ -31,8 +31,8 @@ export {
     BatchDecryptionProof,
 };
 
-class PlainArray extends ScalarDynamicArray(COMMITTEE_MAX_SIZE) {}
-class RandomArray extends ScalarDynamicArray(COMMITTEE_MAX_SIZE) {}
+class PlainArray extends ScalarDynamicArray(INSTANCE_LIMITS.MEMBER) {}
+class RandomArray extends ScalarDynamicArray(INSTANCE_LIMITS.MEMBER) {}
 
 class ElgamalInput extends Struct({
     pubKey: Group,
@@ -126,7 +126,7 @@ const BatchEncryption = ZkProgram({
                     )
                 );
 
-                for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+                for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
                     let iField = Field(i);
                     let random = randomValues.get(iField).toScalar();
                     let pubKey = input.publicKeys.get(iField);
@@ -208,7 +208,7 @@ const BatchDecryption = ZkProgram({
                     );
                 let ski = Group.generator.scale(Scalar.from(0n));
 
-                for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+                for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
                     let iField = Field(i);
                     let plain = polynomialValues.get(iField);
                     let cipher = input.c.get(iField);

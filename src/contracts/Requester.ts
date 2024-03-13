@@ -13,13 +13,12 @@ import {
     ZkProgram,
     Scalar,
     UInt64,
-    PublicKey,
     Bool,
 } from 'o1js';
 import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
 import {
+    INSTANCE_LIMITS,
     REQUEST_EXPIRATION,
-    REQUEST_MAX_SIZE,
     REQUEST_MIN_PERIOD,
     ZkAppEnum,
     ZkProgramEnum,
@@ -49,6 +48,10 @@ import { ErrorEnum, EventEnum, ZkAppAction } from './constants.js';
 import { RequestContract } from './Request.js';
 import { Level1Witness as DkgLevel1Witness } from '../storages/DKGStorage.js';
 import { DkgContract } from './DKG.js';
+import {
+    RollupWitness,
+    calculateActionIndex,
+} from '../storages/RollupStorage.js';
 
 export {
     Action as RequesterAction,
@@ -97,7 +100,6 @@ class AccumulateEncryptionInput extends Struct({
 }) {}
 
 class AccumulateEncryptionOutput extends Struct({
-    address: PublicKey,
     rollupRoot: Field,
     taskId: Field,
     initialCommitmentCounter: Field,
@@ -120,7 +122,6 @@ const AccumulateEncryption = ZkProgram({
     methods: {
         init: {
             privateInputs: [
-                PublicKey,
                 Field,
                 Field,
                 Field,
@@ -133,7 +134,6 @@ const AccumulateEncryption = ZkProgram({
             ],
             method(
                 input: AccumulateEncryptionInput,
-                address: PublicKey,
                 rollupRoot: Field,
                 initialCommitmentCounter: Field,
                 initialCommitmentRoot: Field,
@@ -161,7 +161,6 @@ const AccumulateEncryption = ZkProgram({
                 );
                 let taskId = accumulationWitness.calculateIndex();
                 return new AccumulateEncryptionOutput({
-                    address,
                     taskId,
                     rollupRoot,
                     initialCommitmentCounter,
@@ -185,7 +184,7 @@ const AccumulateEncryption = ZkProgram({
                     AccumulateEncryptionOutput
                 >,
                 Level1Witness,
-                ActionWitness,
+                RollupWitness,
                 ActionWitness,
             ],
 
@@ -196,7 +195,7 @@ const AccumulateEncryption = ZkProgram({
                     AccumulateEncryptionOutput
                 >,
                 commitmentWitness: Level1Witness,
-                rollupWitness: ActionWitness,
+                rollupWitness: RollupWitness,
                 processWitness: ActionWitness
             ) {
                 // Verify earlier proof
@@ -217,7 +216,7 @@ const AccumulateEncryption = ZkProgram({
                     earlierProof.publicOutput.nextCommitmentCounter;
                 let nextCommitmentRoot =
                     earlierProof.publicOutput.nextCommitmentRoot;
-                for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
+                for (let i = 0; i < INSTANCE_LIMITS.DIMENSION; i++) {
                     let index = Field(i);
                     // Verify empty commitment
                     Provable.if(
@@ -271,17 +270,15 @@ const AccumulateEncryption = ZkProgram({
                 }
 
                 // Verify action is rolluped
-                let actionIndex = Poseidon.hash(
-                    [
-                        earlierProof.publicOutput.address.toFields(),
-                        input.action.hash(),
-                        input.actionId,
-                    ].flat()
+                let actionIndex = calculateActionIndex(
+                    Field(ZkAppEnum.REQUESTER_0),
+                    input.actionId
                 );
                 verifyRollup(
                     AccumulateEncryption.name,
-                    earlierProof.publicOutput.rollupRoot,
                     actionIndex,
+                    input.action.hash(),
+                    earlierProof.publicOutput.rollupRoot,
                     rollupWitness
                 );
 
@@ -291,7 +288,7 @@ const AccumulateEncryption = ZkProgram({
                 let sumR = earlierProof.publicOutput.sumR;
                 let sumM = earlierProof.publicOutput.sumM;
 
-                for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
+                for (let i = 0; i < INSTANCE_LIMITS.DIMENSION; i++) {
                     sumR.set(
                         Field(i),
                         sumR.get(Field(i)).add(input.action.R.get(Field(i)))
@@ -314,13 +311,13 @@ const AccumulateEncryption = ZkProgram({
                 // Verify the action isn't already processed
                 let nextProcessRoot = processAction(
                     AccumulateEncryption.name,
+                    input.actionId,
                     actionState,
                     earlierProof.publicOutput.nextProcessRoot,
                     processWitness
                 );
 
                 return new AccumulateEncryptionOutput({
-                    address: earlierProof.publicOutput.address,
                     rollupRoot: earlierProof.publicOutput.rollupRoot,
                     taskId: earlierProof.publicOutput.taskId,
                     initialCommitmentCounter:
@@ -480,7 +477,8 @@ class RequesterContract extends SmartContract {
         keyIndexWitness: Level1Witness,
         periodWitness: Level1Witness,
         dkg: ZkAppRef,
-        rollup: ZkAppRef
+        rollup: ZkAppRef,
+        selfRef: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -535,7 +533,7 @@ class RequesterContract extends SmartContract {
         let R = RequestVector.empty(dimension);
         let M = RequestVector.empty(dimension);
         let commitments = new CommitmentArray();
-        for (let i = 0; i < REQUEST_MAX_SIZE; i++) {
+        for (let i = 0; i < INSTANCE_LIMITS.DIMENSION; i++) {
             let index = Field(i);
             let random = randoms.get(index).toScalar();
             let secret = secrets.get(index);
@@ -587,7 +585,8 @@ class RequesterContract extends SmartContract {
         this.reducer.dispatch(action);
 
         // Record action in Rollup Contract
-        rollupContract.recordAction(action.hash(), this.address);
+        selfRef.address.assertEquals(this.address);
+        rollupContract.recordAction(action.hash(), selfRef);
     }
 
     /**
@@ -619,7 +618,6 @@ class RequesterContract extends SmartContract {
 
         // Verify proof
         proof.verify();
-        proof.publicOutput.address.assertEquals(this.address);
         proof.publicOutput.rollupRoot.assertEquals(
             rollupContract.rollupRoot.getAndRequireEquals(),
             Utils.buildAssertMessage(

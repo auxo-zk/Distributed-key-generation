@@ -8,11 +8,12 @@ import {
 } from 'o1js';
 import { KeyStatus } from '../contracts/DKG.js';
 import { Round1Contribution, Round2Contribution } from '../libs/Committee.js';
-import { COMMITTEE_MAX_SIZE, INSTANCE_LIMITS } from '../constants.js';
+import { INSTANCE_LIMITS } from '../constants.js';
 
 export const LEVEL1_TREE_HEIGHT =
     Math.ceil(Math.log2(INSTANCE_LIMITS.COMMITTEE * INSTANCE_LIMITS.KEY)) + 1;
-export const LEVEL2_TREE_HEIGHT = Math.ceil(Math.log2(COMMITTEE_MAX_SIZE)) + 1;
+export const LEVEL2_TREE_HEIGHT =
+    Math.ceil(Math.log2(INSTANCE_LIMITS.MEMBER)) + 1;
 export class Level1MT extends MerkleTree {}
 export class Level1Witness extends MerkleWitness(LEVEL1_TREE_HEIGHT) {}
 export class Level2MT extends MerkleTree {}

@@ -10,7 +10,6 @@ import {
     Struct,
     SelfProof,
     ZkProgram,
-    PublicKey,
     Group,
 } from 'o1js';
 import { ActionMask as _ActionMask, Utils } from '@auxo-dev/auxo-libs';
@@ -36,6 +35,10 @@ import {
 import { INSTANCE_LIMITS, ZkAppEnum, ZkProgramEnum } from '../constants.js';
 import { ErrorEnum, EventEnum, ZkAppAction } from './constants.js';
 import { RollupContract, processAction, verifyRollup } from './Rollup.js';
+import {
+    RollupWitness,
+    calculateActionIndex,
+} from '../storages/RollupStorage.js';
 
 export {
     KeyStatus,
@@ -113,7 +116,6 @@ class UpdateKeyInput extends Struct({
 }) {}
 
 class UpdateKeyOutput extends Struct({
-    address: PublicKey,
     rollupRoot: Field,
     initialKeyCounterRoot: Field,
     initialKeyStatusRoot: Field,
@@ -130,18 +132,16 @@ const UpdateKey = ZkProgram({
     publicOutput: UpdateKeyOutput,
     methods: {
         init: {
-            privateInputs: [PublicKey, Field, Field, Field, Field],
+            privateInputs: [Field, Field, Field, Field],
             method(
                 input: UpdateKeyInput,
-                address: PublicKey,
                 rollupRoot: Field,
                 initialKeyCounter: Field,
                 initialKeyStatus: Field,
                 initialProcessRoot: Field
             ) {
                 return new UpdateKeyOutput({
-                    address: address,
-                    rollupRoot: rollupRoot,
+                    rollupRoot,
                     initialKeyCounterRoot: initialKeyCounter,
                     initialKeyStatusRoot: initialKeyStatus,
                     initialProcessRoot: initialProcessRoot,
@@ -156,14 +156,14 @@ const UpdateKey = ZkProgram({
             privateInputs: [
                 SelfProof<UpdateKeyInput, UpdateKeyOutput>,
                 Level1Witness,
-                ActionWitness,
+                RollupWitness,
                 ActionWitness,
             ],
             method(
                 input: UpdateKeyInput,
                 earlierProof: SelfProof<UpdateKeyInput, UpdateKeyOutput>,
                 keyStatusWitness: Level1Witness,
-                rollupWitness: ActionWitness,
+                rollupWitness: RollupWitness,
                 processWitness: ActionWitness
             ) {
                 // Verify earlier proof
@@ -217,17 +217,15 @@ const UpdateKey = ZkProgram({
                 );
 
                 // Verify action is rolluped
-                let actionIndex = Poseidon.hash(
-                    [
-                        earlierProof.publicOutput.address.toFields(),
-                        input.action.hash(),
-                        input.actionId,
-                    ].flat()
+                let actionIndex = calculateActionIndex(
+                    Field(ZkAppEnum.DKG),
+                    input.actionId
                 );
                 verifyRollup(
                     UpdateKey.name,
-                    earlierProof.publicOutput.rollupRoot,
                     actionIndex,
+                    input.action.hash(),
+                    earlierProof.publicOutput.rollupRoot,
                     rollupWitness
                 );
 
@@ -243,13 +241,13 @@ const UpdateKey = ZkProgram({
                 // Verify the action isn't already processed
                 let nextProcessRoot = processAction(
                     UpdateKey.name,
+                    input.actionId,
                     actionState,
                     earlierProof.publicOutput.nextProcessRoot,
                     processWitness
                 );
 
                 return new UpdateKeyOutput({
-                    address: earlierProof.publicOutput.address,
                     rollupRoot: earlierProof.publicOutput.rollupRoot,
                     initialKeyCounterRoot:
                         earlierProof.publicOutput.initialKeyCounterRoot,
@@ -271,7 +269,7 @@ const UpdateKey = ZkProgram({
                 Field,
                 CommitteeLevel1Witness,
                 Level1Witness,
-                ActionWitness,
+                RollupWitness,
                 ActionWitness,
             ],
             method(
@@ -280,7 +278,7 @@ const UpdateKey = ZkProgram({
                 currKeyId: Field,
                 keyCounterWitness: CommitteeLevel1Witness,
                 keyStatusWitness: Level1Witness,
-                rollupWitness: ActionWitness,
+                rollupWitness: RollupWitness,
                 processWitness: ActionWitness
             ) {
                 // Verify earlier proof
@@ -337,17 +335,15 @@ const UpdateKey = ZkProgram({
                 );
 
                 // Verify action is rolluped
-                let actionIndex = Poseidon.hash(
-                    [
-                        earlierProof.publicOutput.address.toFields(),
-                        input.action.hash(),
-                        input.actionId,
-                    ].flat()
+                let actionIndex = calculateActionIndex(
+                    Field(ZkAppEnum.DKG),
+                    input.actionId
                 );
                 verifyRollup(
                     UpdateKey.name,
-                    earlierProof.publicOutput.rollupRoot,
                     actionIndex,
+                    input.action.hash(),
+                    earlierProof.publicOutput.rollupRoot,
                     rollupWitness
                 );
 
@@ -363,13 +359,13 @@ const UpdateKey = ZkProgram({
                 // Verify the action isn't already processed
                 let nextProcessRoot = processAction(
                     UpdateKey.name,
+                    input.actionId,
                     actionState,
                     earlierProof.publicOutput.nextProcessRoot,
                     processWitness
                 );
 
                 return new UpdateKeyOutput({
-                    address: earlierProof.publicOutput.address,
                     rollupRoot: earlierProof.publicOutput.rollupRoot,
                     initialKeyCounterRoot:
                         earlierProof.publicOutput.initialKeyCounterRoot,
@@ -437,6 +433,7 @@ class DkgContract extends SmartContract {
      * @param memberWitness Witness for proof of committee's member
      * @param committee Reference to Committee Contract
      * @param rollup Reference to Rollup Contract
+     * @param selfRef Reference to this contract itself
      */
     @method
     committeeAction(
@@ -444,7 +441,8 @@ class DkgContract extends SmartContract {
         actionType: Field,
         memberWitness: CommitteeFullWitness,
         committee: ZkAppRef,
-        rollup: ZkAppRef
+        rollup: ZkAppRef,
+        selfRef: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -517,7 +515,8 @@ class DkgContract extends SmartContract {
         this.reducer.dispatch(action);
 
         // Record action for rollup
-        rollupContract.recordAction(action.hash(), this.address);
+        selfRef.address.assertEquals(this.address);
+        rollupContract.recordAction(action.hash(), selfRef);
     }
 
     /**
@@ -527,6 +526,7 @@ class DkgContract extends SmartContract {
      * @param actionType Action type
      * @param round Reference to Round1/Round2 Contract
      * @param rollup Reference to Rollup Contract
+     * @param selfRef Reference to this contract itself
      */
     @method
     finalizeContributionRound(
@@ -534,7 +534,8 @@ class DkgContract extends SmartContract {
         keyId: Field,
         actionType: Field,
         round: ZkAppRef,
-        rollup: ZkAppRef
+        rollup: ZkAppRef,
+        selfRef: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -577,13 +578,6 @@ class DkgContract extends SmartContract {
             )
         );
 
-        // Verify Rollup Contract address
-        verifyZkApp(
-            DkgContract.name,
-            rollup,
-            zkAppRoot,
-            Field(ZkAppEnum.ROLLUP)
-        );
         const rollupContract = new RollupContract(rollup.address);
 
         // Create & dispatch action
@@ -595,7 +589,8 @@ class DkgContract extends SmartContract {
         this.reducer.dispatch(action);
 
         // Record action for rollup
-        rollupContract.recordAction(action.hash(), this.address);
+        selfRef.address.assertEquals(this.address);
+        rollupContract.recordAction(action.hash(), selfRef);
     }
 
     /**
@@ -620,7 +615,6 @@ class DkgContract extends SmartContract {
 
         // Verify proof
         proof.verify();
-        proof.publicOutput.address.assertEquals(this.address);
         proof.publicOutput.rollupRoot.assertEquals(
             rollupContract.rollupRoot.getAndRequireEquals(),
             Utils.buildAssertMessage(

@@ -1,12 +1,6 @@
 import { Field, MerkleTree } from 'o1js';
 
-interface Storage<
-    RawLeaf,
-    Level1MT extends MerkleTree,
-    Level1Witness,
-    Level2MT extends MerkleTree,
-    Level2Witness
-> {
+interface Storage<RawLeaf, Level1MT, Level1Witness, Level2MT, Level2Witness> {
     get root(): Field;
     get level1(): Level1MT;
     get level2s(): { [key: string]: Level2MT };
@@ -40,7 +34,7 @@ export abstract class GenericStorage<
     RawLeaf,
     Level1MT extends MerkleTree,
     Level1MTWitness,
-    Level2MT extends MerkleTree,
+    Level2MT extends MerkleTree | undefined,
     Level2Witness
 > implements
         Storage<RawLeaf, Level1MT, Level1MTWitness, Level2MT, Level2Witness>
@@ -150,10 +144,15 @@ export abstract class GenericStorage<
     }
 
     updateInternal(level1Index: Field, level2: Level2MT) {
-        Object.assign(this._level2s, {
-            [level1Index.toString()]: level2,
-        });
-        this._level1.setLeaf(level1Index.toBigInt(), level2.getRoot());
+        if (this.EMPTY_LEVEL_2_TREE) {
+            Object.assign(this._level2s, {
+                [level1Index.toString()]: level2,
+            });
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            this._level1.setLeaf(level1Index.toBigInt(), level2!.getRoot());
+        } else {
+            throw new Error('This storage does not support Level2MT');
+        }
     }
 
     updateLeaf(
@@ -169,7 +168,8 @@ export abstract class GenericStorage<
                 leafId += '-' + level2Index.toString();
                 let level2 = this._level2s[level1Index.toString()];
                 if (level2 === undefined) level2 = this.EMPTY_LEVEL_2_TREE();
-                level2.setLeaf(level2Index.toBigInt(), leaf);
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                level2!.setLeaf(level2Index.toBigInt(), leaf);
                 this.updateInternal(level1Index, level2);
             } else {
                 throw new Error('This storage does not support Level2MT');
@@ -196,8 +196,8 @@ export abstract class GenericStorage<
                 leafId += '-' + level2Index.toString();
                 let level2 = this._level2s[level1Index.toString()];
                 if (level2 === undefined) level2 = this.EMPTY_LEVEL_2_TREE();
-
-                level2.setLeaf(level2Index.toBigInt(), leaf);
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                level2!.setLeaf(level2Index.toBigInt(), leaf);
                 this.updateInternal(level1Index, level2);
             } else {
                 throw new Error('This storage does not support Level2MT');

@@ -8,17 +8,19 @@ import {
 } from '@auxo-dev/auxo-libs';
 import { DArray } from './Requester.js';
 import * as ElgamalECC from './Elgamal.js';
-import { COMMITTEE_MAX_SIZE } from '../constants.js';
+import { INSTANCE_LIMITS } from '../constants.js';
 
 /* ========== CONSTANTS, TYPES, & STRUCTS ========== */
 
-export class MemberArray extends PublicKeyDynamicArray(COMMITTEE_MAX_SIZE) {}
-export class CArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
-export class cArray extends Bit255DynamicArray(COMMITTEE_MAX_SIZE) {}
-export class UArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
-export class PublicKeyArray extends GroupDynamicArray(COMMITTEE_MAX_SIZE) {}
+export class MemberArray extends PublicKeyDynamicArray(
+    INSTANCE_LIMITS.MEMBER
+) {}
+export class CArray extends GroupDynamicArray(INSTANCE_LIMITS.MEMBER) {}
+export class cArray extends Bit255DynamicArray(INSTANCE_LIMITS.MEMBER) {}
+export class UArray extends GroupDynamicArray(INSTANCE_LIMITS.MEMBER) {}
+export class PublicKeyArray extends GroupDynamicArray(INSTANCE_LIMITS.MEMBER) {}
 export class EncryptionHashArray extends FieldDynamicArray(
-    COMMITTEE_MAX_SIZE
+    INSTANCE_LIMITS.MEMBER
 ) {}
 
 export type SecretPolynomial = {

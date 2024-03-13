@@ -1,71 +1,22 @@
-/**
- * Unit value for the encrypted secret
- */
-export const SECRET_UNIT = 1e7;
-
-/**
- * Maximum value for the encrypted secret
- */
-export const SECRET_MAX = 1e12;
-
-/**
- * Fee charged for each request
- */
-export const REQUEST_FEE = 1e9;
-
-/**
- * Maximum amount of zkApp address in storage
- */
-export const ADDRESS_MAX_SIZE = 8;
-
-/**
- * Maximum amount of members in a committee
- */
-export const COMMITTEE_MAX_SIZE = 3;
-
-/**
- * Maximum dimension of a request
- */
-export const REQUEST_MAX_SIZE = 5;
-
-/**
- * Minimum value for a request's period ~ 10 blocks
- */
-export const REQUEST_MIN_PERIOD = 30 * 60 * 1000;
-
-/**
- * Waiting period before the expiration of a request ~ 100 blocks
- */
-export const REQUEST_EXPIRATION = 300 * 60 * 1000;
-
-/**
- * Maximum value for number of contracts sharing rollup
- */
-export const ROLLUP_BATCH_MAX_SIZE = 8;
-
-/**
- * Maximum amount for each entity
- */
-export const INSTANCE_LIMITS = {
-    COMMITTEE: 2 ** 3,
-    KEY: 2 ** 3,
-    REQUEST: 2 ** 3,
+export {
+    ACTION_PROCESS_LIMITS,
+    INDEX_SIZE,
+    INSTANCE_LIMITS,
+    REQUEST_FEE,
+    REQUEST_MIN_PERIOD,
+    REQUEST_EXPIRATION,
+    ROLLUP_BATCH_MAX_SIZE,
+    SECRET_MAX,
+    SECRET_UNIT,
+    ZkAppEnum,
+    ZkProgramEnum,
+    Contract,
 };
-
-/**
- * Maximum amount of action processed in a recursive proof
- */
-export const ACTION_PROCESS_LIMITS = 8;
-
-/**
- * The size of an index value in bits for packing indexes array
- */
-export const INDEX_SIZE = 6;
 
 /**
  * Indexes of zkApps in the address storage
  */
-export enum ZkAppEnum {
+enum ZkAppEnum {
     COMMITTEE,
     DKG,
     ROUND1,
@@ -73,10 +24,11 @@ export enum ZkAppEnum {
     REQUEST,
     RESPONSE,
     ROLLUP,
+    REQUESTER_0,
     __LENGTH,
 }
 
-export enum ZkProgramEnum {
+enum ZkProgramEnum {
     Elgamal = 'Elgamal',
     BatchEncryption = 'BatchEncryption',
     BatchDecryption = 'BatchDecryption',
@@ -96,7 +48,7 @@ export enum ZkProgramEnum {
 /**
  * All zkApp/smart contract names
  */
-export enum Contract {
+enum Contract {
     COMMITTEE = 'committee',
     DKG = 'dkg',
     ROUND1 = 'round1',
@@ -105,3 +57,56 @@ export enum Contract {
     REQUEST = 'request',
     ROLLUP = 'rollup',
 }
+
+/**
+ * Maximum amount of action processed in a recursive proof
+ */
+const ACTION_PROCESS_LIMITS = 8;
+
+/**
+ * The size of an index value in bits for packing indexes array
+ */
+const INDEX_SIZE = 6;
+
+/**
+ * Maximum amount for each entity
+ */
+const INSTANCE_LIMITS = {
+    ACTION: 2 ** 10,
+    ADDRESS: ZkAppEnum.__LENGTH,
+    COMMITTEE: 2 ** 6,
+    MEMBER: 3,
+    KEY: 2 ** 6,
+    REQUEST: 2 ** 8,
+    DIMENSION: 3,
+};
+
+/**
+ * Fee charged for each request
+ */
+const REQUEST_FEE = 1e9;
+
+/**
+ * Minimum value for a request's period ~ 10 blocks
+ */
+const REQUEST_MIN_PERIOD = 30 * 60 * 1000;
+
+/**
+ * Waiting period before the expiration of a request ~ 100 blocks
+ */
+const REQUEST_EXPIRATION = 300 * 60 * 1000;
+
+/**
+ * Maximum value for number of contracts sharing rollup
+ */
+const ROLLUP_BATCH_MAX_SIZE = 8;
+
+/**
+ * Maximum value for the encrypted secret
+ */
+const SECRET_MAX = 1e12;
+
+/**
+ * Unit value for the encrypted secret
+ */
+const SECRET_UNIT = 1e7;

@@ -3,7 +3,6 @@ import {
     method,
     Poseidon,
     Provable,
-    PublicKey,
     Reducer,
     SelfProof,
     SmartContract,
@@ -42,12 +41,7 @@ import {
 } from './DKG.js';
 import { BatchEncryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
-import {
-    COMMITTEE_MAX_SIZE,
-    INSTANCE_LIMITS,
-    ZkAppEnum,
-    ZkProgramEnum,
-} from '../constants.js';
+import { INSTANCE_LIMITS, ZkAppEnum, ZkProgramEnum } from '../constants.js';
 import {
     ActionWitness,
     EMPTY_ACTION_MT,
@@ -58,6 +52,10 @@ import {
 } from '../storages/SharedStorage.js';
 import { ErrorEnum, EventEnum, ZkAppAction } from './constants.js';
 import { processAction, RollupContract, verifyRollup } from './Rollup.js';
+import {
+    calculateActionIndex,
+    RollupWitness,
+} from '../storages/RollupStorage.js';
 
 export {
     Action as Round2Action,
@@ -99,7 +97,6 @@ class FinalizeRound2Input extends Struct({
 }) {}
 
 class FinalizeRound2Output extends Struct({
-    address: PublicKey,
     rollupRoot: Field,
     T: Field,
     N: Field,
@@ -119,7 +116,6 @@ const FinalizeRound2 = ZkProgram({
     methods: {
         init: {
             privateInputs: [
-                PublicKey,
                 Field,
                 Field,
                 Field,
@@ -132,7 +128,6 @@ const FinalizeRound2 = ZkProgram({
             // initialEncryptionHashes must be filled with Field(0) with correct length
             method(
                 input: FinalizeRound2Input,
-                address: PublicKey,
                 rollupRoot: Field,
                 T: Field,
                 N: Field,
@@ -178,15 +173,14 @@ const FinalizeRound2 = ZkProgram({
                 );
 
                 return new FinalizeRound2Output({
-                    address: address,
-                    rollupRoot: rollupRoot,
-                    T: T,
-                    N: N,
-                    initialContributionRoot: initialContributionRoot,
-                    initialProcessRoot: initialProcessRoot,
-                    nextContributionRoot: nextContributionRoot,
+                    rollupRoot,
+                    T,
+                    N,
+                    initialContributionRoot,
+                    initialProcessRoot,
+                    nextContributionRoot,
                     nextProcessRoot: initialProcessRoot,
-                    keyIndex: keyIndex,
+                    keyIndex,
                     encryptionHashes: initialEncryptionHashes,
                     processedActions: new ProcessedContributions(),
                 });
@@ -196,7 +190,7 @@ const FinalizeRound2 = ZkProgram({
             privateInputs: [
                 SelfProof<FinalizeRound2Input, FinalizeRound2Output>,
                 DKGWitness,
-                ActionWitness,
+                RollupWitness,
                 ActionWitness,
             ],
             method(
@@ -206,7 +200,7 @@ const FinalizeRound2 = ZkProgram({
                     FinalizeRound2Output
                 >,
                 contributionWitness: DKGWitness,
-                rollupWitness: ActionWitness,
+                rollupWitness: RollupWitness,
                 processWitness: ActionWitness
             ) {
                 // Verify earlier proof
@@ -281,7 +275,7 @@ const FinalizeRound2 = ZkProgram({
                 // Compute new encryption hash array
                 let encryptionHashes =
                     earlierProof.publicOutput.encryptionHashes;
-                for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+                for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
                     let hashChain = encryptionHashes.get(Field(i));
                     hashChain = Provable.if(
                         Field(i).greaterThanOrEqual(
@@ -304,17 +298,15 @@ const FinalizeRound2 = ZkProgram({
                 }
 
                 // Verify action is rolluped
-                let actionIndex = Poseidon.hash(
-                    [
-                        earlierProof.publicOutput.address.toFields(),
-                        input.action.hash(),
-                        input.actionId,
-                    ].flat()
+                let actionIndex = calculateActionIndex(
+                    Field(ZkAppEnum.ROUND2),
+                    input.actionId
                 );
                 verifyRollup(
                     FinalizeRound2.name,
-                    earlierProof.publicOutput.rollupRoot,
                     actionIndex,
+                    input.action.hash(),
+                    earlierProof.publicOutput.rollupRoot,
                     rollupWitness
                 );
 
@@ -330,13 +322,13 @@ const FinalizeRound2 = ZkProgram({
                 // Verify the action isn't already processed
                 let nextProcessRoot = processAction(
                     FinalizeRound2.name,
+                    input.actionId,
                     actionState,
                     earlierProof.publicOutput.nextProcessRoot,
                     processWitness
                 );
 
                 return new FinalizeRound2Output({
-                    address: earlierProof.publicOutput.address,
                     rollupRoot: earlierProof.publicOutput.rollupRoot,
                     T: earlierProof.publicOutput.T,
                     N: earlierProof.publicOutput.N,
@@ -410,7 +402,8 @@ class Round2Contract extends SmartContract {
         publicKeysWitness: DkgLevel1Witness,
         committee: ZkAppRef,
         round1: ZkAppRef,
-        rollup: ZkAppRef
+        rollup: ZkAppRef,
+        selfRef: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -474,7 +467,7 @@ class Round2Contract extends SmartContract {
         // @todo Remove Provable.witness or adding assertion
         let publicKeysLeaf = Provable.witness(Field, () => {
             let publicKeysMT = EMPTY_LEVEL_2_TREE();
-            for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+            for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
                 let value = Provable.if(
                     Field(i).greaterThanOrEqual(
                         proof.publicInput.publicKeys.length
@@ -508,7 +501,8 @@ class Round2Contract extends SmartContract {
         this.reducer.dispatch(action);
 
         // Record action for rollup
-        rollupContract.recordAction(action.hash(), this.address);
+        selfRef.address.assertEquals(this.address);
+        rollupContract.recordAction(action.hash(), selfRef);
     }
 
     /**
@@ -529,8 +523,7 @@ class Round2Contract extends SmartContract {
         committee: ZkAppRef,
         dkg: ZkAppRef,
         rollup: ZkAppRef,
-        dkgRound2: ZkAppRef,
-        dkgRollup: ZkAppRef
+        selfRef: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -566,7 +559,6 @@ class Round2Contract extends SmartContract {
 
         // Verify proof
         proof.verify();
-        proof.publicOutput.address.assertEquals(this.address);
         proof.publicOutput.rollupRoot.assertEquals(
             rollupContract.rollupRoot.getAndRequireEquals(),
             Utils.buildAssertMessage(
@@ -624,7 +616,7 @@ class Round2Contract extends SmartContract {
         // @todo Remove Provable.witness or adding assertion
         let encryptionLeaf = Provable.witness(Field, () => {
             let encryptionHashesMT = EMPTY_LEVEL_2_TREE();
-            for (let i = 0; i < COMMITTEE_MAX_SIZE; i++) {
+            for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
                 let value = Provable.if(
                     Field(i).greaterThanOrEqual(
                         proof.publicOutput.encryptionHashes.length
@@ -665,8 +657,9 @@ class Round2Contract extends SmartContract {
             committeeId,
             keyId,
             Field(DkgActionEnum.FINALIZE_ROUND_2),
-            dkgRound2,
-            dkgRollup
+            selfRef,
+            rollup,
+            dkg
         );
 
         // Emit events
