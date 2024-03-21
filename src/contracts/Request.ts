@@ -12,17 +12,12 @@ import {
     UInt64,
     ZkProgram,
     Provable,
-    Bool,
     Group,
+    Scalar,
+    UInt8,
 } from 'o1js';
-import { Utils } from '@auxo-dev/auxo-libs';
-import { RequestVector, ResultVector } from '../libs/Requester.js';
-import {
-    INSTANCE_LIMITS,
-    REQUEST_FEE,
-    ZkAppEnum,
-    ZkProgramEnum,
-} from '../constants.js';
+import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
+import { REQUEST_FEE, ZkAppEnum, ZkProgramEnum } from '../constants.js';
 import { ErrorEnum, ZkAppAction } from './constants.js';
 import {
     EMPTY_ADDRESS_MT,
@@ -35,10 +30,18 @@ import {
 } from '../storages/RequestStorage.js';
 import { rollup } from './Rollup.js';
 import { ResponseContract } from './Response.js';
+import {
+    EMPTY_LEVEL_2_TREE,
+    Level2Witness,
+} from '../storages/RequesterStorage.js';
 
 export {
     RequestStatus,
     Action as RequestAction,
+    ComputeResultInput,
+    ComputeResultOutput,
+    ComputeResult,
+    ComputeResultProof,
     UpdateRequestInput,
     UpdateRequestOutput,
     UpdateRequest,
@@ -57,10 +60,10 @@ class Action
         requestId: Field,
         keyIndex: Field,
         taskId: Field,
-        accumulatedR: RequestVector,
-        accumulatedM: RequestVector,
-        resultVector: ResultVector,
         expirationTimestamp: UInt64,
+        dimension: UInt8,
+        accumulationRoot: Field,
+        resultRoot: Field,
     })
     implements ZkAppAction
 {
@@ -69,10 +72,10 @@ class Action
             requestId: Field(0),
             keyIndex: Field(0),
             taskId: Field(0),
-            accumulatedR: new RequestVector(),
-            accumulatedM: new RequestVector(),
-            resultVector: new ResultVector(),
             expirationTimestamp: UInt64.zero,
+            dimension: UInt8.from(0),
+            accumulationRoot: Field(0),
+            resultRoot: Field(0),
         });
     }
     static fromFields(input: Field[]): Action {
@@ -82,6 +85,148 @@ class Action
         return Poseidon.hash(Action.toFields(this));
     }
 }
+
+class ComputeResultInput extends Struct({
+    M: Group,
+    D: Group,
+    result: Scalar,
+}) {}
+
+class ComputeResultOutput extends Struct({
+    accumulationRootM: Field,
+    responseRootD: Field,
+    resultRoot: Field,
+    counter: UInt8,
+}) {}
+
+const ComputeResult = ZkProgram({
+    name: ZkProgramEnum.ComputeResult,
+    publicInput: ComputeResultInput,
+    publicOutput: ComputeResultOutput,
+    methods: {
+        init: {
+            privateInputs: [],
+            method(input: ComputeResultInput) {
+                return new ComputeResultOutput({
+                    accumulationRootM: EMPTY_LEVEL_2_TREE().getRoot(),
+                    responseRootD: EMPTY_LEVEL_2_TREE().getRoot(),
+                    resultRoot: EMPTY_LEVEL_2_TREE().getRoot(),
+                    counter: UInt8.from(0),
+                });
+            },
+        },
+        compute: {
+            privateInputs: [
+                SelfProof<ComputeResultInput, ComputeResultOutput>,
+                Level2Witness,
+                Level2Witness,
+                Level2Witness,
+            ],
+            method(
+                input: ComputeResultInput,
+                earlierProof: SelfProof<
+                    ComputeResultInput,
+                    ComputeResultOutput
+                >,
+                accumulationWitness: Level2Witness,
+                responseWitness: Level2Witness,
+                resultWitness: Level2Witness
+            ) {
+                // Verify earlier proof
+                earlierProof.verify();
+
+                // Verify empty M, D, and result value
+                earlierProof.publicOutput.accumulationRootM.assertEquals(
+                    accumulationWitness.calculateRoot(Field(0)),
+                    Utils.buildAssertMessage(
+                        ComputeResult.name,
+                        ComputeResult.compute.name,
+                        ErrorEnum.ACCUMULATION_ROOT
+                    )
+                );
+                earlierProof.publicOutput.counter.value.assertEquals(
+                    accumulationWitness.calculateIndex(),
+                    Utils.buildAssertMessage(
+                        ComputeResult.name,
+                        ComputeResult.compute.name,
+                        ErrorEnum.ACCUMULATION_INDEX_L2
+                    )
+                );
+                earlierProof.publicOutput.responseRootD.assertEquals(
+                    responseWitness.calculateRoot(Field(0)),
+                    Utils.buildAssertMessage(
+                        ComputeResult.name,
+                        ComputeResult.compute.name,
+                        ErrorEnum.RES_D_ROOT
+                    )
+                );
+                earlierProof.publicOutput.counter.value.assertEquals(
+                    responseWitness.calculateIndex(),
+                    Utils.buildAssertMessage(
+                        ComputeResult.name,
+                        ComputeResult.compute.name,
+                        ErrorEnum.RES_D_INDEX_L2
+                    )
+                );
+                earlierProof.publicOutput.resultRoot.assertEquals(
+                    resultWitness.calculateRoot(Field(0)),
+                    Utils.buildAssertMessage(
+                        ComputeResult.name,
+                        ComputeResult.compute.name,
+                        ErrorEnum.REQUEST_RESULT_ROOT
+                    )
+                );
+                earlierProof.publicOutput.counter.value.assertEquals(
+                    resultWitness.calculateIndex(),
+                    Utils.buildAssertMessage(
+                        ComputeResult.name,
+                        ComputeResult.compute.name,
+                        ErrorEnum.REQUEST_RESULT_INDEX_L2
+                    )
+                );
+
+                let resultPoint = input.M.sub(input.D);
+
+                // Verify result value
+                Provable.if(
+                    resultPoint.equals(Group.zero),
+                    CustomScalar.fromScalar(input.result).equals(
+                        CustomScalar.fromScalar(Scalar.from(0))
+                    ),
+                    resultPoint.equals(Group.generator.scale(input.result))
+                ).assertTrue(
+                    Utils.buildAssertMessage(
+                        RequestContract.name,
+                        RequestContract.prototype.resolve.name,
+                        ErrorEnum.REQUEST_RESULT
+                    )
+                );
+
+                // Update M, D, and result root
+                let accumulationRootM = accumulationWitness.calculateRoot(
+                    Poseidon.hash(input.M.toFields())
+                );
+                let responseRootD = responseWitness.calculateRoot(
+                    Poseidon.hash(input.D.toFields())
+                );
+                let resultRoot = responseWitness.calculateRoot(
+                    Poseidon.hash(
+                        CustomScalar.fromScalar(input.result).toFields()
+                    )
+                );
+
+                return new ComputeResultOutput({
+                    accumulationRootM,
+                    responseRootD,
+                    resultRoot,
+                    counter: earlierProof.publicOutput.counter.add(1),
+                });
+            },
+        },
+    },
+});
+
+class ComputeResultProof extends ZkProgram.Proof(ComputeResult) {}
 
 class UpdateRequestInput extends Action {}
 
@@ -225,7 +370,7 @@ const UpdateRequest = ZkProgram({
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.initialize.name,
-                        ErrorEnum.ACCUMULATION_INDEX
+                        ErrorEnum.ACCUMULATION_INDEX_L1
                     )
                 );
 
@@ -256,10 +401,7 @@ const UpdateRequest = ZkProgram({
                     Poseidon.hash(input.taskId.toFields())
                 );
                 let nextAccumulatedRoot = accumulationWitness.calculateRoot(
-                    Poseidon.hash([
-                        input.accumulatedR.hash(),
-                        input.accumulatedM.hash(),
-                    ])
+                    input.accumulationRoot
                 );
                 let nextExpirationRoot = expirationWitness.calculateRoot(
                     Poseidon.hash(input.expirationTimestamp.toFields())
@@ -313,7 +455,7 @@ const UpdateRequest = ZkProgram({
                 earlierProof.verify();
 
                 // Verify action type
-                input.taskId.assertEquals(
+                input.requestId.assertNotEquals(
                     Field(-1),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
@@ -336,13 +478,13 @@ const UpdateRequest = ZkProgram({
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
                         UpdateRequest.resolve.name,
-                        ErrorEnum.REQUEST_RESULT_INDEX
+                        ErrorEnum.REQUEST_RESULT_INDEX_L1
                     )
                 );
 
                 // Calculate new state values
                 let nextResultRoot = resultWitness.calculateRoot(
-                    input.resultVector.hash()
+                    input.resultRoot
                 );
 
                 // Calculate corresponding action state
@@ -407,7 +549,8 @@ class RequestContract extends SmartContract {
     @state(Field) taskIdRoot = State<Field>();
 
     /**
-     * @description MT storing accumulated value = Hash(R | M)
+     * @description MT storing accumulated value
+     * Hash(accumulated R MT root | accumulated M MT root | dimension)
      */
     @state(Field) accumulationRoot = State<Field>();
 
@@ -445,16 +588,16 @@ class RequestContract extends SmartContract {
      * @param committeeId Committee Id
      * @param keyIndex Unique key index
      * @param taskId Request's unique taskId
-     * @param accumulatedR Accumulated R value
-     * @param accumulatedM Accumulated M value
+     * @param accumulationRoot Accumulation data MT root Hash(R | M)
+     * @param dimension Encryption vectors' dimension
      * @param expirationPeriod Waiting period before the expiration of unresolved request
      */
     @method initialize(
         taskId: Field,
         keyIndex: Field,
         requester: PublicKey,
-        accumulatedR: RequestVector,
-        accumulatedM: RequestVector,
+        accumulationRoot: Field,
+        dimension: UInt8,
         expirationPeriod: UInt64
     ) {
         // Verify caller
@@ -465,38 +608,36 @@ class RequestContract extends SmartContract {
             requestId: Field(-1),
             keyIndex: keyIndex,
             taskId: Poseidon.hash([requester.toFields(), taskId].flat()),
-            accumulatedR,
-            accumulatedM,
-            resultVector: new ResultVector(),
             expirationTimestamp: this.network.timestamp
                 .getAndRequireEquals()
                 .add(expirationPeriod),
+            dimension,
+            accumulationRoot,
+            resultRoot: Field(0),
         });
         this.reducer.dispatch(action);
     }
 
     /**
      * Resolve a request and update result
+     * @param proof Verification proof
      * @param expirationTimestamp Timestamp for the expiration of the request
-     * @param accumulatedR Accumulated R value
-     * @param accumulatedM Accumulated M value
-     * @param finalizedD Finalized response D value
-     * @param resultVector Decrypted result vector
+     * @param accumulationRoot Accumulation data MT root
+     * @param responseRoot Response data MT root
+     * @param resultRoot Decryption result MT root
      * @param expirationWitness Witness for proof of expiration timestamp
      * @param accumulationWitness Witness for proof of accumulation data
-     * @param finalizedDWitness Witness for proof of response data
+     * @param responseWitness Witness for proof of response data
      * @param resultWitness Witness for proof of result
      * @param response Reference to Response Contract
      */
     @method resolve(
+        proof: ComputeResultProof,
         expirationTimestamp: UInt64,
-        accumulatedR: RequestVector,
-        accumulatedM: RequestVector,
-        finalizedD: RequestVector,
-        resultVector: ResultVector,
+        accumulationRootR: Field,
         expirationWitness: Level1Witness,
         accumulationWitness: Level1Witness,
-        finalizedDWitness: Level1Witness,
+        responseWitness: Level1Witness,
         resultWitness: Level1Witness,
         response: ZkAppRef
     ) {
@@ -505,15 +646,19 @@ class RequestContract extends SmartContract {
 
         let requestId = accumulationWitness.calculateIndex();
 
-        // Verify caller is Response Contract
-        Utils.requireCaller(response.address, this);
+        // Verify Response Contract address
         verifyZkApp(
             RequestContract.name,
             response,
             zkAppRoot,
             Field(ZkAppEnum.RESPONSE)
         );
-        let responseContract = new ResponseContract(response.address);
+        const responseContract = new ResponseContract(response.address);
+
+        // Verify Compute Result proof
+        proof.verify();
+        let dimension = proof.publicOutput.counter;
+        let accumulationRootM = proof.publicOutput.accumulationRootM;
 
         // Verify request status
         this.verifyRequestStatus(
@@ -525,48 +670,31 @@ class RequestContract extends SmartContract {
         );
 
         // Verify accumulation data
+
         this.verifyAccumulationData(
             requestId,
-            accumulatedR,
-            accumulatedM,
+            accumulationRootR,
+            accumulationRootM,
+            dimension,
             accumulationWitness
         );
 
-        // Verify finalized D value
-        responseContract.verifyFinalizedD(
-            requestId,
-            finalizedD,
-            finalizedDWitness
-        );
-
-        // Verify result vector
-        for (let i = 0; i < INSTANCE_LIMITS.DIMENSION; i++) {
-            let index = Field(i);
-            let M = accumulatedM.get(index);
-            let D = finalizedD.get(index);
-            let result = resultVector.get(index);
-            Provable.if(
-                index.greaterThanOrEqual(finalizedD.length),
-                Bool(true),
-                M.sub(D).equals(Group.generator.scale(result.toScalar()))
-            ).assertTrue(
-                Utils.buildAssertMessage(
-                    RequestContract.name,
-                    RequestContract.prototype.resolve.name,
-                    ErrorEnum.REQUEST_RESULT
-                )
-            );
-        }
+        // Verify response value
+        // responseContract.verifyFinalizedD(
+        //     requestId,
+        //     finalizedD,
+        //     finalizedDWitness
+        // );
 
         // Create and dispatch action
         let action = new Action({
             requestId,
-            keyIndex: Field(-1),
-            taskId: Field(-1),
-            accumulatedR: new RequestVector(),
-            accumulatedM: new RequestVector(),
-            resultVector,
-            expirationTimestamp,
+            keyIndex: Field(0),
+            taskId: Field(0),
+            expirationTimestamp: UInt64.zero,
+            dimension: UInt8.from(0),
+            accumulationRoot: Field(0),
+            resultRoot: proof.publicOutput.resultRoot,
         });
         this.reducer.dispatch(action);
     }
@@ -749,7 +877,7 @@ class RequestContract extends SmartContract {
             Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.getRequestStatus.name,
-                ErrorEnum.REQUEST_RESULT_INDEX
+                ErrorEnum.REQUEST_RESULT_INDEX_L1
             )
         );
         let isExpired = this.expirationRoot
@@ -816,21 +944,26 @@ class RequestContract extends SmartContract {
     /**
      * Verify accumulation data
      * @param requestId Request Id
-     * @param accumulatedR Accumulated R value
-     * @param accumulatedM Accumulated M value
+     * @param accumulatedRRoot Accumulated R MT root
+     * @param accumulatedMRoot Accumulated M MT root
      * @param witness Witness for proof of accumulation data
      */
     verifyAccumulationData(
         requestId: Field,
-        accumulatedR: RequestVector,
-        accumulatedM: RequestVector,
+        accumulationRootR: Field,
+        accumulationRootM: Field,
+        dimension: UInt8,
         witness: Level1Witness
     ) {
         this.accumulationRoot
             .getAndRequireEquals()
             .assertEquals(
                 witness.calculateRoot(
-                    Poseidon.hash([accumulatedR.hash(), accumulatedM.hash()])
+                    Poseidon.hash([
+                        accumulationRootR,
+                        accumulationRootM,
+                        dimension.value,
+                    ])
                 ),
                 Utils.buildAssertMessage(
                     RequestContract.name,
@@ -843,7 +976,7 @@ class RequestContract extends SmartContract {
             Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.verifyAccumulationData.name,
-                ErrorEnum.ACCUMULATION_INDEX
+                ErrorEnum.ACCUMULATION_INDEX_L1
             )
         );
     }

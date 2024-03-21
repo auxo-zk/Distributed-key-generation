@@ -9,12 +9,13 @@ import {
     SmartContract,
     State,
     Struct,
+    UInt8,
+    Void,
     ZkProgram,
     method,
     state,
 } from 'o1js';
-import { Utils } from '@auxo-dev/auxo-libs';
-import { ResponseContribution } from '../libs/Committee.js';
+import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
 import {
     FullMTWitness as CommitteeFullWitness,
     Level1Witness as CommitteeLevel1Witness,
@@ -27,6 +28,7 @@ import {
 import {
     FullMTWitness as RequestWitness,
     Level1Witness as RequestLevel1Witness,
+    Level2Witness,
     EMPTY_LEVEL_1_TREE,
     EMPTY_LEVEL_2_TREE,
 } from '../storages/RequestStorage.js';
@@ -47,17 +49,20 @@ import {
     ZkAppRef,
     verifyZkApp,
 } from '../storages/SharedStorage.js';
-import { DArray, RArray, RequestVector } from '../libs/Requester.js';
 import { ErrorEnum, EventEnum, ZkAppAction } from './constants.js';
 import { RollupContract, processAction, verifyRollup } from './Rollup.js';
-import { RequestContract } from './Request.js';
 import {
     RollupWitness,
     calculateActionIndex,
 } from '../storages/RollupStorage.js';
+import { DArray } from '../libs/Requester.js';
+import { RequestContract } from './Request.js';
 
 export {
     Action as ResponseAction,
+    ComputeResponseOutput,
+    ComputeResponse,
+    ComputeResponseProof,
     FinalizeResponseInput,
     FinalizeResponse,
     FinalizeResponseProof,
@@ -70,7 +75,9 @@ class Action
         keyId: Field,
         memberId: Field,
         requestId: Field,
-        contribution: ResponseContribution,
+        dimension: UInt8,
+        accumulationRootR: Field,
+        responseRootD: Field,
     })
     implements ZkAppAction
 {
@@ -80,7 +87,9 @@ class Action
             keyId: Field(0),
             memberId: Field(0),
             requestId: Field(0),
-            contribution: ResponseContribution.empty(),
+            dimension: UInt8.from(0),
+            accumulationRootR: Field(0),
+            responseRootD: Field(0),
         });
     }
     static fromFields(fields: Field[]): Action {
@@ -91,6 +100,115 @@ class Action
     }
 }
 
+class FinalizeEvent extends Struct({
+    actions: ProcessedContributions,
+    D: DArray,
+}) {}
+
+class ComputeResponseOutput extends Struct({
+    accumulationRootR: Field,
+    responseRootD: Field,
+    skiCommitment: Group,
+    dimension: UInt8,
+}) {}
+
+const ComputeResponse = ZkProgram({
+    name: ZkProgramEnum.ComputeResponse,
+    publicOutput: ComputeResponseOutput,
+    methods: {
+        init: {
+            privateInputs: [CustomScalar],
+            method(ski: CustomScalar) {
+                return new ComputeResponseOutput({
+                    accumulationRootR: EMPTY_LEVEL_2_TREE().getRoot(),
+                    responseRootD: EMPTY_LEVEL_2_TREE().getRoot(),
+                    skiCommitment: Group.generator.scale(ski.toScalar()),
+                    dimension: UInt8.from(0),
+                });
+            },
+        },
+        compute: {
+            privateInputs: [
+                SelfProof<Void, ComputeResponseOutput>,
+                CustomScalar,
+                Group,
+                Level2Witness,
+                Level2Witness,
+            ],
+            method(
+                earlierProof: SelfProof<Void, ComputeResponseOutput>,
+                ski: CustomScalar,
+                R: Group,
+                accumulationWitness: Level2Witness,
+                responseWitness: Level2Witness
+            ) {
+                // Verify earlier proof
+                earlierProof.verify();
+
+                // Verify empty R and D values
+                earlierProof.publicOutput.accumulationRootR.assertEquals(
+                    accumulationWitness.calculateRoot(Field(0)),
+                    Utils.buildAssertMessage(
+                        ComputeResponse.name,
+                        ComputeResponse.compute.name,
+                        ErrorEnum.ACCUMULATION_ROOT
+                    )
+                );
+                earlierProof.publicOutput.dimension.value.assertEquals(
+                    accumulationWitness.calculateIndex(),
+                    Utils.buildAssertMessage(
+                        ComputeResponse.name,
+                        ComputeResponse.compute.name,
+                        ErrorEnum.ACCUMULATION_INDEX_L2
+                    )
+                );
+                earlierProof.publicOutput.responseRootD.assertEquals(
+                    responseWitness.calculateRoot(Field(0)),
+                    Utils.buildAssertMessage(
+                        ComputeResponse.name,
+                        ComputeResponse.compute.name,
+                        ErrorEnum.RES_D_ROOT
+                    )
+                );
+                earlierProof.publicOutput.dimension.value.assertEquals(
+                    responseWitness.calculateIndex(),
+                    Utils.buildAssertMessage(
+                        ComputeResponse.name,
+                        ComputeResponse.compute.name,
+                        ErrorEnum.RES_D_INDEX_L2
+                    )
+                );
+
+                // Calculate contribution D value
+                let skiCommitment = Group.generator.scale(ski.toScalar());
+                skiCommitment.assertEquals(
+                    earlierProof.publicOutput.skiCommitment
+                );
+                let D = R.add(Group.generator)
+                    .scale(ski.toScalar())
+                    .sub(skiCommitment);
+
+                // Update R and result root
+                let accumulationRootR = accumulationWitness.calculateRoot(
+                    Poseidon.hash(R.toFields())
+                );
+                let responseRootD = responseWitness.calculateRoot(
+                    Poseidon.hash(D.toFields())
+                );
+
+                return new ComputeResponseOutput({
+                    accumulationRootR,
+                    responseRootD,
+                    skiCommitment,
+                    dimension: earlierProof.publicOutput.dimension.add(1),
+                });
+            },
+        },
+    },
+});
+
+class ComputeResponseProof extends ZkProgram.Proof(ComputeResponse) {}
+
 class FinalizeResponseInput extends Struct({
     previousActionState: Field,
     action: Action,
@@ -98,17 +216,22 @@ class FinalizeResponseInput extends Struct({
 }) {}
 
 class FinalizeResponseOutput extends Struct({
-    rollupRoot: Field,
     T: Field,
     N: Field,
+    memberCounter: UInt8,
+    dimension: UInt8,
+    dimensionCounter: UInt8,
+    requestId: Field,
+    indexList: Field,
     initialContributionRoot: Field,
     initialProcessRoot: Field,
     nextContributionRoot: Field,
     nextProcessRoot: Field,
-    requestId: Field,
-    D: RequestVector,
-    indexList: Field,
+    responseRootD: Field,
+    Di: Group,
+    rollupRoot: Field,
     processedActions: ProcessedContributions,
+    responseVector: DArray,
 }) {}
 
 class LagrangeCoefficientMul extends Struct({
@@ -125,25 +248,27 @@ const FinalizeResponse = ZkProgram({
             privateInputs: [
                 Field,
                 Field,
-                Field,
+                UInt8,
                 Field,
                 Field,
                 Field,
                 Field,
                 Field,
                 RequestLevel1Witness,
+                RequestLevel1Witness,
             ],
             method(
                 input: FinalizeResponseInput,
-                rollupRoot: Field,
                 T: Field,
                 N: Field,
+                dimension: UInt8,
+                requestId: Field,
+                indexList: Field,
                 initialContributionRoot: Field,
                 initialProcessRoot: Field,
-                requestId: Field,
-                requestDim: Field,
-                indexList: Field,
-                contributionWitness: RequestLevel1Witness
+                rollupRoot: Field,
+                contributionWitness: RequestLevel1Witness,
+                responseWitness: RequestLevel1Witness
             ) {
                 // Verify there is no recorded contribution for the request
                 initialContributionRoot.assertEquals(
@@ -163,44 +288,47 @@ const FinalizeResponse = ZkProgram({
                     )
                 );
 
+                // Verify there is no recorded response for the request
+                initialContributionRoot.assertEquals(
+                    responseWitness.calculateRoot(Field(0)),
+                    Utils.buildAssertMessage(
+                        FinalizeResponse.name,
+                        FinalizeResponse.init.name,
+                        ErrorEnum.RES_D_ROOT
+                    )
+                );
+                requestId.assertEquals(
+                    responseWitness.calculateIndex(),
+                    Utils.buildAssertMessage(
+                        FinalizeResponse.name,
+                        FinalizeResponse.init.name,
+                        ErrorEnum.RES_D_INDEX_L1
+                    )
+                );
+
                 // Record an empty level 2 tree
                 let nextContributionRoot = contributionWitness.calculateRoot(
                     EMPTY_LEVEL_2_TREE().getRoot()
                 );
-
-                // Initialize dynamic vector D
-                let D = Provable.witness(
-                    RequestVector,
-                    () =>
-                        new RequestVector(
-                            [...Array(Number(requestDim)).keys()].map(
-                                () => Group.zero
-                            )
-                        )
-                );
-                D.length.assertEquals(
-                    requestDim,
-                    Utils.buildAssertMessage(
-                        FinalizeResponse.name,
-                        FinalizeResponse.init.name,
-                        ErrorEnum.RES_CONTRIBUTION_DIMENSION
-                    )
-                );
-                for (let i = 0; i < INSTANCE_LIMITS.DIMENSION; i++)
-                    D.set(Field(i), Group.zero);
+                let responseRootD = EMPTY_LEVEL_2_TREE().getRoot();
 
                 return new FinalizeResponseOutput({
-                    rollupRoot,
                     T,
                     N,
+                    memberCounter: UInt8.from(0),
+                    dimension,
+                    dimensionCounter: UInt8.from(0),
+                    requestId,
+                    indexList,
                     initialContributionRoot,
                     initialProcessRoot,
                     nextContributionRoot,
                     nextProcessRoot: initialProcessRoot,
-                    requestId,
-                    D,
-                    indexList,
+                    responseRootD,
+                    Di: Group.zero,
+                    rollupRoot,
                     processedActions: new ProcessedContributions(),
+                    responseVector: new DArray(),
                 });
             },
         },
@@ -224,13 +352,23 @@ const FinalizeResponse = ZkProgram({
                 // Verify earlier proof
                 earlierProof.verify();
 
-                // Verify contributionRoot using the same requestId
+                // Verify requestId
                 input.action.requestId.assertEquals(
                     earlierProof.publicOutput.requestId,
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
                         FinalizeResponse.contribute.name,
                         ErrorEnum.REQUEST_ID
+                    )
+                );
+
+                // Verify dimension
+                input.action.dimension.assertEquals(
+                    earlierProof.publicOutput.dimension,
+                    Utils.buildAssertMessage(
+                        FinalizeResponse.name,
+                        FinalizeResponse.contribute.name,
+                        ErrorEnum.REQUEST_VECTOR_DIM
                     )
                 );
 
@@ -266,9 +404,71 @@ const FinalizeResponse = ZkProgram({
                 let nextContributionRoot =
                     contributionWitness.level1.calculateRoot(
                         contributionWitness.level2.calculateRoot(
-                            input.action.contribution.hash()
+                            input.action.responseRootD
                         )
                     );
+
+                // Verify action is rolluped
+                let actionIndex = calculateActionIndex(
+                    Field(ZkAppEnum.RESPONSE),
+                    input.actionId
+                );
+                verifyRollup(
+                    FinalizeResponse.name,
+                    actionIndex,
+                    input.action.hash(),
+                    earlierProof.publicOutput.rollupRoot,
+                    rollupWitness
+                );
+
+                // Calculate corresponding action state
+                let actionState = Utils.updateActionState(
+                    input.previousActionState,
+                    [Action.toFields(input.action)]
+                );
+                let processedActions =
+                    earlierProof.publicOutput.processedActions;
+                processedActions.push(actionState);
+
+                // Verify the action isn't already processed
+                let nextProcessRoot = processAction(
+                    FinalizeResponse.name,
+                    input.actionId,
+                    UInt8.from(0),
+                    actionState,
+                    earlierProof.publicOutput.nextProcessRoot,
+                    processWitness
+                );
+
+                return new FinalizeResponseOutput({
+                    ...earlierProof.publicOutput,
+                    ...{
+                        nextContributionRoot: nextContributionRoot,
+                        nextProcessRoot: nextProcessRoot,
+                        processedActions: processedActions,
+                    },
+                });
+            },
+        },
+        compute: {
+            privateInputs: [
+                SelfProof<FinalizeResponseInput, FinalizeResponseOutput>,
+                Group,
+                Level2Witness,
+                ActionWitness,
+            ],
+            method(
+                input: FinalizeResponseInput,
+                earlierProof: SelfProof<
+                    FinalizeResponseInput,
+                    FinalizeResponseOutput
+                >,
+                di: Group,
+                responseWitness: Level2Witness,
+                processWitness: ActionWitness
+            ) {
+                // Verify proof
+                earlierProof.verify();
 
                 // Compute Lagrange coefficient
                 let lagrangeCoefficientMul = Provable.witness(
@@ -298,82 +498,137 @@ const FinalizeResponse = ZkProgram({
                 );
 
                 // Compute D values
-                let D = earlierProof.publicOutput.D;
-                for (let i = 0; i < INSTANCE_LIMITS.DIMENSION; i++) {
-                    let Di = D.get(Field(i));
-                    let di = input.action.contribution.D.get(Field(i));
-                    di = Provable.if(
-                        di
-                            .equals(Group.zero)
-                            .or(Field(i).greaterThanOrEqual(D.length)),
-                        di,
-                        di
-                            .add(Group.generator)
-                            .scale(lagrangeCoefficientMul.mul3)
-                            .sub(
-                                Group.generator.scale(
-                                    lagrangeCoefficientMul.mul3
-                                )
-                            )
-                            .sub(
-                                di
-                                    .add(Group.generator)
-                                    .scale(lagrangeCoefficientMul.mul2)
-                                    .sub(
-                                        Group.generator.scale(
-                                            lagrangeCoefficientMul.mul2
-                                        )
+                let Di = earlierProof.publicOutput.Di.add(
+                    di
+                        .add(Group.generator)
+                        .scale(lagrangeCoefficientMul.mul3)
+                        .sub(Group.generator.scale(lagrangeCoefficientMul.mul3))
+                        .sub(
+                            di
+                                .add(Group.generator)
+                                .scale(lagrangeCoefficientMul.mul2)
+                                .sub(
+                                    Group.generator.scale(
+                                        lagrangeCoefficientMul.mul2
                                     )
-                            )
-                    );
-                    D.set(Field(i), Di.add(di));
-                }
-
-                // Verify action is rolluped
-                let actionIndex = calculateActionIndex(
-                    Field(ZkAppEnum.RESPONSE),
-                    input.actionId
-                );
-                verifyRollup(
-                    FinalizeResponse.name,
-                    actionIndex,
-                    input.action.hash(),
-                    earlierProof.publicOutput.rollupRoot,
-                    rollupWitness
+                                )
+                        )
                 );
 
-                // Calculate corresponding action state
+                // Verify action
                 let actionState = Utils.updateActionState(
                     input.previousActionState,
                     [Action.toFields(input.action)]
                 );
-                let processedActions =
-                    earlierProof.publicOutput.processedActions;
-                processedActions.push(actionState);
-
-                // Verify the action isn't already processed
+                earlierProof.publicOutput.processedActions
+                    .get(Field(earlierProof.publicOutput.memberCounter.value))
+                    .assertEquals(
+                        actionState,
+                        Utils.buildAssertMessage(
+                            FinalizeResponse.name,
+                            FinalizeResponse.compute.name,
+                            ErrorEnum.ACTION_STATE
+                        )
+                    );
                 let nextProcessRoot = processAction(
                     FinalizeResponse.name,
                     input.actionId,
+                    earlierProof.publicOutput.dimensionCounter.add(1),
                     actionState,
                     earlierProof.publicOutput.nextProcessRoot,
                     processWitness
                 );
 
+                // Verify response D
+                input.action.responseRootD.assertEquals(
+                    responseWitness.calculateRoot(Poseidon.hash(di.toFields())),
+                    Utils.buildAssertMessage(
+                        FinalizeResponse.name,
+                        FinalizeResponse.compute.name,
+                        ErrorEnum.RES_D_ROOT
+                    )
+                );
+                earlierProof.publicOutput.dimensionCounter.value.assertEquals(
+                    responseWitness.calculateIndex(),
+                    Utils.buildAssertMessage(
+                        FinalizeResponse.name,
+                        FinalizeResponse.compute.name,
+                        ErrorEnum.RES_D_INDEX_L2
+                    )
+                );
+
                 return new FinalizeResponseOutput({
-                    rollupRoot: earlierProof.publicOutput.rollupRoot,
-                    T: earlierProof.publicOutput.T,
-                    N: earlierProof.publicOutput.N,
-                    initialContributionRoot:
-                        earlierProof.publicOutput.initialContributionRoot,
-                    initialProcessRoot:
-                        earlierProof.publicOutput.initialProcessRoot,
-                    nextContributionRoot: nextContributionRoot,
-                    nextProcessRoot: nextProcessRoot,
-                    requestId: input.action.requestId,
-                    D: D,
-                    indexList: earlierProof.publicOutput.indexList,
-                    processedActions: processedActions,
+                    ...earlierProof.publicOutput,
+                    ...{
+                        memberCounter:
+                            earlierProof.publicOutput.memberCounter.add(1),
+                        Di,
+                        nextProcessRoot,
+                    },
+                });
+            },
+        },
+        finalize: {
+            privateInputs: [
+                SelfProof<FinalizeResponseInput, FinalizeResponseOutput>,
+                RequestLevel1Witness,
+            ],
+            method(
+                input: FinalizeResponseInput,
+                earlierProof: SelfProof<
+                    FinalizeResponseInput,
+                    FinalizeResponseOutput
+                >,
+                responseWitness: RequestLevel1Witness
+            ) {
+                // Verify earlier proof
+                earlierProof.verify();
+
+                // Verify committee threshold
+                earlierProof.publicOutput.memberCounter.value.assertEquals(
+                    earlierProof.publicOutput.T,
+                    Utils.buildAssertMessage(
+                        FinalizeResponse.name,
+                        FinalizeResponse.compute.name,
+                        ErrorEnum.RES_CONTRIBUTION_THRESHOLD
+                    )
+                );
+
+                // Verify empty D value
+                earlierProof.publicOutput.responseRootD.assertEquals(
+                    responseWitness.calculateRoot(Field(0)),
+                    Utils.buildAssertMessage(
+                        FinalizeResponse.name,
+                        FinalizeResponse.compute.name,
+                        ErrorEnum.RES_D_ROOT
+                    )
+                );
+                earlierProof.publicOutput.dimensionCounter.value.assertEquals(
+                    responseWitness.calculateIndex(),
+                    Utils.buildAssertMessage(
+                        FinalizeResponse.name,
+                        FinalizeResponse.compute.name,
+                        ErrorEnum.RES_D_INDEX_L2
+                    )
+                );
+
+                // Calculate new response root D value
+                let responseRootD = responseWitness.calculateRoot(
+                    Poseidon.hash(earlierProof.publicOutput.Di.toFields())
+                );
+                let responseVector = earlierProof.publicOutput.responseVector;
+                responseVector.push(earlierProof.publicOutput.Di);
+
+                return new FinalizeResponseOutput({
+                    ...earlierProof.publicOutput,
+                    ...{
+                        memberCounter: UInt8.from(0),
+                        dimensionCounter:
+                            earlierProof.publicOutput.dimensionCounter.add(1),
+                        Di: Group.zero,
+                        responseRootD,
+                        responseVector,
+                    },
                 });
             },
         },
@@ -396,7 +651,7 @@ class ResponseContract extends SmartContract {
     /**
      * @description MT storing members' contributions
      */
-    @state(Field) finalizedDRoot = State<Field>();
+    @state(Field) responseRoot = State<Field>();
 
     /**
      * @description MT storing actions' process state
@@ -406,47 +661,44 @@ class ResponseContract extends SmartContract {
     reducer = Reducer({ actionType: Action });
 
     events = {
-        [EventEnum.ROLLUPED]: Field,
-        [EventEnum.PROCESSED]: ProcessedContributions,
+        [EventEnum.PROCESSED]: FinalizeEvent,
     };
 
     init() {
         super.init();
         this.zkAppRoot.set(EMPTY_ADDRESS_MT().getRoot());
         this.contributionRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
-        this.finalizedDRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
+        this.responseRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
         this.processRoot.set(EMPTY_ACTION_MT().getRoot());
     }
 
     /**
      * Submit response contribution for key usage request
+     * @param decryptionProof Decryption verification proof
+     * @param responseProof Response verification proof
      * @param keyId Committee's key Id
      * @param requestId Request Id
-     * @param proof Decryption proof
-     * @param R Commitment of random inputs
-     * @param ski Partial secret for decryption
-     * @param committee Reference to Committee Contract
-     * @param round1 Reference to Round 1 Contract
-     * @param round2 Reference to Round 2 Contract
      * @param memberWitness Witness for proof of committee membership
      * @param publicKeyWitness Witness for proof of encryption public key
      * @param encryptionWitness Witness for encryption hashes
+     * @param committee Reference to Committee Contract
+     * @param round1 Reference to Round 1 Contract
+     * @param round2 Reference to Round 2 Contract
+     * @param rollup Reference to Rollup Contract
+     * @param selfRef Reference to this Contract
      */
     @method
     contribute(
+        decryptionProof: BatchDecryptionProof,
+        responseProof: ComputeResponseProof,
         keyId: Field,
         requestId: Field,
-        proof: BatchDecryptionProof,
-        R: RArray,
-        ski: Scalar,
         memberWitness: CommitteeFullWitness,
         publicKeyWitness: DKGWitness,
         encryptionWitness: DKGWitness,
-        keyIndexWitness: RequestLevel1Witness,
         committee: ZkAppRef,
         round1: ZkAppRef,
         round2: ZkAppRef,
-        request: ZkAppRef,
         rollup: ZkAppRef,
         selfRef: ZkAppRef
     ) {
@@ -483,14 +735,6 @@ class ResponseContract extends SmartContract {
         // Verify Rollup Contract address
         verifyZkApp(
             ResponseContract.name,
-            request,
-            zkAppRoot,
-            Field(ZkAppEnum.REQUEST)
-        );
-
-        // Verify Rollup Contract address
-        verifyZkApp(
-            ResponseContract.name,
             rollup,
             zkAppRoot,
             Field(ZkAppEnum.ROLLUP)
@@ -499,11 +743,10 @@ class ResponseContract extends SmartContract {
         const committeeContract = new CommitteeContract(committee.address);
         const round1Contract = new Round1Contract(round1.address);
         const round2Contract = new Round2Contract(round2.address);
-        const requestContract = new RequestContract(round2.address);
         const rollupContract = new RollupContract(rollup.address);
 
         // Verify decryption proof
-        proof.verify();
+        decryptionProof.verify();
 
         // Verify keyId
         keyId.assertLessThanOrEqual(
@@ -531,7 +774,7 @@ class ResponseContract extends SmartContract {
             committeeId,
             keyId,
             memberId,
-            proof.publicInput.publicKey,
+            decryptionProof.publicInput.publicKey,
             publicKeyWitness
         );
 
@@ -539,13 +782,15 @@ class ResponseContract extends SmartContract {
         let encryptionHashChain = Field(0);
         for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
             encryptionHashChain = Provable.if(
-                Field(i).greaterThanOrEqual(proof.publicInput.c.length),
+                Field(i).greaterThanOrEqual(
+                    decryptionProof.publicInput.c.length
+                ),
                 encryptionHashChain,
                 Poseidon.hash(
                     [
                         encryptionHashChain,
-                        proof.publicInput.c.get(Field(i)).toFields(),
-                        proof.publicInput.U.get(Field(i)).toFields(),
+                        decryptionProof.publicInput.c.get(Field(i)).toFields(),
+                        decryptionProof.publicInput.U.get(Field(i)).toFields(),
                     ].flat()
                 )
             );
@@ -558,39 +803,16 @@ class ResponseContract extends SmartContract {
             encryptionWitness
         );
 
-        // Verify request Id
-        requestContract.verifyKeyIndex(
-            requestId,
-            calculateKeyIndex(committeeId, keyId),
-            keyIndexWitness
-        );
-
-        // Compute response
-        let D = Provable.witness(DArray, () => {
-            return new DArray(R.values.slice(0, Number(R.length)));
-        });
-        D.length.assertEquals(
-            R.length,
+        // Verify response proof
+        responseProof.verify();
+        responseProof.publicOutput.skiCommitment.assertEquals(
+            decryptionProof.publicOutput,
             Utils.buildAssertMessage(
                 ResponseContract.name,
                 ResponseContract.prototype.contribute.name,
-                ErrorEnum.RES_CONTRIBUTION_DIMENSION
+                ErrorEnum.SECRET_SHARE
             )
         );
-        for (let i = 0; i < INSTANCE_LIMITS.DIMENSION; i++) {
-            let Ri = R.get(Field(i));
-            Group.generator.scale(ski).equals(proof.publicOutput);
-            D.set(
-                Field(i),
-                Provable.if(
-                    Field(i).greaterThanOrEqual(R.length),
-                    Ri,
-                    Ri.add(Group.generator)
-                        .scale(ski)
-                        .sub(Group.generator.scale(ski))
-                )
-            );
-        }
 
         // Create & dispatch action to DkgContract
         let action = new Action({
@@ -598,9 +820,9 @@ class ResponseContract extends SmartContract {
             keyId,
             memberId,
             requestId,
-            contribution: new ResponseContribution({
-                D: D,
-            }),
+            dimension: responseProof.publicOutput.dimension,
+            accumulationRootR: responseProof.publicOutput.accumulationRootR,
+            responseRootD: responseProof.publicOutput.responseRootD,
         });
         this.reducer.dispatch(action);
 
@@ -620,16 +842,20 @@ class ResponseContract extends SmartContract {
     @method
     finalize(
         proof: FinalizeResponseProof,
-        finalizedDWitness: Level1Witness,
+        accumulationRootM: Field,
         settingWitness: CommitteeLevel1Witness,
+        keyIndexWitness: RequestLevel1Witness,
+        accumulationWitness: RequestLevel1Witness,
+        responseWitness: RequestLevel1Witness,
         committee: ZkAppRef,
+        request: ZkAppRef,
         rollup: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
         let contributionRoot = this.contributionRoot.getAndRequireEquals();
         let processRoot = this.processRoot.getAndRequireEquals();
-        let finalizedDRoot = this.finalizedDRoot.getAndRequireEquals();
+        let responseRoot = this.responseRoot.getAndRequireEquals();
 
         // Verify CommitteeContract address
         verifyZkApp(
@@ -637,6 +863,14 @@ class ResponseContract extends SmartContract {
             committee,
             zkAppRoot,
             Field(ZkAppEnum.COMMITTEE)
+        );
+
+        // Verify RequestContract address
+        verifyZkApp(
+            ResponseContract.name,
+            request,
+            zkAppRoot,
+            Field(ZkAppEnum.REQUEST)
         );
 
         // Verify Rollup Contract address
@@ -648,6 +882,7 @@ class ResponseContract extends SmartContract {
         );
 
         const committeeContract = new CommitteeContract(committee.address);
+        const requestContract = new RequestContract(request.address);
         const rollupContract = new RollupContract(rollup.address);
 
         // Verify response proof
@@ -685,9 +920,9 @@ class ResponseContract extends SmartContract {
             )
         );
 
-        // Verify empty finalized D value
-        finalizedDRoot.assertEquals(
-            finalizedDWitness.calculateRoot(Field(0)),
+        // Verify empty response value
+        responseRoot.assertEquals(
+            responseWitness.calculateRoot(Field(0)),
             Utils.buildAssertMessage(
                 ResponseContract.name,
                 ResponseContract.prototype.finalize.name,
@@ -695,15 +930,15 @@ class ResponseContract extends SmartContract {
             )
         );
         proof.publicOutput.requestId.assertEquals(
-            finalizedDWitness.calculateIndex(),
+            responseWitness.calculateIndex(),
             Utils.buildAssertMessage(
                 ResponseContract.name,
                 ResponseContract.prototype.finalize.name,
-                ErrorEnum.RES_D_INDEX
+                ErrorEnum.RES_D_INDEX_L1
             )
         );
-        let nextFinalizedDRoot = finalizedDWitness.calculateRoot(
-            proof.publicOutput.D.hash()
+        let nextResponseRoot = responseWitness.calculateRoot(
+            proof.publicOutput.responseRootD
         );
 
         // Verify committee config
@@ -716,30 +951,50 @@ class ResponseContract extends SmartContract {
             })
         );
 
+        // Verify key index and accumulation data
+        requestContract.verifyKeyIndex(
+            proof.publicOutput.requestId,
+            calculateKeyIndex(
+                proof.publicInput.action.committeeId,
+                proof.publicInput.action.keyId
+            ),
+            keyIndexWitness
+        );
+        requestContract.verifyAccumulationData(
+            proof.publicOutput.requestId,
+            proof.publicInput.action.accumulationRootR,
+            accumulationRootM,
+            proof.publicOutput.dimension,
+            accumulationWitness
+        );
+
         // Set new states
         this.contributionRoot.set(proof.publicOutput.nextContributionRoot);
-        this.finalizedDRoot.set(nextFinalizedDRoot);
+        this.responseRoot.set(nextResponseRoot);
         this.processRoot.set(proof.publicOutput.nextProcessRoot);
 
         // Emit events
         this.emitEvent(
             EventEnum.PROCESSED,
-            proof.publicOutput.processedActions
+            new FinalizeEvent({
+                actions: proof.publicOutput.processedActions,
+                D: proof.publicOutput.responseVector,
+            })
         );
     }
 
-    verifyFinalizedD(
+    verifyResponseD(
         requestId: Field,
-        D: RequestVector,
+        responseRootD: Field,
         witness: Level1Witness
     ) {
-        this.finalizedDRoot
+        this.responseRoot
             .getAndRequireEquals()
             .assertEquals(
-                witness.calculateRoot(D.hash()),
+                witness.calculateRoot(responseRootD),
                 Utils.buildAssertMessage(
                     ResponseContract.name,
-                    ResponseContract.prototype.verifyFinalizedD.name,
+                    ResponseContract.prototype.verifyResponseD.name,
                     ErrorEnum.RES_D_ROOT
                 )
             );
@@ -747,8 +1002,8 @@ class ResponseContract extends SmartContract {
             witness.calculateIndex(),
             Utils.buildAssertMessage(
                 ResponseContract.name,
-                ResponseContract.prototype.verifyFinalizedD.name,
-                ErrorEnum.RES_D_INDEX
+                ResponseContract.prototype.verifyResponseD.name,
+                ErrorEnum.RES_D_INDEX_L1
             )
         );
     }
