@@ -3,31 +3,40 @@ import {
     CustomScalar,
     FieldDynamicArray,
     GroupDynamicArray,
-    ScalarDynamicArray,
+    StaticArray,
 } from '@auxo-dev/auxo-libs';
-import { INSTANCE_LIMITS, SECRET_MAX, SECRET_UNIT } from '../constants.js';
+import { ENCRYPTION_LIMITS, SECRET_MAX, SECRET_UNIT } from '../constants.js';
 
-export class MArray extends GroupDynamicArray(INSTANCE_LIMITS.DIMENSION) {}
-export class RArray extends GroupDynamicArray(INSTANCE_LIMITS.DIMENSION) {}
-export class DArray extends GroupDynamicArray(INSTANCE_LIMITS.DIMENSION) {}
-export class skArray extends ScalarDynamicArray(INSTANCE_LIMITS.DIMENSION) {}
-export class SecretVector extends ScalarDynamicArray(
-    INSTANCE_LIMITS.DIMENSION
+export class MArray extends GroupDynamicArray(
+    ENCRYPTION_LIMITS.FULL_DIMENSION
 ) {}
-export class RandomVector extends ScalarDynamicArray(
-    INSTANCE_LIMITS.DIMENSION
+export class RArray extends GroupDynamicArray(
+    ENCRYPTION_LIMITS.FULL_DIMENSION
 ) {}
-export class RequestVector extends GroupDynamicArray(
-    INSTANCE_LIMITS.DIMENSION
+export class DArray extends GroupDynamicArray(
+    ENCRYPTION_LIMITS.FULL_DIMENSION
 ) {}
-export class ResultVector extends ScalarDynamicArray(
-    INSTANCE_LIMITS.DIMENSION
+export class SecretVector extends StaticArray(
+    CustomScalar,
+    ENCRYPTION_LIMITS.DIMENSION
+) {}
+export class RandomVector extends StaticArray(
+    CustomScalar,
+    ENCRYPTION_LIMITS.DIMENSION
+) {}
+export class RequestVector extends StaticArray(
+    Group,
+    ENCRYPTION_LIMITS.DIMENSION
+) {}
+export class ResultVector extends StaticArray(
+    CustomScalar,
+    ENCRYPTION_LIMITS.DIMENSION
 ) {}
 export class NullifierArray extends FieldDynamicArray(
-    INSTANCE_LIMITS.DIMENSION
+    ENCRYPTION_LIMITS.DIMENSION
 ) {}
 export class CommitmentArray extends FieldDynamicArray(
-    INSTANCE_LIMITS.DIMENSION
+    ENCRYPTION_LIMITS.DIMENSION
 ) {}
 
 export function calculatePublicKey(contributedPublicKeys: Group[]): Group {

@@ -1,4 +1,4 @@
-import { Field, Group, Poseidon, Scalar, Struct } from 'o1js';
+import { Field, Group, MerkleTree, Poseidon, Scalar, Struct } from 'o1js';
 import {
     Bit255,
     Bit255DynamicArray,
@@ -6,9 +6,8 @@ import {
     GroupDynamicArray,
     PublicKeyDynamicArray,
 } from '@auxo-dev/auxo-libs';
-import { DArray } from './Requester.js';
 import * as ElgamalECC from './Elgamal.js';
-import { INSTANCE_LIMITS } from '../constants.js';
+import { ENCRYPTION_LIMITS, INSTANCE_LIMITS } from '../constants.js';
 
 /* ========== CONSTANTS, TYPES, & STRUCTS ========== */
 
@@ -73,16 +72,16 @@ export class Round2Contribution extends Struct({
 }
 
 export class ResponseContribution extends Struct({
-    D: DArray,
+    responseRootD: Field,
 }) {
     static empty(): ResponseContribution {
         return new ResponseContribution({
-            D: new DArray(),
+            responseRootD: Field(0),
         });
     }
 
     toFields(): Field[] {
-        return this.D.toFields();
+        return [this.responseRootD];
     }
 
     hash(): Field {
@@ -127,7 +126,7 @@ export function generateRandomPolynomial(
     return { a, C, f };
 }
 
-export function generateRandomPolynomialWithInputRandom(
+export function getSecretPolynomial(
     a: Scalar[],
     T: number,
     N: number
@@ -194,11 +193,17 @@ export function getResponseContribution(
         Scalar.from(0n)
     );
 
+    let merkleTree = new MerkleTree(ENCRYPTION_LIMITS.FULL_DIMENSION);
     let D = new Array<Group>(R.length);
     for (let i = 0; i < R.length; i++) {
         D[i] = R[i].scale(ski);
+        merkleTree.setLeaf(BigInt(i), Poseidon.hash(D[i].toFields()));
     }
-    return [new ResponseContribution({ D: DArray.from(D) }), ski];
+
+    return [
+        new ResponseContribution({ responseRootD: merkleTree.getRoot() }),
+        ski,
+    ];
 }
 
 export function getLagrangeCoefficient(memberIds: number[]): Scalar[] {
