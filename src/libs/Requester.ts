@@ -1,4 +1,4 @@
-import { Field, Group, Poseidon, Scalar } from 'o1js';
+import { Field, Group, Poseidon, Scalar, UInt8 } from 'o1js';
 import {
     CustomScalar,
     FieldDynamicArray,
@@ -32,10 +32,16 @@ export class ResultVector extends StaticArray(
     CustomScalar,
     ENCRYPTION_LIMITS.DIMENSION
 ) {}
-export class NullifierArray extends FieldDynamicArray(
+export class NullifierArray extends StaticArray(
+    Field,
     ENCRYPTION_LIMITS.DIMENSION
 ) {}
-export class CommitmentArray extends FieldDynamicArray(
+export class CommitmentArray extends StaticArray(
+    Field,
+    ENCRYPTION_LIMITS.DIMENSION
+) {}
+export class IndexArray extends StaticArray(
+    UInt8,
     ENCRYPTION_LIMITS.DIMENSION
 ) {}
 

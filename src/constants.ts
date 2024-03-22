@@ -2,6 +2,7 @@ export {
     ACTION_PROCESS_LIMITS,
     INDEX_SIZE,
     INSTANCE_LIMITS,
+    ENCRYPTION_LIMITS,
     REQUEST_FEE,
     REQUEST_MIN_PERIOD,
     REQUEST_EXPIRATION,
@@ -17,14 +18,13 @@ export {
  * Indexes of zkApps in the address storage
  */
 enum ZkAppEnum {
+    ROLLUP,
     COMMITTEE,
     DKG,
     ROUND1,
     ROUND2,
-    REQUEST,
     RESPONSE,
-    ROLLUP,
-    REQUESTER_0,
+    REQUEST,
     __LENGTH,
 }
 
@@ -39,10 +39,11 @@ enum ZkProgramEnum {
     UpdateKey = 'UpdateKey',
     FinalizeRound1 = 'FinalizeRound1',
     FinalizeRound2 = 'FinalizeRound2',
+    ComputeResponse = 'ComputeResponse',
     FinalizeResponse = 'FinalizeResponse',
-    AttachRequest = 'AttachRequest',
+    ComputeResult = 'ComputeResult',
     UpdateRequest = 'UpdateRequest',
-    AccumulateEncryption = 'AccumulateEncryption',
+    UpdateTask = 'UpdateTask',
 }
 
 /**
@@ -74,11 +75,15 @@ const INDEX_SIZE = 6;
 const INSTANCE_LIMITS = {
     ACTION: 2 ** 10,
     ADDRESS: ZkAppEnum.__LENGTH,
-    COMMITTEE: 2 ** 6,
     MEMBER: 3,
+    COMMITTEE: 2 ** 6,
     KEY: 2 ** 6,
     REQUEST: 2 ** 8,
+};
+
+const ENCRYPTION_LIMITS = {
     DIMENSION: 3,
+    FULL_DIMENSION: 2 ** 6,
 };
 
 /**

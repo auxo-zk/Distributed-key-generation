@@ -983,7 +983,7 @@ class ResponseContract extends SmartContract {
         );
     }
 
-    verifyResponseD(
+    verifyResponse(
         requestId: Field,
         responseRootD: Field,
         witness: Level1Witness
@@ -994,7 +994,7 @@ class ResponseContract extends SmartContract {
                 witness.calculateRoot(responseRootD),
                 Utils.buildAssertMessage(
                     ResponseContract.name,
-                    ResponseContract.prototype.verifyResponseD.name,
+                    ResponseContract.prototype.verifyResponse.name,
                     ErrorEnum.RES_D_ROOT
                 )
             );
@@ -1002,7 +1002,7 @@ class ResponseContract extends SmartContract {
             witness.calculateIndex(),
             Utils.buildAssertMessage(
                 ResponseContract.name,
-                ResponseContract.prototype.verifyResponseD.name,
+                ResponseContract.prototype.verifyResponse.name,
                 ErrorEnum.RES_D_INDEX_L1
             )
         );

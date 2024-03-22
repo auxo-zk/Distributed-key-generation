@@ -3,7 +3,8 @@ import { compile, fetchZkAppState, proveAndSend } from '../../helper/deploy.js';
 import { prepare } from '../prepare.js';
 import { KeyStatusStorage } from '../../../storages/DKGStorage.js';
 import { KeyCounterStorage } from '../../../storages/CommitteeStorage.js';
-import { RequestContract, UpdateRequest } from '../../../contracts/Request.js';
+import { UpdateRequest } from '../../../contracts/Request.js';
+import { RequestContract } from '../../../contracts/Request.js';
 import {
     generateEncryptionWithRandomInput,
     accumulateEncryption,

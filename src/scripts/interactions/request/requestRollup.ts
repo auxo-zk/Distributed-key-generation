@@ -7,11 +7,11 @@ import {
     Level1Witness,
 } from '../../../storages/RequestStorage.js';
 import {
-    RequestContract,
     RequestAction,
     UpdateRequest,
     RequestStatus,
 } from '../../../contracts/Request.js';
+import { RequestContract } from '../../../contracts/Request.js';
 import axios from 'axios';
 import { prepare } from '../prepare.js';
 

@@ -14,12 +14,11 @@ import {
 } from '../../contracts/Encryption.js';
 import { FinalizeRound1, Round1Contract } from '../../contracts/Round1.js';
 import { FinalizeRound2, Round2Contract } from '../../contracts/Round2.js';
-import { RequestContract, UpdateRequest } from '../../contracts/Request.js';
+import { ComputeResult, UpdateRequest } from '../../contracts/Request.js';
+import { RequestContract } from '../../contracts/Request.js';
+import { UpdateTask, RequesterContract } from '../../contracts/Requester.js';
 import {
-    AccumulateEncryption,
-    RequesterContract,
-} from '../../contracts/Requester.js';
-import {
+    ComputeResponse,
     FinalizeResponse,
     ResponseContract,
 } from '../../contracts/Response.js';
@@ -43,8 +42,10 @@ async function main() {
         await Utils.compile(FinalizeRound1, cache, logger, profiler);
         await Utils.compile(FinalizeRound2, cache, logger, profiler);
         await Utils.compile(UpdateRequest, cache, logger, profiler);
-        await Utils.compile(AccumulateEncryption, cache, logger, profiler);
+        await Utils.compile(UpdateTask, cache, logger, profiler);
+        await Utils.compile(ComputeResponse, cache, logger, profiler);
         await Utils.compile(FinalizeResponse, cache, logger, profiler);
+        await Utils.compile(ComputeResult, cache, logger, profiler);
 
         await Utils.compile(RollupContract, cache, logger, profiler);
         await Utils.compile(CommitteeContract, cache, logger, profiler);

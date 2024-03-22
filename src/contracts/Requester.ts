@@ -13,13 +13,13 @@ import {
     ZkProgram,
     Scalar,
     UInt64,
-    Bool,
+    UInt8,
+    UInt32,
 } from 'o1js';
 import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
 import {
-    INSTANCE_LIMITS,
+    ENCRYPTION_LIMITS,
     REQUEST_EXPIRATION,
-    REQUEST_MIN_PERIOD,
     ZkAppEnum,
     ZkProgramEnum,
 } from '../constants.js';
@@ -30,12 +30,9 @@ import {
     RequestVector,
     SecretVector,
 } from '../libs/Requester.js';
-import { RollupContract, processAction, verifyRollup } from './Rollup.js';
+import { rollup } from './Rollup.js';
 import {
-    ActionWitness,
-    EMPTY_ACTION_MT,
     EMPTY_ADDRESS_MT,
-    ProcessedActions,
     ZkAppRef,
     verifyZkApp,
 } from '../storages/SharedStorage.js';
@@ -43,31 +40,30 @@ import {
     Level1Witness,
     EMPTY_LEVEL_1_TREE as REQUESTER_LEVEL_1_TREE,
 } from '../storages/RequestStorage.js';
-import { ErrorEnum, EventEnum, ZkAppAction } from './constants.js';
-
-import { RequestContract } from './Request.js';
+import { ErrorEnum, ZkAppAction } from './constants.js';
 import { Level1Witness as DkgLevel1Witness } from '../storages/DKGStorage.js';
 import { DkgContract } from './DKG.js';
+import { RequestContract } from './Request.js';
 import {
-    RollupWitness,
-    calculateActionIndex,
-} from '../storages/RollupStorage.js';
+    AccumulationWitnesses,
+    CommitmentWitnesses,
+} from '../storages/RequesterStorage.js';
 
 export {
     Action as RequesterAction,
-    AccumulateEncryptionInput,
-    AccumulateEncryptionOutput,
-    AccumulateEncryption,
-    AccumulateEncryptionProof,
+    UpdateTaskInput,
+    UpdateTaskOutput,
+    UpdateTask,
+    UpdateTaskProof,
     RequesterContract,
 };
 
 class Action
     extends Struct({
-        taskId: Field,
+        taskId: UInt32,
         keyIndex: Field,
-        startTimestamp: UInt64,
-        endTimestamp: UInt64,
+        timestamp: UInt64,
+        indexes: Field,
         R: RequestVector,
         M: RequestVector,
         commitments: CommitmentArray,
@@ -76,10 +72,10 @@ class Action
 {
     static empty(): Action {
         return new Action({
-            taskId: Field(0),
+            taskId: UInt32.zero,
             keyIndex: Field(0),
-            startTimestamp: UInt64.zero,
-            endTimestamp: UInt64.zero,
+            timestamp: UInt64.zero,
+            indexes: Field(0),
             R: new RequestVector(),
             M: new RequestVector(),
             commitments: new CommitmentArray(),
@@ -93,255 +89,295 @@ class Action
     }
 }
 
-class AccumulateEncryptionInput extends Struct({
-    previousActionState: Field,
-    action: Action,
-    actionId: Field,
-}) {}
+class UpdateTaskInput extends Action {}
 
-class AccumulateEncryptionOutput extends Struct({
-    rollupRoot: Field,
-    taskId: Field,
+class UpdateTaskOutput extends Struct({
+    taskId: UInt32,
+    initialActionState: Field,
+    initialKeyIndexRoot: Field,
+    initialTimestampRoot: Field,
+    initialAccumulationRoot: Field,
     initialCommitmentCounter: Field,
     initialCommitmentRoot: Field,
-    initialProcessRoot: Field,
+    nextActionState: Field,
+    nextKeyIndexRoot: Field,
+    nextTimestampRoot: Field,
+    nextAccumulationRoot: Field,
     nextCommitmentCounter: Field,
     nextCommitmentRoot: Field,
-    nextProcessRoot: Field,
-    accumulationRoot: Field,
-    sumR: RequestVector,
-    sumM: RequestVector,
-    submissionCounter: Field,
-    processedActions: ProcessedActions,
+    nextTimestamp: UInt64,
 }) {}
 
-const AccumulateEncryption = ZkProgram({
-    name: ZkProgramEnum.AccumulateEncryption,
-    publicInput: AccumulateEncryptionInput,
-    publicOutput: AccumulateEncryptionOutput,
+const UpdateTask = ZkProgram({
+    name: ZkProgramEnum.UpdateTask,
+    publicInput: UpdateTaskInput,
+    publicOutput: UpdateTaskOutput,
     methods: {
         init: {
-            privateInputs: [
-                Field,
-                Field,
-                Field,
-                Field,
-                Field,
-                Field,
-                RequestVector,
-                RequestVector,
-                Level1Witness,
-            ],
+            privateInputs: [UInt32, Field, Field, Field, Field, Field, Field],
             method(
-                input: AccumulateEncryptionInput,
-                rollupRoot: Field,
+                input: UpdateTaskInput,
+                taskId: UInt32,
+                initialActionState: Field,
+                initialKeyIndexRoot: Field,
+                initialTimestampRoot: Field,
+                initialAccumulationRoot: Field,
                 initialCommitmentCounter: Field,
-                initialCommitmentRoot: Field,
-                initialProcessRoot: Field,
-                submissionCounter: Field,
-                accumulationRoot: Field,
-                sumR: RequestVector,
-                sumM: RequestVector,
-                accumulationWitness: Level1Witness
+                initialCommitmentRoot: Field
             ) {
-                // Verify request vectors
-                accumulationRoot.assertEquals(
-                    accumulationWitness.calculateRoot(
-                        Poseidon.hash([
-                            sumR.hash(),
-                            sumM.hash(),
-                            submissionCounter,
-                        ])
-                    ),
-                    Utils.buildAssertMessage(
-                        AccumulateEncryption.name,
-                        AccumulateEncryption.init.name,
-                        ErrorEnum.ACCUMULATION_ROOT
-                    )
-                );
-                let taskId = accumulationWitness.calculateIndex();
-                return new AccumulateEncryptionOutput({
+                return new UpdateTaskOutput({
                     taskId,
-                    rollupRoot,
+                    initialActionState,
+                    initialKeyIndexRoot,
+                    initialTimestampRoot,
+                    initialAccumulationRoot,
                     initialCommitmentCounter,
                     initialCommitmentRoot,
-                    initialProcessRoot,
+                    nextActionState: initialActionState,
+                    nextKeyIndexRoot: initialKeyIndexRoot,
+                    nextTimestampRoot: initialTimestampRoot,
+                    nextAccumulationRoot: initialAccumulationRoot,
                     nextCommitmentCounter: initialCommitmentCounter,
                     nextCommitmentRoot: initialCommitmentRoot,
-                    nextProcessRoot: initialProcessRoot,
-                    accumulationRoot,
-                    sumR,
-                    sumM,
-                    submissionCounter,
-                    processedActions: new ProcessedActions(),
+                    nextTimestamp: UInt64.zero,
                 });
             },
         },
-        accumulate: {
+        create: {
             privateInputs: [
-                SelfProof<
-                    AccumulateEncryptionInput,
-                    AccumulateEncryptionOutput
-                >,
+                SelfProof<UpdateTaskInput, UpdateTaskOutput>,
                 Level1Witness,
-                RollupWitness,
-                ActionWitness,
+                Level1Witness,
             ],
-
             method(
-                input: AccumulateEncryptionInput,
-                earlierProof: SelfProof<
-                    AccumulateEncryptionInput,
-                    AccumulateEncryptionOutput
-                >,
-                commitmentWitness: Level1Witness,
-                rollupWitness: RollupWitness,
-                processWitness: ActionWitness
+                input: UpdateTaskInput,
+                earlierProof: SelfProof<UpdateTaskInput, UpdateTaskOutput>,
+                keyIndexWitness: Level1Witness,
+                timestampWitness: Level1Witness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
 
                 // Verify task Id
-                earlierProof.publicOutput.taskId.assertEquals(
-                    input.action.taskId,
+                earlierProof.publicOutput.taskId.assertEquals(input.taskId);
+
+                // Verify empty key Index
+                earlierProof.publicOutput.nextKeyIndexRoot.assertEquals(
+                    keyIndexWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
-                        AccumulateEncryption.name,
-                        AccumulateEncryption.accumulate.name,
-                        ErrorEnum.TASK_ID
+                        UpdateTask.name,
+                        UpdateTask.create.name,
+                        ErrorEnum.KEY_INDEX_ROOT
+                    )
+                );
+                input.keyIndex.assertEquals(
+                    keyIndexWitness.calculateIndex(),
+                    Utils.buildAssertMessage(
+                        UpdateTask.name,
+                        UpdateTask.create.name,
+                        ErrorEnum.KEY_INDEX_INDEX
                     )
                 );
 
-                // Verify commitments
-                let nextCommitmentCounter =
-                    earlierProof.publicOutput.nextCommitmentCounter;
-                let nextCommitmentRoot =
-                    earlierProof.publicOutput.nextCommitmentRoot;
-                for (let i = 0; i < INSTANCE_LIMITS.DIMENSION; i++) {
-                    let index = Field(i);
-                    // Verify empty commitment
-                    Provable.if(
-                        index.greaterThanOrEqual(
-                            input.action.commitments.length
+                // Verify empty timestamp
+                earlierProof.publicOutput.nextTimestampRoot.assertEquals(
+                    timestampWitness.calculateRoot(Field(0)),
+                    Utils.buildAssertMessage(
+                        UpdateTask.name,
+                        UpdateTask.create.name,
+                        ErrorEnum.REQUEST_TIMESTAMP_ROOT
+                    )
+                );
+                input.timestamp.value.assertEquals(
+                    timestampWitness.calculateIndex(),
+                    Utils.buildAssertMessage(
+                        UpdateTask.name,
+                        UpdateTask.create.name,
+                        ErrorEnum.REQUEST_TIMESTAMP_INDEX
+                    )
+                );
+
+                // Calculate new state values
+                let nextKeyIndexRoot = keyIndexWitness.calculateRoot(
+                    input.keyIndex
+                );
+                let nextTimestampRoot = timestampWitness.calculateRoot(
+                    input.timestamp.value
+                );
+
+                // Calculate corresponding action state
+                let nextActionState = Utils.updateActionState(
+                    earlierProof.publicOutput.nextActionState,
+                    [Action.toFields(input)]
+                );
+
+                return new UpdateTaskOutput({
+                    ...earlierProof.publicOutput,
+                    ...{ nextActionState, nextKeyIndexRoot, nextTimestampRoot },
+                });
+            },
+        },
+        accumulate: {
+            privateInputs: [
+                SelfProof<UpdateTaskInput, UpdateTaskOutput>,
+                Group,
+                Group,
+                Level1Witness,
+                AccumulationWitnesses,
+                AccumulationWitnesses,
+                CommitmentWitnesses,
+            ],
+
+            method(
+                input: UpdateTaskInput,
+                earlierProof: SelfProof<UpdateTaskInput, UpdateTaskOutput>,
+                R: Group,
+                M: Group,
+                accumulationWitness: Level1Witness,
+                accumulationWitnessesR: AccumulationWitnesses,
+                accumulationWitnessesM: AccumulationWitnesses,
+                commitmentWitnesses: CommitmentWitnesses
+            ) {
+                // Verify earlier proof
+                earlierProof.verify();
+
+                // Verify task Id
+                earlierProof.publicOutput.taskId.assertEquals(input.taskId);
+
+                let {
+                    nextAccumulationRoot,
+                    nextCommitmentCounter,
+                    nextCommitmentRoot,
+                } = earlierProof.publicOutput;
+                for (let i = 0; i < ENCRYPTION_LIMITS.DIMENSION; i++) {
+                    let Ri = input.R.get(Field(i));
+                    let Mi = input.M.get(Field(i));
+                    let commitment = input.commitments.get(Field(i));
+                    let accumulationWitnessR = accumulationWitnessesR.get(
+                        Field(i)
+                    );
+                    let accumulationWitnessM = accumulationWitnessesM.get(
+                        Field(i)
+                    );
+                    let commitmentWitness = commitmentWitnesses.get(Field(i));
+                    let index = Field.fromBits(
+                        input.indexes.toBits().slice(i * 8, (i + 1) * 8)
+                    );
+
+                    // Verify accumulation data
+                    earlierProof.publicOutput.nextAccumulationRoot.assertEquals(
+                        accumulationWitness.calculateRoot(
+                            Poseidon.hash([
+                                accumulationWitnessR.calculateRoot(
+                                    Poseidon.hash(R.toFields())
+                                ),
+                                accumulationWitnessM.calculateRoot(
+                                    Poseidon.hash(M.toFields())
+                                ),
+                            ])
                         ),
-                        Bool(true),
-                        nextCommitmentRoot.equals(
-                            commitmentWitness.calculateRoot(Field(0))
-                        )
-                    ).assertTrue(
                         Utils.buildAssertMessage(
-                            AccumulateEncryption.name,
-                            AccumulateEncryption.accumulate.name,
+                            UpdateTask.name,
+                            UpdateTask.accumulate.name,
+                            ErrorEnum.ACCUMULATION_ROOT
+                        )
+                    );
+                    input.taskId.value.assertEquals(
+                        accumulationWitness.calculateIndex(),
+                        Utils.buildAssertMessage(
+                            UpdateTask.name,
+                            UpdateTask.accumulate.name,
+                            ErrorEnum.ACCUMULATION_INDEX_L1
+                        )
+                    );
+                    index.assertEquals(
+                        accumulationWitnessR.calculateIndex(),
+                        Utils.buildAssertMessage(
+                            UpdateTask.name,
+                            UpdateTask.accumulate.name,
+                            ErrorEnum.ACCUMULATION_INDEX_L2
+                        )
+                    );
+                    index.assertEquals(
+                        accumulationWitnessM.calculateIndex(),
+                        Utils.buildAssertMessage(
+                            UpdateTask.name,
+                            UpdateTask.accumulate.name,
+                            ErrorEnum.ACCUMULATION_INDEX_L2
+                        )
+                    );
+
+                    // Verify empty commitment
+                    nextCommitmentRoot.assertEquals(
+                        commitmentWitness.calculateRoot(Field(0)),
+                        Utils.buildAssertMessage(
+                            UpdateTask.name,
+                            UpdateTask.accumulate.name,
                             ErrorEnum.COMMITMENT_ROOT
                         )
                     );
-                    Provable.if(
-                        index.greaterThanOrEqual(
-                            input.action.commitments.length
-                        ),
-                        Bool(true),
-                        nextCommitmentCounter.equals(
-                            commitmentWitness.calculateIndex()
-                        )
-                    ).assertTrue(
+                    nextCommitmentCounter.assertEquals(
+                        commitmentWitness.calculateIndex(),
                         Utils.buildAssertMessage(
-                            AccumulateEncryption.name,
-                            AccumulateEncryption.accumulate.name,
+                            UpdateTask.name,
+                            UpdateTask.accumulate.name,
                             ErrorEnum.COMMITMENT_INDEX
                         )
                     );
 
                     // Calculate new values
+                    R = R.add(Ri);
+                    M = M.add(Mi);
+                    nextAccumulationRoot = accumulationWitness.calculateRoot(
+                        Poseidon.hash([
+                            accumulationWitnessR.calculateRoot(
+                                Poseidon.hash(R.toFields())
+                            ),
+                            accumulationWitnessM.calculateRoot(
+                                Poseidon.hash(M.toFields())
+                            ),
+                        ])
+                    );
                     nextCommitmentRoot = Provable.if(
-                        index.greaterThanOrEqual(
-                            input.action.commitments.length
-                        ),
+                        commitment.equals(Field(0)),
                         nextCommitmentRoot,
-                        commitmentWitness.calculateRoot(
-                            input.action.commitments.get(Field(i))
-                        )
+                        commitmentWitness.calculateRoot(commitment)
                     );
                     nextCommitmentCounter = Provable.if(
-                        index.greaterThanOrEqual(
-                            input.action.commitments.length
-                        ),
+                        commitment.equals(Field(0)),
                         nextCommitmentCounter,
                         nextCommitmentCounter.add(1)
                     );
                 }
 
-                // Verify action is rolluped
-                let actionIndex = calculateActionIndex(
-                    Field(ZkAppEnum.REQUESTER_0),
-                    input.actionId
-                );
-                verifyRollup(
-                    AccumulateEncryption.name,
-                    actionIndex,
-                    input.action.hash(),
-                    earlierProof.publicOutput.rollupRoot,
-                    rollupWitness
-                );
-
-                // Calculate next state values
-                let submissionCounter =
-                    earlierProof.publicOutput.submissionCounter.add(1);
-                let sumR = earlierProof.publicOutput.sumR;
-                let sumM = earlierProof.publicOutput.sumM;
-
-                for (let i = 0; i < INSTANCE_LIMITS.DIMENSION; i++) {
-                    sumR.set(
-                        Field(i),
-                        sumR.get(Field(i)).add(input.action.R.get(Field(i)))
-                    );
-                    sumM.set(
-                        Field(i),
-                        sumM.get(Field(i)).add(input.action.M.get(Field(i)))
-                    );
-                }
-
                 // Calculate corresponding action state
-                let actionState = Utils.updateActionState(
-                    input.previousActionState,
-                    [Action.toFields(input.action)]
-                );
-                let processedActions =
-                    earlierProof.publicOutput.processedActions;
-                processedActions.push(actionState);
-
-                // Verify the action isn't already processed
-                let nextProcessRoot = processAction(
-                    AccumulateEncryption.name,
-                    input.actionId,
-                    actionState,
-                    earlierProof.publicOutput.nextProcessRoot,
-                    processWitness
+                let nextActionState = Utils.updateActionState(
+                    earlierProof.publicOutput.nextActionState,
+                    [Action.toFields(input)]
                 );
 
-                return new AccumulateEncryptionOutput({
-                    rollupRoot: earlierProof.publicOutput.rollupRoot,
-                    taskId: earlierProof.publicOutput.taskId,
-                    initialCommitmentCounter:
-                        earlierProof.publicOutput.initialCommitmentCounter,
-                    initialCommitmentRoot:
-                        earlierProof.publicOutput.initialCommitmentRoot,
-                    initialProcessRoot:
-                        earlierProof.publicOutput.initialProcessRoot,
-                    nextCommitmentCounter,
-                    nextCommitmentRoot,
-                    nextProcessRoot: nextProcessRoot,
-                    accumulationRoot:
-                        earlierProof.publicOutput.accumulationRoot,
-                    sumR,
-                    sumM,
-                    submissionCounter,
-                    processedActions,
+                return new UpdateTaskOutput({
+                    ...earlierProof.publicOutput,
+                    ...{
+                        nextActionState,
+                        nextAccumulationRoot,
+                        nextCommitmentCounter,
+                        nextCommitmentRoot,
+                        nextTimestamp: input.timestamp,
+                    },
                 });
             },
         },
     },
 });
 
-class AccumulateEncryptionProof extends ZkProgram.Proof(AccumulateEncryption) {}
+class UpdateTaskProof extends ZkProgram.Proof(UpdateTask) {}
+
+enum AddressBook {
+    TASK_MANAGER,
+    SUBMISSION_PROXY,
+    DKG,
+}
 
 class RequesterContract extends SmartContract {
     /**
@@ -355,15 +391,9 @@ class RequesterContract extends SmartContract {
     @state(Field) keyIndexRoot = State<Field>();
 
     /**
-     * @description MT storing tasks' period
+     * @description MT storing finalize timestamps for tasks
      */
-    @state(Field) periodRoot = State<Field>();
-
-    /**
-     * @description MT storing tasks' total number of submission
-     * @todo To be implemented
-     */
-    @state(Field) submissionCounterRoot = State<Field>();
+    @state(Field) timestampRoot = State<Field>();
 
     /**
      * @description MT storing latest accumulation data Hash(R | M | counter)
@@ -381,67 +411,54 @@ class RequesterContract extends SmartContract {
     @state(Field) commitmentRoot = State<Field>();
 
     /**
-     * @description MT storing actions' process state
+     * @description Timestamp of the latest processed action
      */
-    @state(Field) processRoot = State<Field>();
+    @state(UInt64) lastTimestamp = State<UInt64>();
+
+    /**
+     * @description Latest rolluped action's state
+     */
+    @state(Field) actionState = State<Field>();
 
     reducer = Reducer({ actionType: Action });
-
-    events = {
-        [EventEnum.PROCESSED]: Field,
-    };
 
     init() {
         super.init();
         this.zkAppRoot.set(EMPTY_ADDRESS_MT().getRoot());
         this.keyIndexRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
-        this.periodRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
+        this.timestampRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.accumulationRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.commitmentCounter.set(Field(0));
         this.commitmentRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
-        this.processRoot.set(EMPTY_ACTION_MT().getRoot());
+        this.lastTimestamp.set(UInt64.zero);
+        this.actionState.set(Reducer.initialActionState);
     }
 
     /**
      * Initialize new threshold homomorphic encryption request
      * @param keyIndex Unique key index
-     * @param startTimestamp Timestamp marks the start of the submission period
-     * @param endTimestamp Timestamp marks the end of the submission period
      */
     @method createTask(
         keyIndex: Field,
-        startTimestamp: UInt64,
-        endTimestamp: UInt64
+        timestamp: UInt64,
+        taskManagerRef: ZkAppRef
     ) {
-        // Verify timestamp configuration
-        startTimestamp.assertGreaterThanOrEqual(
-            this.network.timestamp.getAndRequireEquals(),
-            Utils.buildAssertMessage(
-                RequesterContract.name,
-                RequesterContract.prototype.createTask.name,
-                ErrorEnum.REQUEST_PERIOD
-            )
+        // Get current state values
+        let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
+
+        // Verify call from Task Manager Contract
+        Utils.requireCaller(taskManagerRef.address, this);
+        verifyZkApp(
+            RequesterContract.name,
+            taskManagerRef,
+            zkAppRoot,
+            Field(AddressBook.TASK_MANAGER)
         );
-        startTimestamp
-            .add(REQUEST_MIN_PERIOD)
-            .assertLessThanOrEqual(
-                endTimestamp,
-                Utils.buildAssertMessage(
-                    RequesterContract.name,
-                    RequesterContract.prototype.createTask.name,
-                    ErrorEnum.REQUEST_PERIOD
-                )
-            );
 
         // Create and dispatch action
         let action = new Action({
-            taskId: Field(-1),
-            keyIndex,
-            startTimestamp,
-            endTimestamp,
-            R: new RequestVector(),
-            M: new RequestVector(),
-            commitments: new CommitmentArray(),
+            ...Action.empty(),
+            ...{ taskId: UInt32.MAXINT(), keyIndex, timestamp },
         });
         this.reducer.dispatch(action);
     }
@@ -454,118 +471,74 @@ class RequesterContract extends SmartContract {
      * @param randoms Random values for encryption
      * @param nullifiers Nullifier values for anonymous commitments
      * @param publicKey Encryption public key
-     * @param startTimestamp Timestamp marks the start of the submission period
-     * @param endTimestamp Timestamp marks the end of the submission period
      * @param publicKeyWitness Witness for proof of encryption public key
      * @param keyIndexWitness Witness for key index value
-     * @param periodWitness Witness for proof of submission period
      * @param dkg Reference to Dkg Contract
-     * @param rollup Reference to Rollup Contract
      *
      * @todo Verify dimension value
      */
-    @method submit(
-        taskId: Field,
+    @method submitEncryption(
+        taskId: UInt32,
         keyIndex: Field,
         secrets: SecretVector,
         randoms: RandomVector,
+        indexes: Field,
         nullifiers: NullifierArray,
         publicKey: Group,
-        startTimestamp: UInt64,
-        endTimestamp: UInt64,
         publicKeyWitness: DkgLevel1Witness,
         keyIndexWitness: Level1Witness,
-        periodWitness: Level1Witness,
-        dkg: ZkAppRef,
-        rollup: ZkAppRef,
-        selfRef: ZkAppRef
+        submissionProxy: ZkAppRef,
+        dkg: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
         let timestamp = this.network.timestamp.getAndRequireEquals();
-
-        let dimension = secrets.length;
 
         // Verify Dkg Contract address
         verifyZkApp(
             RequesterContract.name,
             dkg,
             zkAppRoot,
-            Field(ZkAppEnum.DKG)
+            Field(AddressBook.DKG)
         );
 
-        // Verify Rollup Contract address
+        // Verify call from Submission Proxy Contract
+        Utils.requireCaller(submissionProxy.address, this);
         verifyZkApp(
             RequesterContract.name,
-            rollup,
+            submissionProxy,
             zkAppRoot,
-            Field(ZkAppEnum.ROLLUP)
+            Field(AddressBook.SUBMISSION_PROXY)
         );
 
         const dkgContract = new DkgContract(dkg.address);
-        const rollupContract = new RollupContract(rollup.address);
 
         // Verify public key
         dkgContract.verifyKey(keyIndex, publicKey, publicKeyWitness);
-        this.verifyKeyIndex(taskId, keyIndex, keyIndexWitness);
-
-        // Verify submission period
-        timestamp.assertGreaterThanOrEqual(startTimestamp);
-        timestamp.assertLessThanOrEqual(endTimestamp);
-        this.verifySubmissionPeriod(
-            taskId,
-            startTimestamp,
-            endTimestamp,
-            periodWitness
-        );
-
-        // Verify secret vectors
-        dimension.assertEquals(
-            randoms.length,
-            Utils.buildAssertMessage(
-                RequesterContract.name,
-                RequesterContract.prototype.submit.name,
-                ErrorEnum.REQUEST_VECTOR_DIM
-            )
-        );
+        this.verifyKeyIndex(taskId.value, keyIndex, keyIndexWitness);
 
         // Calculate encryption and commitments
-        let R = RequestVector.empty(dimension);
-        let M = RequestVector.empty(dimension);
+        let R = new RequestVector();
+        let M = new RequestVector();
         let commitments = new CommitmentArray();
-        for (let i = 0; i < INSTANCE_LIMITS.DIMENSION; i++) {
+        for (let i = 0; i < ENCRYPTION_LIMITS.DIMENSION; i++) {
             let index = Field(i);
             let random = randoms.get(index).toScalar();
             let secret = secrets.get(index);
             let nullifier = nullifiers.get(index);
-            R.set(
-                index,
-                Provable.if(
-                    Field(i).greaterThanOrEqual(dimension),
-                    Group.zero,
-                    Group.generator.scale(random)
-                )
-            );
-            let Mi = Provable.if(
-                secret.equals(CustomScalar.fromScalar(Scalar.from(0))),
-                Group.zero.add(publicKey.scale(random)),
-                Group.generator
-                    .scale(secrets.get(Field(i)).toScalar())
-                    .add(publicKey.scale(random))
-            );
+            R.set(index, Group.generator.scale(random));
             M.set(
                 index,
                 Provable.if(
-                    Field(i).greaterThanOrEqual(dimension),
+                    secret.equals(CustomScalar.fromScalar(Scalar.from(0))),
                     Group.zero,
-                    Mi
-                )
+                    Group.generator.scale(secrets.get(Field(i)).toScalar())
+                ).add(publicKey.scale(random))
             );
-            commitments.push(
+            commitments.set(
+                index,
                 Provable.if(
-                    secrets
-                        .get(index)
-                        .equals(CustomScalar.fromScalar(Scalar.from(0))),
+                    secret.equals(CustomScalar.fromScalar(Scalar.from(0))),
                     Field(0),
                     Poseidon.hash([nullifier, index, secret.toFields()].flat())
                 )
@@ -574,63 +547,69 @@ class RequesterContract extends SmartContract {
 
         // Create and dispatch action
         let action = new Action({
-            taskId: taskId,
-            keyIndex: keyIndex,
-            startTimestamp,
-            endTimestamp,
+            taskId,
+            keyIndex,
+            timestamp,
+            indexes,
             R,
             M,
             commitments,
         });
         this.reducer.dispatch(action);
-
-        // Record action in Rollup Contract
-        selfRef.address.assertEquals(this.address);
-        rollupContract.recordAction(action.hash(), selfRef);
     }
 
     /**
      * Accumulate encryption submissions
      * @param proof Verification proof
-     * @param accumulationWitness Witness for proof of accumulation data
-     * @param rollup Reference to Rollup Contract
      */
-    @method accumulate(
-        proof: AccumulateEncryptionProof,
-        accumulationWitness: Level1Witness,
-        rollup: ZkAppRef
-    ) {
+    @method updateTasks(proof: UpdateTaskProof) {
         // Get current state values
-        let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
+        let curActionState = this.actionState.getAndRequireEquals();
+        let keyIndexRoot = this.keyIndexRoot.getAndRequireEquals();
+        let timestampRoot = this.timestampRoot.getAndRequireEquals();
         let accumulationRoot = this.accumulationRoot.getAndRequireEquals();
         let commitmentCounter = this.commitmentCounter.getAndRequireEquals();
         let commitmentRoot = this.commitmentRoot.getAndRequireEquals();
-        let processRoot = this.processRoot.getAndRequireEquals();
-
-        // Verify Rollup Contract address
-        verifyZkApp(
-            RequesterContract.name,
-            rollup,
-            zkAppRoot,
-            Field(ZkAppEnum.ROLLUP)
-        );
-        const rollupContract = new RollupContract(rollup.address);
+        let lastTimestamp = this.lastTimestamp.getAndRequireEquals();
+        let lastActionState = this.account.actionState.getAndRequireEquals();
 
         // Verify proof
         proof.verify();
-        proof.publicOutput.rollupRoot.assertEquals(
-            rollupContract.rollupRoot.getAndRequireEquals(),
+        rollup(
+            RequesterContract.name,
+            proof.publicOutput,
+            curActionState,
+            lastActionState
+        );
+        proof.publicOutput.nextKeyIndexRoot.assertEquals(
+            keyIndexRoot,
             Utils.buildAssertMessage(
                 RequesterContract.name,
-                RequesterContract.prototype.accumulate.name,
-                ErrorEnum.ROLLUP_ROOT
+                RequesterContract.prototype.updateTasks.name,
+                ErrorEnum.KEY_INDEX_ROOT
+            )
+        );
+        proof.publicOutput.nextTimestampRoot.assertEquals(
+            timestampRoot,
+            Utils.buildAssertMessage(
+                RequesterContract.name,
+                RequesterContract.prototype.updateTasks.name,
+                ErrorEnum.REQUEST_TIMESTAMP_ROOT
+            )
+        );
+        proof.publicOutput.initialAccumulationRoot.assertEquals(
+            accumulationRoot,
+            Utils.buildAssertMessage(
+                RequesterContract.name,
+                RequesterContract.prototype.updateTasks.name,
+                ErrorEnum.ACCUMULATION_ROOT
             )
         );
         proof.publicOutput.initialCommitmentCounter.assertEquals(
             commitmentCounter,
             Utils.buildAssertMessage(
                 RequesterContract.name,
-                RequesterContract.prototype.accumulate.name,
+                RequesterContract.prototype.updateTasks.name,
                 ErrorEnum.COMMITMENT_COUNTER
             )
         );
@@ -638,80 +617,49 @@ class RequesterContract extends SmartContract {
             commitmentRoot,
             Utils.buildAssertMessage(
                 RequesterContract.name,
-                RequesterContract.prototype.accumulate.name,
+                RequesterContract.prototype.updateTasks.name,
                 ErrorEnum.COMMITMENT_ROOT
             )
         );
-        proof.publicOutput.initialProcessRoot.assertEquals(
-            processRoot,
-            Utils.buildAssertMessage(
-                RequesterContract.name,
-                RequesterContract.prototype.accumulate.name,
-                ErrorEnum.PROCESS_ROOT
-            )
-        );
-        proof.publicOutput.accumulationRoot.assertEquals(
-            accumulationRoot,
-            Utils.buildAssertMessage(
-                RequesterContract.name,
-                RequesterContract.prototype.accumulate.name,
-                ErrorEnum.ACCUMULATION_ROOT
-            )
-        );
-        proof.publicOutput.taskId.assertEquals(
-            accumulationWitness.calculateIndex(),
-            Utils.buildAssertMessage(
-                RequesterContract.name,
-                RequesterContract.prototype.accumulate.name,
-                ErrorEnum.ACCUMULATION_INDEX
-            )
-        );
-
-        let nextAccumulationRoot = accumulationWitness.calculateRoot(
-            Poseidon.hash([
-                proof.publicOutput.sumR.hash(),
-                proof.publicOutput.sumM.hash(),
-                proof.publicOutput.submissionCounter,
-            ])
-        );
 
         // Update state values
-        this.accumulationRoot.set(nextAccumulationRoot);
+        this.actionState.set(proof.publicOutput.nextActionState);
+        this.keyIndexRoot.set(proof.publicOutput.nextKeyIndexRoot);
+        this.timestampRoot.set(proof.publicOutput.nextTimestampRoot);
+        this.accumulationRoot.set(proof.publicOutput.nextAccumulationRoot);
         this.commitmentCounter.set(proof.publicOutput.nextCommitmentCounter);
         this.commitmentRoot.set(proof.publicOutput.nextCommitmentRoot);
-        this.processRoot.set(proof.publicOutput.nextProcessRoot);
+        this.lastTimestamp.set(
+            Provable.if(
+                proof.publicOutput.nextTimestamp.equals(UInt64.zero),
+                lastTimestamp,
+                proof.publicOutput.nextTimestamp
+            )
+        );
     }
 
     /**
      * Finalize the submission period of a task
      * @param taskId Task Id
      * @param keyIndex Unique key index
-     * @param startTimestamp Timestamp marks the start of the submission period
-     * @param endTimestamp Timestamp marks the end of the submission period
      * @param accumulatedR Accumulated R value
      * @param accumulatedM Accumulated M value
-     * @param submissionCounter Total number of encryption submission
      * @param keyIndexWitness Witness for proof of key index value
-     * @param periodWitness Witness for proof of submission period
      * @param accumulationWitness Witness for proof of accumulation data
      * @param request Reference to Request Contract
      */
-    @method finalize(
-        taskId: Field,
+    @method finalizeTask(
+        taskId: UInt32,
+        dimension: UInt8,
         keyIndex: Field,
-        startTimestamp: UInt64,
-        endTimestamp: UInt64,
-        accumulatedR: RequestVector,
-        accumulatedM: RequestVector,
-        submissionCounter: Field,
+        accumulationRootR: Field,
+        accumulationRootM: Field,
         keyIndexWitness: Level1Witness,
-        periodWitness: Level1Witness,
         accumulationWitness: Level1Witness,
         request: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
-        let timestamp = this.network.timestamp.getAndRequireEquals();
 
         // Verify Request Contract address
         verifyZkApp(
@@ -723,42 +671,27 @@ class RequesterContract extends SmartContract {
         const requestContract = new RequestContract(request.address);
 
         // Verify taskId
-        this.verifyKeyIndex(taskId, keyIndex, keyIndexWitness);
-
-        // Verify submission period
-
-        this.verifySubmissionPeriod(
-            taskId,
-            startTimestamp,
-            endTimestamp,
-            periodWitness
-        );
+        this.verifyKeyIndex(taskId.value, keyIndex, keyIndexWitness);
 
         // Verify accumulation data
-        timestamp.assertGreaterThan(
-            endTimestamp,
-            Utils.buildAssertMessage(
-                RequesterContract.name,
-                RequesterContract.prototype.finalize.name,
-                ErrorEnum.REQUEST_PERIOD
-            )
-        );
         this.verifyAccumulationData(
-            taskId,
-            accumulatedR,
-            accumulatedM,
-            submissionCounter,
+            taskId.value,
+            accumulationRootR,
+            accumulationRootM,
             accumulationWitness
         );
 
         // Initialize a request in Request Contract
         requestContract.initialize(
-            taskId,
             keyIndex,
-            this.address,
-            accumulatedR,
-            accumulatedM,
-            UInt64.from(REQUEST_EXPIRATION)
+            taskId,
+            UInt64.from(REQUEST_EXPIRATION),
+            Poseidon.hash([
+                accumulationRootR,
+                accumulationRootM,
+                dimension.value,
+            ]),
+            this.address
         );
     }
 
@@ -790,69 +723,23 @@ class RequesterContract extends SmartContract {
     }
 
     /**
-     * Verify the duration of a task's submission period
-     * @param taskId Task Id
-     * @param startTimestamp Timestamp marks the start of the submission period
-     * @param endTimestamp Timestamp marks the end of the submission period
-     * @param witness Witness for proof of submission period
-     */
-    verifySubmissionPeriod(
-        taskId: Field,
-        startTimestamp: UInt64,
-        endTimestamp: UInt64,
-        witness: Level1Witness
-    ) {
-        this.periodRoot
-            .getAndRequireEquals()
-            .assertEquals(
-                witness.calculateRoot(
-                    Poseidon.hash(
-                        [
-                            startTimestamp.toFields(),
-                            endTimestamp.toFields(),
-                        ].flat()
-                    )
-                ),
-                Utils.buildAssertMessage(
-                    RequesterContract.name,
-                    RequesterContract.prototype.verifySubmissionPeriod.name,
-                    ErrorEnum.REQUEST_PERIOD_ROOT
-                )
-            );
-        taskId.assertEquals(
-            witness.calculateIndex(),
-            Utils.buildAssertMessage(
-                RequesterContract.name,
-                RequesterContract.prototype.verifySubmissionPeriod.name,
-                ErrorEnum.REQUEST_PERIOD_INDEX
-            )
-        );
-    }
-
-    /**
      * Verify accumulation data
      * @param requestId Request Id
-     * @param accumulatedR Accumulated R value
-     * @param accumulatedM Accumulated M value
-     * @param submissionCounter Total number of encryption submission
+     * @param accumulationRootR Accumulated R value
+     * @param accumulationRootM Accumulated M value
      * @param witness Witness for proof of accumulation data
      */
     verifyAccumulationData(
         requestId: Field,
-        accumulatedR: RequestVector,
-        accumulatedM: RequestVector,
-        submissionCounter: Field,
+        accumulationRootR: Field,
+        accumulationRootM: Field,
         witness: Level1Witness
     ) {
         this.accumulationRoot
             .getAndRequireEquals()
             .assertEquals(
                 witness.calculateRoot(
-                    Poseidon.hash([
-                        accumulatedR.hash(),
-                        accumulatedM.hash(),
-                        submissionCounter,
-                    ])
+                    Poseidon.hash([accumulationRootR, accumulationRootM])
                 ),
                 Utils.buildAssertMessage(
                     RequestContract.name,
@@ -865,7 +752,7 @@ class RequesterContract extends SmartContract {
             Utils.buildAssertMessage(
                 RequestContract.name,
                 RequestContract.prototype.verifyAccumulationData.name,
-                ErrorEnum.ACCUMULATION_INDEX
+                ErrorEnum.ACCUMULATION_INDEX_L1
             )
         );
     }

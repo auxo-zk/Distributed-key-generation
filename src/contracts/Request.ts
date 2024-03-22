@@ -15,6 +15,7 @@ import {
     Group,
     Scalar,
     UInt8,
+    UInt32,
 } from 'o1js';
 import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
 import { REQUEST_FEE, ZkAppEnum, ZkProgramEnum } from '../constants.js';
@@ -61,7 +62,6 @@ class Action
         keyIndex: Field,
         taskId: Field,
         expirationTimestamp: UInt64,
-        dimension: UInt8,
         accumulationRoot: Field,
         resultRoot: Field,
     })
@@ -73,7 +73,6 @@ class Action
             keyIndex: Field(0),
             taskId: Field(0),
             expirationTimestamp: UInt64.zero,
-            dimension: UInt8.from(0),
             accumulationRoot: Field(0),
             resultRoot: Field(0),
         });
@@ -96,7 +95,7 @@ class ComputeResultOutput extends Struct({
     accumulationRootM: Field,
     responseRootD: Field,
     resultRoot: Field,
-    counter: UInt8,
+    dimension: UInt8,
 }) {}
 
 const ComputeResult = ZkProgram({
@@ -111,7 +110,7 @@ const ComputeResult = ZkProgram({
                     accumulationRootM: EMPTY_LEVEL_2_TREE().getRoot(),
                     responseRootD: EMPTY_LEVEL_2_TREE().getRoot(),
                     resultRoot: EMPTY_LEVEL_2_TREE().getRoot(),
-                    counter: UInt8.from(0),
+                    dimension: UInt8.from(0),
                 });
             },
         },
@@ -144,7 +143,7 @@ const ComputeResult = ZkProgram({
                         ErrorEnum.ACCUMULATION_ROOT
                     )
                 );
-                earlierProof.publicOutput.counter.value.assertEquals(
+                earlierProof.publicOutput.dimension.value.assertEquals(
                     accumulationWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         ComputeResult.name,
@@ -160,7 +159,7 @@ const ComputeResult = ZkProgram({
                         ErrorEnum.RES_D_ROOT
                     )
                 );
-                earlierProof.publicOutput.counter.value.assertEquals(
+                earlierProof.publicOutput.dimension.value.assertEquals(
                     responseWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         ComputeResult.name,
@@ -176,7 +175,7 @@ const ComputeResult = ZkProgram({
                         ErrorEnum.REQUEST_RESULT_ROOT
                     )
                 );
-                earlierProof.publicOutput.counter.value.assertEquals(
+                earlierProof.publicOutput.dimension.value.assertEquals(
                     resultWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         ComputeResult.name,
@@ -219,7 +218,7 @@ const ComputeResult = ZkProgram({
                     accumulationRootM,
                     responseRootD,
                     resultRoot,
-                    counter: earlierProof.publicOutput.counter.add(1),
+                    dimension: earlierProof.publicOutput.dimension.add(1),
                 });
             },
         },
@@ -549,13 +548,13 @@ class RequestContract extends SmartContract {
     @state(Field) taskIdRoot = State<Field>();
 
     /**
-     * @description MT storing accumulated value
-     * Hash(accumulated R MT root | accumulated M MT root | dimension)
+     * @description MT storing accumulation data
+     * Hash(R accumulation MT root | M accumulation MT root | dimension)
      */
     @state(Field) accumulationRoot = State<Field>();
 
     /**
-     * @description MT storing requests' expiration time = Hash(start | end)
+     * @description MT storing requests' expiration timestamp
      */
     @state(Field) expirationRoot = State<Field>();
 
@@ -585,33 +584,29 @@ class RequestContract extends SmartContract {
 
     /**
      * Initialize a threshold decryption request
-     * @param committeeId Committee Id
      * @param keyIndex Unique key index
-     * @param taskId Request's unique taskId
-     * @param accumulationRoot Accumulation data MT root Hash(R | M)
-     * @param dimension Encryption vectors' dimension
+     * @param taskId Requester's taskId
      * @param expirationPeriod Waiting period before the expiration of unresolved request
+     * @param accumulationRoot Accumulation data Hash(R root | M root | dimension)
+     * @param requester Requester's address
      */
     @method initialize(
-        taskId: Field,
         keyIndex: Field,
-        requester: PublicKey,
+        taskId: UInt32,
+        expirationPeriod: UInt64,
         accumulationRoot: Field,
-        dimension: UInt8,
-        expirationPeriod: UInt64
+        requester: PublicKey
     ) {
         // Verify caller
         Utils.requireCaller(requester, this);
 
         // Create and dispatch action
+        let timestamp = this.network.timestamp.getAndRequireEquals();
         let action = new Action({
             requestId: Field(-1),
             keyIndex: keyIndex,
-            taskId: Poseidon.hash([requester.toFields(), taskId].flat()),
-            expirationTimestamp: this.network.timestamp
-                .getAndRequireEquals()
-                .add(expirationPeriod),
-            dimension,
+            taskId: Poseidon.hash([requester.toFields(), taskId.value].flat()),
+            expirationTimestamp: timestamp.add(expirationPeriod),
             accumulationRoot,
             resultRoot: Field(0),
         });
@@ -657,7 +652,7 @@ class RequestContract extends SmartContract {
 
         // Verify Compute Result proof
         proof.verify();
-        let dimension = proof.publicOutput.counter;
+        let dimension = proof.publicOutput.dimension;
         let accumulationRootM = proof.publicOutput.accumulationRootM;
 
         // Verify request status
@@ -680,21 +675,16 @@ class RequestContract extends SmartContract {
         );
 
         // Verify response value
-        // responseContract.verifyFinalizedD(
-        //     requestId,
-        //     finalizedD,
-        //     finalizedDWitness
-        // );
+        responseContract.verifyResponse(
+            requestId,
+            proof.publicOutput.responseRootD,
+            responseWitness
+        );
 
         // Create and dispatch action
         let action = new Action({
-            requestId,
-            keyIndex: Field(0),
-            taskId: Field(0),
-            expirationTimestamp: UInt64.zero,
-            dimension: UInt8.from(0),
-            accumulationRoot: Field(0),
-            resultRoot: proof.publicOutput.resultRoot,
+            ...Action.empty(),
+            ...{ requestId, resultRoot: proof.publicOutput.resultRoot },
         });
         this.reducer.dispatch(action);
     }

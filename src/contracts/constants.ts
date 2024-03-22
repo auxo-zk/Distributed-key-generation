@@ -85,8 +85,8 @@ export enum ErrorEnum {
     COMMITMENT_ROOT = 'Incorrect commitment Id MT root',
     COMMITMENT_INDEX = 'Incorrect commitment Id MT index',
     REQUEST_PERIOD = 'Incorrect period for the request',
-    REQUEST_PERIOD_ROOT = 'Incorrect request period MT root',
-    REQUEST_PERIOD_INDEX = 'Incorrect request period MT index',
+    REQUEST_TIMESTAMP_ROOT = 'Incorrect request timestamp MT root',
+    REQUEST_TIMESTAMP_INDEX = 'Incorrect request timestamp MT index',
 
     // RequestContract errors
     TASK_ID = 'Incorrect request Id',

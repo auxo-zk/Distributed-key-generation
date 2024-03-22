@@ -380,15 +380,15 @@ function processAction(
         witness.calculateRoot(
             Provable.switch(
                 [
-                    processId.value.equals(Field(0)),
-                    processId.value.equals(Field(1)),
-                    processId.greaterThan(1),
+                    processId.value.equals(0),
+                    processId.value.equals(1),
+                    processId.value.greaterThan(1),
                 ],
                 Field,
                 [
                     Field(0),
                     actionState,
-                    Poseidon.hash([actionState, processId.sub(1).value]),
+                    Poseidon.hash([actionState, processId.value]),
                 ]
             )
         ),
@@ -405,7 +405,7 @@ function processAction(
 
     return witness.calculateRoot(
         Provable.if(
-            processId.greaterThan(0),
+            processId.value.greaterThan(0),
             Poseidon.hash([actionState, processId.value]),
             actionState
         )

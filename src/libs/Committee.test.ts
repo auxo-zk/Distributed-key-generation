@@ -118,7 +118,7 @@ describe('Committee', () => {
             committees[respondedMembers[i]].responseContribution =
                 responseContribution;
             responseContributions.push(responseContribution);
-            D.push(responseContribution.D.values);
+            // D.push(responseContribution.D.values);
         }
     });
 
