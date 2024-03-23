@@ -11,12 +11,11 @@ import {
 } from '../../contracts/Encryption.js';
 import { FinalizeRound1, Round1Contract } from '../../contracts/Round1.js';
 import { FinalizeRound2, Round2Contract } from '../../contracts/Round2.js';
-import { RequestContract, UpdateRequest } from '../../contracts/Request.js';
+import { ComputeResult, UpdateRequest } from '../../contracts/Request.js';
+import { RequestContract } from '../../contracts/Request.js';
+import { UpdateTask, RequesterContract } from '../../contracts/Requester.js';
 import {
-    AccumulateEncryption,
-    RequesterContract,
-} from '../../contracts/Requester.js';
-import {
+    ComputeResponse,
     FinalizeResponse,
     ResponseContract,
 } from '../../contracts/Response.js';
@@ -32,8 +31,10 @@ async function main() {
         FinalizeRound1,
         FinalizeRound2,
         UpdateRequest,
-        AccumulateEncryption,
+        UpdateTask,
+        ComputeResponse,
         FinalizeResponse,
+        ComputeResult,
 
         RollupContract,
         CommitteeContract,
@@ -45,18 +46,25 @@ async function main() {
         ResponseContract,
     ];
 
-    let info: any[] = [];
-    let error: any[] = [];
+    let info: {
+        program: string;
+        method: string;
+        constraints: number;
+        digest: string;
+    }[] = [];
+    let error: unknown[] = [];
 
     for (let i = 0; i < programs.length; i++) {
         let prg = programs[i];
         let analysis;
         try {
             analysis = await prg.analyzeMethods();
-        } catch {
+        } catch (err) {
             error.push(prg.name);
+            console.error(err);
             continue;
         }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Object.entries(analysis).map(([key, value]: [string, any]) => {
             info.push({
                 program: prg.name,

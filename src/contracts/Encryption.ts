@@ -58,13 +58,12 @@ const Elgamal = ZkProgram({
                 let plainBits = Bit255.fromScalar(plain);
                 let encrypted = Bit255.xor(kBits, plainBits);
                 encrypted.assertEquals(
-                    input.c
-                    // FIXME - remove comment after update auxo-libs
-                    // ,Utils.buildAssertMessage(
-                    //     Elgamal.name,
-                    //     Elgamal.encrypt.name,
-                    //     ErrorEnum.ELGAMAL_ENCRYPTION
-                    // )
+                    input.c,
+                    Utils.buildAssertMessage(
+                        Elgamal.name,
+                        Elgamal.encrypt.name,
+                        ErrorEnum.ELGAMAL_ENCRYPTION
+                    )
                 );
                 return encrypted;
             },
@@ -77,12 +76,12 @@ const Elgamal = ZkProgram({
                 let kBits = Bit255.fromBits(k.toBits());
                 let decrypted = Bit255.xor(kBits, input.c);
                 CustomScalar.fromScalar(decrypted.toScalar()).assertEquals(
-                    CustomScalar.fromScalar(plain)
-                    // ,Utils.buildAssertMessage(
-                    //     Elgamal.name,
-                    //     Elgamal.decrypt.name,
-                    //     ErrorEnum.ELGAMAL_DECRYPTION
-                    // )
+                    CustomScalar.fromScalar(plain),
+                    Utils.buildAssertMessage(
+                        Elgamal.name,
+                        Elgamal.decrypt.name,
+                        ErrorEnum.ELGAMAL_DECRYPTION
+                    )
                 );
                 return decrypted;
             },

@@ -11,6 +11,7 @@ import {
     SelfProof,
     ZkProgram,
     Group,
+    UInt8,
 } from 'o1js';
 import { ActionMask as _ActionMask, Utils } from '@auxo-dev/auxo-libs';
 import { CommitteeMemberInput, CommitteeContract } from './Committee.js';
@@ -242,6 +243,7 @@ const UpdateKey = ZkProgram({
                 let nextProcessRoot = processAction(
                     UpdateKey.name,
                     input.actionId,
+                    UInt8.from(0),
                     actionState,
                     earlierProof.publicOutput.nextProcessRoot,
                     processWitness
@@ -360,6 +362,7 @@ const UpdateKey = ZkProgram({
                 let nextProcessRoot = processAction(
                     UpdateKey.name,
                     input.actionId,
+                    UInt8.from(0),
                     actionState,
                     earlierProof.publicOutput.nextProcessRoot,
                     processWitness

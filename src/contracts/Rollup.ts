@@ -1,11 +1,13 @@
 import {
     Field,
     Poseidon,
+    Provable,
     Reducer,
     SelfProof,
     SmartContract,
     State,
     Struct,
+    UInt8,
     ZkProgram,
     method,
     state,
@@ -369,12 +371,27 @@ function verifyRollup(
 function processAction(
     programName: string,
     actionId: Field,
+    processId: UInt8,
     actionState: Field,
     previousRoot: Field,
     witness: RollupWitness
 ): Field {
     previousRoot.assertEquals(
-        witness.calculateRoot(Field(0)),
+        witness.calculateRoot(
+            Provable.switch(
+                [
+                    processId.value.equals(0),
+                    processId.value.equals(1),
+                    processId.value.greaterThan(1),
+                ],
+                Field,
+                [
+                    Field(0),
+                    actionState,
+                    Poseidon.hash([actionState, processId.value]),
+                ]
+            )
+        ),
         Utils.buildAssertMessage(programName, 'process', ErrorEnum.PROCESS_ROOT)
     );
     actionId.assertEquals(
@@ -386,5 +403,11 @@ function processAction(
         )
     );
 
-    return witness.calculateRoot(actionState);
+    return witness.calculateRoot(
+        Provable.if(
+            processId.value.greaterThan(0),
+            Poseidon.hash([actionState, processId.value]),
+            actionState
+        )
+    );
 }

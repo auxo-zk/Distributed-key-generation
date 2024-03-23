@@ -68,10 +68,10 @@ export {
 
 export {
     RequesterAction,
-    AccumulateEncryptionInput,
-    AccumulateEncryptionOutput,
-    AccumulateEncryption,
-    AccumulateEncryptionProof,
+    UpdateTaskInput,
+    UpdateTaskOutput,
+    UpdateTask,
+    UpdateTaskProof,
     RequesterContract,
 } from './contracts/Requester.js';
 

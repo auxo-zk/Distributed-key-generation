@@ -17,7 +17,7 @@ export enum ErrorEnum {
 
     // Action errors
     ACTION_TYPE = 'Incorrect action type',
-
+    ACTION_STATE = 'Incorrect action state',
     CURRENT_ACTION_STATE = 'Incorrect current action state',
     LAST_ACTION_STATE = 'Incorrect last action state',
 
@@ -85,8 +85,8 @@ export enum ErrorEnum {
     COMMITMENT_ROOT = 'Incorrect commitment Id MT root',
     COMMITMENT_INDEX = 'Incorrect commitment Id MT index',
     REQUEST_PERIOD = 'Incorrect period for the request',
-    REQUEST_PERIOD_ROOT = 'Incorrect request period MT root',
-    REQUEST_PERIOD_INDEX = 'Incorrect request period MT index',
+    REQUEST_TIMESTAMP_ROOT = 'Incorrect request timestamp MT root',
+    REQUEST_TIMESTAMP_INDEX = 'Incorrect request timestamp MT index',
 
     // RequestContract errors
     TASK_ID = 'Incorrect request Id',
@@ -96,12 +96,14 @@ export enum ErrorEnum {
     KEY_INDEX_INDEX = 'Incorrect key index MT index',
     REQUEST_STATUS = 'Incorrect request status',
     ACCUMULATION_ROOT = 'Incorrect accumulation Id MT root',
-    ACCUMULATION_INDEX = 'Incorrect accumulation Id MT index',
+    ACCUMULATION_INDEX_L1 = 'Incorrect accumulation Id MT level 1 index',
+    ACCUMULATION_INDEX_L2 = 'Incorrect accumulation Id MT level 2 index',
     REQUEST_EXP_ROOT = 'Incorrect request expiration MT root',
     REQUEST_EXP_INDEX = 'Incorrect request expiration MT index',
     REQUEST_RESULT = 'Incorrect request result',
     REQUEST_RESULT_ROOT = 'Incorrect request result MT root',
-    REQUEST_RESULT_INDEX = 'Incorrect request result MT index',
+    REQUEST_RESULT_INDEX_L1 = 'Incorrect request result MT level 1 index',
+    REQUEST_RESULT_INDEX_L2 = 'Incorrect request result MT level 2 index',
 
     // ResponseContract errors
     REQUEST_ID = 'Incorrect request Id',
@@ -111,7 +113,9 @@ export enum ErrorEnum {
     RES_CONTRIBUTION_DIMENSION = 'Incorrect contribution dimension',
     RES_CONTRIBUTION_THRESHOLD = 'Incorrect number of contributions',
     RES_D_ROOT = 'Incorrect D MT root',
-    RES_D_INDEX = 'Incorrect D MT index',
+    RES_D_INDEX_L1 = 'Incorrect D MT level 1 index',
+    RES_D_INDEX_L2 = 'Incorrect D MT level 2 index',
+    SECRET_SHARE = 'Incorrect secret share value',
 
     // RollupContract errors
     ACTION_COUNTER_ROOT = 'Incorrect rollup counter MT root',

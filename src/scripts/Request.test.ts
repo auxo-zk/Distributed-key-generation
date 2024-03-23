@@ -14,11 +14,11 @@ import {
 import { getProfiler } from './helper/profiler.js';
 import randomAccounts from './helper/randomAccounts.js';
 import {
-    RequestContract,
     UpdateRequest,
     RequestStatus,
     UpdateRequestProof,
 } from '../contracts/Request.js';
+import { RequestContract } from '../contracts/Request.js';
 
 const doProofs = false;
 

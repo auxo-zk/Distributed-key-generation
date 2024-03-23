@@ -7,6 +7,7 @@ import {
     SmartContract,
     State,
     Struct,
+    UInt8,
     ZkProgram,
     method,
     state,
@@ -338,6 +339,7 @@ const FinalizeRound1 = ZkProgram({
                 let nextProcessRoot = processAction(
                     FinalizeRound1.name,
                     input.actionId,
+                    UInt8.from(0),
                     actionState,
                     earlierProof.publicOutput.nextProcessRoot,
                     processWitness

@@ -9,6 +9,7 @@ import {
     state,
     State,
     Struct,
+    UInt8,
     ZkProgram,
 } from 'o1js';
 import { Utils } from '@auxo-dev/auxo-libs';
@@ -323,6 +324,7 @@ const FinalizeRound2 = ZkProgram({
                 let nextProcessRoot = processAction(
                     FinalizeRound2.name,
                     input.actionId,
+                    UInt8.from(0),
                     actionState,
                     earlierProof.publicOutput.nextProcessRoot,
                     processWitness
