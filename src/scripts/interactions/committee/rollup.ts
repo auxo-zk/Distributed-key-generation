@@ -11,7 +11,7 @@ import axios from 'axios';
 import { MemberArray } from '../../../libs/Committee.js';
 import { IpfsHash } from '@auxo-dev/auxo-libs';
 import {
-    EMPTY_LEVEL_2_TREE,
+    COMMITTEE_LEVEL_2_TREE,
     MemberStorage,
     SettingStorage,
 } from '../../../storages/CommitteeStorage.js';
@@ -61,7 +61,7 @@ async function main() {
             console.log(
                 `Adding committee ${committee.committeeId} to storage...`
             );
-            let level2Tree = EMPTY_LEVEL_2_TREE();
+            let level2Tree = COMMITTEE_LEVEL_2_TREE();
             for (let i = 0; i < committee.numberOfMembers; i++) {
                 level2Tree.setLeaf(
                     BigInt(i),
@@ -139,7 +139,7 @@ async function main() {
         );
         console.log('Done');
 
-        let level2Tree = EMPTY_LEVEL_2_TREE();
+        let level2Tree = COMMITTEE_LEVEL_2_TREE();
         for (let i = 0; i < Number(action.addresses.length); i++) {
             level2Tree.setLeaf(
                 BigInt(i),

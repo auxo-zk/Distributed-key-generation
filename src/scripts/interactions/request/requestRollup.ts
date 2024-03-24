@@ -1,11 +1,7 @@
 import { Field, Mina, Provable, PublicKey, Reducer, fetchAccount } from 'o1js';
 import { compile, proveAndSend, wait } from '../../helper/deploy.js';
 import { fetchActions, fetchZkAppState } from '../../helper/deploy.js';
-import {
-    RequestStatusStorage,
-    RequesterStorage,
-    Level1Witness,
-} from '../../../storages/RequestStorage.js';
+import { RequestLevel1Witness } from '../../../storages/RequestStorage.js';
 import {
     RequestAction,
     UpdateRequest,
@@ -53,26 +49,26 @@ async function main() {
     ]);
 
     // Storage
-    let requestStatusStorage = new RequestStatusStorage();
-    let requesterStorage = new RequesterStorage();
+    // let requestStatusStorage = new RequestStatusStorage();
+    // let requesterStorage = new RequesterStorage();
 
     // Build storage
-    for (const key in requestStatusValue) {
-        requestStatusStorage.updateLeaf(
-            { level1Index: Field(key) },
-            Field(requestStatusValue[key]['leaf'])
-        );
-    }
+    // for (const key in requestStatusValue) {
+    //     requestStatusStorage.updateLeaf(
+    //         { level1Index: Field(key) },
+    //         Field(requestStatusValue[key]['leaf'])
+    //     );
+    // }
 
-    for (const key in requesterValue) {
-        requesterStorage.updateLeaf(
-            { level1Index: Field(key) },
-            Field(requesterValue[key]['leaf'])
-        );
-    }
+    // for (const key in requesterValue) {
+    //     requesterStorage.updateLeaf(
+    //         { level1Index: Field(key) },
+    //         Field(requesterValue[key]['leaf'])
+    //     );
+    // }
 
-    Provable.log('request status root: ', requestStatusStorage.root);
-    Provable.log('requester value root: ', requesterStorage.root);
+    // Provable.log('request status root: ', requestStatusStorage.root);
+    // Provable.log('requester value root: ', requesterStorage.root);
 
     const fromState = committeeState.actionState;
     const rawActions = await fetchActions(requestAddress, fromState);

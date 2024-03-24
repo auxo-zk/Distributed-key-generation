@@ -24,7 +24,7 @@ import {
 import { IpfsHash } from '@auxo-dev/auxo-libs';
 import { MemberArray } from '../libs/Committee.js';
 import {
-    EMPTY_LEVEL_2_TREE,
+    COMMITTEE_LEVEL_2_TREE,
     MemberStorage,
     SettingStorage,
 } from '../storages/CommitteeStorage.js';
@@ -149,7 +149,7 @@ describe('Committee', () => {
         );
 
         // Update data to local
-        tree1 = EMPTY_LEVEL_2_TREE();
+        tree1 = COMMITTEE_LEVEL_2_TREE();
         for (let i = 0; i < Number(myMemberArray1.length); i++) {
             tree1.setLeaf(
                 BigInt(i),
@@ -181,7 +181,7 @@ describe('Committee', () => {
         );
 
         // Update data to local
-        tree2 = EMPTY_LEVEL_2_TREE();
+        tree2 = COMMITTEE_LEVEL_2_TREE();
         for (let i = 0; i < Number(myMemberArray2.length); i++) {
             tree2.setLeaf(
                 BigInt(i),
