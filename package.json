@@ -1,6 +1,6 @@
 {
     "name": "@auxo-dev/dkg",
-    "version": "0.3.3",
+    "version": "0.3.4",
     "description": "Auxo's DKG Module for the On-chain Funding platform on Mina blockchain",
     "author": "Auxo",
     "license": "Apache-2.0",
@@ -13,9 +13,9 @@
     "main": "./build/esm/src/index.js",
     "types": "./build/esm/src/index.d.ts",
     "scripts": {
-        "build": "tsc --build tsconfig.json tsconfig.cjs.json tsconfig.types.json && ./fix-export.sh",
-        "build:no-scripts": "tsc --build tsconfig.noscripts.json",
-        "scripts": "tsc --build tsconfig.json tsconfig.cjs.json tsconfig.types.json && ./fix-export.sh && node build/esm/src/scripts/$npm_config_name",
+        "build": "tsc --build tsconfig.node.json && ./fix-export.node.sh",
+        "build:publish": "rm -rf build && tsc --build tsconfig.esm.json tsconfig.cjs.json tsconfig.types.json && ./fix-export.sh",
+        "scripts": "tsc --build tsconfig.node.json && ./fix-export.node.sh && node build/node/src/scripts/$npm_config_name",
         "buildw": "tsc --watch",
         "coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
         "format": "prettier --write --ignore-unknown **/*",

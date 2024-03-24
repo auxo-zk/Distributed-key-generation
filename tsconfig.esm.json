@@ -1,9 +1,8 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "./build/types",
-    "declaration": true,
-    "emitDeclarationOnly": true
+    "outDir": "./build/esm",
+    "module": "es2022"
   },
   "include": ["./src"],
   "exclude": ["./src/scripts"]

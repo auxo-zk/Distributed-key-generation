@@ -4,5 +4,6 @@
     "outDir": "./build/cjs",
     "module": "commonjs"
   },
-  "include": ["./src"]
+  "include": ["./src"],
+  "exclude": ["./src/scripts"]
 }
