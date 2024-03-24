@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "target": "es2021",
+    "module": "es2022",
     "lib": ["dom", "esnext"],
     "rootDir": ".",
     "strict": true,
@@ -17,5 +18,5 @@
     "noFallthroughCasesInSwitch": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["./src", "temp.js"]
+  "include": ["./src"]
 }
