@@ -17,20 +17,21 @@ import {
 } from 'o1js';
 import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
 import {
-    FullMTWitness as CommitteeFullWitness,
-    Level1Witness as CommitteeLevel1Witness,
+    CommitteeWitness,
+    CommitteeLevel1Witness,
 } from '../storages/CommitteeStorage.js';
 import {
-    FullMTWitness as DKGWitness,
-    Level1Witness,
+    DKGWitness,
+    DKG_LEVEL_2_TREE,
+    ProcessedContributions,
     calculateKeyIndex,
-} from '../storages/DKGStorage.js';
+} from '../storages/DkgStorage.js';
 import {
-    FullMTWitness as RequestWitness,
-    Level1Witness as RequestLevel1Witness,
-    Level2Witness,
-    EMPTY_LEVEL_1_TREE,
-    EMPTY_LEVEL_2_TREE,
+    RequestWitness,
+    RequestLevel1Witness,
+    RequestLevel2Witness,
+    REQUEST_LEVEL_1_TREE,
+    REQUEST_LEVEL_2_TREE,
 } from '../storages/RequestStorage.js';
 import {
     CommitteeConfigInput,
@@ -40,17 +41,25 @@ import {
 import { BatchDecryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
 import { Round2Contract } from './Round2.js';
-import { INSTANCE_LIMITS, ZkAppEnum, ZkProgramEnum } from '../constants.js';
+import { INSTANCE_LIMITS } from '../constants.js';
 import {
-    ActionWitness,
-    EMPTY_ACTION_MT,
-    EMPTY_ADDRESS_MT,
-    ProcessedContributions,
+    ADDRESS_MT,
     ZkAppRef,
     verifyZkApp,
-} from '../storages/SharedStorage.js';
-import { ErrorEnum, EventEnum, ZkAppAction } from './constants.js';
-import { RollupContract, processAction, verifyRollup } from './Rollup.js';
+} from '../storages/AddressStorage.js';
+import {
+    PROCESS_MT,
+    ProcessWitness,
+    processAction,
+} from '../storages/ProcessStorage.js';
+import {
+    ErrorEnum,
+    EventEnum,
+    ZkAppAction,
+    ZkAppIndex,
+    ZkProgramEnum,
+} from './constants.js';
+import { RollupContract, verifyRollup } from './Rollup.js';
 import {
     RollupWitness,
     calculateActionIndex,
@@ -120,8 +129,8 @@ const ComputeResponse = ZkProgram({
             privateInputs: [CustomScalar],
             method(ski: CustomScalar) {
                 return new ComputeResponseOutput({
-                    accumulationRootR: EMPTY_LEVEL_2_TREE().getRoot(),
-                    responseRootD: EMPTY_LEVEL_2_TREE().getRoot(),
+                    accumulationRootR: REQUEST_LEVEL_2_TREE().getRoot(),
+                    responseRootD: REQUEST_LEVEL_2_TREE().getRoot(),
                     skiCommitment: Group.generator.scale(ski.toScalar()),
                     dimension: UInt8.from(0),
                 });
@@ -132,15 +141,15 @@ const ComputeResponse = ZkProgram({
                 SelfProof<Void, ComputeResponseOutput>,
                 CustomScalar,
                 Group,
-                Level2Witness,
-                Level2Witness,
+                RequestLevel2Witness,
+                RequestLevel2Witness,
             ],
             method(
                 earlierProof: SelfProof<Void, ComputeResponseOutput>,
                 ski: CustomScalar,
                 R: Group,
-                accumulationWitness: Level2Witness,
-                responseWitness: Level2Witness
+                accumulationWitness: RequestLevel2Witness,
+                responseWitness: RequestLevel2Witness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
@@ -308,9 +317,9 @@ const FinalizeResponse = ZkProgram({
 
                 // Record an empty level 2 tree
                 let nextContributionRoot = contributionWitness.calculateRoot(
-                    EMPTY_LEVEL_2_TREE().getRoot()
+                    DKG_LEVEL_2_TREE().getRoot()
                 );
-                let responseRootD = EMPTY_LEVEL_2_TREE().getRoot();
+                let responseRootD = REQUEST_LEVEL_2_TREE().getRoot();
 
                 return new FinalizeResponseOutput({
                     T,
@@ -337,7 +346,7 @@ const FinalizeResponse = ZkProgram({
                 SelfProof<FinalizeResponseInput, FinalizeResponseOutput>,
                 RequestWitness,
                 RollupWitness,
-                ActionWitness,
+                ProcessWitness,
             ],
             method(
                 input: FinalizeResponseInput,
@@ -347,7 +356,7 @@ const FinalizeResponse = ZkProgram({
                 >,
                 contributionWitness: RequestWitness,
                 rollupWitness: RollupWitness,
-                processWitness: ActionWitness
+                processWitness: ProcessWitness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
@@ -410,7 +419,7 @@ const FinalizeResponse = ZkProgram({
 
                 // Verify action is rolluped
                 let actionIndex = calculateActionIndex(
-                    Field(ZkAppEnum.RESPONSE),
+                    Field(ZkAppIndex.RESPONSE),
                     input.actionId
                 );
                 verifyRollup(
@@ -454,8 +463,8 @@ const FinalizeResponse = ZkProgram({
             privateInputs: [
                 SelfProof<FinalizeResponseInput, FinalizeResponseOutput>,
                 Group,
-                Level2Witness,
-                ActionWitness,
+                RequestLevel2Witness,
+                ProcessWitness,
             ],
             method(
                 input: FinalizeResponseInput,
@@ -464,11 +473,29 @@ const FinalizeResponse = ZkProgram({
                     FinalizeResponseOutput
                 >,
                 di: Group,
-                responseWitness: Level2Witness,
-                processWitness: ActionWitness
+                responseWitness: RequestLevel2Witness,
+                processWitness: ProcessWitness
             ) {
                 // Verify proof
                 earlierProof.verify();
+
+                // Verify response D
+                input.action.responseRootD.assertEquals(
+                    responseWitness.calculateRoot(Poseidon.hash(di.toFields())),
+                    Utils.buildAssertMessage(
+                        FinalizeResponse.name,
+                        FinalizeResponse.compute.name,
+                        ErrorEnum.RES_D_ROOT
+                    )
+                );
+                earlierProof.publicOutput.dimensionCounter.value.assertEquals(
+                    responseWitness.calculateIndex(),
+                    Utils.buildAssertMessage(
+                        FinalizeResponse.name,
+                        FinalizeResponse.compute.name,
+                        ErrorEnum.RES_D_INDEX_L2
+                    )
+                );
 
                 // Compute Lagrange coefficient
                 let lagrangeCoefficientMul = Provable.witness(
@@ -537,24 +564,6 @@ const FinalizeResponse = ZkProgram({
                     actionState,
                     earlierProof.publicOutput.nextProcessRoot,
                     processWitness
-                );
-
-                // Verify response D
-                input.action.responseRootD.assertEquals(
-                    responseWitness.calculateRoot(Poseidon.hash(di.toFields())),
-                    Utils.buildAssertMessage(
-                        FinalizeResponse.name,
-                        FinalizeResponse.compute.name,
-                        ErrorEnum.RES_D_ROOT
-                    )
-                );
-                earlierProof.publicOutput.dimensionCounter.value.assertEquals(
-                    responseWitness.calculateIndex(),
-                    Utils.buildAssertMessage(
-                        FinalizeResponse.name,
-                        FinalizeResponse.compute.name,
-                        ErrorEnum.RES_D_INDEX_L2
-                    )
                 );
 
                 return new FinalizeResponseOutput({
@@ -666,10 +675,10 @@ class ResponseContract extends SmartContract {
 
     init() {
         super.init();
-        this.zkAppRoot.set(EMPTY_ADDRESS_MT().getRoot());
-        this.contributionRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
-        this.responseRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
-        this.processRoot.set(EMPTY_ACTION_MT().getRoot());
+        this.zkAppRoot.set(ADDRESS_MT().getRoot());
+        this.contributionRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
+        this.responseRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
+        this.processRoot.set(PROCESS_MT().getRoot());
     }
 
     /**
@@ -693,7 +702,7 @@ class ResponseContract extends SmartContract {
         responseProof: ComputeResponseProof,
         keyId: Field,
         requestId: Field,
-        memberWitness: CommitteeFullWitness,
+        memberWitness: CommitteeWitness,
         publicKeyWitness: DKGWitness,
         encryptionWitness: DKGWitness,
         committee: ZkAppRef,
@@ -713,7 +722,7 @@ class ResponseContract extends SmartContract {
             ResponseContract.name,
             committee,
             zkAppRoot,
-            Field(ZkAppEnum.COMMITTEE)
+            Field(ZkAppIndex.COMMITTEE)
         );
 
         // Verify Round1Contract address
@@ -721,7 +730,7 @@ class ResponseContract extends SmartContract {
             ResponseContract.name,
             round1,
             zkAppRoot,
-            Field(ZkAppEnum.ROUND1)
+            Field(ZkAppIndex.ROUND1)
         );
 
         // Verify Round2Contract address
@@ -729,7 +738,7 @@ class ResponseContract extends SmartContract {
             ResponseContract.name,
             round2,
             zkAppRoot,
-            Field(ZkAppEnum.ROUND2)
+            Field(ZkAppIndex.ROUND2)
         );
 
         // Verify Rollup Contract address
@@ -737,7 +746,7 @@ class ResponseContract extends SmartContract {
             ResponseContract.name,
             rollup,
             zkAppRoot,
-            Field(ZkAppEnum.ROLLUP)
+            Field(ZkAppIndex.ROLLUP)
         );
 
         const committeeContract = new CommitteeContract(committee.address);
@@ -862,7 +871,7 @@ class ResponseContract extends SmartContract {
             ResponseContract.name,
             committee,
             zkAppRoot,
-            Field(ZkAppEnum.COMMITTEE)
+            Field(ZkAppIndex.COMMITTEE)
         );
 
         // Verify RequestContract address
@@ -870,7 +879,7 @@ class ResponseContract extends SmartContract {
             ResponseContract.name,
             request,
             zkAppRoot,
-            Field(ZkAppEnum.REQUEST)
+            Field(ZkAppIndex.REQUEST)
         );
 
         // Verify Rollup Contract address
@@ -878,7 +887,7 @@ class ResponseContract extends SmartContract {
             ResponseContract.name,
             rollup,
             zkAppRoot,
-            Field(ZkAppEnum.ROLLUP)
+            Field(ZkAppIndex.ROLLUP)
         );
 
         const committeeContract = new CommitteeContract(committee.address);
@@ -986,7 +995,7 @@ class ResponseContract extends SmartContract {
     verifyResponse(
         requestId: Field,
         responseRootD: Field,
-        witness: Level1Witness
+        witness: RequestLevel1Witness
     ) {
         this.responseRoot
             .getAndRequireEquals()

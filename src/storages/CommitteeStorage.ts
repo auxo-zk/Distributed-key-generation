@@ -7,177 +7,58 @@ import {
     Struct,
 } from 'o1js';
 import { INSTANCE_LIMITS } from '../constants.js';
+import { GenericStorage } from './GenericStorage.js';
 
-export const LEVEL1_TREE_HEIGHT =
-    Math.ceil(Math.log2(INSTANCE_LIMITS.COMMITTEE)) + 1;
-export const LEVEL2_TREE_HEIGHT =
-    Math.ceil(Math.log2(INSTANCE_LIMITS.MEMBER)) + 1;
-export class Level1MT extends MerkleTree {}
-export class Level1Witness extends MerkleWitness(LEVEL1_TREE_HEIGHT) {}
-export class Level2MT extends MerkleTree {}
-export class Level2Witness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
-export const EMPTY_LEVEL_1_TREE = () => new Level1MT(LEVEL1_TREE_HEIGHT);
-export const EMPTY_LEVEL_2_TREE = () => new Level2MT(LEVEL2_TREE_HEIGHT);
-export class FullMTWitness extends Struct({
+export {
+    EMPTY_LEVEL_1_TREE as COMMITTEE_LEVEL_1_TREE,
+    EMPTY_LEVEL_2_TREE as COMMITTEE_LEVEL_2_TREE,
+    Level1MT as CommitteeLevel1MT,
+    Level1Witness as CommitteeLevel1Witness,
+    Level2MT as CommitteeLevel2MT,
+    Level2Witness as CommitteeLevel2Witness,
+    FullMTWitness as CommitteeWitness,
+};
+
+export {
+    MemberLeaf,
+    MemberStorage,
+    SettingLeaf,
+    SettingStorage,
+    KeyCounterLeaf,
+    KeyCounterStorage,
+};
+
+const LEVEL1_TREE_HEIGHT = Math.ceil(Math.log2(INSTANCE_LIMITS.COMMITTEE)) + 1;
+const LEVEL2_TREE_HEIGHT = Math.ceil(Math.log2(INSTANCE_LIMITS.MEMBER)) + 1;
+class Level1MT extends MerkleTree {}
+class Level1Witness extends MerkleWitness(LEVEL1_TREE_HEIGHT) {}
+class Level2MT extends MerkleTree {}
+class Level2Witness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
+class FullMTWitness extends Struct({
     level1: Level1Witness,
     level2: Level2Witness,
 }) {}
+const EMPTY_LEVEL_1_TREE = () => new Level1MT(LEVEL1_TREE_HEIGHT);
+const EMPTY_LEVEL_2_TREE = () => new Level2MT(LEVEL2_TREE_HEIGHT);
 
-export abstract class CommitteeStrorage<RawLeaf> {
-    private _level1: Level1MT;
-    private _level2s: { [key: string]: Level2MT };
-    private _leafs: {
-        [key: string]: { raw: RawLeaf | undefined; leaf: Field };
-    };
-
+type MemberLeaf = PublicKey;
+class MemberStorage extends GenericStorage<
+    MemberLeaf,
+    Level1MT,
+    Level1Witness,
+    Level2MT,
+    Level2Witness
+> {
     constructor(
         leafs?: {
             level1Index: Field;
-            level2Index?: Field;
-            leaf: RawLeaf | Field;
+            leaf: MemberLeaf | Field;
+            isRaw: boolean;
         }[]
     ) {
-        this._level1 = EMPTY_LEVEL_1_TREE();
-        this._level2s = {};
-        this._leafs = {};
-        if (leafs) {
-            for (let i = 0; i < leafs.length; i++) {
-                if (leafs[i].leaf instanceof Field) {
-                    this.updateLeaf(
-                        {
-                            level1Index: leafs[i].level1Index,
-                            level2Index: leafs[i].level2Index,
-                        },
-                        leafs[i].leaf as Field
-                    );
-                } else {
-                    this.updateRawLeaf(
-                        {
-                            level1Index: leafs[i].level1Index,
-                            level2Index: leafs[i].level2Index,
-                        },
-                        leafs[i].leaf as RawLeaf
-                    );
-                }
-            }
-        }
+        super(EMPTY_LEVEL_1_TREE, EMPTY_LEVEL_2_TREE, leafs);
     }
 
-    get root(): Field {
-        return this._level1.getRoot();
-    }
-
-    get level1(): Level1MT {
-        return this._level1;
-    }
-
-    get level2s(): { [key: string]: Level2MT } {
-        return this._level2s;
-    }
-
-    get leafs(): { [key: string]: { raw: RawLeaf | undefined; leaf: Field } } {
-        return this._leafs;
-    }
-
-    abstract calculateLeaf(rawLeaf: RawLeaf): Field;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    abstract calculateLevel1Index(args: any): Field;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    calculateLevel2Index?(args: any): Field;
-
-    getLevel1Witness(level1Index: Field): Level1Witness {
-        return new Level1Witness(
-            this._level1.getWitness(level1Index.toBigInt())
-        );
-    }
-
-    getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
-        let level2 = this._level2s[level1Index.toString()];
-        if (level2 === undefined)
-            throw new Error('Level 2 MT does not exist at this index');
-        return new Level2Witness(level2.getWitness(level2Index.toBigInt()));
-    }
-
-    getWitness(
-        level1Index: Field,
-        level2Index?: Field
-    ): Level1Witness | FullMTWitness {
-        if (level2Index) {
-            return new FullMTWitness({
-                level1: this.getLevel1Witness(level1Index),
-                level2: this.getLevel2Witness(level1Index, level2Index),
-            });
-        } else {
-            return this.getLevel1Witness(level1Index);
-        }
-    }
-
-    updateInternal(level1Index: Field, level2: Level2MT) {
-        Object.assign(this._level2s, {
-            [level1Index.toString()]: level2,
-        });
-        this._level1.setLeaf(level1Index.toBigInt(), level2.getRoot());
-    }
-
-    updateLeaf(
-        {
-            level1Index,
-            level2Index,
-        }: { level1Index: Field; level2Index?: Field },
-        leaf: Field
-    ): void {
-        let leafId = level1Index.toString();
-        if (level2Index) {
-            leafId += '-' + level2Index.toString();
-            let level2 = this._level2s[level1Index.toString()];
-            if (level2 === undefined) level2 = EMPTY_LEVEL_2_TREE();
-
-            level2.setLeaf(level2Index.toBigInt(), leaf);
-            this.updateInternal(level1Index, level2);
-        } else this._level1.setLeaf(level1Index.toBigInt(), leaf);
-
-        this._leafs[leafId] = {
-            raw: undefined,
-            leaf: leaf,
-        };
-    }
-
-    updateRawLeaf(
-        {
-            level1Index,
-            level2Index,
-        }: { level1Index: Field; level2Index?: Field },
-        rawLeaf: RawLeaf
-    ): void {
-        let leafId = level1Index.toString();
-        let leaf = this.calculateLeaf(rawLeaf);
-        if (level2Index) {
-            leafId += '-' + level2Index.toString();
-            let level2 = this._level2s[level1Index.toString()];
-            if (level2 === undefined) level2 = EMPTY_LEVEL_2_TREE();
-
-            level2.setLeaf(level2Index.toBigInt(), leaf);
-            this.updateInternal(level1Index, level2);
-        } else this._level1.setLeaf(level1Index.toBigInt(), leaf);
-
-        this._leafs[leafId] = {
-            raw: rawLeaf,
-            leaf: leaf,
-        };
-    }
-}
-
-export type MemberLeaf = PublicKey;
-
-// export class MemberStorage extends GenericStorage<
-//   MemberLeaf,
-//   Level1MT,
-//   Level1Witness,
-//   Level2MT,
-//   Level2Witness
-// >
-
-export class MemberStorage extends CommitteeStrorage<MemberLeaf> {
     static calculateLeaf(publicKey: MemberLeaf): Field {
         return Poseidon.hash(publicKey.toFields());
     }
@@ -227,12 +108,27 @@ export class MemberStorage extends CommitteeStrorage<MemberLeaf> {
     }
 }
 
-export type SettingLeaf = {
+type SettingLeaf = {
     T: Field;
     N: Field;
 };
+class SettingStorage extends GenericStorage<
+    SettingLeaf,
+    Level1MT,
+    Level1Witness,
+    never,
+    never
+> {
+    constructor(
+        leafs?: {
+            level1Index: Field;
+            leaf: SettingLeaf | Field;
+            isRaw: boolean;
+        }[]
+    ) {
+        super(EMPTY_LEVEL_1_TREE, undefined, leafs);
+    }
 
-export class SettingStorage extends CommitteeStrorage<SettingLeaf> {
     static calculateLeaf(rawLeaf: SettingLeaf): Field {
         return Poseidon.hash([rawLeaf.T, rawLeaf.N]);
     }
@@ -265,9 +161,24 @@ export class SettingStorage extends CommitteeStrorage<SettingLeaf> {
     }
 }
 
-export type KeyCounterLeaf = Field;
+type KeyCounterLeaf = Field;
+class KeyCounterStorage extends GenericStorage<
+    KeyCounterLeaf,
+    Level1MT,
+    Level1Witness,
+    never,
+    never
+> {
+    constructor(
+        leafs?: {
+            level1Index: Field;
+            leaf: KeyCounterLeaf | Field;
+            isRaw: boolean;
+        }[]
+    ) {
+        super(EMPTY_LEVEL_1_TREE, undefined, leafs);
+    }
 
-export class KeyCounterStorage extends CommitteeStrorage<KeyCounterLeaf> {
     static calculateLeaf(nextKeyId: KeyCounterLeaf): Field {
         return nextKeyId;
     }

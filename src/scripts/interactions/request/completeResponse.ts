@@ -33,10 +33,10 @@
 // import axios from 'axios';
 // import {
 //   AddressWitness,
-//   ActionWitness,
+//   ProcessWitness,
 //   ZkAppRef,
 // } from '../../../contracts/SharedStorage.js';
-// import { ZkAppEnum } from '../../../constants.js';
+// import { ZkAppIndex } from '../../../constants.js';
 // import { RollupRound2, FinalizeRound2Input } from '../../../contracts/Round2.js';
 // import { EncryptionHashArray } from '../../../libs/Committee.js';
 
@@ -183,7 +183,7 @@
 //         }),
 //         Round2ContributionStorage.calculateLevel2Index(action.memberId)
 //       ),
-//       ActionWitness.fromJSON(reduce[actionHashes[i].toString()])
+//       ProcessWitness.fromJSON(reduce[actionHashes[i].toString()])
 //     );
 //     console.log('Done');
 
@@ -226,11 +226,11 @@
 //         ),
 //         new ZkAppRef({
 //           address: PublicKey.fromBase58(committeeAddress),
-//           witness: AddressWitness.fromJSON(round2ZkApp[ZkAppEnum.COMMITTEE]),
+//           witness: AddressWitness.fromJSON(round2ZkApp[ZkAppIndex.COMMITTEE]),
 //         }),
 //         new ZkAppRef({
 //           address: PublicKey.fromBase58(dkgAddress),
-//           witness: AddressWitness.fromJSON(round2ZkApp[ZkAppEnum.DKG]),
+//           witness: AddressWitness.fromJSON(round2ZkApp[ZkAppIndex.DKG]),
 //         }),
 //         CommitteeLevel1Witness.fromJSON(
 //           setting[Number(SettingStorage.calculateLevel1Index(committeeId))]

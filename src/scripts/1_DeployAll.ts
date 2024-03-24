@@ -31,7 +31,7 @@
 // } from '../contracts/Response.js';
 // import { BatchDecryption, BatchEncryption } from '../contracts/Encryption.js';
 // import { AddressStorage } from '../storages/SharedStorage.js';
-// import { ZkAppEnum, Contract } from '../constants.js';
+// import { ZkAppIndex, Contract } from '../constants.js';
 // import { RequestContract, UpdateRequest } from '../contracts/Request.js';
 
 // function waitConfig(time: number): Promise<void> {
@@ -273,25 +273,25 @@
 //     await deploy(feePayerKey, 'CommitteeContract', [], fee, ++feePayerNonce);
 
 //     dkgAddressStorage.updateLeaf(
-//         dkgAddressStorage.calculateIndex(ZkAppEnum.COMMITTEE),
+//         dkgAddressStorage.calculateIndex(ZkAppIndex.COMMITTEE),
 //         dkgAddressStorage.calculateLeaf(
 //             contracts[Contract.COMMITTEE].contract.address
 //         )
 //     );
 //     round1AddressStorage.updateLeaf(
-//         round1AddressStorage.calculateIndex(ZkAppEnum.COMMITTEE),
+//         round1AddressStorage.calculateIndex(ZkAppIndex.COMMITTEE),
 //         round1AddressStorage.calculateLeaf(
 //             contracts[Contract.COMMITTEE].contract.address
 //         )
 //     );
 //     round2AddressStorage.updateLeaf(
-//         round2AddressStorage.calculateIndex(ZkAppEnum.COMMITTEE),
+//         round2AddressStorage.calculateIndex(ZkAppIndex.COMMITTEE),
 //         round2AddressStorage.calculateLeaf(
 //             contracts[Contract.COMMITTEE].contract.address
 //         )
 //     );
 //     responseAddressStorage.updateLeaf(
-//         responseAddressStorage.calculateIndex(ZkAppEnum.COMMITTEE),
+//         responseAddressStorage.calculateIndex(ZkAppIndex.COMMITTEE),
 //         responseAddressStorage.calculateLeaf(
 //             contracts[Contract.COMMITTEE].contract.address
 //         )
@@ -306,19 +306,19 @@
 //         ++feePayerNonce
 //     );
 //     round1AddressStorage.updateLeaf(
-//         round1AddressStorage.calculateIndex(ZkAppEnum.DKG),
+//         round1AddressStorage.calculateIndex(ZkAppIndex.DKG),
 //         round1AddressStorage.calculateLeaf(
 //             contracts[Contract.DKG].contract.address
 //         )
 //     );
 //     round2AddressStorage.updateLeaf(
-//         round2AddressStorage.calculateIndex(ZkAppEnum.DKG),
+//         round2AddressStorage.calculateIndex(ZkAppIndex.DKG),
 //         round2AddressStorage.calculateLeaf(
 //             contracts[Contract.DKG].contract.address
 //         )
 //     );
 //     responseAddressStorage.updateLeaf(
-//         responseAddressStorage.calculateIndex(ZkAppEnum.DKG),
+//         responseAddressStorage.calculateIndex(ZkAppIndex.DKG),
 //         responseAddressStorage.calculateLeaf(
 //             contracts[Contract.DKG].contract.address
 //         )
@@ -333,13 +333,13 @@
 //         ++feePayerNonce
 //     );
 //     round2AddressStorage.updateLeaf(
-//         round2AddressStorage.calculateIndex(ZkAppEnum.ROUND1),
+//         round2AddressStorage.calculateIndex(ZkAppIndex.ROUND1),
 //         round2AddressStorage.calculateLeaf(
 //             contracts[Contract.ROUND1].contract.address
 //         )
 //     );
 //     responseAddressStorage.updateLeaf(
-//         responseAddressStorage.calculateIndex(ZkAppEnum.ROUND1),
+//         responseAddressStorage.calculateIndex(ZkAppIndex.ROUND1),
 //         responseAddressStorage.calculateLeaf(
 //             contracts[Contract.ROUND1].contract.address
 //         )
@@ -354,14 +354,14 @@
 //         ++feePayerNonce
 //     );
 //     responseAddressStorage.updateLeaf(
-//         responseAddressStorage.calculateIndex(ZkAppEnum.ROUND2),
+//         responseAddressStorage.calculateIndex(ZkAppIndex.ROUND2),
 //         responseAddressStorage.calculateLeaf(
 //             contracts[Contract.ROUND2].contract.address
 //         )
 //     );
 
 //     responseAddressStorage.updateLeaf(
-//         responseAddressStorage.calculateIndex(ZkAppEnum.REQUEST),
+//         responseAddressStorage.calculateIndex(ZkAppIndex.REQUEST),
 //         responseAddressStorage.calculateLeaf(
 //             contracts[Contract.REQUEST].contract.address
 //         )

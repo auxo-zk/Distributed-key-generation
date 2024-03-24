@@ -19,16 +19,17 @@ import {
     Round2Contribution,
 } from '../libs/Committee.js';
 import {
-    FullMTWitness as CommitteeFullWitness,
-    Level1Witness as CommitteeLevel1Witness,
+    CommitteeWitness,
+    CommitteeLevel1Witness,
 } from '../storages/CommitteeStorage.js';
 import {
     calculateKeyIndex,
-    FullMTWitness as DKGWitness,
-    EMPTY_LEVEL_1_TREE,
-    EMPTY_LEVEL_2_TREE,
-    Level1Witness as DkgLevel1Witness,
-} from '../storages/DKGStorage.js';
+    DKGWitness,
+    DKG_LEVEL_1_TREE,
+    DKG_LEVEL_2_TREE,
+    DkgLevel1Witness,
+    ProcessedContributions,
+} from '../storages/DkgStorage.js';
 import {
     CommitteeConfigInput,
     CommitteeMemberInput,
@@ -42,17 +43,25 @@ import {
 } from './DKG.js';
 import { BatchEncryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
-import { INSTANCE_LIMITS, ZkAppEnum, ZkProgramEnum } from '../constants.js';
+import { INSTANCE_LIMITS } from '../constants.js';
 import {
-    ActionWitness,
-    EMPTY_ACTION_MT,
-    EMPTY_ADDRESS_MT,
-    ProcessedContributions,
+    ADDRESS_MT,
     verifyZkApp,
     ZkAppRef,
-} from '../storages/SharedStorage.js';
-import { ErrorEnum, EventEnum, ZkAppAction } from './constants.js';
-import { processAction, RollupContract, verifyRollup } from './Rollup.js';
+} from '../storages/AddressStorage.js';
+import {
+    PROCESS_MT,
+    ProcessWitness,
+    processAction,
+} from '../storages/ProcessStorage.js';
+import {
+    ErrorEnum,
+    EventEnum,
+    ZkAppAction,
+    ZkAppIndex,
+    ZkProgramEnum,
+} from './constants.js';
+import { RollupContract, verifyRollup } from './Rollup.js';
 import {
     calculateActionIndex,
     RollupWitness,
@@ -170,7 +179,7 @@ const FinalizeRound2 = ZkProgram({
 
                 // Record an empty level 2 tree
                 let nextContributionRoot = contributionWitness.calculateRoot(
-                    EMPTY_LEVEL_2_TREE().getRoot()
+                    DKG_LEVEL_2_TREE().getRoot()
                 );
 
                 return new FinalizeRound2Output({
@@ -192,7 +201,7 @@ const FinalizeRound2 = ZkProgram({
                 SelfProof<FinalizeRound2Input, FinalizeRound2Output>,
                 DKGWitness,
                 RollupWitness,
-                ActionWitness,
+                ProcessWitness,
             ],
             method(
                 input: FinalizeRound2Input,
@@ -202,7 +211,7 @@ const FinalizeRound2 = ZkProgram({
                 >,
                 contributionWitness: DKGWitness,
                 rollupWitness: RollupWitness,
-                processWitness: ActionWitness
+                processWitness: ProcessWitness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
@@ -300,7 +309,7 @@ const FinalizeRound2 = ZkProgram({
 
                 // Verify action is rolluped
                 let actionIndex = calculateActionIndex(
-                    Field(ZkAppEnum.ROUND2),
+                    Field(ZkAppIndex.ROUND2),
                     input.actionId
                 );
                 verifyRollup(
@@ -354,21 +363,25 @@ class FinalizeRound2Proof extends ZkProgram.Proof(FinalizeRound2) {}
 class Round2Contract extends SmartContract {
     /**
      * @description MT storing addresses of other zkApps
+     * @see AddressStorage for off-chain storage implementation
      */
     @state(Field) zkAppRoot = State<Field>();
 
     /**
      * @description MT storing members' contributions
+     * @see Round2ContributionStorage for off-chain storage implementation
      */
     @state(Field) contributionRoot = State<Field>();
 
     /**
      * @description MT storing members' encryption hashes
+     * @see EncryptionStorage for off-chain storage implementation
      */
     @state(Field) encryptionRoot = State<Field>();
 
     /**
      * @description MT storing actions' process state
+     * @see ProcessStorage for off-chain storage implementation
      */
     @state(Field) processRoot = State<Field>();
 
@@ -381,10 +394,10 @@ class Round2Contract extends SmartContract {
 
     init() {
         super.init();
-        this.zkAppRoot.set(EMPTY_ADDRESS_MT().getRoot());
-        this.contributionRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
-        this.encryptionRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
-        this.processRoot.set(EMPTY_ACTION_MT().getRoot());
+        this.zkAppRoot.set(ADDRESS_MT().getRoot());
+        this.contributionRoot.set(DKG_LEVEL_1_TREE().getRoot());
+        this.encryptionRoot.set(DKG_LEVEL_1_TREE().getRoot());
+        this.processRoot.set(PROCESS_MT().getRoot());
     }
 
     /**
@@ -400,7 +413,7 @@ class Round2Contract extends SmartContract {
     contribute(
         keyId: Field,
         proof: BatchEncryptionProof,
-        memberWitness: CommitteeFullWitness,
+        memberWitness: CommitteeWitness,
         publicKeysWitness: DkgLevel1Witness,
         committee: ZkAppRef,
         round1: ZkAppRef,
@@ -418,7 +431,7 @@ class Round2Contract extends SmartContract {
             Round2Contract.name,
             committee,
             zkAppRoot,
-            Field(ZkAppEnum.COMMITTEE)
+            Field(ZkAppIndex.COMMITTEE)
         );
 
         // Verify Round1Contract address
@@ -426,7 +439,7 @@ class Round2Contract extends SmartContract {
             Round2Contract.name,
             round1,
             zkAppRoot,
-            Field(ZkAppEnum.ROUND1)
+            Field(ZkAppIndex.ROUND1)
         );
 
         // Verify Rollup Contract address
@@ -434,7 +447,7 @@ class Round2Contract extends SmartContract {
             Round2Contract.name,
             rollup,
             zkAppRoot,
-            Field(ZkAppEnum.ROLLUP)
+            Field(ZkAppIndex.ROLLUP)
         );
 
         const committeeContract = new CommitteeContract(committee.address);
@@ -468,7 +481,7 @@ class Round2Contract extends SmartContract {
         // Verify round 1 public keys (C0[])
         // @todo Remove Provable.witness or adding assertion
         let publicKeysLeaf = Provable.witness(Field, () => {
-            let publicKeysMT = EMPTY_LEVEL_2_TREE();
+            let publicKeysMT = DKG_LEVEL_2_TREE();
             for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
                 let value = Provable.if(
                     Field(i).greaterThanOrEqual(
@@ -541,18 +554,18 @@ class Round2Contract extends SmartContract {
             Round2Contract.name,
             committee,
             zkAppRoot,
-            Field(ZkAppEnum.COMMITTEE)
+            Field(ZkAppIndex.COMMITTEE)
         );
 
         // Verify Round1Contract address
-        verifyZkApp(Round2Contract.name, dkg, zkAppRoot, Field(ZkAppEnum.DKG));
+        verifyZkApp(Round2Contract.name, dkg, zkAppRoot, Field(ZkAppIndex.DKG));
 
         // Verify Rollup Contract address
         verifyZkApp(
             Round2Contract.name,
             rollup,
             zkAppRoot,
-            Field(ZkAppEnum.ROLLUP)
+            Field(ZkAppIndex.ROLLUP)
         );
 
         const committeeContract = new CommitteeContract(committee.address);
@@ -617,7 +630,7 @@ class Round2Contract extends SmartContract {
         // Verify encryption witness
         // @todo Remove Provable.witness or adding assertion
         let encryptionLeaf = Provable.witness(Field, () => {
-            let encryptionHashesMT = EMPTY_LEVEL_2_TREE();
+            let encryptionHashesMT = DKG_LEVEL_2_TREE();
             for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
                 let value = Provable.if(
                     Field(i).greaterThanOrEqual(

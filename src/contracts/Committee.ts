@@ -14,15 +14,20 @@ import {
     Void,
 } from 'o1js';
 import { IpfsHash, Utils } from '@auxo-dev/auxo-libs';
-import { INSTANCE_LIMITS, ZkProgramEnum } from '../constants.js';
 import {
-    EMPTY_LEVEL_1_TREE,
-    EMPTY_LEVEL_2_TREE,
-    Level1Witness,
-    FullMTWitness,
+    COMMITTEE_LEVEL_1_TREE,
+    COMMITTEE_LEVEL_2_TREE,
+    CommitteeLevel1Witness,
+    CommitteeWitness,
 } from '../storages/CommitteeStorage.js';
 import { MemberArray } from '../libs/Committee.js';
-import { ErrorEnum, EventEnum, ZkAppAction } from './constants.js';
+import { INSTANCE_LIMITS } from '../constants.js';
+import {
+    ErrorEnum,
+    EventEnum,
+    ZkAppAction,
+    ZkProgramEnum,
+} from './constants.js';
 import { rollup } from './Rollup.js';
 
 export {
@@ -43,6 +48,13 @@ class Action
     })
     implements ZkAppAction
 {
+    static empty(): Action {
+        return new Action({
+            addresses: new MemberArray(),
+            threshold: Field(0),
+            ipfsHash: IpfsHash.empty(),
+        });
+    }
     static fromFields(fields: Field[]): Action {
         return super.fromFields(fields) as Action;
     }
@@ -55,14 +67,14 @@ class CommitteeMemberInput extends Struct({
     address: PublicKey,
     committeeId: Field,
     memberId: Field,
-    memberWitness: FullMTWitness,
+    memberWitness: CommitteeWitness,
 }) {}
 
 class CommitteeConfigInput extends Struct({
     N: Field,
     T: Field,
     committeeId: Field,
-    settingWitness: Level1Witness,
+    settingWitness: CommitteeLevel1Witness,
 }) {}
 
 class UpdateCommitteeOutput extends Struct({
@@ -104,14 +116,14 @@ const UpdateCommittee = ZkProgram({
             privateInputs: [
                 SelfProof<Void, UpdateCommitteeOutput>,
                 Action,
-                Level1Witness,
-                Level1Witness,
+                CommitteeLevel1Witness,
+                CommitteeLevel1Witness,
             ],
             method(
                 earlierProof: SelfProof<Void, UpdateCommitteeOutput>,
                 input: Action,
-                memberWitness: Level1Witness,
-                settingWitness: Level1Witness
+                memberWitness: CommitteeLevel1Witness,
+                settingWitness: CommitteeLevel1Witness
             ): UpdateCommitteeOutput {
                 // Verify earlier proof
                 earlierProof.verify();
@@ -157,7 +169,7 @@ const UpdateCommittee = ZkProgram({
                 );
 
                 // Create new level 2 MT for committee members' public keys
-                let level2MT = EMPTY_LEVEL_2_TREE();
+                let level2MT = COMMITTEE_LEVEL_2_TREE();
                 for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
                     let value = Provable.if(
                         Field(i).greaterThanOrEqual(input.addresses.length),
@@ -173,27 +185,24 @@ const UpdateCommittee = ZkProgram({
                 );
 
                 // update setting tree with hash [t,n]
+                let nextActionState = Utils.updateActionState(
+                    earlierProof.publicOutput.nextActionState,
+                    [Action.toFields(input)]
+                );
                 let nextSettingRoot = settingWitness.calculateRoot(
                     Poseidon.hash([input.threshold, input.addresses.length])
                 );
+                let nextCommitteeId =
+                    earlierProof.publicOutput.nextCommitteeId.add(Field(1));
 
                 return new UpdateCommitteeOutput({
-                    initialActionState:
-                        earlierProof.publicOutput.initialActionState,
-                    initialMemberRoot:
-                        earlierProof.publicOutput.initialMemberRoot,
-                    initialSettingRoot:
-                        earlierProof.publicOutput.initialSettingRoot,
-                    initialCommitteeId:
-                        earlierProof.publicOutput.initialCommitteeId,
-                    nextActionState: Utils.updateActionState(
-                        earlierProof.publicOutput.nextActionState,
-                        [Action.toFields(input)]
-                    ),
-                    nextMemberRoot: nextMemberRoot,
-                    nextSettingRoot: nextSettingRoot,
-                    nextCommitteeId:
-                        earlierProof.publicOutput.nextCommitteeId.add(Field(1)),
+                    ...earlierProof.publicOutput,
+                    ...{
+                        nextActionState,
+                        nextMemberRoot,
+                        nextSettingRoot,
+                        nextCommitteeId,
+                    },
                 });
             },
         },
@@ -209,6 +218,7 @@ class UpdateCommitteeProof extends ZkProgram.Proof(UpdateCommittee) {}
 class CommitteeContract extends SmartContract {
     /**
      * @description MT storing addresses of other zkApps
+     * @see AddressStorage for off-chain storage implementation
      */
     @state(Field) zkAppRoot = State<Field>();
 
@@ -219,12 +229,14 @@ class CommitteeContract extends SmartContract {
 
     /**
      * @description MT storing committees' members
+     * @see MemberStorage for off-chain storage implementation
      */
     @state(Field) memberRoot = State<Field>();
 
     /**
      * @description MT storing committees' threshold config (T/N)
      * @todo Change 'setting' to 'config'
+     * @see SettingStorage  for off-chain storage implementation
      */
     @state(Field) settingRoot = State<Field>();
 
@@ -253,8 +265,8 @@ class CommitteeContract extends SmartContract {
 
     init() {
         super.init();
-        this.memberRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
-        this.settingRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
+        this.memberRoot.set(COMMITTEE_LEVEL_1_TREE().getRoot());
+        this.settingRoot.set(COMMITTEE_LEVEL_1_TREE().getRoot());
         this.actionState.set(Reducer.initialActionState);
     }
 

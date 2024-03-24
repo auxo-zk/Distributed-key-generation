@@ -1,7 +1,7 @@
 import { Field, Mina, PublicKey, Group, Scalar } from 'o1js';
 import { compile, fetchZkAppState, proveAndSend } from '../../helper/deploy.js';
 import { prepare } from '../prepare.js';
-import { KeyStatusStorage } from '../../../storages/DKGStorage.js';
+import { KeyStatusStorage } from '../../../storages/DkgStorage.js';
 import { KeyCounterStorage } from '../../../storages/CommitteeStorage.js';
 import { UpdateRequest } from '../../../contracts/Request.js';
 import { RequestContract } from '../../../contracts/Request.js';

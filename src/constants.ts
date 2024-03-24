@@ -9,55 +9,7 @@ export {
     ROLLUP_BATCH_MAX_SIZE,
     SECRET_MAX,
     SECRET_UNIT,
-    ZkAppEnum,
-    ZkProgramEnum,
-    Contract,
 };
-
-/**
- * Indexes of zkApps in the address storage
- */
-enum ZkAppEnum {
-    ROLLUP,
-    COMMITTEE,
-    DKG,
-    ROUND1,
-    ROUND2,
-    RESPONSE,
-    REQUEST,
-    __LENGTH,
-}
-
-enum ZkProgramEnum {
-    Elgamal = 'Elgamal',
-    BatchEncryption = 'BatchEncryption',
-    BatchDecryption = 'BatchDecryption',
-
-    Rollup = 'Rollup',
-
-    UpdateCommittee = 'UpdateCommittee',
-    UpdateKey = 'UpdateKey',
-    FinalizeRound1 = 'FinalizeRound1',
-    FinalizeRound2 = 'FinalizeRound2',
-    ComputeResponse = 'ComputeResponse',
-    FinalizeResponse = 'FinalizeResponse',
-    ComputeResult = 'ComputeResult',
-    UpdateRequest = 'UpdateRequest',
-    UpdateTask = 'UpdateTask',
-}
-
-/**
- * All zkApp/smart contract names
- */
-enum Contract {
-    COMMITTEE = 'committee',
-    DKG = 'dkg',
-    ROUND1 = 'round1',
-    ROUND2 = 'round2',
-    RESPONSE = 'response',
-    REQUEST = 'request',
-    ROLLUP = 'rollup',
-}
 
 /**
  * Maximum amount of action processed in a recursive proof
@@ -74,16 +26,18 @@ const INDEX_SIZE = 6;
  */
 const INSTANCE_LIMITS = {
     ACTION: 2 ** 10,
-    ADDRESS: ZkAppEnum.__LENGTH,
+    ADDRESS: 2 ** 8,
     MEMBER: 3,
     COMMITTEE: 2 ** 6,
     KEY: 2 ** 6,
     REQUEST: 2 ** 8,
+    REQUESTER: 2 ** 3,
 };
 
 const ENCRYPTION_LIMITS = {
     DIMENSION: 3,
     FULL_DIMENSION: 2 ** 6,
+    SUBMISSION: 2 ** 10,
 };
 
 /**

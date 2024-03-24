@@ -17,12 +17,7 @@ import {
     UInt32,
 } from 'o1js';
 import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
-import {
-    ENCRYPTION_LIMITS,
-    REQUEST_EXPIRATION,
-    ZkAppEnum,
-    ZkProgramEnum,
-} from '../constants.js';
+import { ENCRYPTION_LIMITS, REQUEST_EXPIRATION } from '../constants.js';
 import {
     CommitmentArray,
     NullifierArray,
@@ -32,22 +27,25 @@ import {
 } from '../libs/Requester.js';
 import { rollup } from './Rollup.js';
 import {
-    EMPTY_ADDRESS_MT,
+    ADDRESS_MT,
     ZkAppRef,
     verifyZkApp,
-} from '../storages/SharedStorage.js';
+} from '../storages/AddressStorage.js';
 import {
-    Level1Witness,
-    EMPTY_LEVEL_1_TREE as REQUESTER_LEVEL_1_TREE,
-} from '../storages/RequestStorage.js';
-import { ErrorEnum, ZkAppAction } from './constants.js';
-import { Level1Witness as DkgLevel1Witness } from '../storages/DKGStorage.js';
+    RequesterLevel1Witness,
+    REQUESTER_LEVEL_1_TREE,
+} from '../storages/RequesterStorage.js';
+import {
+    ErrorEnum,
+    ZkAppAction,
+    ZkAppIndex,
+    ZkProgramEnum,
+} from './constants.js';
+import { DkgLevel1Witness } from '../storages/DkgStorage.js';
 import { DkgContract } from './DKG.js';
 import { RequestContract } from './Request.js';
-import {
-    AccumulationWitnesses,
-    CommitmentWitnesses,
-} from '../storages/RequesterStorage.js';
+import { CommitmentWitnesses } from '../storages/RequesterStorage.js';
+import { GroupVectorWitnesses } from '../storages/RequestStorage.js';
 
 export {
     Action as RequesterAction,
@@ -146,14 +144,14 @@ const UpdateTask = ZkProgram({
         create: {
             privateInputs: [
                 SelfProof<UpdateTaskInput, UpdateTaskOutput>,
-                Level1Witness,
-                Level1Witness,
+                RequesterLevel1Witness,
+                RequesterLevel1Witness,
             ],
             method(
                 input: UpdateTaskInput,
                 earlierProof: SelfProof<UpdateTaskInput, UpdateTaskOutput>,
-                keyIndexWitness: Level1Witness,
-                timestampWitness: Level1Witness
+                keyIndexWitness: RequesterLevel1Witness,
+                timestampWitness: RequesterLevel1Witness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
@@ -222,9 +220,9 @@ const UpdateTask = ZkProgram({
                 SelfProof<UpdateTaskInput, UpdateTaskOutput>,
                 Group,
                 Group,
-                Level1Witness,
-                AccumulationWitnesses,
-                AccumulationWitnesses,
+                RequesterLevel1Witness,
+                GroupVectorWitnesses,
+                GroupVectorWitnesses,
                 CommitmentWitnesses,
             ],
 
@@ -233,9 +231,9 @@ const UpdateTask = ZkProgram({
                 earlierProof: SelfProof<UpdateTaskInput, UpdateTaskOutput>,
                 R: Group,
                 M: Group,
-                accumulationWitness: Level1Witness,
-                accumulationWitnessesR: AccumulationWitnesses,
-                accumulationWitnessesM: AccumulationWitnesses,
+                accumulationWitness: RequesterLevel1Witness,
+                accumulationWitnessesR: GroupVectorWitnesses,
+                accumulationWitnessesM: GroupVectorWitnesses,
                 commitmentWitnesses: CommitmentWitnesses
             ) {
                 // Verify earlier proof
@@ -380,6 +378,8 @@ enum AddressBook {
 }
 
 class RequesterContract extends SmartContract {
+    static readonly AddressBook = AddressBook;
+
     /**
      * @description MT storing addresses of other zkApps
      */
@@ -387,16 +387,19 @@ class RequesterContract extends SmartContract {
 
     /**
      * @description MT storing corresponding keys
+     * @see RequesterKeyIndexStorage for off-chain storage implementation
      */
     @state(Field) keyIndexRoot = State<Field>();
 
     /**
      * @description MT storing finalize timestamps for tasks
+     * @see TimestampStorage for off-chain storage implementation
      */
     @state(Field) timestampRoot = State<Field>();
 
     /**
-     * @description MT storing latest accumulation data Hash(R | M | counter)
+     * @description MT storing latest accumulation data Hash(R | M)
+     * @see RequesterAccumulationStorage for off-chain storage implementation
      */
     @state(Field) accumulationRoot = State<Field>();
 
@@ -407,6 +410,7 @@ class RequesterContract extends SmartContract {
 
     /**
      * @description MT storing anonymous commitments
+     * @see CommitmentStorage for off-chain storage implementation
      */
     @state(Field) commitmentRoot = State<Field>();
 
@@ -424,7 +428,7 @@ class RequesterContract extends SmartContract {
 
     init() {
         super.init();
-        this.zkAppRoot.set(EMPTY_ADDRESS_MT().getRoot());
+        this.zkAppRoot.set(ADDRESS_MT().getRoot());
         this.keyIndexRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.timestampRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.accumulationRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
@@ -452,7 +456,7 @@ class RequesterContract extends SmartContract {
             RequesterContract.name,
             taskManagerRef,
             zkAppRoot,
-            Field(AddressBook.TASK_MANAGER)
+            Field(RequesterContract.AddressBook.TASK_MANAGER)
         );
 
         // Create and dispatch action
@@ -486,7 +490,7 @@ class RequesterContract extends SmartContract {
         nullifiers: NullifierArray,
         publicKey: Group,
         publicKeyWitness: DkgLevel1Witness,
-        keyIndexWitness: Level1Witness,
+        keyIndexWitness: RequesterLevel1Witness,
         submissionProxy: ZkAppRef,
         dkg: ZkAppRef
     ) {
@@ -499,7 +503,7 @@ class RequesterContract extends SmartContract {
             RequesterContract.name,
             dkg,
             zkAppRoot,
-            Field(AddressBook.DKG)
+            Field(RequesterContract.AddressBook.DKG)
         );
 
         // Verify call from Submission Proxy Contract
@@ -508,7 +512,7 @@ class RequesterContract extends SmartContract {
             RequesterContract.name,
             submissionProxy,
             zkAppRoot,
-            Field(AddressBook.SUBMISSION_PROXY)
+            Field(RequesterContract.AddressBook.SUBMISSION_PROXY)
         );
 
         const dkgContract = new DkgContract(dkg.address);
@@ -654,8 +658,8 @@ class RequesterContract extends SmartContract {
         keyIndex: Field,
         accumulationRootR: Field,
         accumulationRootM: Field,
-        keyIndexWitness: Level1Witness,
-        accumulationWitness: Level1Witness,
+        keyIndexWitness: RequesterLevel1Witness,
+        accumulationWitness: RequesterLevel1Witness,
         request: ZkAppRef
     ) {
         // Get current state values
@@ -666,7 +670,7 @@ class RequesterContract extends SmartContract {
             RequesterContract.name,
             request,
             zkAppRoot,
-            Field(ZkAppEnum.REQUEST)
+            Field(ZkAppIndex.REQUEST)
         );
         const requestContract = new RequestContract(request.address);
 
@@ -701,7 +705,11 @@ class RequesterContract extends SmartContract {
      * @param keyIndex Corresponding key index
      * @param witness Witness for proof of key index value
      */
-    verifyKeyIndex(taskId: Field, keyIndex: Field, witness: Level1Witness) {
+    verifyKeyIndex(
+        taskId: Field,
+        keyIndex: Field,
+        witness: RequesterLevel1Witness
+    ) {
         this.keyIndexRoot
             .getAndRequireEquals()
             .assertEquals(
@@ -733,7 +741,7 @@ class RequesterContract extends SmartContract {
         requestId: Field,
         accumulationRootR: Field,
         accumulationRootM: Field,
-        witness: Level1Witness
+        witness: RequesterLevel1Witness
     ) {
         this.accumulationRoot
             .getAndRequireEquals()

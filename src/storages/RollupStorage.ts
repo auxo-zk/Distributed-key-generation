@@ -1,33 +1,39 @@
 import { Field, MerkleTree, MerkleWitness } from 'o1js';
 import { GenericStorage } from './GenericStorage.js';
 import { INSTANCE_LIMITS } from '../constants.js';
-import {
-    AddressMT,
-    AddressWitness,
-    EMPTY_ADDRESS_MT,
-} from './SharedStorage.js';
+import { AddressMT, AddressWitness, ADDRESS_MT } from './AddressStorage.js';
 
-export const ROLLUP_TREE_HEIGHT =
+export { ROLLUP_MT, ROLLUP_COUNTER_MT, calculateActionIndex };
+
+export {
+    RollupMT,
+    RollupWitness,
+    RollupLeaf,
+    RollupStorage,
+    RollupCounterMT,
+    RollupCounterWitness,
+    RollupCounterLeaf,
+    RollupCounterStorage,
+};
+
+const ROLLUP_TREE_HEIGHT =
     Math.ceil(Math.log2(INSTANCE_LIMITS.ADDRESS * INSTANCE_LIMITS.ACTION)) + 1;
-export class RollupMT extends MerkleTree {}
-export class RollupWitness extends MerkleWitness(ROLLUP_TREE_HEIGHT) {}
-export const EMPTY_ROLLUP_MT = () => new RollupMT(ROLLUP_TREE_HEIGHT);
-export class RollupCounterMT extends AddressMT {}
-export class RollupCounterWitness extends AddressWitness {}
-export const EMPTY_ROLLUP_COUNTER_MT = EMPTY_ADDRESS_MT;
+class RollupMT extends MerkleTree {}
+class RollupWitness extends MerkleWitness(ROLLUP_TREE_HEIGHT) {}
+const ROLLUP_MT = () => new RollupMT(ROLLUP_TREE_HEIGHT);
+class RollupCounterMT extends AddressMT {}
+class RollupCounterWitness extends AddressWitness {}
+const ROLLUP_COUNTER_MT = ADDRESS_MT;
 
-export function calculateActionIndex(
-    zkAppIndex: Field,
-    actionId: Field
-): Field {
+function calculateActionIndex(zkAppIndex: Field, actionId: Field): Field {
     return Field.from(BigInt(INSTANCE_LIMITS.ACTION))
         .mul(zkAppIndex)
         .add(actionId);
 }
 
-export type RollupLeaf = Field;
+type RollupLeaf = Field;
 
-export class RollupStorage extends GenericStorage<
+class RollupStorage extends GenericStorage<
     RollupLeaf,
     RollupMT,
     RollupWitness,
@@ -41,7 +47,7 @@ export class RollupStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_ROLLUP_MT, undefined, leafs);
+        super(ROLLUP_MT, undefined, leafs);
     }
 
     static calculateLeaf(actionHash: RollupLeaf): Field {
@@ -91,9 +97,9 @@ export class RollupStorage extends GenericStorage<
     }
 }
 
-export type RollupCounterLeaf = Field;
+type RollupCounterLeaf = Field;
 
-export class RollupCounterStorage extends GenericStorage<
+class RollupCounterStorage extends GenericStorage<
     RollupCounterLeaf,
     RollupCounterMT,
     RollupCounterWitness,
@@ -107,7 +113,7 @@ export class RollupCounterStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_ROLLUP_COUNTER_MT, undefined, leafs);
+        super(ROLLUP_COUNTER_MT, undefined, leafs);
     }
 
     static calculateLeaf(counter: RollupCounterLeaf): Field {

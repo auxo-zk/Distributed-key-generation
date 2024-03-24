@@ -1,15 +1,70 @@
 import { Field } from 'o1js';
 
-export type ZkAppAction = {
+export {
+    ZkAppAction,
+    ZkAppIndex,
+    ZkAppEnum,
+    ZkProgramEnum,
+    EventEnum,
+    ErrorEnum,
+};
+
+type ZkAppAction = {
     hash(): Field;
 };
 
-export enum EventEnum {
+/**
+ * Indexes of zkApps in the address storage
+ */
+enum ZkAppIndex {
+    ROLLUP,
+    COMMITTEE,
+    DKG,
+    ROUND1,
+    ROUND2,
+    RESPONSE,
+    REQUEST,
+    __LENGTH,
+}
+
+enum ZkProgramEnum {
+    Elgamal = 'Elgamal',
+    BatchEncryption = 'BatchEncryption',
+    BatchDecryption = 'BatchDecryption',
+
+    Rollup = 'Rollup',
+
+    UpdateCommittee = 'UpdateCommittee',
+    UpdateKey = 'UpdateKey',
+    FinalizeRound1 = 'FinalizeRound1',
+    FinalizeRound2 = 'FinalizeRound2',
+    ComputeResponse = 'ComputeResponse',
+    FinalizeResponse = 'FinalizeResponse',
+    ComputeResult = 'ComputeResult',
+    UpdateRequest = 'UpdateRequest',
+    UpdateTask = 'UpdateTask',
+}
+
+/**
+ * All zkApp/smart contract names
+ */
+enum ZkAppEnum {
+    COMMITTEE = 'Committee',
+    DKG = 'Dkg',
+    ROUND1 = 'Round1',
+    ROUND2 = 'Round2',
+    REQUEST = 'Request',
+    REQUESTER = 'Requester',
+    RESPONSE = 'Response',
+    ROLLUP = 'Rollup',
+}
+
+enum EventEnum {
     ROLLUPED = 'actions-rolluped',
     PROCESSED = 'actions-processed',
 }
 
-export enum ErrorEnum {
+enum ErrorEnum {
     // Address errors
     ZKAPP_ROOT = 'Incorrect zkApp MT root',
     ZKAPP_INDEX = 'Incorrect zkApp MT index',

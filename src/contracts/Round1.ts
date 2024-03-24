@@ -15,16 +15,17 @@ import {
 import { Utils } from '@auxo-dev/auxo-libs';
 import { CArray, Round1Contribution } from '../libs/Committee.js';
 import {
-    FullMTWitness as CommitteeFullWitness,
-    Level1Witness as CommitteeLevel1Witness,
+    CommitteeWitness,
+    CommitteeLevel1Witness,
 } from '../storages/CommitteeStorage.js';
 import {
-    FullMTWitness as DKGWitness,
-    EMPTY_LEVEL_1_TREE,
-    EMPTY_LEVEL_2_TREE,
-    Level1Witness as DkgLevel1Witness,
+    DKGWitness,
+    DKG_LEVEL_1_TREE,
+    DKG_LEVEL_2_TREE,
+    DkgLevel1Witness,
+    ProcessedContributions,
     calculateKeyIndex,
-} from '../storages/DKGStorage.js';
+} from '../storages/DkgStorage.js';
 import {
     CommitteeConfigInput,
     CommitteeMemberInput,
@@ -36,17 +37,26 @@ import {
     KeyStatus,
     KeyStatusInput,
 } from './DKG.js';
-import { INSTANCE_LIMITS, ZkAppEnum, ZkProgramEnum } from '../constants.js';
+import { INSTANCE_LIMITS } from '../constants.js';
 import {
-    ActionWitness,
-    EMPTY_ACTION_MT,
-    EMPTY_ADDRESS_MT,
-    ProcessedContributions,
+    ADDRESS_MT,
     ZkAppRef,
     verifyZkApp,
-} from '../storages/SharedStorage.js';
-import { ErrorEnum, EventEnum, ZkAppAction } from './constants.js';
-import { RollupContract, processAction, verifyRollup } from './Rollup.js';
+} from '../storages/AddressStorage.js';
+
+import {
+    PROCESS_MT,
+    ProcessWitness,
+    processAction,
+} from '../storages/ProcessStorage.js';
+import {
+    ErrorEnum,
+    EventEnum,
+    ZkAppAction,
+    ZkAppIndex,
+    ZkProgramEnum,
+} from './constants.js';
+import { RollupContract, verifyRollup } from './Rollup.js';
 import {
     RollupWitness,
     calculateActionIndex,
@@ -156,7 +166,7 @@ const FinalizeRound1 = ZkProgram({
                 );
 
                 let nextContributionRoot = contributionWitness.calculateRoot(
-                    EMPTY_LEVEL_2_TREE().getRoot()
+                    DKG_LEVEL_2_TREE().getRoot()
                 );
 
                 // Verify and update empty public key level 2 MT
@@ -178,7 +188,7 @@ const FinalizeRound1 = ZkProgram({
                 );
 
                 let nextPublicKeyRoot = publicKeyWitness.calculateRoot(
-                    EMPTY_LEVEL_2_TREE().getRoot()
+                    DKG_LEVEL_2_TREE().getRoot()
                 );
 
                 return new FinalizeRound1Output({
@@ -203,7 +213,7 @@ const FinalizeRound1 = ZkProgram({
                 DKGWitness,
                 DKGWitness,
                 RollupWitness,
-                ActionWitness,
+                ProcessWitness,
             ],
             method(
                 input: FinalizeRound1Input,
@@ -214,7 +224,7 @@ const FinalizeRound1 = ZkProgram({
                 contributionWitness: DKGWitness,
                 publicKeyWitness: DKGWitness,
                 rollupWitness: RollupWitness,
-                processWitness: ActionWitness
+                processWitness: ProcessWitness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
@@ -315,7 +325,7 @@ const FinalizeRound1 = ZkProgram({
 
                 // Verify action is rolluped
                 let actionIndex = calculateActionIndex(
-                    Field(ZkAppEnum.ROUND1),
+                    Field(ZkAppIndex.ROUND1),
                     input.actionId
                 );
                 verifyRollup(
@@ -375,21 +385,25 @@ class FinalizeRound1Proof extends ZkProgram.Proof(FinalizeRound1) {}
 class Round1Contract extends SmartContract {
     /**
      * @description MT storing addresses of other zkApps
+     * @see AddressStorage for off-chain storage implementation
      */
     @state(Field) zkAppRoot = State<Field>();
 
     /**
      * @description MT storing members' contributions
+     * @see Round1ContributionStorage for off-chain storage implementation
      */
     @state(Field) contributionRoot = State<Field>();
 
     /**
      * @description MT storing members' encryption public keys
+     * @see PublicKeyStorage for off-chain storage implementation
      */
     @state(Field) publicKeyRoot = State<Field>();
 
     /**
      * @description MT storing actions' process state
+     * @see ProcessStorage for off-chain storage implementation
      */
     @state(Field) processRoot = State<Field>();
 
@@ -401,10 +415,10 @@ class Round1Contract extends SmartContract {
 
     init() {
         super.init();
-        this.zkAppRoot.set(EMPTY_ADDRESS_MT().getRoot());
-        this.contributionRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
-        this.publicKeyRoot.set(EMPTY_LEVEL_1_TREE().getRoot());
-        this.processRoot.set(EMPTY_ACTION_MT().getRoot());
+        this.zkAppRoot.set(ADDRESS_MT().getRoot());
+        this.contributionRoot.set(DKG_LEVEL_1_TREE().getRoot());
+        this.publicKeyRoot.set(DKG_LEVEL_1_TREE().getRoot());
+        this.processRoot.set(PROCESS_MT().getRoot());
     }
 
     /**
@@ -418,7 +432,7 @@ class Round1Contract extends SmartContract {
     contribute(
         keyId: Field,
         C: CArray,
-        memberWitness: CommitteeFullWitness,
+        memberWitness: CommitteeWitness,
         committee: ZkAppRef,
         rollup: ZkAppRef,
         selfRef: ZkAppRef
@@ -434,7 +448,7 @@ class Round1Contract extends SmartContract {
             Round1Contract.name,
             committee,
             zkAppRoot,
-            Field(ZkAppEnum.COMMITTEE)
+            Field(ZkAppIndex.COMMITTEE)
         );
 
         // Verify Rollup Contract address
@@ -442,7 +456,7 @@ class Round1Contract extends SmartContract {
             Round1Contract.name,
             rollup,
             zkAppRoot,
-            Field(ZkAppEnum.ROLLUP)
+            Field(ZkAppIndex.ROLLUP)
         );
 
         const committeeContract = new CommitteeContract(committee.address);
@@ -520,18 +534,18 @@ class Round1Contract extends SmartContract {
             Round1Contract.name,
             committee,
             zkAppRoot,
-            Field(ZkAppEnum.COMMITTEE)
+            Field(ZkAppIndex.COMMITTEE)
         );
 
         // Verify Dkg Contract address
-        verifyZkApp(Round1Contract.name, dkg, zkAppRoot, Field(ZkAppEnum.DKG));
+        verifyZkApp(Round1Contract.name, dkg, zkAppRoot, Field(ZkAppIndex.DKG));
 
         // Verify Rollup Contract address
         verifyZkApp(
             DkgContract.name,
             rollup,
             zkAppRoot,
-            Field(ZkAppEnum.ROLLUP)
+            Field(ZkAppIndex.ROLLUP)
         );
 
         const committeeContract = new CommitteeContract(committee.address);

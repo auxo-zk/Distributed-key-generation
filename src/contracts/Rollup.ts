@@ -1,28 +1,25 @@
 import {
     Field,
     Poseidon,
-    Provable,
     Reducer,
     SelfProof,
     SmartContract,
     State,
     Struct,
-    UInt8,
     ZkProgram,
     method,
     state,
 } from 'o1js';
 import { Utils } from '@auxo-dev/auxo-libs';
 import {
-    EMPTY_ROLLUP_COUNTER_MT,
-    EMPTY_ROLLUP_MT,
+    ROLLUP_COUNTER_MT,
+    ROLLUP_MT,
     RollupCounterWitness,
     RollupWitness,
     calculateActionIndex,
 } from '../storages/RollupStorage.js';
-import { ErrorEnum, EventEnum } from './constants.js';
-import { ZkProgramEnum } from '../constants.js';
-import { ZkAppRef } from '../storages/SharedStorage.js';
+import { ErrorEnum, EventEnum, ZkProgramEnum } from './constants.js';
+import { ZkAppRef } from '../storages/AddressStorage.js';
 
 export {
     Action as RollupAction,
@@ -33,7 +30,6 @@ export {
     rollup,
     rollupWithMT,
     verifyRollup,
-    processAction,
 };
 
 class Action extends Struct({
@@ -189,8 +185,8 @@ class RollupContract extends SmartContract {
 
     init() {
         super.init();
-        this.counterRoot.set(EMPTY_ROLLUP_COUNTER_MT().getRoot());
-        this.rollupRoot.set(EMPTY_ROLLUP_MT().getRoot());
+        this.counterRoot.set(ROLLUP_COUNTER_MT().getRoot());
+        this.rollupRoot.set(ROLLUP_MT().getRoot());
         this.actionState.set(Reducer.initialActionState);
     }
 
@@ -364,50 +360,6 @@ function verifyRollup(
             programName,
             'verifyRollup',
             ErrorEnum.ROLLUP_INDEX
-        )
-    );
-}
-
-function processAction(
-    programName: string,
-    actionId: Field,
-    processId: UInt8,
-    actionState: Field,
-    previousRoot: Field,
-    witness: RollupWitness
-): Field {
-    previousRoot.assertEquals(
-        witness.calculateRoot(
-            Provable.switch(
-                [
-                    processId.value.equals(0),
-                    processId.value.equals(1),
-                    processId.value.greaterThan(1),
-                ],
-                Field,
-                [
-                    Field(0),
-                    actionState,
-                    Poseidon.hash([actionState, processId.value]),
-                ]
-            )
-        ),
-        Utils.buildAssertMessage(programName, 'process', ErrorEnum.PROCESS_ROOT)
-    );
-    actionId.assertEquals(
-        witness.calculateIndex(),
-        Utils.buildAssertMessage(
-            programName,
-            'process',
-            ErrorEnum.PROCESS_INDEX
-        )
-    );
-
-    return witness.calculateRoot(
-        Provable.if(
-            processId.value.greaterThan(0),
-            Poseidon.hash([actionState, processId.value]),
-            actionState
         )
     );
 }

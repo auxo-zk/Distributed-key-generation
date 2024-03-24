@@ -15,8 +15,8 @@ import {
     Utils,
 } from '@auxo-dev/auxo-libs';
 import { CArray, cArray, UArray } from '../libs/Committee.js';
-import { INSTANCE_LIMITS, ZkProgramEnum } from '../constants.js';
-import { ErrorEnum } from './constants.js';
+import { INSTANCE_LIMITS } from '../constants.js';
+import { ErrorEnum, ZkProgramEnum } from './constants.js';
 
 export {
     PlainArray,

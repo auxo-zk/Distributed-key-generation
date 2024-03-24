@@ -89,7 +89,7 @@
 //     getRound1Contribution,
 //     getRound2Contribution,
 // } from '../libs/Committee.js';
-// import { ZkAppEnum, Contract, INDEX_SIZE } from '../constants.js';
+// import { ZkAppIndex, Contract, INDEX_SIZE } from '../constants.js';
 // import {
 //     RArray,
 //     accumulateEncryption,
@@ -381,19 +381,19 @@
 //             ['settingRoot', settingStorage.root],
 //         ]);
 //         dkgAddressStorage.updateAddress(
-//             AddressStorage.calculateIndex(ZkAppEnum.COMMITTEE),
+//             AddressStorage.calculateIndex(ZkAppIndex.COMMITTEE),
 //             contracts[Contract.COMMITTEE].contract.address
 //         );
 //         round1AddressStorage.updateAddress(
-//             AddressStorage.calculateIndex(ZkAppEnum.COMMITTEE),
+//             AddressStorage.calculateIndex(ZkAppIndex.COMMITTEE),
 //             contracts[Contract.COMMITTEE].contract.address
 //         );
 //         round2AddressStorage.updateAddress(
-//             AddressStorage.calculateIndex(ZkAppEnum.COMMITTEE),
+//             AddressStorage.calculateIndex(ZkAppIndex.COMMITTEE),
 //             contracts[Contract.COMMITTEE].contract.address
 //         );
 //         responseAddressStorage.updateAddress(
-//             AddressStorage.calculateIndex(ZkAppEnum.COMMITTEE),
+//             AddressStorage.calculateIndex(ZkAppIndex.COMMITTEE),
 //             contracts[Contract.COMMITTEE].contract.address
 //         );
 
@@ -402,15 +402,15 @@
 //             ['zkApps', dkgAddressStorage.root],
 //         ]);
 //         round1AddressStorage.updateAddress(
-//             AddressStorage.calculateIndex(ZkAppEnum.DKG),
+//             AddressStorage.calculateIndex(ZkAppIndex.DKG),
 //             contracts[Contract.DKG].contract.address
 //         );
 //         round2AddressStorage.updateAddress(
-//             AddressStorage.calculateIndex(ZkAppEnum.DKG),
+//             AddressStorage.calculateIndex(ZkAppIndex.DKG),
 //             contracts[Contract.DKG].contract.address
 //         );
 //         responseAddressStorage.updateAddress(
-//             AddressStorage.calculateIndex(ZkAppEnum.DKG),
+//             AddressStorage.calculateIndex(ZkAppIndex.DKG),
 //             contracts[Contract.DKG].contract.address
 //         );
 
@@ -419,11 +419,11 @@
 //             ['zkApps', round1AddressStorage.root],
 //         ]);
 //         round2AddressStorage.updateAddress(
-//             AddressStorage.calculateIndex(ZkAppEnum.ROUND1),
+//             AddressStorage.calculateIndex(ZkAppIndex.ROUND1),
 //             contracts[Contract.ROUND1].contract.address
 //         );
 //         responseAddressStorage.updateAddress(
-//             AddressStorage.calculateIndex(ZkAppEnum.ROUND1),
+//             AddressStorage.calculateIndex(ZkAppIndex.ROUND1),
 //             contracts[Contract.ROUND1].contract.address
 //         );
 
@@ -432,12 +432,12 @@
 //             ['zkApps', round2AddressStorage.root],
 //         ]);
 //         responseAddressStorage.updateAddress(
-//             AddressStorage.calculateIndex(ZkAppEnum.ROUND2),
+//             AddressStorage.calculateIndex(ZkAppIndex.ROUND2),
 //             contracts[Contract.ROUND2].contract.address
 //         );
 
 //         responseAddressStorage.updateAddress(
-//             AddressStorage.calculateIndex(ZkAppEnum.REQUEST),
+//             AddressStorage.calculateIndex(ZkAppIndex.REQUEST),
 //             contracts[Contract.REQUEST].contract.address
 //         );
 
@@ -487,7 +487,7 @@
 //                     action.keyId,
 //                     Field(ActionEnum.GENERATE_KEY),
 //                     commmitteeAddressStorage.getZkAppRef(
-//                         ZkAppEnum.COMMITTEE,
+//                         ZkAppIndex.COMMITTEE,
 //                         contracts[Contract.COMMITTEE].contract.address
 //                     ),
 //                     memberWitness
@@ -599,7 +599,7 @@
 //                     action.keyId,
 //                     contribution.C,
 //                     round1AddressStorage.getZkAppRef(
-//                         ZkAppEnum.COMMITTEE,
+//                         ZkAppIndex.COMMITTEE,
 //                         contracts[Contract.COMMITTEE].contract.address
 //                     ),
 //                     memberWitness
@@ -794,11 +794,11 @@
 //             round1Contract.finalize(
 //                 finalizeProof,
 //                 round1AddressStorage.getZkAppRef(
-//                     ZkAppEnum.COMMITTEE,
+//                     ZkAppIndex.COMMITTEE,
 //                     contracts[Contract.COMMITTEE].contract.address
 //                 ),
 //                 round1AddressStorage.getZkAppRef(
-//                     ZkAppEnum.DKG,
+//                     ZkAppIndex.DKG,
 //                     contracts[Contract.DKG].contract.address
 //                 ),
 //                 settingStorage.getWitness(committeeIndex),
@@ -913,11 +913,11 @@
 //             //         action.keyId,
 //             //         encryptionProof,
 //             //         round2AddressStorage.getZkAppRef(
-//             //             ZkAppEnum.COMMITTEE,
+//             //             ZkAppIndex.COMMITTEE,
 //             //             contracts[Contract.COMMITTEE].contract.address
 //             //         ),
 //             //         round2AddressStorage.getZkAppRef(
-//             //             ZkAppEnum.ROUND1,
+//             //             ZkAppIndex.ROUND1,
 //             //             contracts[Contract.ROUND1].contract.address
 //             //         ),
 //             //         memberWitness,
@@ -1113,11 +1113,11 @@
 //                     })
 //                 ),
 //                 round2AddressStorage.getZkAppRef(
-//                     ZkAppEnum.COMMITTEE,
+//                     ZkAppIndex.COMMITTEE,
 //                     contracts[Contract.COMMITTEE].contract.address
 //                 ),
 //                 round2AddressStorage.getZkAppRef(
-//                     ZkAppEnum.DKG,
+//                     ZkAppIndex.DKG,
 //                     contracts[Contract.DKG].contract.address
 //                 ),
 //                 settingStorage.getWitness(committeeIndex),
@@ -1265,15 +1265,15 @@
 //             //             new RArray(sumR),
 //             //             ski,
 //             //             responseAddressStorage.getZkAppRef(
-//             //                 ZkAppEnum.COMMITTEE,
+//             //                 ZkAppIndex.COMMITTEE,
 //             //                 contracts[Contract.COMMITTEE].contract.address
 //             //             ),
 //             //             responseAddressStorage.getZkAppRef(
-//             //                 ZkAppEnum.ROUND1,
+//             //                 ZkAppIndex.ROUND1,
 //             //                 contracts[Contract.ROUND1].contract.address
 //             //             ),
 //             //             responseAddressStorage.getZkAppRef(
-//             //                 ZkAppEnum.ROUND2,
+//             //                 ZkAppIndex.ROUND2,
 //             //                 contracts[Contract.ROUND2].contract.address
 //             //             ),
 //             //             memberWitness,
@@ -1432,15 +1432,15 @@
 //         //     responseContract.finalize(
 //         //         completeProof,
 //         //         responseAddressStorage.getZkAppRef(
-//         //             ZkAppEnum.COMMITTEE,
+//         //             ZkAppIndex.COMMITTEE,
 //         //             contracts[Contract.COMMITTEE].contract.address
 //         //         ),
 //         //         responseAddressStorage.getZkAppRef(
-//         //             ZkAppEnum.DKG,
+//         //             ZkAppIndex.DKG,
 //         //             contracts[Contract.DKG].contract.address
 //         //         ),
 //         //         responseAddressStorage.getZkAppRef(
-//         //             ZkAppEnum.REQUEST,
+//         //             ZkAppIndex.REQUEST,
 //         //             contracts[Contract.REQUEST].contract.address
 //         //         ),
 //         //         settingStorage.getWitness(committeeIndex),
