@@ -63,7 +63,7 @@ export async function deploy(
     } else {
         sender = { sender: feePayer.publicKey, fee: fee };
     }
-    let tx = await Mina.transaction(sender, () => {
+    let tx = await Mina.transaction(sender, async () => {
         AccountUpdate.fundNewAccount(feePayer.publicKey, 1);
         ct.contract.deploy();
         for (let i = 0; i < initArgs.length; i++) {

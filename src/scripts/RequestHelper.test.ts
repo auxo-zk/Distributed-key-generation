@@ -133,7 +133,7 @@ describe('Requester', () => {
 
     // it('deploy contract Requester', async () => {
     //     requestHelperContract = new RequesterContract(addresses.requestHelper);
-    //     let tx = await Mina.transaction(feePayer, () => {
+    //     let tx = await Mina.transaction(feePayer, async () => {
     //         AccountUpdate.fundNewAccount(feePayer, 4);
     //         requestHelperContract.deploy();
     //         let feePayerAccount = AccountUpdate.createSigned(feePayer);
@@ -146,7 +146,7 @@ describe('Requester', () => {
     // });
 
     // it('send 3 tx', async () => {
-    //     let tx = await Mina.transaction(feePayer, () => {
+    //     let tx = await Mina.transaction(feePayer, async () => {
     //         requestHelperContract.request(input[0]);
     //         requestHelperContract.request(input[1]);
     //         requestHelperContract.request(input[2]);
@@ -194,7 +194,7 @@ describe('Requester', () => {
     //     expect(proof.publicOutput.initialActionState).toEqual(
     //         Reducer.initialActionState
     //     );
-    //     let tx = await Mina.transaction(feePayer, () => {
+    //     let tx = await Mina.transaction(feePayer, async () => {
     //         requestHelperContract.request(input[0]);
     //         requestHelperContract.request(input[1]);
     //         requestHelperContract.request(input[2]);

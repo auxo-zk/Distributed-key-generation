@@ -47,16 +47,18 @@ const Elgamal = ZkProgram({
     methods: {
         encrypt: {
             privateInputs: [Scalar, Scalar],
-            method(input: ElgamalInput, plain: Scalar, random: Scalar) {
+            async method(input: ElgamalInput, plain: Scalar, random: Scalar) {
                 let U = Group.generator.scale(random);
                 let V = input.pubKey
                     .add(Group.generator)
                     .scale(random)
                     .sub(Group.generator.scale(random));
                 let k = Poseidon.hash([U.toFields(), V.toFields()].flat());
-                let kBits = Bit255.fromBits(k.toBits());
+                let kBits = k.toBits();
+                kBits.push(Bool(false));
+                let kBitsPadded = Bit255.fromBits(kBits);
                 let plainBits = Bit255.fromScalar(plain);
-                let encrypted = Bit255.xor(kBits, plainBits);
+                let encrypted = Bit255.xor(kBitsPadded, plainBits);
                 encrypted.assertEquals(
                     input.c,
                     Utils.buildAssertMessage(
@@ -70,11 +72,13 @@ const Elgamal = ZkProgram({
         },
         decrypt: {
             privateInputs: [Scalar, Scalar],
-            method(input: ElgamalInput, plain: Scalar, prvKey: Scalar) {
+            async method(input: ElgamalInput, plain: Scalar, prvKey: Scalar) {
                 let V = input.U.scale(prvKey);
                 let k = Poseidon.hash(input.U.toFields().concat(V.toFields()));
-                let kBits = Bit255.fromBits(k.toBits());
-                let decrypted = Bit255.xor(kBits, input.c);
+                let kBits = k.toBits();
+                kBits.push(Bool(false));
+                let kBitsPadded = Bit255.fromBits(kBits);
+                let decrypted = Bit255.xor(kBitsPadded, input.c);
                 CustomScalar.fromScalar(decrypted.toScalar()).assertEquals(
                     CustomScalar.fromScalar(plain),
                     Utils.buildAssertMessage(
@@ -102,7 +106,7 @@ const BatchEncryption = ZkProgram({
     methods: {
         encrypt: {
             privateInputs: [PlainArray, RandomArray],
-            method(
+            async method(
                 input: BatchEncryptionInput,
                 polynomialValues: PlainArray,
                 randomValues: RandomArray
@@ -138,12 +142,14 @@ const BatchEncryption = ZkProgram({
                         .sub(Group.generator.scale(random));
                     let k = Poseidon.hash([U.toFields(), V.toFields()].flat());
                     let plain = polynomialValues.get(iField);
-                    let kBits = Bit255.fromBits(k.toBits());
+                    let kBits = k.toBits();
+                    kBits.push(Bool(false));
+                    let kBitsPadded = Bit255.fromBits(kBits);
                     let plainBits = new Bit255({
                         head: plain.head,
                         tail: plain.tail,
                     });
-                    let encrypted = Bit255.xor(kBits, plainBits);
+                    let encrypted = Bit255.xor(kBitsPadded, plainBits);
                     Provable.if(
                         input.memberId
                             .equals(iField)
@@ -181,7 +187,7 @@ const BatchDecryption = ZkProgram({
     methods: {
         decrypt: {
             privateInputs: [PlainArray, Scalar],
-            method(
+            async method(
                 input: BatchDecryptionInput,
                 polynomialValues: PlainArray,
                 privateKey: Scalar
@@ -217,8 +223,10 @@ const BatchDecryption = ZkProgram({
                         .scale(privateKey)
                         .sub(Group.generator.scale(privateKey));
                     let k = Poseidon.hash([U.toFields(), V.toFields()].flat());
-                    let kBits = Bit255.fromBits(k.toBits());
-                    let decrypted = Bit255.xor(kBits, cipher);
+                    let kBits = k.toBits();
+                    kBits.push(Bool(false));
+                    let kBitsPadded = Bit255.fromBits(kBits);
+                    let decrypted = Bit255.xor(kBitsPadded, cipher);
 
                     Provable.if(
                         input.memberId

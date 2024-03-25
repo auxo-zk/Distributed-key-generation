@@ -53,7 +53,7 @@ const Rollup = ZkProgram({
     methods: {
         init: {
             privateInputs: [Field, Field, Field],
-            method(
+            async method(
                 input: Action,
                 initialCounterRoot: Field,
                 initialRollupRoot: Field,
@@ -76,7 +76,7 @@ const Rollup = ZkProgram({
                 RollupCounterWitness,
                 RollupWitness,
             ],
-            method(
+            async method(
                 input: Action,
                 earlierProof: SelfProof<Action, RollupOutput>,
                 counter: Field,
@@ -195,7 +195,8 @@ class RollupContract extends SmartContract {
      * @param actionHash Action's hash
      * @param address Caller's address
      */
-    @method recordAction(actionHash: Field, zkApp: ZkAppRef) {
+    @method
+    async recordAction(actionHash: Field, zkApp: ZkAppRef) {
         // Verify registered caller address
         Utils.requireCaller(zkApp.address, this);
         this.zkAppRoot
@@ -223,7 +224,8 @@ class RollupContract extends SmartContract {
      * Rollup actions to latest state
      * @param proof Verification proof
      */
-    @method rollup(proof: RollupProof) {
+    @method
+    async rollup(proof: RollupProof) {
         // Get current state values
         let curActionState = this.actionState.getAndRequireEquals();
         let counterRoot = this.counterRoot.getAndRequireEquals();

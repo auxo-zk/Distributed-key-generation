@@ -108,7 +108,7 @@ const ComputeResult = ZkProgram({
     methods: {
         init: {
             privateInputs: [],
-            method() {
+            async method() {
                 return new ComputeResultOutput({
                     accumulationRootM: REQUEST_LEVEL_2_TREE().getRoot(),
                     responseRootD: REQUEST_LEVEL_2_TREE().getRoot(),
@@ -124,7 +124,7 @@ const ComputeResult = ZkProgram({
                 RequestLevel2Witness,
                 RequestLevel2Witness,
             ],
-            method(
+            async method(
                 input: ComputeResultInput,
                 earlierProof: SelfProof<
                     ComputeResultInput,
@@ -259,7 +259,7 @@ const UpdateRequest = ZkProgram({
     methods: {
         init: {
             privateInputs: [Field, Field, Field, Field, Field, Field, Field],
-            method(
+            async method(
                 input: UpdateRequestInput,
                 initialRequestCounter: Field,
                 initialKeyIndexRoot: Field,
@@ -268,7 +268,7 @@ const UpdateRequest = ZkProgram({
                 initialExpirationRoot: Field,
                 initialResultRoot: Field,
                 initialActionState: Field
-            ): UpdateRequestOutput {
+            ) {
                 return new UpdateRequestOutput({
                     initialRequestCounter: initialRequestCounter,
                     initialKeyIndexRoot: initialKeyIndexRoot,
@@ -295,7 +295,7 @@ const UpdateRequest = ZkProgram({
                 RequestLevel1Witness,
                 RequestLevel1Witness,
             ],
-            method(
+            async method(
                 input: UpdateRequestInput,
                 earlierProof: SelfProof<
                     UpdateRequestInput,
@@ -445,7 +445,7 @@ const UpdateRequest = ZkProgram({
                 SelfProof<UpdateRequestInput, UpdateRequestOutput>,
                 RequestLevel1Witness,
             ],
-            method(
+            async method(
                 input: UpdateRequestInput,
                 earlierProof: SelfProof<
                     UpdateRequestInput,
@@ -599,7 +599,8 @@ class RequestContract extends SmartContract {
      * @param accumulationRoot Accumulation data Hash(R root | M root | dimension)
      * @param requester Requester's address
      */
-    @method initialize(
+    @method
+    async initialize(
         keyIndex: Field,
         taskId: UInt32,
         expirationPeriod: UInt64,
@@ -635,7 +636,8 @@ class RequestContract extends SmartContract {
      * @param resultWitness Witness for proof of result
      * @param response Reference to Response Contract
      */
-    @method resolve(
+    @method
+    async resolve(
         proof: ComputeResultProof,
         expirationTimestamp: UInt64,
         accumulationRootR: Field,
@@ -702,7 +704,8 @@ class RequestContract extends SmartContract {
      * Update requests by rollup to the latest actions
      * @param proof Verification proof
      */
-    @method update(proof: UpdateRequestProof) {
+    @method
+    async update(proof: UpdateRequestProof) {
         // Get current state values
         let curActionState = this.actionState.getAndRequireEquals();
         let requestCounter = this.requestCounter.getAndRequireEquals();
@@ -780,12 +783,14 @@ class RequestContract extends SmartContract {
         this.actionState.set(proof.publicOutput.nextActionState);
     }
 
-    @method refund(requestId: Field, receiver: PublicKey) {
+    @method
+    async refund(requestId: Field, receiver: PublicKey) {
         // Refund fee
         this.send({ to: receiver, amount: UInt64.from(REQUEST_FEE) });
     }
 
-    @method claimFee(requestId: Field, receiver: PublicKey) {
+    @method
+    async claimFee(requestId: Field, receiver: PublicKey) {
         // Send shared fee
         // @todo Consider between this.sender or requester
         this.send({ to: receiver, amount: UInt64.from(REQUEST_FEE) });

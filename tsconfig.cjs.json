@@ -2,7 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./build/cjs",
-    "module": "commonjs"
+    "module": "commonjs",
+    "importHelpers": true
   },
   "include": ["./src"],
   "exclude": ["./src/scripts"]

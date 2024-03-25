@@ -68,7 +68,7 @@ describe('Committee', () => {
             CommitteeContract.analyzeMethods();
         }
 
-        let tx = await Mina.transaction(feePayer, () => {
+        let tx = await Mina.transaction(feePayer, async () => {
             AccountUpdate.fundNewAccount(feePayer, 1);
             committeeContract.deploy();
         });
@@ -93,7 +93,7 @@ describe('Committee', () => {
             ipfsHash: IpfsHash.fromString('testing'),
         });
 
-        let tx = await Mina.transaction(feePayer, () => {
+        let tx = await Mina.transaction(feePayer, async () => {
             committeeContract.createCommittee(action);
         });
         await tx.prove();
@@ -111,7 +111,7 @@ describe('Committee', () => {
             ipfsHash: IpfsHash.fromString('testing'),
         });
 
-        let tx = await Mina.transaction(feePayer, () => {
+        let tx = await Mina.transaction(feePayer, async () => {
             committeeContract.createCommittee(action);
         });
         await tx.prove();
@@ -197,7 +197,7 @@ describe('Committee', () => {
     });
 
     xit('committeeContract rollup', async () => {
-        let tx = await Mina.transaction(feePayer, () => {
+        let tx = await Mina.transaction(feePayer, async () => {
             committeeContract.updateCommittees(proof);
         });
         await tx.prove();
@@ -212,7 +212,7 @@ describe('Committee', () => {
             memberId: Field(1),
             memberWitness: memberStorage.getWitness(Field(0), Field(1)),
         });
-        let tx = await Mina.transaction(feePayer, () => {
+        let tx = await Mina.transaction(feePayer, async () => {
             committeeContract.verifyMember(checkInput);
         });
         await tx.prove();

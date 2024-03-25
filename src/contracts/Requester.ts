@@ -113,7 +113,7 @@ const UpdateTask = ZkProgram({
     methods: {
         init: {
             privateInputs: [UInt32, Field, Field, Field, Field, Field, Field],
-            method(
+            async method(
                 input: UpdateTaskInput,
                 taskId: UInt32,
                 initialActionState: Field,
@@ -147,7 +147,7 @@ const UpdateTask = ZkProgram({
                 RequesterLevel1Witness,
                 RequesterLevel1Witness,
             ],
-            method(
+            async method(
                 input: UpdateTaskInput,
                 earlierProof: SelfProof<UpdateTaskInput, UpdateTaskOutput>,
                 keyIndexWitness: RequesterLevel1Witness,
@@ -226,7 +226,7 @@ const UpdateTask = ZkProgram({
                 CommitmentWitnesses,
             ],
 
-            method(
+            async method(
                 input: UpdateTaskInput,
                 earlierProof: SelfProof<UpdateTaskInput, UpdateTaskOutput>,
                 R: Group,
@@ -442,7 +442,8 @@ class RequesterContract extends SmartContract {
      * Initialize new threshold homomorphic encryption request
      * @param keyIndex Unique key index
      */
-    @method createTask(
+    @method
+    async createTask(
         keyIndex: Field,
         timestamp: UInt64,
         taskManagerRef: ZkAppRef
@@ -481,7 +482,8 @@ class RequesterContract extends SmartContract {
      *
      * @todo Verify dimension value
      */
-    @method submitEncryption(
+    @method
+    async submitEncryption(
         taskId: UInt32,
         keyIndex: Field,
         secrets: SecretVector,
@@ -566,7 +568,8 @@ class RequesterContract extends SmartContract {
      * Accumulate encryption submissions
      * @param proof Verification proof
      */
-    @method updateTasks(proof: UpdateTaskProof) {
+    @method
+    async updateTasks(proof: UpdateTaskProof) {
         // Get current state values
         let curActionState = this.actionState.getAndRequireEquals();
         let keyIndexRoot = this.keyIndexRoot.getAndRequireEquals();
@@ -652,7 +655,8 @@ class RequesterContract extends SmartContract {
      * @param accumulationWitness Witness for proof of accumulation data
      * @param request Reference to Request Contract
      */
-    @method finalizeTask(
+    @method
+    async finalizeTask(
         taskId: UInt32,
         dimension: UInt8,
         keyIndex: Field,
@@ -686,7 +690,7 @@ class RequesterContract extends SmartContract {
         );
 
         // Initialize a request in Request Contract
-        requestContract.initialize(
+        await requestContract.initialize(
             keyIndex,
             taskId,
             UInt64.from(REQUEST_EXPIRATION),

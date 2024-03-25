@@ -94,12 +94,12 @@ const UpdateCommittee = ZkProgram({
     methods: {
         init: {
             privateInputs: [Field, Field, Field, Field],
-            method(
+            async method(
                 initialActionState: Field,
                 initialMemberRoot: Field,
                 initialSettingRoot: Field,
                 initialCommitteeId: Field
-            ): UpdateCommitteeOutput {
+            ): Promise<UpdateCommitteeOutput> {
                 return new UpdateCommitteeOutput({
                     initialActionState,
                     initialMemberRoot,
@@ -119,12 +119,12 @@ const UpdateCommittee = ZkProgram({
                 CommitteeLevel1Witness,
                 CommitteeLevel1Witness,
             ],
-            method(
+            async method(
                 earlierProof: SelfProof<Void, UpdateCommitteeOutput>,
                 input: Action,
                 memberWitness: CommitteeLevel1Witness,
                 settingWitness: CommitteeLevel1Witness
-            ): UpdateCommitteeOutput {
+            ): Promise<UpdateCommitteeOutput> {
                 // Verify earlier proof
                 earlierProof.verify();
 
@@ -274,7 +274,8 @@ class CommitteeContract extends SmartContract {
      * Create a new DKG committee
      * @param action Committee's information
      */
-    @method createCommittee(action: Action) {
+    @method
+    async createCommittee(action: Action) {
         // Verify committee threshold
         action.threshold.assertGreaterThan(
             0,
@@ -309,7 +310,8 @@ class CommitteeContract extends SmartContract {
      * Update committees by rollup to the latest actions
      * @param proof Verification proof
      */
-    @method updateCommittees(proof: UpdateCommitteeProof) {
+    @method
+    async updateCommittees(proof: UpdateCommitteeProof) {
         // Verify proof
         proof.verify();
 

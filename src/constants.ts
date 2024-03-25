@@ -14,7 +14,7 @@ export {
 /**
  * Maximum amount of action processed in a recursive proof
  */
-const ACTION_PROCESS_LIMITS = 8;
+const ACTION_PROCESS_LIMITS = 16;
 
 /**
  * The size of an index value in bits for packing indexes array

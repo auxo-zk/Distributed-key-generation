@@ -1,14 +1,4 @@
-import {
-    Field,
-    Group,
-    method,
-    PrivateKey,
-    Scalar,
-    SmartContract,
-    state,
-    State,
-    Reducer,
-} from 'o1js';
+import { Group, PrivateKey, Scalar } from 'o1js';
 import * as Committee from './Committee.js';
 import * as Requester from './Requester.js';
 import { Bit255 } from '@auxo-dev/auxo-libs';
@@ -138,41 +128,5 @@ describe('Committee', () => {
         for (let i = 0; i < result.length; i++) {
             expect(rawResult[i].toBigInt()).toEqual(result[i]);
         }
-    });
-
-    xit('Should be used in Smart Contract', async () => {
-        class TestRound1Contribution extends SmartContract {
-            reducer = Reducer({ actionType: Committee.Round1Contribution });
-            @state(Field) keyId = State<Field>();
-            @method test(): Field {
-                return Field(0);
-            }
-        }
-
-        class TestRound2Contribution extends SmartContract {
-            reducer = Reducer({ actionType: Committee.Round2Contribution });
-            @state(Field) keyId = State<Field>();
-            @method test(): Field {
-                return Field(0);
-            }
-        }
-
-        class TestResponseContribution extends SmartContract {
-            reducer = Reducer({ actionType: Committee.ResponseContribution });
-            @state(Field) keyId = State<Field>();
-            @method test(): Field {
-                return Field(0);
-            }
-        }
-
-        console.log('Compile test round 1...');
-        await TestRound1Contribution.compile();
-        console.log('DONE!');
-        console.log('Compile test round 2...');
-        await TestRound2Contribution.compile();
-        console.log('DONE!');
-        console.log('Compile test response...');
-        await TestResponseContribution.compile();
-        console.log('DONE!');
     });
 });

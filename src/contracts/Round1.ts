@@ -134,7 +134,7 @@ const FinalizeRound1 = ZkProgram({
                 DkgLevel1Witness,
                 DkgLevel1Witness,
             ],
-            method(
+            async method(
                 input: FinalizeRound1Input,
                 rollupRoot: Field,
                 T: Field,
@@ -215,7 +215,7 @@ const FinalizeRound1 = ZkProgram({
                 RollupWitness,
                 ProcessWitness,
             ],
-            method(
+            async method(
                 input: FinalizeRound1Input,
                 earlierProof: SelfProof<
                     FinalizeRound1Input,
@@ -429,7 +429,7 @@ class Round1Contract extends SmartContract {
      * @param memberWitness Witness for proof of committee's member
      */
     @method
-    contribute(
+    async contribute(
         keyId: Field,
         C: CArray,
         memberWitness: CommitteeWitness,
@@ -473,10 +473,9 @@ class Round1Contract extends SmartContract {
         );
 
         // Verify committee member
-        Utils.requireSignature(this.sender);
         committeeContract.verifyMember(
             new CommitteeMemberInput({
-                address: this.sender,
+                address: this.sender.getAndRequireSignature(),
                 committeeId: committeeId,
                 memberId: memberId,
                 memberWitness: memberWitness,
@@ -496,7 +495,7 @@ class Round1Contract extends SmartContract {
 
         // Record action for rollup
         selfRef.address.assertEquals(this.address);
-        rollupContract.recordAction(action.hash(), selfRef);
+        await rollupContract.recordAction(action.hash(), selfRef);
     }
 
     /**
@@ -511,7 +510,7 @@ class Round1Contract extends SmartContract {
      * @param dkgRollup Reference to Rollup Contract in Dkg Contract
      */
     @method
-    finalize(
+    async finalize(
         proof: FinalizeRound1Proof,
         settingWitness: CommitteeLevel1Witness,
         keyStatusWitness: DkgLevel1Witness,
@@ -621,7 +620,7 @@ class Round1Contract extends SmartContract {
         this.processRoot.set(proof.publicOutput.nextProcessRoot);
 
         // Create & dispatch action to DkgContract
-        dkgContract.finalizeContributionRound(
+        await dkgContract.finalizeContributionRound(
             committeeId,
             keyId,
             Field(DkgActionEnum.FINALIZE_ROUND_1),

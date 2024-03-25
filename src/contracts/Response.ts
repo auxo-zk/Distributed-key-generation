@@ -127,7 +127,7 @@ const ComputeResponse = ZkProgram({
     methods: {
         init: {
             privateInputs: [CustomScalar],
-            method(ski: CustomScalar) {
+            async method(ski: CustomScalar) {
                 return new ComputeResponseOutput({
                     accumulationRootR: REQUEST_LEVEL_2_TREE().getRoot(),
                     responseRootD: REQUEST_LEVEL_2_TREE().getRoot(),
@@ -144,7 +144,7 @@ const ComputeResponse = ZkProgram({
                 RequestLevel2Witness,
                 RequestLevel2Witness,
             ],
-            method(
+            async method(
                 earlierProof: SelfProof<Void, ComputeResponseOutput>,
                 ski: CustomScalar,
                 R: Group,
@@ -266,7 +266,7 @@ const FinalizeResponse = ZkProgram({
                 RequestLevel1Witness,
                 RequestLevel1Witness,
             ],
-            method(
+            async method(
                 input: FinalizeResponseInput,
                 T: Field,
                 N: Field,
@@ -348,7 +348,7 @@ const FinalizeResponse = ZkProgram({
                 RollupWitness,
                 ProcessWitness,
             ],
-            method(
+            async method(
                 input: FinalizeResponseInput,
                 earlierProof: SelfProof<
                     FinalizeResponseInput,
@@ -466,7 +466,7 @@ const FinalizeResponse = ZkProgram({
                 RequestLevel2Witness,
                 ProcessWitness,
             ],
-            method(
+            async method(
                 input: FinalizeResponseInput,
                 earlierProof: SelfProof<
                     FinalizeResponseInput,
@@ -582,7 +582,7 @@ const FinalizeResponse = ZkProgram({
                 SelfProof<FinalizeResponseInput, FinalizeResponseOutput>,
                 RequestLevel1Witness,
             ],
-            method(
+            async method(
                 input: FinalizeResponseInput,
                 earlierProof: SelfProof<
                     FinalizeResponseInput,
@@ -697,7 +697,7 @@ class ResponseContract extends SmartContract {
      * @param selfRef Reference to this Contract
      */
     @method
-    contribute(
+    async contribute(
         decryptionProof: BatchDecryptionProof,
         responseProof: ComputeResponseProof,
         keyId: Field,
@@ -768,10 +768,9 @@ class ResponseContract extends SmartContract {
         );
 
         // Verify committee member
-        Utils.requireSignature(this.sender);
         committeeContract.verifyMember(
             new CommitteeMemberInput({
-                address: this.sender,
+                address: this.sender.getAndRequireSignature(),
                 committeeId: committeeId,
                 memberId: memberId,
                 memberWitness: memberWitness,
@@ -837,7 +836,7 @@ class ResponseContract extends SmartContract {
 
         // Record action for rollup
         selfRef.address.assertEquals(this.address);
-        rollupContract.recordAction(action.hash(), selfRef);
+        await rollupContract.recordAction(action.hash(), selfRef);
     }
 
     /**
@@ -849,7 +848,7 @@ class ResponseContract extends SmartContract {
      * @param keyStatusWitness Witness for proof of threshold
      */
     @method
-    finalize(
+    async finalize(
         proof: FinalizeResponseProof,
         accumulationRootM: Field,
         settingWitness: CommitteeLevel1Witness,

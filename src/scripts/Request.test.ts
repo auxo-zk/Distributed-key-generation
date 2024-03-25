@@ -102,7 +102,7 @@ describe('Testing Request Contract', () => {
         //     console.log('Done analyzeMethods');
         // }
 
-        // let tx = await Mina.transaction(feePayer, () => {
+        // let tx = await Mina.transaction(feePayer, async () => {
         //     AccountUpdate.fundNewAccount(feePayer, 3);
         //     requestContract.deploy();
         //     let feePayerAccount = AccountUpdate.createSigned(feePayer);
@@ -158,7 +158,7 @@ describe('Testing Request Contract', () => {
     //     );
     //     ActionRequestProfiler.stop().store();
 
-    //     let tx = await Mina.transaction(feePayer, () => {
+    //     let tx = await Mina.transaction(feePayer, async () => {
     //         requestContract.rollupRequest(proof);
     //     });
     //     await tx.prove();
@@ -197,7 +197,7 @@ describe('Testing Request Contract', () => {
     //     });
     //     console.log('Respone contract send requestInput2');
     //     let balanceBefore = Number(Account(addresses.response).balance.get());
-    //     let tx = await Mina.transaction(feePayer, () => {
+    //     let tx = await Mina.transaction(feePayer, async () => {
     //         responseContract.resolve(addresses.request, input2);
     //     });
     //     await tx.prove();
@@ -236,7 +236,7 @@ describe('Testing Request Contract', () => {
     //     let balanceBefore = Number(Account(addresses.response).balance.get());
     //     // rollUp
     //     console.log('Rollup requestInput2...');
-    //     let tx = await Mina.transaction(feePayer, () => {
+    //     let tx = await Mina.transaction(feePayer, async () => {
     //         requestContract.rollupRequest(proof);
     //     });
     //     await tx.prove();

@@ -143,7 +143,7 @@ const UpdateKey = ZkProgram({
     methods: {
         init: {
             privateInputs: [Field, Field, Field, Field],
-            method(
+            async method(
                 input: UpdateKeyInput,
                 rollupRoot: Field,
                 initialKeyCounter: Field,
@@ -169,7 +169,7 @@ const UpdateKey = ZkProgram({
                 RollupWitness,
                 ProcessWitness,
             ],
-            method(
+            async method(
                 input: UpdateKeyInput,
                 earlierProof: SelfProof<UpdateKeyInput, UpdateKeyOutput>,
                 keyStatusWitness: DkgLevel1Witness,
@@ -283,7 +283,7 @@ const UpdateKey = ZkProgram({
                 RollupWitness,
                 ProcessWitness,
             ],
-            method(
+            async method(
                 input: UpdateKeyInput,
                 earlierProof: SelfProof<UpdateKeyInput, UpdateKeyOutput>,
                 currKeyId: Field,
@@ -452,7 +452,7 @@ class DkgContract extends SmartContract {
      * @param selfRef Reference to this contract itself
      */
     @method
-    committeeAction(
+    async committeeAction(
         keyId: Field,
         actionType: Field,
         memberWitness: CommitteeWitness,
@@ -486,10 +486,9 @@ class DkgContract extends SmartContract {
         const rollupContract = new RollupContract(rollup.address);
 
         // Verify committee member
-        Utils.requireSignature(this.sender);
         committeeContract.verifyMember(
             new CommitteeMemberInput({
-                address: this.sender,
+                address: this.sender.getAndRequireSignature(),
                 committeeId: committeeId,
                 memberId: memberId,
                 memberWitness: memberWitness,
@@ -532,7 +531,7 @@ class DkgContract extends SmartContract {
 
         // Record action for rollup
         selfRef.address.assertEquals(this.address);
-        rollupContract.recordAction(action.hash(), selfRef);
+        await rollupContract.recordAction(action.hash(), selfRef);
     }
 
     /**
@@ -545,7 +544,7 @@ class DkgContract extends SmartContract {
      * @param selfRef Reference to this contract itself
      */
     @method
-    finalizeContributionRound(
+    async finalizeContributionRound(
         committeeId: Field,
         keyId: Field,
         actionType: Field,
@@ -606,14 +605,15 @@ class DkgContract extends SmartContract {
 
         // Record action for rollup
         selfRef.address.assertEquals(this.address);
-        rollupContract.recordAction(action.hash(), selfRef);
+        await rollupContract.recordAction(action.hash(), selfRef);
     }
 
     /**
      * Update keys' status and counter values
      * @param proof Verification proof
      */
-    @method updateKeys(proof: UpdateKeyProof, rollup: ZkAppRef) {
+    @method
+    async updateKeys(proof: UpdateKeyProof, rollup: ZkAppRef) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
         let keyCounterRoot = this.keyCounterRoot.getAndRequireEquals();

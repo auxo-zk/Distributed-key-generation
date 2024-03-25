@@ -98,7 +98,7 @@
 //         }
 
 //         console.log('deploy committeeContract...');
-//         let tx = await Mina.transaction(feePayer, () => {
+//         let tx = await Mina.transaction(feePayer, async () => {
 //             AccountUpdate.fundNewAccount(feePayer, 1);
 //             committeeContract.deploy();
 //         });
@@ -116,7 +116,7 @@
 //             threshold: Field(1),
 //             ipfsHash: IpfsHash.fromString('testing'),
 //         });
-//         tx = await Mina.transaction(feePayer, () => {
+//         tx = await Mina.transaction(feePayer, async () => {
 //             committeeContract.createCommittee(action);
 //         });
 //         await tx.prove();
@@ -143,7 +143,7 @@
 //             threshold: Field(2),
 //             ipfsHash: IpfsHash.fromString('testing'),
 //         });
-//         tx = await Mina.transaction(feePayer, () => {
+//         tx = await Mina.transaction(feePayer, async () => {
 //             committeeContract.createCommittee(action);
 //         });
 //         await tx.prove();
@@ -216,7 +216,7 @@
 
 //         ActionCommitteeProfiler.start('committeeContract.rollup...');
 //         console.log('committeeContract.rollup: ');
-//         tx = await Mina.transaction(feePayer, () => {
+//         tx = await Mina.transaction(feePayer, async () => {
 //             committeeContract.rollup(proof);
 //         });
 //         await tx.prove();
@@ -258,7 +258,7 @@
 //             memberId: Field(1),
 //             memberWitness: memberStorage.getWitness(Field(0), Field(1)),
 //         });
-//         tx = await Mina.transaction(feePayer, () => {
+//         tx = await Mina.transaction(feePayer, async () => {
 //             committeeContract.verifyMember(checkInput);
 //         });
 //         await tx.prove();

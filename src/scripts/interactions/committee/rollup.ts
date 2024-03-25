@@ -173,7 +173,7 @@ async function main() {
             fee: feePayer.fee,
             nonce: feePayer.nonce++,
         },
-        () => {
+        async () => {
             committeeContract.updateCommittees(proof);
         }
     );
