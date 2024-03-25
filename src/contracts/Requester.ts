@@ -479,8 +479,6 @@ class RequesterContract extends SmartContract {
      * @param publicKeyWitness Witness for proof of encryption public key
      * @param keyIndexWitness Witness for key index value
      * @param dkg Reference to Dkg Contract
-     *
-     * @todo Verify dimension value
      */
     @method
     async submitEncryption(
