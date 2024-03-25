@@ -211,7 +211,7 @@ const ComputeResult = ZkProgram({
                 let responseRootD = responseWitness.calculateRoot(
                     Poseidon.hash(input.D.toFields())
                 );
-                let resultRoot = responseWitness.calculateRoot(
+                let resultRoot = resultWitness.calculateRoot(
                     Poseidon.hash(
                         CustomScalar.fromScalar(input.result).toFields()
                     )
@@ -947,8 +947,9 @@ class RequestContract extends SmartContract {
     /**
      * Verify accumulation data
      * @param requestId Request Id
-     * @param accumulatedRRoot Accumulated R MT root
-     * @param accumulatedMRoot Accumulated M MT root
+     * @param accumulatedRRoot Accumulation root of R
+     * @param accumulatedMRoot Accumulation root of M
+     * @param dimension Full dimension of the encryption vector
      * @param witness Witness for proof of accumulation data
      */
     verifyAccumulationData(
@@ -980,6 +981,45 @@ class RequestContract extends SmartContract {
                 RequestContract.name,
                 RequestContract.prototype.verifyAccumulationData.name,
                 ErrorEnum.ACCUMULATION_INDEX_L1
+            )
+        );
+    }
+
+    /**
+     * Verify result value
+     * @param requestId Request Id
+     * @param result Decrypted result value
+     * @param witness Witness for proof of result vector
+     * @param scalarWitness Witness for proof of result value
+     */
+    verifyResultRoot(
+        requestId: Field,
+        result: Scalar,
+        witness: RequestLevel1Witness,
+        scalarWitness: RequestLevel2Witness
+    ) {
+        this.resultRoot
+            .getAndRequireEquals()
+            .assertEquals(
+                witness.calculateRoot(
+                    scalarWitness.calculateRoot(
+                        Poseidon.hash(
+                            CustomScalar.fromScalar(result).toFields()
+                        )
+                    )
+                ),
+                Utils.buildAssertMessage(
+                    RequestContract.name,
+                    RequestContract.prototype.verifyResultRoot.name,
+                    ErrorEnum.REQUEST_RESULT_ROOT
+                )
+            );
+        requestId.assertEquals(
+            witness.calculateIndex(),
+            Utils.buildAssertMessage(
+                RequestContract.name,
+                RequestContract.prototype.verifyResultRoot.name,
+                ErrorEnum.REQUEST_RESULT_INDEX_L1
             )
         );
     }
