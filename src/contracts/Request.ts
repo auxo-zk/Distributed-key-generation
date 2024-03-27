@@ -988,12 +988,14 @@ class RequestContract extends SmartContract {
     /**
      * Verify result value
      * @param requestId Request Id
+     * @param dimensionIndex Dimension index in the full result vector
      * @param result Decrypted result value
      * @param witness Witness for proof of result vector
      * @param scalarWitness Witness for proof of result value
      */
-    verifyResultRoot(
+    verifyResult(
         requestId: Field,
+        dimensionIndex: UInt8,
         result: Scalar,
         witness: RequestLevel1Witness,
         scalarWitness: RequestLevel2Witness
@@ -1010,7 +1012,7 @@ class RequestContract extends SmartContract {
                 ),
                 Utils.buildAssertMessage(
                     RequestContract.name,
-                    RequestContract.prototype.verifyResultRoot.name,
+                    RequestContract.prototype.verifyResult.name,
                     ErrorEnum.REQUEST_RESULT_ROOT
                 )
             );
@@ -1018,8 +1020,16 @@ class RequestContract extends SmartContract {
             witness.calculateIndex(),
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.verifyResultRoot.name,
+                RequestContract.prototype.verifyResult.name,
                 ErrorEnum.REQUEST_RESULT_INDEX_L1
+            )
+        );
+        dimensionIndex.value.assertEquals(
+            scalarWitness.calculateIndex(),
+            Utils.buildAssertMessage(
+                RequestContract.name,
+                RequestContract.prototype.verifyResult.name,
+                ErrorEnum.REQUEST_RESULT_INDEX_L2
             )
         );
     }

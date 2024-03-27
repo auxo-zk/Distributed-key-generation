@@ -336,16 +336,9 @@ const UpdateTask = ZkProgram({
                             ),
                         ])
                     );
-                    nextCommitmentRoot = Provable.if(
-                        commitment.equals(Field(0)),
-                        nextCommitmentRoot,
-                        commitmentWitness.calculateRoot(commitment)
-                    );
-                    nextCommitmentCounter = Provable.if(
-                        commitment.equals(Field(0)),
-                        nextCommitmentCounter,
-                        nextCommitmentCounter.add(1)
-                    );
+                    nextCommitmentRoot =
+                        commitmentWitness.calculateRoot(commitment);
+                    nextCommitmentCounter = nextCommitmentCounter.add(1);
                 }
 
                 // Calculate corresponding action state
@@ -541,11 +534,7 @@ class RequesterContract extends SmartContract {
             );
             commitments.set(
                 index,
-                Provable.if(
-                    secret.equals(CustomScalar.fromScalar(Scalar.from(0))),
-                    Field(0),
-                    Poseidon.hash([nullifier, index, secret.toFields()].flat())
-                )
+                Poseidon.hash([nullifier, index, secret.toFields()].flat())
             );
         }
 

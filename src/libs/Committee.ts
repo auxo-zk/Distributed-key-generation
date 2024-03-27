@@ -9,31 +9,51 @@ import {
 import * as ElgamalECC from './Elgamal.js';
 import { ENCRYPTION_LIMITS, INSTANCE_LIMITS } from '../constants.js';
 
+export {
+    MemberArray,
+    CArray,
+    cArray,
+    UArray,
+    PublicKeyArray,
+    EncryptionHashArray,
+    SecretPolynomial,
+    Round2Data,
+    Round1Contribution,
+    Round2Contribution,
+    ResponseContribution,
+    calculatePublicKey,
+    calculatePublicKey as calculatePublicKeyFromContribution,
+    calculatePolynomialValue,
+    generateRandomPolynomial,
+    recoverSecretPolynomial,
+    getRound1Contribution,
+    getRound2Contribution,
+    getResponseContribution,
+    getLagrangeCoefficient,
+    accumulateResponses,
+};
+
 /* ========== CONSTANTS, TYPES, & STRUCTS ========== */
 
-export class MemberArray extends PublicKeyDynamicArray(
-    INSTANCE_LIMITS.MEMBER
-) {}
-export class CArray extends GroupDynamicArray(INSTANCE_LIMITS.MEMBER) {}
-export class cArray extends Bit255DynamicArray(INSTANCE_LIMITS.MEMBER) {}
-export class UArray extends GroupDynamicArray(INSTANCE_LIMITS.MEMBER) {}
-export class PublicKeyArray extends GroupDynamicArray(INSTANCE_LIMITS.MEMBER) {}
-export class EncryptionHashArray extends FieldDynamicArray(
-    INSTANCE_LIMITS.MEMBER
-) {}
+class MemberArray extends PublicKeyDynamicArray(INSTANCE_LIMITS.MEMBER) {}
+class CArray extends GroupDynamicArray(INSTANCE_LIMITS.MEMBER) {}
+class cArray extends Bit255DynamicArray(INSTANCE_LIMITS.MEMBER) {}
+class UArray extends GroupDynamicArray(INSTANCE_LIMITS.MEMBER) {}
+class PublicKeyArray extends GroupDynamicArray(INSTANCE_LIMITS.MEMBER) {}
+class EncryptionHashArray extends FieldDynamicArray(INSTANCE_LIMITS.MEMBER) {}
 
-export type SecretPolynomial = {
+type SecretPolynomial = {
     a: Scalar[];
     C: Group[];
     f: Scalar[];
 };
 
-export type Round2Data = {
+type Round2Data = {
     c: Bit255;
     U: Group;
 };
 
-export class Round1Contribution extends Struct({
+class Round1Contribution extends Struct({
     C: CArray,
 }) {
     static empty(): Round1Contribution {
@@ -51,7 +71,7 @@ export class Round1Contribution extends Struct({
     }
 }
 
-export class Round2Contribution extends Struct({
+class Round2Contribution extends Struct({
     c: cArray,
     U: UArray,
 }) {
@@ -71,7 +91,7 @@ export class Round2Contribution extends Struct({
     }
 }
 
-export class ResponseContribution extends Struct({
+class ResponseContribution extends Struct({
     responseRootD: Field,
 }) {
     static empty(): ResponseContribution {
@@ -91,9 +111,7 @@ export class ResponseContribution extends Struct({
 
 /* ========== FUNCTIONS ========== */
 
-export function calculatePublicKey(
-    round1Contributions: Round1Contribution[]
-): Group {
+function calculatePublicKey(round1Contributions: Round1Contribution[]): Group {
     let result = Group.zero;
     for (let i = 0; i < round1Contributions.length; i++) {
         result = result.add(round1Contributions[i].C.values[0]);
@@ -101,7 +119,7 @@ export function calculatePublicKey(
     return result;
 }
 
-export function calculatePolynomialValue(a: Scalar[], x: number): Scalar {
+function calculatePolynomialValue(a: Scalar[], x: number): Scalar {
     let result = Scalar.from(a[0]);
     for (let i = 1; i < a.length; i++) {
         result = result.add(a[i].mul(Scalar.from(Math.pow(x, i))));
@@ -109,10 +127,7 @@ export function calculatePolynomialValue(a: Scalar[], x: number): Scalar {
     return result;
 }
 
-export function generateRandomPolynomial(
-    T: number,
-    N: number
-): SecretPolynomial {
+function generateRandomPolynomial(T: number, N: number): SecretPolynomial {
     let a = new Array<Scalar>(T);
     let C = new Array<Group>(T);
     for (let i = 0; i < T; i++) {
@@ -126,7 +141,7 @@ export function generateRandomPolynomial(
     return { a, C, f };
 }
 
-export function getSecretPolynomial(
+function recoverSecretPolynomial(
     a: Scalar[],
     T: number,
     N: number
@@ -142,14 +157,12 @@ export function getSecretPolynomial(
     return { a, C, f };
 }
 
-export function getRound1Contribution(
-    secret: SecretPolynomial
-): Round1Contribution {
+function getRound1Contribution(secret: SecretPolynomial): Round1Contribution {
     let provableC = CArray.from(secret.C);
     return new Round1Contribution({ C: provableC });
 }
 
-export function getRound2Contribution(
+function getRound2Contribution(
     secret: SecretPolynomial,
     memberId: number,
     round1Contributions: Round1Contribution[],
@@ -177,7 +190,7 @@ export function getRound2Contribution(
     return new Round2Contribution({ c: provablec, U: provableU });
 }
 
-export function getResponseContribution(
+function getResponseContribution(
     secret: SecretPolynomial,
     memberId: number,
     round2Data: Round2Data[],
@@ -206,7 +219,7 @@ export function getResponseContribution(
     ];
 }
 
-export function getLagrangeCoefficient(memberIds: number[]): Scalar[] {
+function getLagrangeCoefficient(memberIds: number[]): Scalar[] {
     const threshold = memberIds.length;
     let lagrangeCoefficient = new Array<Scalar>(threshold);
     for (let i = 0; i < threshold; i++) {
@@ -224,10 +237,7 @@ export function getLagrangeCoefficient(memberIds: number[]): Scalar[] {
     return lagrangeCoefficient;
 }
 
-export function accumulateResponses(
-    memberIds: number[],
-    D: Group[][]
-): Group[] {
+function accumulateResponses(memberIds: number[], D: Group[][]): Group[] {
     let lagrangeCoefficient = getLagrangeCoefficient(memberIds);
     let threshold = memberIds.length;
     let sumD = Array<Group>(D[0].length);

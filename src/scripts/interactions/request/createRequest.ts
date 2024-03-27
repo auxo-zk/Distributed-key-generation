@@ -6,7 +6,7 @@ import { KeyCounterStorage } from '../../../storages/CommitteeStorage.js';
 import { UpdateRequest } from '../../../contracts/Request.js';
 import { RequestContract } from '../../../contracts/Request.js';
 import {
-    generateEncryptionWithRandomInput,
+    recoverEncryption,
     accumulateEncryption,
     generateEncryption,
     RequestVector,
