@@ -54,11 +54,11 @@ async function main() {
     let R: Group[][] = [];
     let M: Group[][] = [];
 
-    for (let i = 0; i < investInputs.length; i++) {
-        let encryptedVector = generateEncryption(publicKey, investInputs[i]);
-        R.push(encryptedVector.R);
-        M.push(encryptedVector.M);
-    }
+    // for (let i = 0; i < investInputs.length; i++) {
+    //     let encryptedVector = generateEncryption(publicKey, investInputs[i]);
+    //     R.push(encryptedVector.R);
+    //     M.push(encryptedVector.M);
+    // }
 
     let totalValue = accumulateEncryption(R, M);
 
