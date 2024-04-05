@@ -17,6 +17,7 @@ export {
     NullifierArray,
     CommitmentArray,
     calculatePublicKey as calculatePublicKeyFromPoints,
+    calculateCommitment,
     generateEncryption,
     recoverEncryption,
     accumulateEncryption,
@@ -43,6 +44,7 @@ class ResultVector extends StaticArray(
 class NullifierArray extends StaticArray(Field, ENCRYPTION_LIMITS.DIMENSION) {}
 class CommitmentArray extends StaticArray(Field, ENCRYPTION_LIMITS.DIMENSION) {}
 type SecretNote = {
+    taskId: Field;
     index: Field;
     nullifier: Field;
     commitment: Field;
@@ -56,9 +58,20 @@ function calculatePublicKey(contributedPublicKeys: Group[]): Group {
     return result;
 }
 
+function calculateCommitment(
+    nullifier: Field,
+    taskId: Field,
+    index: Field,
+    secret: CustomScalar
+) {
+    return Poseidon.hash([nullifier, taskId, index, secret.toFields()].flat());
+}
+
 function generateEncryption(
+    taskIndex: number,
     publicKey: Group,
-    vector: bigint[]
+    vector: bigint[],
+    indexes: number[]
 ): {
     r: Scalar[];
     R: Group[];
@@ -70,7 +83,6 @@ function generateEncryption(
     let R = new Array<Group>(dimension);
     let M = new Array<Group>(dimension);
     let notes = new Array<SecretNote>(dimension);
-    let index = -1;
     for (let i = 0; i < dimension; i++) {
         let random = Scalar.random();
         r[i] = random;
@@ -82,26 +94,25 @@ function generateEncryption(
                       .add(publicKey.scale(random))
                 : Group.zero.add(publicKey.scale(random));
         let nullifier = Field.random();
-        notes[i] = {
-            index: Field(i),
-            nullifier: nullifier,
-            commitment: Poseidon.hash(
-                [
-                    nullifier,
-                    Field(index),
-                    CustomScalar.fromScalar(Scalar.from(vector[i])).toFields(),
-                ].flat()
-            ),
-        };
+        let taskId = Field(taskIndex);
+        let index = Field(indexes[i]);
+        let commitment = calculateCommitment(
+            nullifier,
+            taskId,
+            index,
+            CustomScalar.fromScalar(Scalar.from(vector[i]))
+        );
+        notes[i] = { taskId, index, nullifier, commitment };
     }
-    if (index == -1) throw new Error('Incorrect secret vector');
     return { r, R, M, notes };
 }
 
 function recoverEncryption(
-    r: Scalar[],
+    taskIndex: number,
     publicKey: Group,
-    vector: bigint[]
+    r: Scalar[],
+    vector: bigint[],
+    indexes: number[]
 ): {
     R: Group[];
     M: Group[];
@@ -111,7 +122,6 @@ function recoverEncryption(
     let R = new Array<Group>(dimension);
     let M = new Array<Group>(dimension);
     let notes = new Array<SecretNote>(dimension);
-    let index = -1;
     for (let i = 0; i < dimension; i++) {
         let random = r[i];
         R[i] = Group.generator.scale(random);
@@ -121,19 +131,16 @@ function recoverEncryption(
                       .scale(Scalar.from(vector[i]))
                       .add(publicKey.scale(random))
                 : Group.zero.add(publicKey.scale(random));
-        index = i;
         let nullifier = Field.random();
-        notes[i] = {
-            index: Field(i),
-            nullifier: nullifier,
-            commitment: Poseidon.hash(
-                [
-                    nullifier,
-                    Field(index),
-                    CustomScalar.fromScalar(Scalar.from(vector[i])).toFields(),
-                ].flat()
-            ),
-        };
+        let taskId = Field(taskIndex);
+        let index = Field(indexes[i]);
+        let commitment = calculateCommitment(
+            nullifier,
+            taskId,
+            index,
+            CustomScalar.fromScalar(Scalar.from(vector[i]))
+        );
+        notes[i] = { taskId, index, nullifier, commitment };
     }
     return { R, M, notes };
 }

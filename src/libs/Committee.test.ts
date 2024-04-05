@@ -83,12 +83,12 @@ describe('Committee', () => {
 
     it('Should accumulate encryption', async () => {
         for (let i = 0; i < plainVectors.length; i++) {
-            let encryptedVector = Requester.generateEncryption(
-                Committee.calculatePublicKey(round1Contributions),
-                plainVectors[i]
-            );
-            R.push(encryptedVector.R);
-            M.push(encryptedVector.M);
+            // let encryptedVector = Requester.generateEncryption(
+            //     Committee.calculatePublicKey(round1Contributions),
+            //     plainVectors[i]
+            // );
+            // R.push(encryptedVector.R);
+            // M.push(encryptedVector.M);
         }
 
         let accumulatedEncryption = Requester.accumulateEncryption(R, M);

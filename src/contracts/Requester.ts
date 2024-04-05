@@ -24,6 +24,7 @@ import {
     RandomVector,
     RequestVector,
     SecretVector,
+    calculateCommitment,
 } from '../libs/Requester.js';
 import { rollup } from './Rollup.js';
 import {
@@ -519,13 +520,15 @@ class RequesterContract extends SmartContract {
         let M = new RequestVector();
         let commitments = new CommitmentArray();
         for (let i = 0; i < ENCRYPTION_LIMITS.DIMENSION; i++) {
-            let index = Field(i);
-            let random = randoms.get(index).toScalar();
-            let secret = secrets.get(index);
-            let nullifier = nullifiers.get(index);
-            R.set(index, Group.generator.scale(random));
+            let index = Field.fromBits(
+                indexes.toBits().slice(i * 8, (i + 1) * 8)
+            );
+            let random = randoms.get(Field(i)).toScalar();
+            let secret = secrets.get(Field(i));
+            let nullifier = nullifiers.get(Field(i));
+            R.set(Field(i), Group.generator.scale(random));
             M.set(
-                index,
+                Field(i),
                 Provable.if(
                     secret.equals(CustomScalar.fromScalar(Scalar.from(0))),
                     Group.zero,
@@ -533,8 +536,8 @@ class RequesterContract extends SmartContract {
                 ).add(publicKey.scale(random))
             );
             commitments.set(
-                index,
-                Poseidon.hash([nullifier, index, secret.toFields()].flat())
+                Field(i),
+                calculateCommitment(nullifier, taskId.value, index, secret)
             );
         }
 
@@ -739,18 +742,35 @@ class RequesterContract extends SmartContract {
                     Poseidon.hash([accumulationRootR, accumulationRootM])
                 ),
                 Utils.buildAssertMessage(
-                    RequestContract.name,
-                    RequestContract.prototype.verifyAccumulationData.name,
+                    RequesterContract.name,
+                    RequesterContract.prototype.verifyAccumulationData.name,
                     ErrorEnum.ACCUMULATION_ROOT
                 )
             );
         requestId.assertEquals(
             witness.calculateIndex(),
             Utils.buildAssertMessage(
-                RequestContract.name,
-                RequestContract.prototype.verifyAccumulationData.name,
+                RequesterContract.name,
+                RequesterContract.prototype.verifyAccumulationData.name,
                 ErrorEnum.ACCUMULATION_INDEX_L1
             )
         );
+    }
+
+    verifyCommitment(
+        index: Field,
+        commitment: Field,
+        witness: RequesterLevel1Witness
+    ) {
+        this.commitmentRoot
+            .getAndRequireEquals()
+            .assertEquals(
+                witness.calculateRoot(commitment),
+                Utils.buildAssertMessage(
+                    RequesterContract.name,
+                    RequesterContract.prototype.verifyCommitment.name,
+                    ErrorEnum.COMMITMENT_ROOT
+                )
+            );
     }
 }
