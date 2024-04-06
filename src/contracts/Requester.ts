@@ -772,5 +772,14 @@ class RequesterContract extends SmartContract {
                     ErrorEnum.COMMITMENT_ROOT
                 )
             );
+
+        index.assertEquals(
+            witness.calculateIndex(),
+            Utils.buildAssertMessage(
+                RequesterContract.name,
+                RequesterContract.prototype.verifyCommitment.name,
+                ErrorEnum.COMMITMENT_INDEX
+            )
+        );
     }
 }

@@ -1,11 +1,13 @@
 import { Field, MerkleTree, MerkleWitness, Poseidon, UInt64 } from 'o1js';
 import { StaticArray } from '@auxo-dev/auxo-libs';
 import { ENCRYPTION_LIMITS, INSTANCE_LIMITS } from '../constants.js';
-import { GenericStorage } from './GenericStorage.js';
+import { GenericStorage, Witness } from './GenericStorage.js';
 
 export {
-    EMPTY_LEVEL_1_TREE as REQUESTER_LEVEL_1_TREE,
-    EMPTY_COMMITMENT_TREE as COMMITMENT_TREE,
+    REQUESTER_LEVEL_1_TREE,
+    REQUESTER_LEVEL_1_WITNESS,
+    COMMITMENT_TREE,
+    COMMITMENT_WITNESS,
     Level1MT as RequesterLevel1MT,
     Level1Witness as RequesterLevel1Witness,
     CommitmentMT,
@@ -33,17 +35,14 @@ class Level1MT extends MerkleTree {}
 class Level1Witness extends MerkleWitness(LEVEL1_TREE_HEIGHT) {}
 class CommitmentMT extends MerkleTree {}
 class CommitmentWitness extends MerkleWitness(COMMITMENT_TREE_HEIGHT) {}
-const EMPTY_LEVEL_1_TREE = () => new Level1MT(LEVEL1_TREE_HEIGHT);
-const EMPTY_COMMITMENT_TREE = () => new CommitmentMT(COMMITMENT_TREE_HEIGHT);
+const REQUESTER_LEVEL_1_TREE = () => new Level1MT(LEVEL1_TREE_HEIGHT);
+const REQUESTER_LEVEL_1_WITNESS = (witness: Witness) =>
+    new Level1Witness(witness);
+const COMMITMENT_TREE = () => new CommitmentMT(COMMITMENT_TREE_HEIGHT);
+const COMMITMENT_WITNESS = (witness: Witness) => new CommitmentWitness(witness);
 
 type KeyIndexLeaf = Field;
-class KeyIndexStorage extends GenericStorage<
-    KeyIndexLeaf,
-    Level1MT,
-    Level1Witness,
-    undefined,
-    undefined
-> {
+class KeyIndexStorage extends GenericStorage<KeyIndexLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -51,7 +50,13 @@ class KeyIndexStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_LEVEL_1_TREE, undefined, leafs);
+        super(
+            REQUESTER_LEVEL_1_TREE,
+            REQUESTER_LEVEL_1_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
     }
     static calculateLeaf(keyIndex: KeyIndexLeaf): Field {
         return keyIndex;
@@ -86,13 +91,7 @@ class KeyIndexStorage extends GenericStorage<
 }
 
 type TimestampLeaf = UInt64;
-class TimestampStorage extends GenericStorage<
-    TimestampLeaf,
-    Level1MT,
-    Level1Witness,
-    undefined,
-    undefined
-> {
+class TimestampStorage extends GenericStorage<TimestampLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -100,7 +99,13 @@ class TimestampStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_LEVEL_1_TREE, undefined, leafs);
+        super(
+            REQUESTER_LEVEL_1_TREE,
+            REQUESTER_LEVEL_1_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
     }
     static calculateLeaf(timestamp: TimestampLeaf): Field {
         return timestamp.value;
@@ -138,13 +143,7 @@ type AccumulationLeaf = {
     accumulationRootR: Field;
     accumulationRootM: Field;
 };
-class AccumulationStorage extends GenericStorage<
-    AccumulationLeaf,
-    Level1MT,
-    Level1Witness,
-    undefined,
-    undefined
-> {
+class AccumulationStorage extends GenericStorage<AccumulationLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -153,7 +152,13 @@ class AccumulationStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_LEVEL_1_TREE, undefined, leafs);
+        super(
+            REQUESTER_LEVEL_1_TREE,
+            REQUESTER_LEVEL_1_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
     }
 
     static calculateLeaf(rawLeaf: AccumulationLeaf): Field {
@@ -207,13 +212,7 @@ class CommitmentWitnesses extends StaticArray(
     CommitmentWitness,
     ENCRYPTION_LIMITS.DIMENSION
 ) {}
-class CommitmentStorage extends GenericStorage<
-    CommitmentLeaf,
-    CommitmentMT,
-    CommitmentWitness,
-    undefined,
-    undefined
-> {
+class CommitmentStorage extends GenericStorage<CommitmentLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -221,7 +220,13 @@ class CommitmentStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_LEVEL_1_TREE, undefined, leafs);
+        super(
+            REQUESTER_LEVEL_1_TREE,
+            REQUESTER_LEVEL_1_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
     }
 
     static calculateLeaf(commitment: CommitmentLeaf): Field {

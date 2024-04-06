@@ -12,11 +12,13 @@ import {
 } from 'o1js';
 import { CustomScalar, StaticArray } from '@auxo-dev/auxo-libs';
 import { ENCRYPTION_LIMITS, INSTANCE_LIMITS } from '../constants.js';
-import { GenericStorage } from './GenericStorage.js';
+import { GenericStorage, Witness } from './GenericStorage.js';
 
 export {
-    EMPTY_LEVEL_1_TREE as REQUEST_LEVEL_1_TREE,
-    EMPTY_LEVEL_2_TREE as REQUEST_LEVEL_2_TREE,
+    REQUEST_LEVEL_1_TREE,
+    REQUEST_LEVEL_1_WITNESS,
+    REQUEST_LEVEL_2_TREE,
+    REQUEST_LEVEL_2_WITNESS,
     Level1MT as RequestLevel1MT,
     Level1Witness as RequestLevel1Witness,
     Level2MT as RequestLevel2MT,
@@ -56,17 +58,15 @@ class FullMTWitness extends Struct({
     level1: Level1Witness,
     level2: Level2Witness,
 }) {}
-const EMPTY_LEVEL_1_TREE = () => new Level1MT(LEVEL1_TREE_HEIGHT);
-const EMPTY_LEVEL_2_TREE = () => new Level2MT(LEVEL2_TREE_HEIGHT);
+const REQUEST_LEVEL_1_TREE = () => new Level1MT(LEVEL1_TREE_HEIGHT);
+const REQUEST_LEVEL_1_WITNESS = (witness: Witness) =>
+    new Level1Witness(witness);
+const REQUEST_LEVEL_2_TREE = () => new Level2MT(LEVEL2_TREE_HEIGHT);
+const REQUEST_LEVEL_2_WITNESS = (witness: Witness) =>
+    new Level2Witness(witness);
 
 type KeyIndexLeaf = Field;
-class KeyIndexStorage extends GenericStorage<
-    KeyIndexLeaf,
-    Level1MT,
-    Level1Witness,
-    undefined,
-    undefined
-> {
+class KeyIndexStorage extends GenericStorage<KeyIndexLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -74,7 +74,13 @@ class KeyIndexStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_LEVEL_1_TREE, undefined, leafs);
+        super(
+            REQUEST_LEVEL_1_TREE,
+            REQUEST_LEVEL_1_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
     }
     static calculateLeaf(keyIndex: KeyIndexLeaf): Field {
         return keyIndex;
@@ -112,13 +118,7 @@ type TaskIdLeaf = {
     requester: PublicKey;
     taskId: UInt32;
 };
-class TaskIdStorage extends GenericStorage<
-    TaskIdLeaf,
-    Level1MT,
-    Level1Witness,
-    undefined,
-    undefined
-> {
+class TaskIdStorage extends GenericStorage<TaskIdLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -126,7 +126,13 @@ class TaskIdStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_LEVEL_1_TREE, undefined, leafs);
+        super(
+            REQUEST_LEVEL_1_TREE,
+            REQUEST_LEVEL_1_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
     }
 
     static calculateLeaf(rawLeaf: TaskIdLeaf): Field {
@@ -164,13 +170,7 @@ class TaskIdStorage extends GenericStorage<
 }
 
 type ExpirationLeaf = UInt64;
-class ExpirationStorage extends GenericStorage<
-    ExpirationLeaf,
-    Level1MT,
-    Level1Witness,
-    undefined,
-    undefined
-> {
+class ExpirationStorage extends GenericStorage<ExpirationLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -178,7 +178,13 @@ class ExpirationStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_LEVEL_1_TREE, undefined, leafs);
+        super(
+            REQUEST_LEVEL_1_TREE,
+            REQUEST_LEVEL_1_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
     }
 
     static calculateLeaf(timestamp: ExpirationLeaf): Field {
@@ -214,13 +220,7 @@ class ExpirationStorage extends GenericStorage<
 }
 
 type ResultLeaf = Field;
-class ResultStorage extends GenericStorage<
-    ResultLeaf,
-    Level1MT,
-    Level1Witness,
-    undefined,
-    undefined
-> {
+class ResultStorage extends GenericStorage<ResultLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -228,7 +228,13 @@ class ResultStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_LEVEL_1_TREE, undefined, leafs);
+        super(
+            REQUEST_LEVEL_1_TREE,
+            REQUEST_LEVEL_1_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
     }
 
     static calculateLeaf(resultRoot: ResultLeaf): Field {
@@ -277,13 +283,7 @@ type AccumulationLeaf = {
     dimension: UInt32;
 };
 
-class AccumulationStorage extends GenericStorage<
-    AccumulationLeaf,
-    Level1MT,
-    Level1Witness,
-    undefined,
-    undefined
-> {
+class AccumulationStorage extends GenericStorage<AccumulationLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -291,7 +291,13 @@ class AccumulationStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_LEVEL_1_TREE, undefined, leafs);
+        super(
+            REQUEST_LEVEL_1_TREE,
+            REQUEST_LEVEL_1_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
     }
 
     static calculateLeaf(rawLeaf: AccumulationLeaf): Field {
@@ -338,13 +344,7 @@ class GroupVectorWitnesses extends StaticArray(
     Level2Witness,
     ENCRYPTION_LIMITS.DIMENSION
 ) {}
-class GroupVectorStorage extends GenericStorage<
-    GroupVectorLeaf,
-    Level2MT,
-    Level2Witness,
-    undefined,
-    undefined
-> {
+class GroupVectorStorage extends GenericStorage<GroupVectorLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -353,7 +353,13 @@ class GroupVectorStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_LEVEL_2_TREE, undefined, leafs);
+        super(
+            REQUEST_LEVEL_2_TREE,
+            REQUEST_LEVEL_2_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
     }
 
     static calculateLeaf(point: GroupVectorLeaf): Field {
@@ -396,13 +402,7 @@ class ScalarVectorWitnesses extends StaticArray(
     Level2Witness,
     ENCRYPTION_LIMITS.DIMENSION
 ) {}
-class ScalarVectorStorage extends GenericStorage<
-    ScalarVectorLeaf,
-    Level2MT,
-    Level2Witness,
-    undefined,
-    undefined
-> {
+class ScalarVectorStorage extends GenericStorage<ScalarVectorLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -411,7 +411,13 @@ class ScalarVectorStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_LEVEL_2_TREE, undefined, leafs);
+        super(
+            REQUEST_LEVEL_2_TREE,
+            REQUEST_LEVEL_2_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
     }
 
     static calculateLeaf(value: ScalarVectorLeaf): Field {

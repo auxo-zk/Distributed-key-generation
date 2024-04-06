@@ -1,9 +1,24 @@
-import { Field, MerkleTree } from 'o1js';
+import { Bool, Field, MerkleTree } from 'o1js';
 
-interface Storage<RawLeaf, Level1MT, Level1Witness, Level2MT, Level2Witness> {
+export { Witness, BaseMerkleWitness, GenericStorage };
+
+type Witness = {
+    isLeft: boolean;
+    sibling: Field;
+}[];
+
+interface BaseMerkleWitness {
+    path: Field[];
+    isLeft: Bool[];
+    height(): number;
+    calculateRoot(leaf: Field): Field;
+    calculateIndex(): Field;
+}
+
+interface Storage<RawLeaf> {
     get root(): Field;
-    get level1(): Level1MT;
-    get level2s(): { [key: string]: Level2MT };
+    get level1(): MerkleTree;
+    get level2s(): { [key: string]: MerkleTree };
     get leafs(): { [key: string]: { raw: RawLeaf | undefined; leaf: Field } };
 
     calculateLeaf(args: RawLeaf): Field;
@@ -11,9 +26,12 @@ interface Storage<RawLeaf, Level1MT, Level1Witness, Level2MT, Level2Witness> {
     calculateLevel1Index(args: any): Field;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     calculateLevel2Index?(args: any): Field;
-    getLevel1Witness(level1Index: Field): Level1Witness;
-    getLevel2Witness?(level1Index: Field, level2Index: Field): Level2Witness;
-    updateInternal?(level1Index: Field, level2: Level2MT): void;
+    getLevel1Witness(level1Index: Field): BaseMerkleWitness;
+    getLevel2Witness?(
+        level1Index: Field,
+        level2Index: Field
+    ): BaseMerkleWitness;
+    updateInternal?(level1Index: Field, level2: MerkleTree): void;
     updateLeaf(
         {
             level1Index,
@@ -30,26 +48,22 @@ interface Storage<RawLeaf, Level1MT, Level1Witness, Level2MT, Level2Witness> {
     ): void;
 }
 
-export abstract class GenericStorage<
-    RawLeaf,
-    Level1MT extends MerkleTree,
-    Level1MTWitness,
-    Level2MT extends MerkleTree | undefined,
-    Level2Witness
-> implements
-        Storage<RawLeaf, Level1MT, Level1MTWitness, Level2MT, Level2Witness>
-{
-    EMPTY_LEVEL_1_TREE?(): Level1MT;
-    EMPTY_LEVEL_2_TREE?(): Level2MT;
-    private _level1: Level1MT;
-    private _level2s: { [key: string]: Level2MT };
+abstract class GenericStorage<RawLeaf> implements Storage<RawLeaf> {
+    emptyLevel1Tree: () => MerkleTree;
+    generateLevel1Witness: (witness: Witness) => BaseMerkleWitness;
+    emptyLevel2Tree?: () => MerkleTree;
+    generateLevel2Witness?: (witness: Witness) => BaseMerkleWitness;
+    private _level1: MerkleTree;
+    private _level2s: { [key: string]: MerkleTree };
     private _leafs: {
         [key: string]: { raw: RawLeaf | undefined; leaf: Field };
     };
 
     constructor(
-        emptyLevel1Tree: () => Level1MT,
-        emptyLevel2Tree?: () => Level2MT,
+        emptyLevel1Tree: () => MerkleTree,
+        generateLevel1Witness: (witness: Witness) => BaseMerkleWitness,
+        emptyLevel2Tree?: () => MerkleTree,
+        generateLevel2Witness?: (witness: Witness) => BaseMerkleWitness,
         leafs?: {
             level1Index: Field;
             level2Index?: Field;
@@ -57,12 +71,14 @@ export abstract class GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        this.EMPTY_LEVEL_1_TREE = emptyLevel1Tree;
-        this._level1 = this.EMPTY_LEVEL_1_TREE();
+        this.emptyLevel1Tree = emptyLevel1Tree;
+        this.generateLevel1Witness = generateLevel1Witness;
+        this._level1 = this.emptyLevel1Tree();
         this._level2s = {};
         this._leafs = {};
-        if (emptyLevel2Tree) {
-            this.EMPTY_LEVEL_2_TREE = emptyLevel2Tree;
+        if (emptyLevel2Tree && generateLevel2Witness) {
+            this.emptyLevel2Tree = emptyLevel2Tree;
+            this.generateLevel2Witness = generateLevel2Witness;
             if (leafs) {
                 for (let i = 0; i < leafs.length; i++) {
                     if (leafs[i].isRaw) {
@@ -91,11 +107,11 @@ export abstract class GenericStorage<
         return this._level1.getRoot();
     }
 
-    get level1(): Level1MT {
+    get level1(): MerkleTree {
         return this._level1;
     }
 
-    get level2s(): { [key: string]: Level2MT } {
+    get level2s(): { [key: string]: MerkleTree } {
         return this._level2s;
     }
 
@@ -109,29 +125,35 @@ export abstract class GenericStorage<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     calculateLevel2Index?(args: any): Field;
 
-    getLevel1Witness(level1Index: Field): Level1MTWitness {
-        return this._level1.getWitness(
-            level1Index.toBigInt()
-        ) as Level1MTWitness;
+    getLevel1Witness(level1Index: Field): BaseMerkleWitness {
+        return this.generateLevel1Witness(
+            this._level1.getWitness(level1Index.toBigInt())
+        );
     }
 
-    getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
+    getLevel2Witness(
+        level1Index: Field,
+        level2Index: Field
+    ): BaseMerkleWitness {
         let level2 = this._level2s[level1Index.toString()];
-        if (!this.EMPTY_LEVEL_2_TREE)
-            throw new Error('This storage does not support Level2MT');
+        if (!this.emptyLevel2Tree)
+            throw new Error('This storage does not support MerkleTree');
         if (level2 === undefined)
             throw new Error('Level 2 MT does not exist at this index');
-        return level2.getWitness(level2Index.toBigInt()) as Level2Witness;
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        return this.generateLevel2Witness!(
+            level2.getWitness(level2Index.toBigInt())
+        );
     }
 
     getWitness(
         level1Index: Field,
         level2Index?: Field
     ):
-        | Level1MTWitness
+        | BaseMerkleWitness
         | {
-              level1: Level1MTWitness;
-              level2: Level2Witness;
+              level1: BaseMerkleWitness;
+              level2: BaseMerkleWitness;
           } {
         if (level2Index) {
             return {
@@ -143,15 +165,15 @@ export abstract class GenericStorage<
         }
     }
 
-    updateInternal(level1Index: Field, level2: Level2MT) {
-        if (this.EMPTY_LEVEL_2_TREE) {
+    updateInternal(level1Index: Field, level2: MerkleTree) {
+        if (this.emptyLevel2Tree) {
             Object.assign(this._level2s, {
                 [level1Index.toString()]: level2,
             });
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             this._level1.setLeaf(level1Index.toBigInt(), level2!.getRoot());
         } else {
-            throw new Error('This storage does not support Level2MT');
+            throw new Error('This storage does not support MerkleTree');
         }
     }
 
@@ -164,15 +186,15 @@ export abstract class GenericStorage<
     ): void {
         let leafId = level1Index.toString();
         if (level2Index) {
-            if (this.EMPTY_LEVEL_2_TREE) {
+            if (this.emptyLevel2Tree) {
                 leafId += '-' + level2Index.toString();
                 let level2 = this._level2s[level1Index.toString()];
-                if (level2 === undefined) level2 = this.EMPTY_LEVEL_2_TREE();
+                if (level2 === undefined) level2 = this.emptyLevel2Tree();
                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 level2!.setLeaf(level2Index.toBigInt(), leaf);
                 this.updateInternal(level1Index, level2);
             } else {
-                throw new Error('This storage does not support Level2MT');
+                throw new Error('This storage does not support MerkleTree');
             }
         } else this._level1.setLeaf(level1Index.toBigInt(), leaf);
 
@@ -192,15 +214,15 @@ export abstract class GenericStorage<
         let leafId = level1Index.toString();
         let leaf = this.calculateLeaf(rawLeaf);
         if (level2Index) {
-            if (this.EMPTY_LEVEL_2_TREE) {
+            if (this.emptyLevel2Tree) {
                 leafId += '-' + level2Index.toString();
                 let level2 = this._level2s[level1Index.toString()];
-                if (level2 === undefined) level2 = this.EMPTY_LEVEL_2_TREE();
+                if (level2 === undefined) level2 = this.emptyLevel2Tree();
                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 level2!.setLeaf(level2Index.toBigInt(), leaf);
                 this.updateInternal(level1Index, level2);
             } else {
-                throw new Error('This storage does not support Level2MT');
+                throw new Error('This storage does not support MerkleTree');
             }
         } else this._level1.setLeaf(level1Index.toBigInt(), leaf);
 

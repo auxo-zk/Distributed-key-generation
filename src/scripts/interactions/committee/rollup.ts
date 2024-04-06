@@ -131,12 +131,12 @@ async function main() {
             )
         );
 
-        proof = await UpdateCommittee.update(
-            proof,
-            new CommitteeAction(action),
-            memberWitness,
-            storageWitness
-        );
+        // proof = await UpdateCommittee.update(
+        //     proof,
+        //     new CommitteeAction(action),
+        //     memberWitness,
+        //     storageWitness
+        // );
         console.log('Done');
 
         let level2Tree = COMMITTEE_LEVEL_2_TREE();

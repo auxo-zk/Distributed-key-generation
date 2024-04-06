@@ -7,7 +7,7 @@ import {
     Struct,
 } from 'o1js';
 import { INSTANCE_LIMITS } from '../constants.js';
-import { GenericStorage } from './GenericStorage.js';
+import { GenericStorage, Witness } from './GenericStorage.js';
 
 export {
     EMPTY_LEVEL_1_TREE as COMMITTEE_LEVEL_1_TREE,
@@ -39,16 +39,12 @@ class FullMTWitness extends Struct({
     level2: Level2Witness,
 }) {}
 const EMPTY_LEVEL_1_TREE = () => new Level1MT(LEVEL1_TREE_HEIGHT);
+const LEVEL_1_WITNESS = (witness: Witness) => new Level1Witness(witness);
 const EMPTY_LEVEL_2_TREE = () => new Level2MT(LEVEL2_TREE_HEIGHT);
+const LEVEL_2_WITNESS = (witness: Witness) => new Level2Witness(witness);
 
 type MemberLeaf = PublicKey;
-class MemberStorage extends GenericStorage<
-    MemberLeaf,
-    Level1MT,
-    Level1Witness,
-    Level2MT,
-    Level2Witness
-> {
+class MemberStorage extends GenericStorage<MemberLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -56,7 +52,13 @@ class MemberStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_LEVEL_1_TREE, EMPTY_LEVEL_2_TREE, leafs);
+        super(
+            EMPTY_LEVEL_1_TREE,
+            LEVEL_1_WITNESS,
+            EMPTY_LEVEL_2_TREE,
+            LEVEL_2_WITNESS,
+            leafs
+        );
     }
 
     static calculateLeaf(publicKey: MemberLeaf): Field {
@@ -112,13 +114,7 @@ type SettingLeaf = {
     T: Field;
     N: Field;
 };
-class SettingStorage extends GenericStorage<
-    SettingLeaf,
-    Level1MT,
-    Level1Witness,
-    never,
-    never
-> {
+class SettingStorage extends GenericStorage<SettingLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -126,7 +122,7 @@ class SettingStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_LEVEL_1_TREE, undefined, leafs);
+        super(EMPTY_LEVEL_1_TREE, LEVEL_1_WITNESS, undefined, undefined, leafs);
     }
 
     static calculateLeaf(rawLeaf: SettingLeaf): Field {
@@ -162,13 +158,7 @@ class SettingStorage extends GenericStorage<
 }
 
 type KeyCounterLeaf = Field;
-class KeyCounterStorage extends GenericStorage<
-    KeyCounterLeaf,
-    Level1MT,
-    Level1Witness,
-    never,
-    never
-> {
+class KeyCounterStorage extends GenericStorage<KeyCounterLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -176,7 +166,7 @@ class KeyCounterStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EMPTY_LEVEL_1_TREE, undefined, leafs);
+        super(EMPTY_LEVEL_1_TREE, LEVEL_1_WITNESS, undefined, undefined, leafs);
     }
 
     static calculateLeaf(nextKeyId: KeyCounterLeaf): Field {
