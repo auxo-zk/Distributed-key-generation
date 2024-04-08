@@ -1,6 +1,8 @@
 import { Bit255 } from '@auxo-dev/auxo-libs';
 import { Group, Poseidon, Scalar } from 'o1js';
 
+export { encrypt, decrypt };
+
 /**
  * Encryption
  * - Input:
@@ -19,7 +21,7 @@ import { Group, Poseidon, Scalar } from 'o1js';
  *   + m: Bit255 => => Scalar
  */
 
-export function encrypt(
+function encrypt(
     m: Scalar,
     pbK: Group,
     b: Scalar
@@ -34,7 +36,7 @@ export function encrypt(
     return { c, U };
 }
 
-export function decrypt(c: Bit255, U: Group, prvK: Scalar): { m: Scalar } {
+function decrypt(c: Bit255, U: Group, prvK: Scalar): { m: Scalar } {
     let V = U.add(Group.generator).scale(prvK).sub(Group.generator.scale(prvK));
     let k = Poseidon.hash(U.toFields().concat(V.toFields()));
     let m = Bit255.fromBigInt(k.toBigInt()).xor(c).toScalar();

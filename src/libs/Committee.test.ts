@@ -1,8 +1,25 @@
 import { Group, PrivateKey, Scalar } from 'o1js';
-import * as Committee from './Committee.js';
-import * as Requester from './Requester.js';
 import { Bit255 } from '@auxo-dev/auxo-libs';
 import { SECRET_UNIT } from '../constants.js';
+import {
+    ResponseContribution,
+    Round1Contribution,
+    Round2Contribution,
+    Round2Data,
+    SecretPolynomial,
+    accumulateResponses,
+    calculatePublicKey,
+    generateRandomPolynomial,
+    getResponseContribution,
+    getRound1Contribution,
+    getRound2Contribution,
+} from './Committee.js';
+import {
+    accumulateEncryption,
+    bruteForceResultVector,
+    generateEncryption,
+    getResultVector,
+} from './Requester.js';
 
 describe('Committee', () => {
     let T = 1;
@@ -10,14 +27,14 @@ describe('Committee', () => {
     let committees: {
         privateKey: PrivateKey;
         memberId: number;
-        secretPolynomial: Committee.SecretPolynomial;
-        round1Contribution?: Committee.Round1Contribution;
-        round2Contribution?: Committee.Round2Contribution;
-        responseContribution?: Committee.ResponseContribution;
+        secretPolynomial: SecretPolynomial;
+        round1Contribution?: Round1Contribution;
+        round2Contribution?: Round2Contribution;
+        responseContribution?: ResponseContribution;
     }[] = [];
-    let round1Contributions: Committee.Round1Contribution[] = [];
-    let round2Contributions: Committee.Round2Contribution[] = [];
-    let responseContributions: Committee.ResponseContribution[] = [];
+    let round1Contributions: Round1Contribution[] = [];
+    let round2Contributions: Round2Contribution[] = [];
+    let responseContributions: ResponseContribution[] = [];
     let publicKey: Group;
     let R: Group[][] = [];
     let M: Group[][] = [];
@@ -36,7 +53,7 @@ describe('Committee', () => {
     beforeAll(async () => {
         for (let i = 0; i < N; i++) {
             let privateKey = PrivateKey.random();
-            let secretPolynomial = Committee.generateRandomPolynomial(T, N);
+            let secretPolynomial = generateRandomPolynomial(T, N);
             committees.push({
                 privateKey: privateKey,
                 memberId: i,
@@ -49,22 +66,23 @@ describe('Committee', () => {
 
     it('Should generate round 1 contribution', async () => {
         for (let i = 0; i < N; i++) {
-            let round1Contribution = Committee.getRound1Contribution(
+            let round1Contribution = getRound1Contribution(
                 committees[i].secretPolynomial
             );
             committees[i].round1Contribution = round1Contribution;
             round1Contributions.push(round1Contribution);
         }
-        publicKey = Committee.calculatePublicKey(round1Contributions);
+        publicKey = calculatePublicKey(round1Contributions);
+        expect(publicKey.isZero().toBoolean()).toEqual(false);
     });
 
     it('Should generate round 2 contribution', async () => {
         for (let i = 0; i < N; i++) {
-            let round2Contribution = Committee.getRound2Contribution(
+            let round2Contribution = getRound2Contribution(
                 committees[i].secretPolynomial,
                 committees[i].memberId,
                 round1Contributions,
-                [...Array(N).keys()].map((e) => Scalar.random())
+                [...Array(N).keys()].map(() => Scalar.random())
             );
             committees[i].round2Contribution = round2Contribution;
             round2Contributions.push(round2Contribution);
@@ -73,15 +91,15 @@ describe('Committee', () => {
 
     it('Should accumulate encryption', async () => {
         for (let i = 0; i < plainVectors.length; i++) {
-            let encryptedVector = Requester.generateEncryption(
-                Committee.calculatePublicKey(round1Contributions),
+            let encryptedVector = generateEncryption(
+                calculatePublicKey(round1Contributions),
                 plainVectors[i]
             );
             R.push(encryptedVector.R);
             M.push(encryptedVector.M);
         }
 
-        let accumulatedEncryption = Requester.accumulateEncryption(R, M);
+        let accumulatedEncryption = accumulateEncryption(R, M);
         sumR = accumulatedEncryption.sumR;
         sumM = accumulatedEncryption.sumM;
     });
@@ -89,7 +107,7 @@ describe('Committee', () => {
     it('Should generate response contribution', async () => {
         for (let i = 0; i < T; i++) {
             let member = committees[respondedMembers[i]];
-            let round2Data: Committee.Round2Data[] = round2Contributions.map(
+            let round2Data: Round2Data[] = round2Contributions.map(
                 (contribution, index) =>
                     index == committees[respondedMembers[i]].memberId
                         ? { c: Bit255.fromBigInt(0n), U: Group.zero }
@@ -99,7 +117,7 @@ describe('Committee', () => {
                           },
                 {}
             );
-            let responseContribution = Committee.getResponseContribution(
+            let responseContribution = getResponseContribution(
                 committees[respondedMembers[i]].secretPolynomial,
                 committees[respondedMembers[i]].memberId,
                 round2Data,
@@ -108,13 +126,13 @@ describe('Committee', () => {
             committees[respondedMembers[i]].responseContribution =
                 responseContribution;
             responseContributions.push(responseContribution);
-            // D.push(responseContribution.D.values);
+            D.push(responseContribution.D.values);
         }
     });
 
     it('Should calculate result vector', async () => {
-        sumD = Committee.accumulateResponses(respondedMembers, D);
-        resultVector = Requester.getResultVector(sumD, sumM);
+        sumD = accumulateResponses(respondedMembers, D);
+        resultVector = getResultVector(sumD, sumM);
 
         for (let i = 0; i < result.length; i++) {
             let point = Group.generator.scale(Scalar.from(result[i]));
@@ -124,7 +142,7 @@ describe('Committee', () => {
     });
 
     it('Should brute force raw result correctly', async () => {
-        let rawResult = Requester.bruteForceResultVector(resultVector);
+        let rawResult = bruteForceResultVector(resultVector);
         for (let i = 0; i < result.length; i++) {
             expect(rawResult[i].toBigInt()).toEqual(result[i]);
         }

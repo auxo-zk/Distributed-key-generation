@@ -103,15 +103,24 @@ export {
 
 export {
     SecretPolynomial,
+    Round2Data,
+    MemberArray,
+    CArray,
+    cArray,
+    UArray,
+    PublicKeyArray,
+    EncryptionHashArray,
     Round1Contribution,
     Round2Contribution,
-    Round2Data,
     ResponseContribution,
     calculatePublicKey,
+    calculatePolynomialValue,
     generateRandomPolynomial,
+    getSecretPolynomial,
     getRound1Contribution,
     getRound2Contribution,
     getResponseContribution,
+    getLagrangeCoefficient,
     accumulateResponses,
 } from './libs/Committee.js';
 
