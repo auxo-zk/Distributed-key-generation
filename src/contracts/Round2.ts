@@ -152,7 +152,7 @@ const FinalizeRound2 = ZkProgram({
                     contributionWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         FinalizeRound2.name,
-                        FinalizeRound2.init.name,
+                        'init',
                         ErrorEnum.R2_CONTRIBUTION_ROOT
                     )
                 );
@@ -160,7 +160,7 @@ const FinalizeRound2 = ZkProgram({
                     contributionWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeRound2.name,
-                        FinalizeRound2.init.name,
+                        'init',
                         ErrorEnum.R2_CONTRIBUTION_INDEX_L1
                     )
                 );
@@ -172,7 +172,7 @@ const FinalizeRound2 = ZkProgram({
                     ),
                     Utils.buildAssertMessage(
                         FinalizeRound2.name,
-                        FinalizeRound2.init.name,
+                        'init',
                         ErrorEnum.INITIAL_ENCRYPTION_HASHES
                     )
                 );
@@ -219,7 +219,7 @@ const FinalizeRound2 = ZkProgram({
                     earlierProof.publicOutput.processedActions.length,
                     Utils.buildAssertMessage(
                         FinalizeRound2.name,
-                        FinalizeRound2.contribute.name,
+                        'contribute',
                         ErrorEnum.R2_CONTRIBUTION_ORDER
                     )
                 );
@@ -227,7 +227,7 @@ const FinalizeRound2 = ZkProgram({
                     earlierProof.publicOutput.N,
                     Utils.buildAssertMessage(
                         FinalizeRound2.name,
-                        FinalizeRound2.contribute.name,
+                        'contribute',
                         ErrorEnum.R2_CONTRIBUTION_VALUE
                     )
                 );
@@ -241,7 +241,7 @@ const FinalizeRound2 = ZkProgram({
                     earlierProof.publicOutput.keyIndex,
                     Utils.buildAssertMessage(
                         FinalizeRound2.name,
-                        FinalizeRound2.contribute.name,
+                        'contribute',
                         ErrorEnum.R2_CONTRIBUTION_KEY_INDEX
                     )
                 );
@@ -253,7 +253,7 @@ const FinalizeRound2 = ZkProgram({
                     ),
                     Utils.buildAssertMessage(
                         FinalizeRound2.name,
-                        FinalizeRound2.contribute.name,
+                        'contribute',
                         ErrorEnum.R2_CONTRIBUTION_ROOT
                     )
                 );
@@ -261,7 +261,7 @@ const FinalizeRound2 = ZkProgram({
                     contributionWitness.level1.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeRound2.name,
-                        FinalizeRound2.contribute.name,
+                        'contribute',
                         ErrorEnum.R2_CONTRIBUTION_INDEX_L1
                     )
                 );
@@ -269,7 +269,7 @@ const FinalizeRound2 = ZkProgram({
                     contributionWitness.level2.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeRound2.name,
-                        FinalizeRound2.contribute.name,
+                        'contribute',
                         ErrorEnum.R2_CONTRIBUTION_INDEX_L2
                     )
                 );
@@ -462,7 +462,7 @@ class Round2Contract extends SmartContract {
             INSTANCE_LIMITS.KEY,
             Utils.buildAssertMessage(
                 Round2Contract.name,
-                Round2Contract.prototype.contribute.name,
+                'contribute',
                 ErrorEnum.KEY_COUNTER_LIMIT
             )
         );
@@ -576,8 +576,8 @@ class Round2Contract extends SmartContract {
         proof.publicOutput.rollupRoot.assertEquals(
             rollupContract.rollupRoot.getAndRequireEquals(),
             Utils.buildAssertMessage(
-                Round1Contract.name,
-                Round1Contract.prototype.finalize.name,
+                Round2Contract.name,
+                'finalize',
                 ErrorEnum.ROLLUP_ROOT
             )
         );
@@ -585,7 +585,7 @@ class Round2Contract extends SmartContract {
             contributionRoot,
             Utils.buildAssertMessage(
                 Round2Contract.name,
-                Round2Contract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.R2_CONTRIBUTION_ROOT
             )
         );
@@ -593,7 +593,7 @@ class Round2Contract extends SmartContract {
             processRoot,
             Utils.buildAssertMessage(
                 Round2Contract.name,
-                Round2Contract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.PROCESS_ROOT
             )
         );
@@ -601,7 +601,7 @@ class Round2Contract extends SmartContract {
             proof.publicOutput.N,
             Utils.buildAssertMessage(
                 Round2Contract.name,
-                Round2Contract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.R2_CONTRIBUTION_THRESHOLD
             )
         );
@@ -646,7 +646,7 @@ class Round2Contract extends SmartContract {
             encryptionWitness.calculateRoot(Field(0)),
             Utils.buildAssertMessage(
                 Round2Contract.name,
-                Round2Contract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.ENCRYPTION_ROOT
             )
         );
@@ -654,7 +654,7 @@ class Round2Contract extends SmartContract {
             encryptionWitness.calculateIndex(),
             Utils.buildAssertMessage(
                 Round2Contract.name,
-                Round2Contract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.ENCRYPTION_INDEX_L1
             )
         );
@@ -699,7 +699,7 @@ class Round2Contract extends SmartContract {
                 ),
                 Utils.buildAssertMessage(
                     Round2Contract.name,
-                    Round2Contract.prototype.verifyEncHashChain.name,
+                    'verifyEncHashChain',
                     ErrorEnum.ENCRYPTION_ROOT
                 )
             );
@@ -707,7 +707,7 @@ class Round2Contract extends SmartContract {
             witness.level1.calculateIndex(),
             Utils.buildAssertMessage(
                 Round2Contract.name,
-                Round2Contract.prototype.verifyEncHashChain.name,
+                'verifyEncHashChain',
                 ErrorEnum.ENCRYPTION_INDEX_L1
             )
         );
@@ -715,7 +715,7 @@ class Round2Contract extends SmartContract {
             witness.level2.calculateIndex(),
             Utils.buildAssertMessage(
                 Round2Contract.name,
-                Round2Contract.prototype.verifyEncHashChain.name,
+                'verifyEncHashChain',
                 ErrorEnum.ENCRYPTION_INDEX_L2
             )
         );

@@ -142,7 +142,7 @@ const ComputeResult = ZkProgram({
                     accumulationWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         ComputeResult.name,
-                        ComputeResult.compute.name,
+                        'compute',
                         ErrorEnum.ACCUMULATION_ROOT
                     )
                 );
@@ -150,7 +150,7 @@ const ComputeResult = ZkProgram({
                     accumulationWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         ComputeResult.name,
-                        ComputeResult.compute.name,
+                        'compute',
                         ErrorEnum.ACCUMULATION_INDEX_L2
                     )
                 );
@@ -158,7 +158,7 @@ const ComputeResult = ZkProgram({
                     responseWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         ComputeResult.name,
-                        ComputeResult.compute.name,
+                        'compute',
                         ErrorEnum.RES_D_ROOT
                     )
                 );
@@ -166,7 +166,7 @@ const ComputeResult = ZkProgram({
                     responseWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         ComputeResult.name,
-                        ComputeResult.compute.name,
+                        'compute',
                         ErrorEnum.RES_D_INDEX_L2
                     )
                 );
@@ -174,7 +174,7 @@ const ComputeResult = ZkProgram({
                     resultWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         ComputeResult.name,
-                        ComputeResult.compute.name,
+                        'compute',
                         ErrorEnum.REQUEST_RESULT_ROOT
                     )
                 );
@@ -182,7 +182,7 @@ const ComputeResult = ZkProgram({
                     resultWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         ComputeResult.name,
-                        ComputeResult.compute.name,
+                        'compute',
                         ErrorEnum.REQUEST_RESULT_INDEX_L2
                     )
                 );
@@ -199,7 +199,7 @@ const ComputeResult = ZkProgram({
                 ).assertTrue(
                     Utils.buildAssertMessage(
                         RequestContract.name,
-                        RequestContract.prototype.resolve.name,
+                        'compute',
                         ErrorEnum.REQUEST_RESULT
                     )
                 );
@@ -314,7 +314,7 @@ const UpdateRequest = ZkProgram({
                     Field(-1),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
-                        UpdateRequest.initialize.name,
+                        'initialize',
                         ErrorEnum.ACTION_TYPE
                     )
                 );
@@ -327,7 +327,7 @@ const UpdateRequest = ZkProgram({
                     keyIndexWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
-                        UpdateRequest.initialize.name,
+                        'initialize',
                         ErrorEnum.KEY_INDEX_ROOT
                     )
                 );
@@ -335,7 +335,7 @@ const UpdateRequest = ZkProgram({
                     keyIndexWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
-                        UpdateRequest.initialize.name,
+                        'initialize',
                         ErrorEnum.KEY_INDEX_INDEX
                     )
                 );
@@ -345,7 +345,7 @@ const UpdateRequest = ZkProgram({
                     taskIdWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
-                        UpdateRequest.initialize.name,
+                        'initialize',
                         ErrorEnum.TASK_ID_ROOT
                     )
                 );
@@ -353,7 +353,7 @@ const UpdateRequest = ZkProgram({
                     taskIdWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
-                        UpdateRequest.initialize.name,
+                        'initialize',
                         ErrorEnum.TASK_ID_INDEX
                     )
                 );
@@ -363,7 +363,7 @@ const UpdateRequest = ZkProgram({
                     accumulationWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
-                        UpdateRequest.initialize.name,
+                        'initialize',
                         ErrorEnum.ACCUMULATION_ROOT
                     )
                 );
@@ -371,7 +371,7 @@ const UpdateRequest = ZkProgram({
                     accumulationWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
-                        UpdateRequest.initialize.name,
+                        'initialize',
                         ErrorEnum.ACCUMULATION_INDEX_L1
                     )
                 );
@@ -381,7 +381,7 @@ const UpdateRequest = ZkProgram({
                     expirationWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
-                        UpdateRequest.initialize.name,
+                        'initialize',
                         ErrorEnum.REQUEST_EXP_ROOT
                     )
                 );
@@ -389,7 +389,7 @@ const UpdateRequest = ZkProgram({
                     expirationWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
-                        UpdateRequest.initialize.name,
+                        'initialize',
                         ErrorEnum.REQUEST_EXP_INDEX
                     )
                 );
@@ -461,7 +461,7 @@ const UpdateRequest = ZkProgram({
                     Field(-1),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
-                        UpdateRequest.initialize.name,
+                        'resolve',
                         ErrorEnum.ACTION_TYPE
                     )
                 );
@@ -471,7 +471,7 @@ const UpdateRequest = ZkProgram({
                     resultWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
-                        UpdateRequest.resolve.name,
+                        'resolve',
                         ErrorEnum.REQUEST_RESULT_ROOT
                     )
                 );
@@ -479,7 +479,7 @@ const UpdateRequest = ZkProgram({
                     resultWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
-                        UpdateRequest.resolve.name,
+                        'resolve',
                         ErrorEnum.REQUEST_RESULT_INDEX_L1
                     )
                 );
@@ -728,7 +728,7 @@ class RequestContract extends SmartContract {
             requestCounter,
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.update.name,
+                'update',
                 ErrorEnum.REQUEST_COUNTER
             )
         );
@@ -736,7 +736,7 @@ class RequestContract extends SmartContract {
             keyIndexRoot,
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.update.name,
+                'update',
                 ErrorEnum.KEY_INDEX_ROOT
             )
         );
@@ -744,7 +744,7 @@ class RequestContract extends SmartContract {
             taskIdRoot,
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.update.name,
+                'update',
                 ErrorEnum.TASK_ID_ROOT
             )
         );
@@ -752,7 +752,7 @@ class RequestContract extends SmartContract {
             accumulationRoot,
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.update.name,
+                'update',
                 ErrorEnum.ACCUMULATION_ROOT
             )
         );
@@ -760,7 +760,7 @@ class RequestContract extends SmartContract {
             expirationRoot,
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.update.name,
+                'update',
                 ErrorEnum.REQUEST_EXP_ROOT
             )
         );
@@ -768,7 +768,7 @@ class RequestContract extends SmartContract {
             resultRoot,
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.update.name,
+                'update',
                 ErrorEnum.REQUEST_RESULT_ROOT
             )
         );
@@ -813,7 +813,7 @@ class RequestContract extends SmartContract {
                 witness.calculateRoot(keyIndex),
                 Utils.buildAssertMessage(
                     RequestContract.name,
-                    RequestContract.prototype.verifyKeyIndex.name,
+                    'verifyKeyIndex',
                     ErrorEnum.KEY_INDEX_ROOT
                 )
             );
@@ -821,7 +821,7 @@ class RequestContract extends SmartContract {
             witness.calculateIndex(),
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.verifyKeyIndex.name,
+                'verifyKeyIndex',
                 ErrorEnum.KEY_INDEX_INDEX
             )
         );
@@ -848,7 +848,7 @@ class RequestContract extends SmartContract {
                 ),
                 Utils.buildAssertMessage(
                     RequestContract.name,
-                    RequestContract.prototype.verifyTaskId.name,
+                    'verifyTaskId',
                     ErrorEnum.TASK_ID_ROOT
                 )
             );
@@ -856,7 +856,7 @@ class RequestContract extends SmartContract {
             witness.calculateIndex(),
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.verifyTaskId.name,
+                'verifyTaskId',
                 ErrorEnum.TASK_ID_INDEX
             )
         );
@@ -884,7 +884,7 @@ class RequestContract extends SmartContract {
             resultWitness.calculateIndex(),
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.getRequestStatus.name,
+                'getRequestStatus',
                 ErrorEnum.REQUEST_RESULT_INDEX_L1
             )
         );
@@ -904,7 +904,7 @@ class RequestContract extends SmartContract {
             expirationWitness.calculateIndex(),
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.getRequestStatus.name,
+                'getRequestStatus',
                 ErrorEnum.REQUEST_EXP_INDEX
             )
         );
@@ -976,7 +976,7 @@ class RequestContract extends SmartContract {
                 ),
                 Utils.buildAssertMessage(
                     RequestContract.name,
-                    RequestContract.prototype.verifyAccumulationData.name,
+                    'verifyAccumulationData',
                     ErrorEnum.ACCUMULATION_ROOT
                 )
             );
@@ -984,7 +984,7 @@ class RequestContract extends SmartContract {
             witness.calculateIndex(),
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.verifyAccumulationData.name,
+                'verifyAccumulationData',
                 ErrorEnum.ACCUMULATION_INDEX_L1
             )
         );
@@ -1017,7 +1017,7 @@ class RequestContract extends SmartContract {
                 ),
                 Utils.buildAssertMessage(
                     RequestContract.name,
-                    RequestContract.prototype.verifyResult.name,
+                    'verifyResult',
                     ErrorEnum.REQUEST_RESULT_ROOT
                 )
             );
@@ -1025,7 +1025,7 @@ class RequestContract extends SmartContract {
             witness.calculateIndex(),
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.verifyResult.name,
+                'verifyResult',
                 ErrorEnum.REQUEST_RESULT_INDEX_L1
             )
         );
@@ -1033,7 +1033,7 @@ class RequestContract extends SmartContract {
             scalarWitness.calculateIndex(),
             Utils.buildAssertMessage(
                 RequestContract.name,
-                RequestContract.prototype.verifyResult.name,
+                'verifyResult',
                 ErrorEnum.REQUEST_RESULT_INDEX_L2
             )
         );

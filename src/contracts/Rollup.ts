@@ -91,7 +91,7 @@ const Rollup = ZkProgram({
                     counterWitness.calculateRoot(counter),
                     Utils.buildAssertMessage(
                         Rollup.name,
-                        Rollup.rollup.name,
+                        'rollup',
                         ErrorEnum.ACTION_COUNTER_ROOT
                     )
                 );
@@ -99,7 +99,7 @@ const Rollup = ZkProgram({
                     counterWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         Rollup.name,
-                        Rollup.rollup.name,
+                        'rollup',
                         ErrorEnum.ACTION_COUNTER_INDEX
                     )
                 );
@@ -116,7 +116,7 @@ const Rollup = ZkProgram({
                     rollupWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         Rollup.name,
-                        Rollup.rollup.name,
+                        'rollup',
                         ErrorEnum.ROLLUP_ROOT
                     )
                 );
@@ -124,7 +124,7 @@ const Rollup = ZkProgram({
                     rollupWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         Rollup.name,
-                        Rollup.rollup.name,
+                        'rollup',
                         ErrorEnum.ROLLUP_INDEX
                     )
                 );
@@ -249,7 +249,7 @@ class RollupContract extends SmartContract {
             counterRoot,
             Utils.buildAssertMessage(
                 RollupContract.name,
-                RollupContract.prototype.rollup.name,
+                'rollup',
                 ErrorEnum.ACTION_COUNTER_ROOT
             )
         );

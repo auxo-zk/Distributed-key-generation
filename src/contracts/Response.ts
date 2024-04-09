@@ -159,7 +159,7 @@ const ComputeResponse = ZkProgram({
                     accumulationWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         ComputeResponse.name,
-                        ComputeResponse.compute.name,
+                        'compute',
                         ErrorEnum.ACCUMULATION_ROOT
                     )
                 );
@@ -167,7 +167,7 @@ const ComputeResponse = ZkProgram({
                     accumulationWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         ComputeResponse.name,
-                        ComputeResponse.compute.name,
+                        'compute',
                         ErrorEnum.ACCUMULATION_INDEX_L2
                     )
                 );
@@ -175,7 +175,7 @@ const ComputeResponse = ZkProgram({
                     responseWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         ComputeResponse.name,
-                        ComputeResponse.compute.name,
+                        'compute',
                         ErrorEnum.RES_D_ROOT
                     )
                 );
@@ -183,7 +183,7 @@ const ComputeResponse = ZkProgram({
                     responseWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         ComputeResponse.name,
-                        ComputeResponse.compute.name,
+                        'compute',
                         ErrorEnum.RES_D_INDEX_L2
                     )
                 );
@@ -284,7 +284,7 @@ const FinalizeResponse = ZkProgram({
                     contributionWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
-                        FinalizeResponse.init.name,
+                        'init',
                         ErrorEnum.RES_CONTRIBUTION_ROOT
                     )
                 );
@@ -292,7 +292,7 @@ const FinalizeResponse = ZkProgram({
                     contributionWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
-                        FinalizeResponse.init.name,
+                        'init',
                         ErrorEnum.RES_CONTRIBUTION_INDEX_L1
                     )
                 );
@@ -302,7 +302,7 @@ const FinalizeResponse = ZkProgram({
                     responseWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
-                        FinalizeResponse.init.name,
+                        'init',
                         ErrorEnum.RES_D_ROOT
                     )
                 );
@@ -310,7 +310,7 @@ const FinalizeResponse = ZkProgram({
                     responseWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
-                        FinalizeResponse.init.name,
+                        'init',
                         ErrorEnum.RES_D_INDEX_L1
                     )
                 );
@@ -366,7 +366,7 @@ const FinalizeResponse = ZkProgram({
                     earlierProof.publicOutput.requestId,
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
-                        FinalizeResponse.contribute.name,
+                        'contribute',
                         ErrorEnum.REQUEST_ID
                     )
                 );
@@ -376,7 +376,7 @@ const FinalizeResponse = ZkProgram({
                     earlierProof.publicOutput.dimension,
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
-                        FinalizeResponse.contribute.name,
+                        'contribute',
                         ErrorEnum.REQUEST_VECTOR_DIM
                     )
                 );
@@ -388,7 +388,7 @@ const FinalizeResponse = ZkProgram({
                     ),
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
-                        FinalizeResponse.contribute.name,
+                        'contribute',
                         ErrorEnum.RES_CONTRIBUTION_ROOT
                     )
                 );
@@ -396,7 +396,7 @@ const FinalizeResponse = ZkProgram({
                     contributionWitness.level1.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
-                        FinalizeResponse.contribute.name,
+                        'contribute',
                         ErrorEnum.RES_CONTRIBUTION_INDEX_L1
                     )
                 );
@@ -404,7 +404,7 @@ const FinalizeResponse = ZkProgram({
                     contributionWitness.level2.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
-                        FinalizeResponse.contribute.name,
+                        'contribute',
                         ErrorEnum.RES_CONTRIBUTION_INDEX_L2
                     )
                 );
@@ -484,7 +484,7 @@ const FinalizeResponse = ZkProgram({
                     responseWitness.calculateRoot(Poseidon.hash(di.toFields())),
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
-                        FinalizeResponse.compute.name,
+                        'compute',
                         ErrorEnum.RES_D_ROOT
                     )
                 );
@@ -492,7 +492,7 @@ const FinalizeResponse = ZkProgram({
                     responseWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
-                        FinalizeResponse.compute.name,
+                        'compute',
                         ErrorEnum.RES_D_INDEX_L2
                     )
                 );
@@ -553,7 +553,7 @@ const FinalizeResponse = ZkProgram({
                         actionState,
                         Utils.buildAssertMessage(
                             FinalizeResponse.name,
-                            FinalizeResponse.compute.name,
+                            'compute',
                             ErrorEnum.ACTION_STATE
                         )
                     );
@@ -598,7 +598,7 @@ const FinalizeResponse = ZkProgram({
                     earlierProof.publicOutput.T,
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
-                        FinalizeResponse.compute.name,
+                        'finalize',
                         ErrorEnum.RES_CONTRIBUTION_THRESHOLD
                     )
                 );
@@ -608,7 +608,7 @@ const FinalizeResponse = ZkProgram({
                     responseWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
-                        FinalizeResponse.compute.name,
+                        'finalize',
                         ErrorEnum.RES_D_ROOT
                     )
                 );
@@ -616,7 +616,7 @@ const FinalizeResponse = ZkProgram({
                     responseWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeResponse.name,
-                        FinalizeResponse.compute.name,
+                        'finalize',
                         ErrorEnum.RES_D_INDEX_L2
                     )
                 );
@@ -762,7 +762,7 @@ class ResponseContract extends SmartContract {
             INSTANCE_LIMITS.KEY,
             Utils.buildAssertMessage(
                 ResponseContract.name,
-                ResponseContract.prototype.contribute.name,
+                'contribute',
                 ErrorEnum.KEY_COUNTER_LIMIT
             )
         );
@@ -817,7 +817,7 @@ class ResponseContract extends SmartContract {
             decryptionProof.publicOutput,
             Utils.buildAssertMessage(
                 ResponseContract.name,
-                ResponseContract.prototype.contribute.name,
+                'contribute',
                 ErrorEnum.SECRET_SHARE
             )
         );
@@ -898,8 +898,8 @@ class ResponseContract extends SmartContract {
         proof.publicOutput.rollupRoot.assertEquals(
             rollupContract.rollupRoot.getAndRequireEquals(),
             Utils.buildAssertMessage(
-                Round1Contract.name,
-                Round1Contract.prototype.finalize.name,
+                ResponseContract.name,
+                'finalize',
                 ErrorEnum.ROLLUP_ROOT
             )
         );
@@ -907,7 +907,7 @@ class ResponseContract extends SmartContract {
             contributionRoot,
             Utils.buildAssertMessage(
                 ResponseContract.name,
-                ResponseContract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.RES_CONTRIBUTION_ROOT
             )
         );
@@ -915,7 +915,7 @@ class ResponseContract extends SmartContract {
             processRoot,
             Utils.buildAssertMessage(
                 ResponseContract.name,
-                ResponseContract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.PROCESS_ROOT
             )
         );
@@ -923,7 +923,7 @@ class ResponseContract extends SmartContract {
             proof.publicOutput.T,
             Utils.buildAssertMessage(
                 ResponseContract.name,
-                ResponseContract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.RES_CONTRIBUTION_THRESHOLD
             )
         );
@@ -933,7 +933,7 @@ class ResponseContract extends SmartContract {
             responseWitness.calculateRoot(Field(0)),
             Utils.buildAssertMessage(
                 ResponseContract.name,
-                ResponseContract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.RES_D_ROOT
             )
         );
@@ -941,7 +941,7 @@ class ResponseContract extends SmartContract {
             responseWitness.calculateIndex(),
             Utils.buildAssertMessage(
                 ResponseContract.name,
-                ResponseContract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.RES_D_INDEX_L1
             )
         );
@@ -1002,7 +1002,7 @@ class ResponseContract extends SmartContract {
                 witness.calculateRoot(responseRootD),
                 Utils.buildAssertMessage(
                     ResponseContract.name,
-                    ResponseContract.prototype.verifyResponse.name,
+                    'verifyResponse',
                     ErrorEnum.RES_D_ROOT
                 )
             );
@@ -1010,7 +1010,7 @@ class ResponseContract extends SmartContract {
             witness.calculateIndex(),
             Utils.buildAssertMessage(
                 ResponseContract.name,
-                ResponseContract.prototype.verifyResponse.name,
+                'verifyResponse',
                 ErrorEnum.RES_D_INDEX_L1
             )
         );

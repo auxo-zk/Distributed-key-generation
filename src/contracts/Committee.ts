@@ -136,7 +136,7 @@ const UpdateCommittee = ZkProgram({
                     earlierProof.publicOutput.nextMemberRoot,
                     Utils.buildAssertMessage(
                         UpdateCommittee.name,
-                        UpdateCommittee.update.name,
+                        'update',
                         ErrorEnum.MEMBER_ROOT
                     )
                 );
@@ -144,7 +144,7 @@ const UpdateCommittee = ZkProgram({
                     earlierProof.publicOutput.nextCommitteeId,
                     Utils.buildAssertMessage(
                         UpdateCommittee.name,
-                        UpdateCommittee.update.name,
+                        'update',
                         ErrorEnum.MEMBER_INDEX_L1
                     )
                 );
@@ -156,7 +156,7 @@ const UpdateCommittee = ZkProgram({
                     earlierProof.publicOutput.nextSettingRoot,
                     Utils.buildAssertMessage(
                         UpdateCommittee.name,
-                        UpdateCommittee.update.name,
+                        'update',
                         ErrorEnum.SETTING_ROOT
                     )
                 );
@@ -164,7 +164,7 @@ const UpdateCommittee = ZkProgram({
                     earlierProof.publicOutput.nextCommitteeId,
                     Utils.buildAssertMessage(
                         UpdateCommittee.name,
-                        UpdateCommittee.update.name,
+                        'update',
                         ErrorEnum.SETTING_INDEX
                     )
                 );

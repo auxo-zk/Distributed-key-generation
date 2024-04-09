@@ -151,7 +151,7 @@ const FinalizeRound1 = ZkProgram({
                     contributionWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         FinalizeRound1.name,
-                        FinalizeRound1.init.name,
+                        'init',
                         ErrorEnum.R1_CONTRIBUTION_ROOT
                     )
                 );
@@ -160,7 +160,7 @@ const FinalizeRound1 = ZkProgram({
                     contributionWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeRound1.name,
-                        FinalizeRound1.init.name,
+                        'init',
                         ErrorEnum.R1_CONTRIBUTION_INDEX_L1
                     )
                 );
@@ -174,7 +174,7 @@ const FinalizeRound1 = ZkProgram({
                     publicKeyWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         FinalizeRound1.name,
-                        FinalizeRound1.init.name,
+                        'init',
                         ErrorEnum.ENC_PUBKEY_ROOT
                     )
                 );
@@ -182,7 +182,7 @@ const FinalizeRound1 = ZkProgram({
                     publicKeyWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeRound1.name,
-                        FinalizeRound1.init.name,
+                        'init',
                         ErrorEnum.ENC_PUBKEY_INDEX_L1
                     )
                 );
@@ -232,7 +232,7 @@ const FinalizeRound1 = ZkProgram({
                     earlierProof.publicOutput.T,
                     Utils.buildAssertMessage(
                         FinalizeRound1.name,
-                        FinalizeRound1.contribute.name,
+                        'contribute',
                         ErrorEnum.R1_CONTRIBUTION_VALUE
                     )
                 );
@@ -246,7 +246,7 @@ const FinalizeRound1 = ZkProgram({
                     earlierProof.publicOutput.keyIndex,
                     Utils.buildAssertMessage(
                         FinalizeRound1.name,
-                        FinalizeRound1.contribute.name,
+                        'contribute',
                         ErrorEnum.R1_CONTRIBUTION_KEY_INDEX
                     )
                 );
@@ -258,7 +258,7 @@ const FinalizeRound1 = ZkProgram({
                     ),
                     Utils.buildAssertMessage(
                         FinalizeRound1.name,
-                        FinalizeRound1.contribute.name,
+                        'contribute',
                         ErrorEnum.R1_CONTRIBUTION_ROOT
                     )
                 );
@@ -266,7 +266,7 @@ const FinalizeRound1 = ZkProgram({
                     contributionWitness.level1.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeRound1.name,
-                        FinalizeRound1.contribute.name,
+                        'contribute',
                         ErrorEnum.R1_CONTRIBUTION_INDEX_L1
                     )
                 );
@@ -274,7 +274,7 @@ const FinalizeRound1 = ZkProgram({
                     contributionWitness.level2.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeRound1.name,
-                        FinalizeRound1.contribute.name,
+                        'contribute',
                         ErrorEnum.R1_CONTRIBUTION_INDEX_L2
                     )
                 );
@@ -294,7 +294,7 @@ const FinalizeRound1 = ZkProgram({
                     ),
                     Utils.buildAssertMessage(
                         FinalizeRound1.name,
-                        FinalizeRound1.contribute.name,
+                        'contribute',
                         ErrorEnum.ENC_PUBKEY_ROOT
                     )
                 );
@@ -302,7 +302,7 @@ const FinalizeRound1 = ZkProgram({
                     publicKeyWitness.level1.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeRound1.name,
-                        FinalizeRound1.contribute.name,
+                        'contribute',
                         ErrorEnum.ENC_PUBKEY_INDEX_L1
                     )
                 );
@@ -310,7 +310,7 @@ const FinalizeRound1 = ZkProgram({
                     publicKeyWitness.level2.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeRound1.name,
-                        FinalizeRound1.contribute.name,
+                        'contribute',
                         ErrorEnum.ENC_PUBKEY_INDEX_L2
                     )
                 );
@@ -467,7 +467,7 @@ class Round1Contract extends SmartContract {
             INSTANCE_LIMITS.KEY,
             Utils.buildAssertMessage(
                 Round1Contract.name,
-                Round1Contract.prototype.contribute.name,
+                'contribute',
                 ErrorEnum.KEY_COUNTER_LIMIT
             )
         );
@@ -557,7 +557,7 @@ class Round1Contract extends SmartContract {
             rollupContract.rollupRoot.getAndRequireEquals(),
             Utils.buildAssertMessage(
                 Round1Contract.name,
-                Round1Contract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.ROLLUP_ROOT
             )
         );
@@ -565,7 +565,7 @@ class Round1Contract extends SmartContract {
             contributionRoot,
             Utils.buildAssertMessage(
                 Round1Contract.name,
-                Round1Contract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.R1_CONTRIBUTION_ROOT
             )
         );
@@ -573,7 +573,7 @@ class Round1Contract extends SmartContract {
             publicKeyRoot,
             Utils.buildAssertMessage(
                 Round1Contract.name,
-                Round1Contract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.ENC_PUBKEY_ROOT
             )
         );
@@ -581,7 +581,7 @@ class Round1Contract extends SmartContract {
             processRoot,
             Utils.buildAssertMessage(
                 Round1Contract.name,
-                Round1Contract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.PROCESS_ROOT
             )
         );
@@ -589,7 +589,7 @@ class Round1Contract extends SmartContract {
             proof.publicOutput.N,
             Utils.buildAssertMessage(
                 Round1Contract.name,
-                Round1Contract.prototype.finalize.name,
+                'finalize',
                 ErrorEnum.R1_CONTRIBUTION_THRESHOLD
             )
         );
@@ -662,7 +662,7 @@ class Round1Contract extends SmartContract {
                 ),
                 Utils.buildAssertMessage(
                     Round1Contract.name,
-                    Round1Contract.prototype.verifyEncPubKey.name,
+                    'verifyEncPubKey',
                     ErrorEnum.ENC_PUBKEY_ROOT
                 )
             );
@@ -670,7 +670,7 @@ class Round1Contract extends SmartContract {
             witness.level1.calculateIndex(),
             Utils.buildAssertMessage(
                 Round1Contract.name,
-                Round1Contract.prototype.verifyEncPubKey.name,
+                'verifyEncPubKey',
                 ErrorEnum.ENC_PUBKEY_INDEX_L1
             )
         );
@@ -678,7 +678,7 @@ class Round1Contract extends SmartContract {
             witness.level2.calculateIndex(),
             Utils.buildAssertMessage(
                 Round1Contract.name,
-                Round1Contract.prototype.verifyEncPubKey.name,
+                'verifyEncPubKey',
                 ErrorEnum.ENC_PUBKEY_INDEX_L2
             )
         );
@@ -704,7 +704,7 @@ class Round1Contract extends SmartContract {
                 witness.calculateRoot(leaf),
                 Utils.buildAssertMessage(
                     Round1Contract.name,
-                    Round1Contract.prototype.verifyEncPubKeys.name,
+                    'verifyEncPubKeys',
                     ErrorEnum.ENC_PUBKEY_ROOT
                 )
             );
@@ -712,7 +712,7 @@ class Round1Contract extends SmartContract {
             witness.calculateIndex(),
             Utils.buildAssertMessage(
                 Round1Contract.name,
-                Round1Contract.prototype.verifyEncPubKeys.name,
+                'verifyEncPubKeys',
                 ErrorEnum.ENC_PUBKEY_INDEX_L1
             )
         );

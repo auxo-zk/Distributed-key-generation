@@ -194,7 +194,7 @@ const UpdateKey = ZkProgram({
                     Field(KeyStatus.EMPTY),
                     Utils.buildAssertMessage(
                         UpdateKey.name,
-                        UpdateKey.update.name,
+                        'update',
                         ErrorEnum.KEY_STATUS_VALUE
                     )
                 );
@@ -208,7 +208,7 @@ const UpdateKey = ZkProgram({
                     keyStatusWitness.calculateRoot(keyStatus),
                     Utils.buildAssertMessage(
                         UpdateKey.name,
-                        UpdateKey.update.name,
+                        'update',
                         ErrorEnum.KEY_STATUS_ROOT
                     )
                 );
@@ -216,7 +216,7 @@ const UpdateKey = ZkProgram({
                     keyStatusWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateKey.name,
-                        UpdateKey.update.name,
+                        'update',
                         ErrorEnum.KEY_STATUS_INDEX
                     )
                 );
@@ -300,7 +300,7 @@ const UpdateKey = ZkProgram({
                     keyCounterWitness.calculateRoot(currKeyId),
                     Utils.buildAssertMessage(
                         UpdateKey.name,
-                        UpdateKey.generate.name,
+                        'generate',
                         ErrorEnum.KEY_COUNTER_ROOT
                     )
                 );
@@ -308,7 +308,7 @@ const UpdateKey = ZkProgram({
                     keyCounterWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateKey.name,
-                        UpdateKey.generate.name,
+                        'generate',
                         ErrorEnum.KEY_COUNTER_INDEX
                     )
                 );
@@ -327,7 +327,7 @@ const UpdateKey = ZkProgram({
                     keyStatusWitness.calculateRoot(Field(KeyStatus.EMPTY)),
                     Utils.buildAssertMessage(
                         UpdateKey.name,
-                        UpdateKey.generate.name,
+                        'generate',
                         ErrorEnum.KEY_STATUS_ROOT
                     )
                 );
@@ -335,7 +335,7 @@ const UpdateKey = ZkProgram({
                     keyStatusWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateKey.name,
-                        UpdateKey.generate.name,
+                        'generate',
                         ErrorEnum.KEY_STATUS_INDEX
                     )
                 );
@@ -502,7 +502,7 @@ class DkgContract extends SmartContract {
             .assertTrue(
                 Utils.buildAssertMessage(
                     DkgContract.name,
-                    DkgContract.prototype.committeeAction.name,
+                    'committeeAction',
                     ErrorEnum.ACTION_TYPE
                 )
             );
@@ -512,7 +512,7 @@ class DkgContract extends SmartContract {
             INSTANCE_LIMITS.KEY,
             Utils.buildAssertMessage(
                 DkgContract.name,
-                DkgContract.prototype.committeeAction.name,
+                'committeeAction',
                 ErrorEnum.KEY_COUNTER_LIMIT
             )
         );
@@ -562,7 +562,7 @@ class DkgContract extends SmartContract {
             .assertTrue(
                 Utils.buildAssertMessage(
                     DkgContract.name,
-                    DkgContract.prototype.finalizeContributionRound.name,
+                    'finalizeContributionRound',
                     ErrorEnum.ACTION_TYPE
                 )
             );
@@ -572,7 +572,7 @@ class DkgContract extends SmartContract {
             INSTANCE_LIMITS.KEY,
             Utils.buildAssertMessage(
                 DkgContract.name,
-                DkgContract.prototype.committeeAction.name,
+                'finalizeContributionRound',
                 ErrorEnum.KEY_COUNTER_LIMIT
             )
         );
@@ -635,7 +635,7 @@ class DkgContract extends SmartContract {
             rollupContract.rollupRoot.getAndRequireEquals(),
             Utils.buildAssertMessage(
                 DkgContract.name,
-                DkgContract.prototype.updateKeys.name,
+                'updateKeys',
                 ErrorEnum.ROLLUP_ROOT
             )
         );
@@ -643,7 +643,7 @@ class DkgContract extends SmartContract {
             keyCounterRoot,
             Utils.buildAssertMessage(
                 DkgContract.name,
-                DkgContract.prototype.updateKeys.name,
+                'updateKeys',
                 ErrorEnum.KEY_COUNTER_ROOT
             )
         );
@@ -651,7 +651,7 @@ class DkgContract extends SmartContract {
             keyStatusRoot,
             Utils.buildAssertMessage(
                 DkgContract.name,
-                DkgContract.prototype.updateKeys.name,
+                'updateKeys',
                 ErrorEnum.KEY_STATUS_ROOT
             )
         );
@@ -659,7 +659,7 @@ class DkgContract extends SmartContract {
             processRoot,
             Utils.buildAssertMessage(
                 DkgContract.name,
-                DkgContract.prototype.updateKeys.name,
+                'updateKeys',
                 ErrorEnum.PROCESS_ROOT
             )
         );
@@ -685,7 +685,7 @@ class DkgContract extends SmartContract {
             INSTANCE_LIMITS.KEY,
             Utils.buildAssertMessage(
                 DkgContract.name,
-                DkgContract.prototype.verifyKeyStatus.name,
+                'verifyKeyStatus',
                 ErrorEnum.KEY_COUNTER_LIMIT
             )
         );
@@ -700,7 +700,7 @@ class DkgContract extends SmartContract {
                 input.witness.calculateRoot(input.status),
                 Utils.buildAssertMessage(
                     DkgContract.name,
-                    DkgContract.prototype.verifyKeyStatus.name,
+                    'verifyKeyStatus',
                     ErrorEnum.KEY_STATUS_ROOT
                 )
             );
@@ -708,7 +708,7 @@ class DkgContract extends SmartContract {
             input.witness.calculateIndex(),
             Utils.buildAssertMessage(
                 DkgContract.name,
-                DkgContract.prototype.verifyKeyStatus.name,
+                'verifyKeyStatus',
                 ErrorEnum.KEY_STATUS_INDEX
             )
         );
@@ -727,7 +727,7 @@ class DkgContract extends SmartContract {
                 witness.calculateRoot(Poseidon.hash(key.toFields())),
                 Utils.buildAssertMessage(
                     DkgContract.name,
-                    DkgContract.prototype.verifyKey.name,
+                    'verifyKey',
                     ErrorEnum.KEY_ROOT
                 )
             );
@@ -735,7 +735,7 @@ class DkgContract extends SmartContract {
             witness.calculateIndex(),
             Utils.buildAssertMessage(
                 DkgContract.name,
-                DkgContract.prototype.verifyKey.name,
+                'verifyKey',
                 ErrorEnum.KEY_INDEX
             )
         );

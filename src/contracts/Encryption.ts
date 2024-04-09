@@ -33,7 +33,6 @@ export {
 
 class PlainArray extends ScalarDynamicArray(INSTANCE_LIMITS.MEMBER) {}
 class RandomArray extends ScalarDynamicArray(INSTANCE_LIMITS.MEMBER) {}
-
 class ElgamalInput extends Struct({
     pubKey: Group,
     c: Bit255,
@@ -63,7 +62,7 @@ const Elgamal = ZkProgram({
                     input.c,
                     Utils.buildAssertMessage(
                         Elgamal.name,
-                        Elgamal.encrypt.name,
+                        'encrypt',
                         ErrorEnum.ELGAMAL_ENCRYPTION
                     )
                 );
@@ -83,7 +82,7 @@ const Elgamal = ZkProgram({
                     CustomScalar.fromScalar(plain),
                     Utils.buildAssertMessage(
                         Elgamal.name,
-                        Elgamal.decrypt.name,
+                        'decrypt',
                         ErrorEnum.ELGAMAL_DECRYPTION
                     )
                 );
@@ -116,7 +115,7 @@ const BatchEncryption = ZkProgram({
                     length,
                     Utils.buildAssertMessage(
                         Elgamal.name,
-                        Elgamal.decrypt.name,
+                        'encrypt',
                         ErrorEnum.ELGAMAL_BATCH_SIZE
                     )
                 );
@@ -124,7 +123,7 @@ const BatchEncryption = ZkProgram({
                     length,
                     Utils.buildAssertMessage(
                         Elgamal.name,
-                        Elgamal.decrypt.name,
+                        'encrypt',
                         ErrorEnum.ELGAMAL_BATCH_SIZE
                     )
                 );
@@ -161,7 +160,7 @@ const BatchEncryption = ZkProgram({
                     ).assertTrue(
                         Utils.buildAssertMessage(
                             Elgamal.name,
-                            Elgamal.decrypt.name,
+                            'encrypt',
                             ErrorEnum.ELGAMAL_ENCRYPTION
                         )
                     );
@@ -197,7 +196,7 @@ const BatchDecryption = ZkProgram({
                     length,
                     Utils.buildAssertMessage(
                         Elgamal.name,
-                        Elgamal.decrypt.name,
+                        'decrypt',
                         ErrorEnum.ELGAMAL_BATCH_SIZE
                     )
                 );
@@ -207,7 +206,7 @@ const BatchDecryption = ZkProgram({
                         input.publicKey,
                         Utils.buildAssertMessage(
                             Elgamal.name,
-                            Elgamal.decrypt.name,
+                            'decrypt',
                             ErrorEnum.ELGAMAL_KEY
                         )
                     );
@@ -240,7 +239,7 @@ const BatchDecryption = ZkProgram({
                     ).assertTrue(
                         Utils.buildAssertMessage(
                             Elgamal.name,
-                            Elgamal.decrypt.name,
+                            'decrypt',
                             ErrorEnum.ELGAMAL_DECRYPTION
                         )
                     );
