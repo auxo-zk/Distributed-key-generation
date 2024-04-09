@@ -11,28 +11,28 @@ import { ENCRYPTION_LIMITS, INSTANCE_LIMITS } from '../constants.js';
 import { DArray } from './Requester.js';
 
 export {
-    SecretPolynomial,
-    Round2Data,
     MemberArray,
     CArray,
     cArray,
     UArray,
     PublicKeyArray,
     EncryptionHashArray,
+    SecretPolynomial,
+    Round2Data,
     Round1Contribution,
     Round2Contribution,
     ResponseContribution,
     calculatePublicKey,
+    calculatePublicKey as calculatePublicKeyFromContribution,
     calculatePolynomialValue,
     generateRandomPolynomial,
-    getSecretPolynomial,
+    recoverSecretPolynomial,
     getRound1Contribution,
     getRound2Contribution,
     getResponseContribution,
     getLagrangeCoefficient,
     accumulateResponses,
 };
-
 type SecretPolynomial = {
     a: Scalar[];
     C: Group[];
@@ -134,7 +134,7 @@ function generateRandomPolynomial(T: number, N: number): SecretPolynomial {
     return { a, C, f };
 }
 
-function getSecretPolynomial(
+function recoverSecretPolynomial(
     a: Scalar[],
     T: number,
     N: number

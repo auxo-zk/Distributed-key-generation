@@ -17,8 +17,8 @@ export default {
   transformIgnorePatterns: [
     '<rootDir>/node_modules/(?!(tslib|o1js/node_modules/tslib))',
   ],
-  modulePaths: ['<rootDir>/build/esm/'],
-  modulePathIgnorePatterns: ['<rootDir>/build/'],
+  // modulePaths: ['<rootDir>/build/node/'],
+  modulePathIgnorePatterns: ['<rootDir>/build/*'],
   moduleNameMapper: {
     '^(\\.{1,2}/.+)\\.js$': '$1',
   },

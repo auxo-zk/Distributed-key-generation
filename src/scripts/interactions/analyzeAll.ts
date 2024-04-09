@@ -35,7 +35,8 @@ async function main() {
         ComputeResponse,
         FinalizeResponse,
         ComputeResult,
-
+    ];
+    const contracts = [
         RollupContract,
         CommitteeContract,
         DkgContract,
@@ -68,6 +69,27 @@ async function main() {
         Object.entries(analysis).map(([key, value]: [string, any]) => {
             info.push({
                 program: prg.name,
+                method: key,
+                constraints: value.rows,
+                digest: value.digest,
+            });
+        });
+    }
+
+    for (let i = 0; i < contracts.length; i++) {
+        let ct = contracts[i];
+        let analysis;
+        try {
+            analysis = await ct.analyzeMethods();
+        } catch (err) {
+            error.push(ct.name);
+            console.error(err);
+            continue;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Object.entries(analysis).map(([key, value]: [string, any]) => {
+            info.push({
+                program: ct.name,
                 method: key,
                 constraints: value.rows,
                 digest: value.digest,

@@ -37,6 +37,7 @@ export {
     UpdateCommitteeOutput,
     UpdateCommittee,
     UpdateCommitteeProof,
+    // ICommitteeContract,
     CommitteeContract,
 };
 
@@ -211,6 +212,11 @@ const UpdateCommittee = ZkProgram({
 
 class UpdateCommitteeProof extends ZkProgram.Proof(UpdateCommittee) {}
 
+// interface ICommitteeContract {
+//     zkAppRoot: State<Field>;
+//     createCommittee: (...args: any) => Promise<void>;
+// }
+
 /**
  * @todo Prevent fake committee by spoofing IPFS hash
  * @todo Replace struct with arguments array for method input
@@ -277,11 +283,11 @@ class CommitteeContract extends SmartContract {
     @method
     async createCommittee(action: Action) {
         // Verify committee threshold
-        action.threshold.assertGreaterThan(
-            0,
+        action.threshold.assertGreaterThanOrEqual(
+            1,
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                CommitteeContract.prototype.createCommittee.name,
+                'createCommittee',
                 ErrorEnum.COMMITTEE_THRESHOLD
             )
         );
@@ -335,7 +341,7 @@ class CommitteeContract extends SmartContract {
             proof.publicOutput.initialCommitteeId,
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                CommitteeContract.prototype.updateCommittees.name,
+                'updateCommittees',
                 ErrorEnum.NEXT_COMMITTEE_ID
             )
         );
@@ -345,7 +351,7 @@ class CommitteeContract extends SmartContract {
             proof.publicOutput.initialMemberRoot,
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                CommitteeContract.prototype.updateCommittees.name,
+                'updateCommittees',
                 ErrorEnum.MEMBER_ROOT
             )
         );
@@ -355,7 +361,7 @@ class CommitteeContract extends SmartContract {
             proof.publicOutput.initialSettingRoot,
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                CommitteeContract.prototype.updateCommittees.name,
+                'updateCommittees',
                 ErrorEnum.SETTING_ROOT
             )
         );

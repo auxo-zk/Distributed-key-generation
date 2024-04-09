@@ -5,6 +5,5 @@
     "module": "commonjs",
     "importHelpers": true
   },
-  "include": ["./src"],
   "exclude": ["./src/scripts"]
 }

@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "target": "es2021",
+    "module": "es2022",
     "lib": ["dom", "esnext"],
+    "outDir": "./build/esm",
     "rootDir": ".",
     "strict": true,
     "strictPropertyInitialization": false, // to enable generic constructors, e.g. on CircuitValue
@@ -18,5 +20,5 @@
     "allowSyntheticDefaultImports": true,
     "removeComments": true
   },
-  "include": ["./src", "temp.js"]
+  "include": ["./src"]
 }

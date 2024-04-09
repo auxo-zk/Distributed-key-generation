@@ -9,10 +9,11 @@ import {
 import { Utils } from '@auxo-dev/auxo-libs';
 import { INSTANCE_LIMITS } from '../constants.js';
 import { ErrorEnum, ZkAppIndex } from '../contracts/constants.js';
-import { GenericStorage } from './GenericStorage.js';
+import { GenericStorage, Witness } from './GenericStorage.js';
 
 export {
     ADDRESS_MT,
+    ADDRESS_WITNESS,
     getZkAppRef,
     verifyZkApp,
     AddressMT,
@@ -25,19 +26,14 @@ const ADDRESS_TREE_HEIGHT = Math.ceil(Math.log2(INSTANCE_LIMITS.ADDRESS)) + 1;
 class AddressMT extends MerkleTree {}
 class AddressWitness extends MerkleWitness(ADDRESS_TREE_HEIGHT) {}
 const ADDRESS_MT = () => new AddressMT(ADDRESS_TREE_HEIGHT);
+const ADDRESS_WITNESS = (witness: Witness) => new AddressWitness(witness);
 
 class ZkAppRef extends Struct({
     address: PublicKey,
     witness: AddressWitness,
 }) {}
 
-class AddressStorage extends GenericStorage<
-    PublicKey,
-    AddressMT,
-    AddressWitness,
-    undefined,
-    undefined
-> {
+class AddressStorage extends GenericStorage<PublicKey> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -45,7 +41,7 @@ class AddressStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(ADDRESS_MT, undefined, leafs);
+        super(ADDRESS_MT, ADDRESS_WITNESS, undefined, undefined, leafs);
     }
 
     get addressMap(): AddressMT {

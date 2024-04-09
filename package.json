@@ -1,6 +1,6 @@
 {
     "name": "@auxo-dev/dkg",
-    "version": "0.3.4",
+    "version": "0.3.8",
     "description": "Auxo's DKG Module for the On-chain Funding platform on Mina blockchain",
     "author": "Auxo",
     "license": "Apache-2.0",
@@ -20,9 +20,10 @@
         "coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
         "format": "prettier --write --ignore-unknown **/*",
         "prepare": "husky install",
-        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-        "testw": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
-        "lint": "npx eslint src/* --fix"
+        "test": "tsc --build tsconfig.node.json && node --experimental-vm-modules node_modules/jest/bin/jest.js",
+        "testw": "node --build tsconfig.node.json --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+        "lint": "npx eslint src/* --fix",
+        "publish": "rm -f package-lock.json && npm install && npm run build:publish && npm publish --access public"
     },
     "exports": {
         ".": {
@@ -67,7 +68,7 @@
         "zkapp-cli": "^0.15.0"
     },
     "dependencies": {
-        "@auxo-dev/auxo-libs": "^0.4.10",
+        "@auxo-dev/auxo-libs": "^0.4.11",
         "o1js": "./pkg/o1js-0.17.0.tgz"
     }
 }

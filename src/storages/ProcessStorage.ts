@@ -9,7 +9,7 @@ import {
 import { FieldDynamicArray, Utils } from '@auxo-dev/auxo-libs';
 import { ACTION_PROCESS_LIMITS, INSTANCE_LIMITS } from '../constants.js';
 import { ErrorEnum } from '../contracts/constants.js';
-import { GenericStorage } from './GenericStorage.js';
+import { GenericStorage, Witness } from './GenericStorage.js';
 
 export {
     ProcessMT,
@@ -18,6 +18,7 @@ export {
     ProcessLeaf,
     ProcessStorage,
     PROCESS_MT,
+    PROCESS_WITNESS,
     processAction,
 };
 
@@ -25,6 +26,7 @@ const PROCESS_TREE_HEIGHT = Math.ceil(Math.log2(INSTANCE_LIMITS.ACTION)) + 1;
 class ProcessMT extends MerkleTree {}
 class ProcessWitness extends MerkleWitness(PROCESS_TREE_HEIGHT) {}
 const PROCESS_MT = () => new ProcessMT(PROCESS_TREE_HEIGHT);
+const PROCESS_WITNESS = (witness: Witness) => new ProcessWitness(witness);
 
 class ProcessedActions extends FieldDynamicArray(ACTION_PROCESS_LIMITS) {}
 
@@ -32,13 +34,7 @@ type ProcessLeaf = {
     actionState: Field;
     processId: UInt8;
 };
-class ProcessStorage extends GenericStorage<
-    ProcessLeaf,
-    ProcessMT,
-    ProcessWitness,
-    undefined,
-    undefined
-> {
+class ProcessStorage extends GenericStorage<ProcessLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -46,7 +42,7 @@ class ProcessStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(PROCESS_MT, undefined, leafs);
+        super(PROCESS_MT, PROCESS_WITNESS, undefined, undefined, leafs);
     }
 
     get actionMap() {

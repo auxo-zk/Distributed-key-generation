@@ -1,7 +1,12 @@
 import { Field, MerkleTree, MerkleWitness } from 'o1js';
-import { GenericStorage } from './GenericStorage.js';
+import { GenericStorage, Witness } from './GenericStorage.js';
 import { INSTANCE_LIMITS } from '../constants.js';
-import { AddressMT, AddressWitness, ADDRESS_MT } from './AddressStorage.js';
+import {
+    AddressMT,
+    AddressWitness,
+    ADDRESS_MT,
+    ADDRESS_WITNESS,
+} from './AddressStorage.js';
 
 export { ROLLUP_MT, ROLLUP_COUNTER_MT, calculateActionIndex };
 
@@ -21,9 +26,11 @@ const ROLLUP_TREE_HEIGHT =
 class RollupMT extends MerkleTree {}
 class RollupWitness extends MerkleWitness(ROLLUP_TREE_HEIGHT) {}
 const ROLLUP_MT = () => new RollupMT(ROLLUP_TREE_HEIGHT);
+const ROLLUP_WITNESS = (witness: Witness) => new RollupWitness(witness);
 class RollupCounterMT extends AddressMT {}
 class RollupCounterWitness extends AddressWitness {}
 const ROLLUP_COUNTER_MT = ADDRESS_MT;
+const ROLLUP_COUNTER_WITNESS = ADDRESS_WITNESS;
 
 function calculateActionIndex(zkAppIndex: Field, actionId: Field): Field {
     return Field.from(BigInt(INSTANCE_LIMITS.ACTION))
@@ -33,13 +40,7 @@ function calculateActionIndex(zkAppIndex: Field, actionId: Field): Field {
 
 type RollupLeaf = Field;
 
-class RollupStorage extends GenericStorage<
-    RollupLeaf,
-    RollupMT,
-    RollupWitness,
-    never,
-    never
-> {
+class RollupStorage extends GenericStorage<RollupLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -47,7 +48,7 @@ class RollupStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(ROLLUP_MT, undefined, leafs);
+        super(ROLLUP_MT, ROLLUP_WITNESS, undefined, undefined, leafs);
     }
 
     static calculateLeaf(actionHash: RollupLeaf): Field {
@@ -99,13 +100,7 @@ class RollupStorage extends GenericStorage<
 
 type RollupCounterLeaf = Field;
 
-class RollupCounterStorage extends GenericStorage<
-    RollupCounterLeaf,
-    RollupCounterMT,
-    RollupCounterWitness,
-    never,
-    never
-> {
+class RollupCounterStorage extends GenericStorage<RollupCounterLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -113,7 +108,13 @@ class RollupCounterStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(ROLLUP_COUNTER_MT, undefined, leafs);
+        super(
+            ROLLUP_COUNTER_MT,
+            ROLLUP_COUNTER_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
     }
 
     static calculateLeaf(counter: RollupCounterLeaf): Field {

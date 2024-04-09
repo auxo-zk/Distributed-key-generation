@@ -9,14 +9,18 @@ import {
 import { KeyStatus } from '../contracts/DKG.js';
 import { Round1Contribution, Round2Contribution } from '../libs/Committee.js';
 import { INSTANCE_LIMITS } from '../constants.js';
-import { GenericStorage } from './GenericStorage.js';
-import { RequestLevel1MT, RequestLevel1Witness } from './RequestStorage.js';
-import { REQUESTER_LEVEL_1_TREE } from './RequesterStorage.js';
+import { GenericStorage, Witness } from './GenericStorage.js';
 import { FieldDynamicArray } from '@auxo-dev/auxo-libs';
+import {
+    REQUEST_LEVEL_1_TREE,
+    REQUEST_LEVEL_1_WITNESS,
+} from './RequestStorage.js';
 
 export {
-    DKG_LEVEL_1_TREE as DKG_LEVEL_1_TREE,
-    DKG_LEVEL_2_TREE as DKG_LEVEL_2_TREE,
+    DKG_LEVEL_1_TREE,
+    DKG_LEVEL_1_WITNESS,
+    DKG_LEVEL_2_TREE,
+    DKG_LEVEL_2_WITNESS,
     calculateKeyIndex,
     Level1MT as DkgLevel1MT,
     Level1Witness as DkgLevel1Witness,
@@ -56,7 +60,9 @@ class FullMTWitness extends Struct({
 }) {}
 
 const DKG_LEVEL_1_TREE = () => new Level1MT(LEVEL1_TREE_HEIGHT);
+const DKG_LEVEL_1_WITNESS = (witness: Witness) => new Level1Witness(witness);
 const DKG_LEVEL_2_TREE = () => new Level2MT(LEVEL2_TREE_HEIGHT);
+const DKG_LEVEL_2_WITNESS = (witness: Witness) => new Level2Witness(witness);
 
 function calculateKeyIndex(committeeId: Field, keyId: Field): Field {
     return Field.from(BigInt(INSTANCE_LIMITS.KEY)).mul(committeeId).add(keyId);
@@ -67,13 +73,7 @@ class ProcessedContributions extends FieldDynamicArray(
 ) {}
 
 type KeyStatusLeaf = KeyStatus;
-class KeyStatusStorage extends GenericStorage<
-    KeyStatusLeaf,
-    Level1MT,
-    Level1Witness,
-    undefined,
-    undefined
-> {
+class KeyStatusStorage extends GenericStorage<KeyStatusLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -81,7 +81,13 @@ class KeyStatusStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(DKG_LEVEL_1_TREE, undefined, leafs);
+        super(
+            DKG_LEVEL_1_TREE,
+            DKG_LEVEL_1_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
     }
 
     static calculateLeaf(status: KeyStatusLeaf): Field {
@@ -135,13 +141,7 @@ class KeyStatusStorage extends GenericStorage<
 }
 
 type Round1ContributionLeaf = Round1Contribution;
-class Round1ContributionStorage extends GenericStorage<
-    Round1ContributionLeaf,
-    Level1MT,
-    Level1Witness,
-    Level2MT,
-    Level2Witness
-> {
+class Round1ContributionStorage extends GenericStorage<Round1ContributionLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -149,7 +149,13 @@ class Round1ContributionStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(DKG_LEVEL_1_TREE, DKG_LEVEL_2_TREE, leafs);
+        super(
+            DKG_LEVEL_1_TREE,
+            DKG_LEVEL_1_WITNESS,
+            DKG_LEVEL_2_TREE,
+            DKG_LEVEL_2_WITNESS,
+            leafs
+        );
     }
 
     static calculateLeaf(contribution: Round1ContributionLeaf): Field {
@@ -220,13 +226,7 @@ class Round1ContributionStorage extends GenericStorage<
 }
 
 type PublicKeyLeaf = Group;
-class PublicKeyStorage extends GenericStorage<
-    PublicKeyLeaf,
-    Level1MT,
-    Level1Witness,
-    Level2MT,
-    Level2Witness
-> {
+class PublicKeyStorage extends GenericStorage<PublicKeyLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -234,7 +234,13 @@ class PublicKeyStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(DKG_LEVEL_1_TREE, DKG_LEVEL_2_TREE, leafs);
+        super(
+            DKG_LEVEL_1_TREE,
+            DKG_LEVEL_1_WITNESS,
+            DKG_LEVEL_2_TREE,
+            DKG_LEVEL_2_WITNESS,
+            leafs
+        );
     }
 
     static calculateLeaf(C0: PublicKeyLeaf): Field {
@@ -305,13 +311,7 @@ class PublicKeyStorage extends GenericStorage<
 }
 
 type Round2ContributionLeaf = Round2Contribution;
-class Round2ContributionStorage extends GenericStorage<
-    Round2ContributionLeaf,
-    Level1MT,
-    Level1Witness,
-    Level2MT,
-    Level2Witness
-> {
+class Round2ContributionStorage extends GenericStorage<Round2ContributionLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -319,7 +319,13 @@ class Round2ContributionStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(DKG_LEVEL_1_TREE, DKG_LEVEL_2_TREE, leafs);
+        super(
+            DKG_LEVEL_1_TREE,
+            DKG_LEVEL_1_WITNESS,
+            DKG_LEVEL_2_TREE,
+            DKG_LEVEL_2_WITNESS,
+            leafs
+        );
     }
 
     static calculateLeaf(contribution: Round2ContributionLeaf): Field {
@@ -393,13 +399,7 @@ type EncryptionLeaf = {
     contributions: Round2Contribution[];
     memberId: Field;
 };
-class EncryptionStorage extends GenericStorage<
-    EncryptionLeaf,
-    Level1MT,
-    Level1Witness,
-    Level2MT,
-    Level2Witness
-> {
+class EncryptionStorage extends GenericStorage<EncryptionLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -407,7 +407,13 @@ class EncryptionStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(DKG_LEVEL_1_TREE, DKG_LEVEL_2_TREE, leafs);
+        super(
+            DKG_LEVEL_1_TREE,
+            DKG_LEVEL_1_WITNESS,
+            DKG_LEVEL_2_TREE,
+            DKG_LEVEL_2_WITNESS,
+            leafs
+        );
     }
 
     static calculateLeaf(rawLeaf: EncryptionLeaf): Field {
@@ -489,13 +495,7 @@ class EncryptionStorage extends GenericStorage<
 
 type ResponseContributionLeaf = Field;
 
-class ResponseContributionStorage extends GenericStorage<
-    ResponseContributionLeaf,
-    RequestLevel1MT,
-    RequestLevel1Witness,
-    Level2MT,
-    Level2Witness
-> {
+class ResponseContributionStorage extends GenericStorage<ResponseContributionLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -503,7 +503,13 @@ class ResponseContributionStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(REQUESTER_LEVEL_1_TREE, DKG_LEVEL_2_TREE, leafs);
+        super(
+            REQUEST_LEVEL_1_TREE,
+            REQUEST_LEVEL_1_WITNESS,
+            DKG_LEVEL_2_TREE,
+            DKG_LEVEL_2_WITNESS,
+            leafs
+        );
     }
 
     static calculateLeaf(contribution: ResponseContributionLeaf): Field {
@@ -556,13 +562,7 @@ class ResponseContributionStorage extends GenericStorage<
 }
 
 type ResponseLeaf = Field;
-class ResponseStorage extends GenericStorage<
-    ResponseLeaf,
-    RequestLevel1MT,
-    RequestLevel1Witness,
-    undefined,
-    undefined
-> {
+class ResponseStorage extends GenericStorage<ResponseLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
@@ -570,7 +570,13 @@ class ResponseStorage extends GenericStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(DKG_LEVEL_1_TREE, undefined, leafs);
+        super(
+            DKG_LEVEL_1_TREE,
+            DKG_LEVEL_1_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
     }
 
     static calculateLeaf(responseRootD: ResponseLeaf): Field {
