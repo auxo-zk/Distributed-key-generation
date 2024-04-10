@@ -29,3 +29,10 @@ export type Contract = {
     contract: SmartContract;
     actionStates: Field[];
 };
+
+export enum Network {
+    Local,
+    Lightnet,
+    Testnet,
+    Mainnet,
+}

@@ -1,234 +1,293 @@
-// /* eslint-disable @typescript-eslint/no-unused-vars */
-// import {
-//     Field,
-//     Reducer,
-//     Mina,
-//     PrivateKey,
-//     PublicKey,
-//     AccountUpdate,
-//     Poseidon,
-//     MerkleTree,
-//     Proof,
-//     Void,
-// } from 'o1js';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+import fs from 'fs/promises';
+import { Field, Provable, Reducer } from 'o1js';
+import { IpfsHash, Utils } from '@auxo-dev/auxo-libs';
+import {
+    CommitteeContract,
+    CommitteeAction,
+    UpdateCommittee,
+    CommitteeMemberInput,
+    CommitteeConfigInput,
+} from '../contracts/Committee.js';
+import { MemberArray } from '../libs/Committee.js';
+import { MemberStorage, SettingStorage } from '../storages/CommitteeStorage.js';
+import { prepare } from './interactions/prepare.js';
+import { Network } from './helper/config.js';
 
-// import { getProfiler } from './helper/profiler.js';
-// import randomAccounts from './helper/randomAccounts.js';
-// import {
-//     CommitteeContract,
-//     CommitteeAction,
-//     UpdateCommittee,
-//     CommitteeMemberInput,
-//     UpdateCommitteeOutput,
-// } from '../contracts/Committee.js';
-// import { IpfsHash } from '@auxo-dev/auxo-libs';
-// import { MemberArray } from '../libs/Committee.js';
-// import {
-//     COMMITTEE_LEVEL_2_TREE,
-//     MemberStorage,
-//     SettingStorage,
-// } from '../storages/CommitteeStorage.js';
+describe('Committee', () => {
+    const doProofs = false;
+    const profiler = Utils.getProfiler('committee', fs);
+    const logger = {
+        info: true,
+        debug: true,
+    };
+    let _: any;
+    let committeeZkApp: Utils.ZkApp;
+    let memberStorage = new MemberStorage();
+    let settingStorage = new SettingStorage();
+    let committees: {
+        members: MemberArray;
+        threshold: Field;
+        ipfsHash: IpfsHash;
+    }[] = [];
 
-// describe('Committee', () => {
-//     const doProofs = false;
-//     let memberStorage = new MemberStorage();
-//     let settingStorage = new SettingStorage();
+    beforeAll(async () => {
+        _ = await prepare(
+            './caches',
+            { type: Network.Local, doProofs },
+            {
+                aliases: ['committee', 'user1', 'user2', 'user3'],
+            }
+        );
+        await Utils.compile(UpdateCommittee, _.cache, profiler);
+        if (doProofs) {
+            await Utils.compile(CommitteeContract, _.cache, profiler);
+        }
+        committeeZkApp = {
+            key: _.accounts.committee,
+            contract: new CommitteeContract(_.accounts.committee.publicKey),
+            name: CommitteeContract.name,
+            actions: [],
+            events: [],
+        };
+        await Utils.deployZkApps(
+            [{ zkApp: committeeZkApp, initArgs: [] }],
+            _.feePayer
+        );
+    });
 
-//     let { keys, addresses } = randomAccounts(
-//         'committee',
-//         'p1',
-//         'p2',
-//         'p3',
-//         'p4',
-//         'p5'
-//     );
-//     let feePayerKey: PrivateKey;
-//     let feePayer: PublicKey;
-//     let committeeContract: CommitteeContract;
-//     let proof: Proof<Void, UpdateCommitteeOutput>;
-//     let myMemberArray1: MemberArray;
-//     let threshold1 = Field(1);
-//     let threshold2 = Field(2);
-//     let myMemberArray2: MemberArray;
-//     let tree1: MerkleTree;
-//     let tree2: MerkleTree;
+    it('Should create committee with config T = 1, N = 2', async () => {
+        let { accounts, feePayer } = _;
+        let memberArray = new MemberArray([
+            accounts.user1.publicKey,
+            accounts.user2.publicKey,
+        ]);
 
-//     const ActionCommitteeProfiler = getProfiler('Testing committee');
+        let action = new CommitteeAction({
+            addresses: memberArray,
+            threshold: Field(1),
+            ipfsHash: IpfsHash.fromString(
+                'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
+            ),
+        });
 
-//     beforeAll(async () => {
-//         let Local = Mina.LocalBlockchain({ proofsEnabled: doProofs });
-//         Mina.setActiveInstance(Local);
-//         feePayerKey = Local.testAccounts[0].privateKey;
-//         feePayer = Local.testAccounts[0].publicKey;
-//         committeeContract = new CommitteeContract(addresses.committee);
-//         if (doProofs) {
-//             await CommitteeContract.compile();
-//         } else {
-//             // UpdateCommittee.analyzeMethods();
-//             CommitteeContract.analyzeMethods();
-//         }
+        let committeeContract = committeeZkApp.contract as CommitteeContract;
+        await Utils.proveAndSendTx(
+            CommitteeContract.name,
+            'createCommittee',
+            async () => committeeContract.createCommittee(action),
+            feePayer,
+            undefined,
+            profiler
+        );
 
-//         let tx = await Mina.transaction(feePayer, () => {
-//             AccountUpdate.fundNewAccount(feePayer, 1);
-//             committeeContract.deploy();
-//         });
-//         await tx.sign([feePayerKey, keys.committee]).send();
-//     });
+        committees.push({
+            members: action.addresses,
+            threshold: action.threshold,
+            ipfsHash: action.ipfsHash,
+        });
+        committeeZkApp.actions!.push(CommitteeAction.toFields(action));
+    });
 
-//     // beforeEach(() => {});
+    it('Should create committee with config T = 3, N = 3', async () => {
+        let { accounts, feePayer } = _;
+        let memberArray = new MemberArray([
+            accounts.user1.publicKey,
+            accounts.user2.publicKey,
+            accounts.user3.publicKey,
+        ]);
 
-//     xit('compile proof', async () => {
-//         // compile proof
-//         await UpdateCommittee.compile();
-//     });
+        let action = new CommitteeAction({
+            addresses: memberArray,
+            threshold: Field(3),
+            ipfsHash: IpfsHash.fromString(
+                'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
+            ),
+        });
 
-//     xit('Create committee consist of 2 people with threshold 1, and test deploy DKG', async () => {
-//         let arrayAddress = [];
-//         arrayAddress.push(addresses.p1, addresses.p2);
-//         myMemberArray1 = new MemberArray(arrayAddress);
+        let committeeContract = committeeZkApp.contract as CommitteeContract;
+        await Utils.proveAndSendTx(
+            CommitteeContract.name,
+            'createCommittee',
+            async () => committeeContract.createCommittee(action),
+            feePayer
+        );
 
-//         let action = new CommitteeAction({
-//             addresses: myMemberArray1,
-//             threshold: threshold1,
-//             ipfsHash: IpfsHash.fromString('testing'),
-//         });
+        committees.push({
+            members: action.addresses,
+            threshold: action.threshold,
+            ipfsHash: action.ipfsHash,
+        });
+        committeeZkApp.actions!.push(CommitteeAction.toFields(action));
+    });
 
-//         let tx = await Mina.transaction(feePayer, () => {
-//             committeeContract.createCommittee(action);
-//         });
-//         await tx.prove();
-//         await tx.sign([feePayerKey]).send();
-//     });
+    it('Should not create committee with duplicated members', async () => {
+        let { accounts, feePayer } = _;
+        let memberArray = new MemberArray([
+            accounts.user1.publicKey,
+            accounts.user2.publicKey,
+            accounts.user1.publicKey,
+        ]);
 
-//     it('Create committee consist of 3 people with threshold 2', async () => {
-//         let arrayAddress = [];
-//         arrayAddress.push(addresses.p3, addresses.p4, addresses.p5);
-//         myMemberArray2 = new MemberArray(arrayAddress);
+        let action = new CommitteeAction({
+            addresses: memberArray,
+            threshold: Field(1),
+            ipfsHash: IpfsHash.fromString(
+                'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
+            ),
+        });
 
-//         let action = new CommitteeAction({
-//             addresses: myMemberArray2,
-//             threshold: threshold2,
-//             ipfsHash: IpfsHash.fromString('testing'),
-//         });
+        let committeeContract = committeeZkApp.contract as CommitteeContract;
+        expect(
+            Utils.proveAndSendTx(
+                CommitteeContract.name,
+                'createCommittee',
+                async () => committeeContract.createCommittee(action),
+                feePayer
+            )
+        ).rejects.toThrow();
+    });
 
-//         let tx = await Mina.transaction(feePayer, () => {
-//             committeeContract.createCommittee(action);
-//         });
-//         await tx.prove();
-//         await tx.sign([feePayerKey]).send();
-//     });
+    it('Should not create committee with threshold T = 0', async () => {
+        let { accounts, feePayer } = _;
+        let memberArray = new MemberArray([
+            accounts.user1.publicKey,
+            accounts.user2.publicKey,
+        ]);
 
-//     xit('create proof first step...', async () => {
-//         // create first step proof
-//         proof = await UpdateCommittee.init(
-//             Reducer.initialActionState,
-//             memberStorage.root,
-//             settingStorage.root,
-//             committeeContract.nextCommitteeId.get()
-//         );
-//         expect(proof.publicOutput.initialActionState).toEqual(
-//             Reducer.initialActionState
-//         );
-//         expect(proof.publicOutput.initialCommitteeId).toEqual(Field(0));
-//     });
+        let action = new CommitteeAction({
+            addresses: memberArray,
+            threshold: Field(0),
+            ipfsHash: IpfsHash.fromString(
+                'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
+            ),
+        });
 
-//     xit('create proof next step 1...', async () => {
-//         proof = await UpdateCommittee.update(
-//             proof,
-//             new CommitteeAction({
-//                 addresses: myMemberArray1,
-//                 threshold: threshold1,
-//                 ipfsHash: IpfsHash.fromString('testing'),
-//             }),
-//             memberStorage.getLevel1Witness(Field(0)),
-//             settingStorage.getWitness(Field(0))
-//         );
+        let committeeContract = committeeZkApp.contract as CommitteeContract;
+        expect(
+            Utils.proveAndSendTx(
+                CommitteeContract.name,
+                'createCommittee',
+                async () => committeeContract.createCommittee(action),
+                feePayer
+            )
+        ).rejects.toThrow();
+    });
 
-//         expect(proof.publicOutput.initialActionState).toEqual(
-//             Reducer.initialActionState
-//         );
+    it('Should rollup actions and update committees...', async () => {
+        let { feePayer } = _;
+        // create first step proof
+        let committeeContract = committeeZkApp.contract as CommitteeContract;
+        let proof = await Utils.prove(
+            UpdateCommittee.name,
+            'init',
+            UpdateCommittee.init(
+                Reducer.initialActionState,
+                memberStorage.root,
+                settingStorage.root,
+                committeeContract.nextCommitteeId.get()
+            ),
+            profiler,
+            logger
+        );
+        for (let i = 0; i < committees.length; i++) {
+            let committee = committees[i];
+            proof = await Utils.prove(
+                UpdateCommittee.name,
+                'update',
+                UpdateCommittee.update(
+                    proof,
+                    CommitteeAction.fromFields(committeeZkApp.actions![i]),
+                    memberStorage.getLevel1Witness(Field(i)),
+                    settingStorage.getLevel1Witness(Field(i))
+                ),
+                profiler,
+                logger
+            );
+            for (let j = 0; j < Number(committee.members.length); j++)
+                memberStorage.updateRawLeaf(
+                    {
+                        level1Index: Field(i),
+                        level2Index: Field(j),
+                    },
+                    committee.members.get(Field(j))
+                );
 
-//         // Update data to local
-//         tree1 = COMMITTEE_LEVEL_2_TREE();
-//         for (let i = 0; i < Number(myMemberArray1.length); i++) {
-//             tree1.setLeaf(
-//                 BigInt(i),
-//                 MemberArray.hash(myMemberArray1.get(Field(i)))
-//             );
-//         }
+            settingStorage.updateRawLeaf(
+                { level1Index: Field(i) },
+                {
+                    T: committees[i].threshold,
+                    N: Field(committee.members.length),
+                }
+            );
+        }
 
-//         memberStorage.updateInternal(Field(0), tree1);
-//         settingStorage.updateLeaf(
-//             { level1Index: Field(0) },
-//             Poseidon.hash([Field(1), myMemberArray1.length])
-//         );
-//     });
+        await Utils.proveAndSendTx(
+            CommitteeContract.name,
+            'updateCommittees',
+            async () => committeeContract.updateCommittees(proof),
+            feePayer,
+            true,
+            profiler,
+            logger
+        );
 
-//     xit('create proof next step 2...', async () => {
-//         proof = await UpdateCommittee.update(
-//             proof,
-//             new CommitteeAction({
-//                 addresses: myMemberArray2,
-//                 threshold: threshold2,
-//                 ipfsHash: IpfsHash.fromString('testing'),
-//             }),
-//             memberStorage.getLevel1Witness(Field(1)),
-//             settingStorage.getWitness(Field(1))
-//         );
+        Provable.log(memberStorage.root);
+        Provable.log(committeeContract.memberRoot.get());
+        expect(committeeContract.memberRoot.get()).toEqual(memberStorage.root);
+        expect(committeeContract.settingRoot.get()).toEqual(
+            settingStorage.root
+        );
+    });
 
-//         expect(proof.publicOutput.initialActionState).toEqual(
-//             Reducer.initialActionState
-//         );
+    it('Should verify committee membership', async () => {
+        let { accounts } = _;
+        let memberVerification = new CommitteeMemberInput({
+            address: accounts.user1.publicKey,
+            committeeId: Field(0),
+            memberId: Field(0),
+            memberWitness: memberStorage.getWitness(Field(0), Field(0)),
+        });
+        let committeeContract = committeeZkApp.contract as CommitteeContract;
+        committeeContract.verifyMember(memberVerification);
+    });
 
-//         // Update data to local
-//         tree2 = COMMITTEE_LEVEL_2_TREE();
-//         for (let i = 0; i < Number(myMemberArray2.length); i++) {
-//             tree2.setLeaf(
-//                 BigInt(i),
-//                 MemberArray.hash(myMemberArray2.get(Field(i)))
-//             );
-//         }
+    it('Should verify committee non-membership', async () => {
+        let { accounts } = _;
+        // Check if member belong to committeeId
+        let memberVerification = new CommitteeMemberInput({
+            address: accounts.user3.publicKey,
+            committeeId: Field(0),
+            memberId: Field(1),
+            memberWitness: memberStorage.getWitness(Field(0), Field(1)),
+        });
+        let committeeContract = committeeZkApp.contract as CommitteeContract;
+        expect(() =>
+            committeeContract.verifyMember(memberVerification)
+        ).toThrow();
+    });
 
-//         memberStorage.updateInternal(Field(1), tree2);
-//         settingStorage.updateLeaf(
-//             { level1Index: Field(1) },
-//             Poseidon.hash([Field(2), myMemberArray2.length])
-//         );
-//     });
+    it('Should verify correctness of setting', async () => {
+        let correctInput = new CommitteeConfigInput({
+            N: committees[0].members.length,
+            T: committees[0].threshold,
+            committeeId: Field(0),
+            settingWitness: settingStorage.getWitness(Field(0)),
+        });
+        let committeeContract = committeeZkApp.contract as CommitteeContract;
+        committeeContract.verifyConfig(correctInput);
 
-//     xit('committeeContract rollup', async () => {
-//         let tx = await Mina.transaction(feePayer, () => {
-//             committeeContract.updateCommittees(proof);
-//         });
-//         await tx.prove();
-//         await tx.sign([feePayerKey]).send();
-//     });
+        let incorrectInput = new CommitteeConfigInput({
+            N: committees[0].members.length,
+            T: committees[0].threshold.add(1),
+            committeeId: Field(0),
+            settingWitness: settingStorage.getWitness(Field(0)),
+        });
+        expect(() => committeeContract.verifyConfig(incorrectInput)).toThrow();
+    });
 
-//     xit('check if p2 belong to committee 0', async () => {
-//         // Check if member belong to committeeId
-//         let checkInput = new CommitteeMemberInput({
-//             address: addresses.p2,
-//             committeeId: Field(0),
-//             memberId: Field(1),
-//             memberWitness: memberStorage.getWitness(Field(0), Field(1)),
-//         });
-//         let tx = await Mina.transaction(feePayer, () => {
-//             committeeContract.verifyMember(checkInput);
-//         });
-//         await tx.prove();
-//         await tx.sign([feePayerKey]).send();
-//     });
-
-//     xit('check if p2 belong to committee 1: to throw error', async () => {
-//         // Check if member belong to committeeId
-//         let checkInput = new CommitteeMemberInput({
-//             address: addresses.p2,
-//             committeeId: Field(1),
-//             memberId: Field(1),
-//             memberWitness: memberStorage.getWitness(Field(1), Field(1)),
-//         });
-//         expect(() => {
-//             committeeContract.verifyMember(checkInput);
-//         }).toThrowError();
-//     });
-// });
+    afterAll(async () => {
+        profiler.store();
+    });
+});

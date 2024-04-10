@@ -1,5 +1,5 @@
 import { Field, Mina, PublicKey, Group, Scalar } from 'o1js';
-import { compile, fetchZkAppState, proveAndSend } from '../../helper/deploy.js';
+import { Utils } from '@auxo-dev/auxo-libs';
 import { prepare } from '../prepare.js';
 import { KeyStatusStorage } from '../../../storages/DkgStorage.js';
 import { KeyCounterStorage } from '../../../storages/CommitteeStorage.js';
@@ -20,8 +20,8 @@ async function main() {
     const keyId = Field(0);
 
     // Compile programs
-    await compile(UpdateRequest, cache);
-    await compile(RequestContract, cache);
+    await Utils.compile(UpdateRequest, cache);
+    await Utils.compile(RequestContract, cache);
     const requestAddress =
         'B62qjujctknmNAsUHEiRhxttm6vZ9ipSd5nfWP8ijGgHHcRzMDRHDcu';
     const requestContract = new RequestContract(
@@ -69,7 +69,7 @@ async function main() {
     // });
 
     // Fetch state and state
-    await fetchZkAppState(requestAddress);
+    await Utils.fetchZkAppState(PublicKey.fromBase58(requestAddress));
 
     // let tx = await Mina.transaction(
     //     {

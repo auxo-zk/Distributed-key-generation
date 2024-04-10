@@ -1,3 +1,4 @@
+import fs from 'fs/promises';
 import {
     Field,
     Mina,
@@ -10,9 +11,7 @@ import {
     Poseidon,
     Cache,
 } from 'o1js';
-
-import { getProfiler } from './helper/profiler.js';
-import randomAccounts from './helper/randomAccounts.js';
+import { Utils } from '@auxo-dev/auxo-libs';
 import {
     UpdateRequest,
     RequestStatus,
@@ -28,14 +27,14 @@ describe('Testing Request Contract', () => {
     const statusMerkleMap = new MerkleMap();
     const requesterMerkleMap = new MerkleMap();
 
-    let { keys, addresses } = randomAccounts(
+    let { keys, addresses } = Utils.randomAccounts([
         'request',
         'response',
         'requester1',
         'rqteD1',
         'R1',
-        'D1'
-    );
+        'D1',
+    ]);
     let feePayerKey: PrivateKey;
     let feePayer: PublicKey;
     let requestContract: RequestContract;
@@ -81,7 +80,7 @@ describe('Testing Request Contract', () => {
     const requestStatusMap = new MerkleMap();
     const requesterMap = new MerkleMap();
 
-    const ActionRequestProfiler = getProfiler('Testing request');
+    const ActionRequestProfiler = Utils.getProfiler('Testing request', fs);
 
     beforeAll(async () => {
         let Local = Mina.LocalBlockchain({ proofsEnabled: doProofs });

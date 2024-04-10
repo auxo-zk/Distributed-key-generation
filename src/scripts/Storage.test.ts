@@ -6,7 +6,7 @@ describe('Storage', () => {
     const keyCounterStorage = new KeyCounterStorage();
     const publicKeyStorage = new PublicKeyStorage();
 
-    it('should manage 1-level MT', async () => {
+    it('Should manage 1-level MT', async () => {
         let value = Field(123);
         keyCounterStorage.updateRawLeaf({ level1Index: Field(1) }, value);
         let witness = keyCounterStorage.getWitness(Field(1));
@@ -16,7 +16,7 @@ describe('Storage', () => {
         );
     });
 
-    it('should manage 2-level MT', async () => {
+    it('Should manage 2-level MT', async () => {
         let publicKey = PrivateKey.random().toPublicKey();
         publicKeyStorage.updateRawLeaf(
             { level1Index: Field(1), level2Index: Field(2) },
@@ -41,7 +41,7 @@ describe('Storage', () => {
         ).toEqual(publicKeyStorage.root.toBigInt());
     });
 
-    it('should be usable in Smart Contract', async () => {
+    it('Should be usable in Smart Contract', async () => {
         class TestContract extends SmartContract {
             @method
             async checkWitness(

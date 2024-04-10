@@ -1,3 +1,4 @@
+import fs from 'fs/promises';
 import {
     AccountUpdate,
     Cache,
@@ -8,6 +9,7 @@ import {
     Provable,
     Scalar,
 } from 'o1js';
+import { Bit255, CustomScalar, Utils } from '@auxo-dev/auxo-libs';
 import {
     BatchDecryption,
     BatchDecryptionInput,
@@ -17,12 +19,9 @@ import {
     PlainArray,
     RandomArray,
 } from '../contracts/Encryption.js';
-import { getProfiler } from './helper/profiler.js';
-import { Bit255, CustomScalar } from '@auxo-dev/auxo-libs';
 import { Elgamal as ElgamalLib } from '../libs/index.js';
 import { Elgamal } from '../contracts/Encryption.js';
 import { CArray, UArray, cArray } from '../libs/Committee.js';
-import { compile, deploy, proveAndSend } from './helper/deploy.js';
 import { Round2Contract } from '../contracts/Round2.js';
 import { Contract } from './helper/config.js';
 
@@ -31,7 +30,7 @@ describe('Encryption', () => {
     const cache = Cache.FileSystem('./caches');
     let Local = Mina.LocalBlockchain({ proofsEnabled: false });
     Mina.setActiveInstance(Local);
-    const DKGProfiler = getProfiler('Benchmark Encryption');
+    const DKGProfiler = Utils.getProfiler('Benchmark Encryption', fs);
 
     let prvKey: Scalar = Scalar.random();
     let pubKey: Group = Group.generator.scale(prvKey);
@@ -47,7 +46,7 @@ describe('Encryption', () => {
 
     it('Should compile all ZK programs', async () => {
         // await compile(Elgamal, 'Elgamal', profiling);
-        await compile(BatchEncryption, cache);
+        await Utils.compile(BatchEncryption, cache);
         // await compile(BatchDecryption, 'BatchDecryption', profiling);
     });
 

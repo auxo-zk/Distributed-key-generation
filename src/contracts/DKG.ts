@@ -12,6 +12,7 @@ import {
     ZkProgram,
     Group,
     UInt8,
+    Bool,
 } from 'o1js';
 import { ActionMask as _ActionMask, Utils } from '@auxo-dev/auxo-libs';
 import { CommitteeMemberInput, CommitteeContract } from './Committee.js';
@@ -100,6 +101,7 @@ class Action
     extends Struct({
         committeeId: Field,
         keyId: Field,
+        key: Group,
         mask: ActionMask,
     })
     implements ZkAppAction
@@ -108,6 +110,7 @@ class Action
         return new Action({
             committeeId: Field(0),
             keyId: Field(0),
+            key: Group.zero,
             mask: new ActionMask(),
         });
     }
@@ -129,9 +132,11 @@ class UpdateKeyOutput extends Struct({
     rollupRoot: Field,
     initialKeyCounterRoot: Field,
     initialKeyStatusRoot: Field,
+    initialKeyRoot: Field,
     initialProcessRoot: Field,
     nextKeyCounterRoot: Field,
     nextKeyStatusRoot: Field,
+    nextKeyRoot: Field,
     nextProcessRoot: Field,
     processedActions: ProcessedActions,
 }) {}
@@ -142,21 +147,24 @@ const UpdateKey = ZkProgram({
     publicOutput: UpdateKeyOutput,
     methods: {
         init: {
-            privateInputs: [Field, Field, Field, Field],
+            privateInputs: [Field, Field, Field, Field, Field],
             async method(
                 input: UpdateKeyInput,
                 rollupRoot: Field,
-                initialKeyCounter: Field,
-                initialKeyStatus: Field,
+                initialKeyCounterRoot: Field,
+                initialKeyStatusRoot: Field,
+                initialKeyRoot: Field,
                 initialProcessRoot: Field
             ) {
                 return new UpdateKeyOutput({
                     rollupRoot,
-                    initialKeyCounterRoot: initialKeyCounter,
-                    initialKeyStatusRoot: initialKeyStatus,
-                    initialProcessRoot: initialProcessRoot,
-                    nextKeyCounterRoot: initialKeyCounter,
-                    nextKeyStatusRoot: initialKeyStatus,
+                    initialKeyCounterRoot,
+                    initialKeyStatusRoot,
+                    initialKeyRoot,
+                    initialProcessRoot,
+                    nextKeyCounterRoot: initialKeyCounterRoot,
+                    nextKeyStatusRoot: initialKeyStatusRoot,
+                    nextKeyRoot: initialKeyRoot,
                     nextProcessRoot: initialProcessRoot,
                     processedActions: new ProcessedActions(),
                 });
@@ -166,6 +174,7 @@ const UpdateKey = ZkProgram({
             privateInputs: [
                 SelfProof<UpdateKeyInput, UpdateKeyOutput>,
                 DkgLevel1Witness,
+                DkgLevel1Witness,
                 RollupWitness,
                 ProcessWitness,
             ],
@@ -173,6 +182,7 @@ const UpdateKey = ZkProgram({
                 input: UpdateKeyInput,
                 earlierProof: SelfProof<UpdateKeyInput, UpdateKeyOutput>,
                 keyStatusWitness: DkgLevel1Witness,
+                keyWitness: DkgLevel1Witness,
                 rollupWitness: RollupWitness,
                 processWitness: ProcessWitness
             ) {
@@ -226,6 +236,41 @@ const UpdateKey = ZkProgram({
                     keyStatus.add(1)
                 );
 
+                // Verify empty key if round 1 -> round 2
+                earlierProof.publicOutput.nextKeyRoot
+                    .equals(keyWitness.calculateRoot(Field(0)))
+                    .assertEquals(
+                        Provable.if(
+                            keyStatus.equals(
+                                Field(KeyStatus.ROUND_1_CONTRIBUTION)
+                            ),
+                            Bool(true),
+                            Bool(false)
+                        ),
+                        Utils.buildAssertMessage(
+                            UpdateKey.name,
+                            'update',
+                            ErrorEnum.KEY_ROOT
+                        )
+                    );
+                keyIndex.assertEquals(
+                    keyWitness.calculateIndex(),
+                    Utils.buildAssertMessage(
+                        UpdateKey.name,
+                        'update',
+                        ErrorEnum.KEY_INDEX
+                    )
+                );
+
+                // Calculate new key root
+                let nextKeyRoot = Provable.if(
+                    keyStatus.equals(Field(KeyStatus.ROUND_1_CONTRIBUTION)),
+                    keyWitness.calculateRoot(
+                        Poseidon.hash(input.action.key.toFields())
+                    ),
+                    earlierProof.publicOutput.nextKeyRoot
+                );
+
                 // Verify action is rolluped
                 let actionIndex = calculateActionIndex(
                     Field(ZkAppIndex.DKG),
@@ -259,18 +304,11 @@ const UpdateKey = ZkProgram({
                 );
 
                 return new UpdateKeyOutput({
-                    rollupRoot: earlierProof.publicOutput.rollupRoot,
-                    initialKeyCounterRoot:
-                        earlierProof.publicOutput.initialKeyCounterRoot,
-                    initialKeyStatusRoot:
-                        earlierProof.publicOutput.initialKeyStatusRoot,
-                    initialProcessRoot:
-                        earlierProof.publicOutput.initialProcessRoot,
-                    nextKeyCounterRoot:
-                        earlierProof.publicOutput.nextKeyCounterRoot,
-                    nextKeyStatusRoot: nextKeyStatusRoot,
-                    nextProcessRoot: nextProcessRoot,
-                    processedActions: processedActions,
+                    ...earlierProof.publicOutput,
+                    nextKeyStatusRoot,
+                    nextKeyRoot,
+                    nextProcessRoot,
+                    processedActions,
                 });
             },
         },
@@ -314,7 +352,7 @@ const UpdateKey = ZkProgram({
                 );
 
                 // Calculate new keyCounter root
-                let nextKeyCounter = keyCounterWitness.calculateRoot(
+                let nextKeyCounterRoot = keyCounterWitness.calculateRoot(
                     currKeyId.add(Field(1))
                 );
 
@@ -341,7 +379,7 @@ const UpdateKey = ZkProgram({
                 );
 
                 // Calculate the new key status MT root
-                let nextKeyStatus = keyStatusWitness.calculateRoot(
+                let nextKeyStatusRoot = keyStatusWitness.calculateRoot(
                     Field(KeyStatus.ROUND_1_CONTRIBUTION)
                 );
 
@@ -378,17 +416,11 @@ const UpdateKey = ZkProgram({
                 );
 
                 return new UpdateKeyOutput({
-                    rollupRoot: earlierProof.publicOutput.rollupRoot,
-                    initialKeyCounterRoot:
-                        earlierProof.publicOutput.initialKeyCounterRoot,
-                    initialKeyStatusRoot:
-                        earlierProof.publicOutput.initialKeyStatusRoot,
-                    initialProcessRoot:
-                        earlierProof.publicOutput.initialProcessRoot,
-                    nextKeyCounterRoot: nextKeyCounter,
-                    nextKeyStatusRoot: nextKeyStatus,
-                    nextProcessRoot: nextProcessRoot,
-                    processedActions: processedActions,
+                    ...earlierProof.publicOutput,
+                    nextKeyCounterRoot,
+                    nextKeyStatusRoot,
+                    nextProcessRoot,
+                    processedActions,
                 });
             },
         },
@@ -519,12 +551,13 @@ class DkgContract extends SmartContract {
 
         // Create & dispatch action
         let action = new Action({
-            committeeId: committeeId,
+            committeeId,
             keyId: Provable.if(
                 actionType.equals(ActionEnum.GENERATE_KEY),
                 Field(-1),
                 keyId
             ),
+            key: Group.zero,
             mask: ActionMask.createMask(actionType),
         });
         this.reducer.dispatch(action);
@@ -548,6 +581,7 @@ class DkgContract extends SmartContract {
         committeeId: Field,
         keyId: Field,
         actionType: Field,
+        key: Group,
         round: ZkAppRef,
         rollup: ZkAppRef,
         selfRef: ZkAppRef
@@ -597,8 +631,9 @@ class DkgContract extends SmartContract {
 
         // Create & dispatch action
         let action = new Action({
-            committeeId: committeeId,
-            keyId: keyId,
+            committeeId,
+            keyId,
+            key,
             mask: ActionMask.createMask(actionType),
         });
         this.reducer.dispatch(action);
@@ -618,6 +653,7 @@ class DkgContract extends SmartContract {
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
         let keyCounterRoot = this.keyCounterRoot.getAndRequireEquals();
         let keyStatusRoot = this.keyStatusRoot.getAndRequireEquals();
+        let keyRoot = this.keyRoot.getAndRequireEquals();
         let processRoot = this.processRoot.getAndRequireEquals();
 
         // Verify Rollup Contract address
@@ -655,6 +691,14 @@ class DkgContract extends SmartContract {
                 ErrorEnum.KEY_STATUS_ROOT
             )
         );
+        proof.publicOutput.initialKeyRoot.assertEquals(
+            keyRoot,
+            Utils.buildAssertMessage(
+                DkgContract.name,
+                'updateKeys',
+                ErrorEnum.KEY_ROOT
+            )
+        );
         proof.publicOutput.initialProcessRoot.assertEquals(
             processRoot,
             Utils.buildAssertMessage(
@@ -667,6 +711,7 @@ class DkgContract extends SmartContract {
         // Set new state values
         this.keyCounterRoot.set(proof.publicOutput.nextKeyCounterRoot);
         this.keyStatusRoot.set(proof.publicOutput.nextKeyStatusRoot);
+        this.keyRoot.set(proof.publicOutput.nextKeyRoot);
         this.processRoot.set(proof.publicOutput.nextProcessRoot);
 
         this.emitEvent(

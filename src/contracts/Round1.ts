@@ -624,6 +624,7 @@ class Round1Contract extends SmartContract {
             committeeId,
             keyId,
             Field(DkgActionEnum.FINALIZE_ROUND_1),
+            proof.publicOutput.publicKey,
             selfRef,
             rollup,
             dkg

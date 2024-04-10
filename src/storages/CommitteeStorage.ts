@@ -85,6 +85,17 @@ class MemberStorage extends GenericStorage<MemberLeaf> {
         return MemberStorage.calculateLevel2Index(memberId);
     }
 
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
+    }
+
+    getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
+        return super.getLevel2Witness(
+            level1Index,
+            level2Index
+        ) as Level2Witness;
+    }
+
     getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
         return super.getWitness(level1Index, level2Index) as FullMTWitness;
     }
@@ -139,6 +150,10 @@ class SettingStorage extends GenericStorage<SettingLeaf> {
 
     calculateLevel1Index(committeeId: Field): Field {
         return SettingStorage.calculateLevel1Index(committeeId);
+    }
+
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
     }
 
     getWitness(level1Index: Field): Level1Witness {

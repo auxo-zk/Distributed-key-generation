@@ -1,7 +1,6 @@
-import { Field, Mina, Provable, PublicKey, Reducer, fetchAccount } from 'o1js';
 import 'dotenv/config.js';
-import { compile, proveAndSend, wait } from '../../helper/deploy.js';
-import { fetchActions, fetchZkAppState } from '../../helper/deploy.js';
+import { Field, Mina, Provable, PublicKey, Reducer, fetchAccount } from 'o1js';
+import { Utils } from '@auxo-dev/auxo-libs';
 import {
     CommitteeAction,
     CommitteeContract,
@@ -30,8 +29,8 @@ async function main() {
     const toState = undefined;
 
     // Compile programs
-    await compile(UpdateCommittee, cache);
-    await compile(CommitteeContract, cache);
+    await Utils.compile(UpdateCommittee, cache);
+    await Utils.compile(CommitteeContract, cache);
     const committeeAddress = process.env.BERKELEY_COMMITTEE_ADDRESS as string;
     console.log('Committee address:', committeeAddress);
     const committeeContract = new CommitteeContract(
@@ -39,7 +38,9 @@ async function main() {
     );
 
     // Fetch on-chain states
-    const rawState = (await fetchZkAppState(committeeAddress)) || [];
+    const rawState =
+        (await Utils.fetchZkAppState(PublicKey.fromBase58(committeeAddress))) ||
+        [];
     const committeeState = {
         nextCommitteeId: Field(rawState[0]),
         committeeTreeRoot: Field(rawState[1]),
@@ -89,7 +90,11 @@ async function main() {
         });
 
     // Fetch actions
-    const rawActions = await fetchActions(committeeAddress, fromState, toState);
+    const rawActions = await Utils.fetchActions(
+        PublicKey.fromBase58(committeeAddress),
+        fromState,
+        toState
+    );
     const actions: CommitteeAction[] = rawActions.map((e) => {
         let action: Field[] = e.actions[0].map((e) => Field(e));
         return new CommitteeAction({
@@ -167,17 +172,14 @@ async function main() {
     }
 
     // Prove and submit tx
-    let tx = await Mina.transaction(
-        {
-            sender: feePayer.key.publicKey,
-            fee: feePayer.fee,
-            nonce: feePayer.nonce++,
-        },
+    await Utils.proveAndSendTx(
+        CommitteeContract.name,
+        'updateCommittee',
         async () => {
             committeeContract.updateCommittees(proof);
-        }
+        },
+        feePayer
     );
-    await proveAndSend(tx, feePayer.key, 'CommitteeContract', 'rollup');
 }
 
 main()

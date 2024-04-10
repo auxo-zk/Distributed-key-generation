@@ -1,5 +1,6 @@
 import {
     Field,
+    Group,
     method,
     Poseidon,
     Provable,
@@ -671,6 +672,7 @@ class Round2Contract extends SmartContract {
             committeeId,
             keyId,
             Field(DkgActionEnum.FINALIZE_ROUND_2),
+            Group.zero,
             selfRef,
             rollup,
             dkg

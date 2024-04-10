@@ -1,6 +1,5 @@
 import { Field, Mina, Provable, PublicKey, Reducer, fetchAccount } from 'o1js';
-import { compile, proveAndSend, wait } from '../../helper/deploy.js';
-import { fetchActions, fetchZkAppState } from '../../helper/deploy.js';
+import { Utils } from '@auxo-dev/auxo-libs';
 import { RequestLevel1Witness } from '../../../storages/RequestStorage.js';
 import {
     RequestAction,
@@ -15,15 +14,17 @@ async function main() {
     const { cache, feePayer } = await prepare();
 
     // Compile programs
-    await compile(UpdateRequest, cache);
-    await compile(RequestContract, cache);
+    await Utils.compile(UpdateRequest, cache);
+    await Utils.compile(RequestContract, cache);
     const requestAddress =
         'B62qjujctknmNAsUHEiRhxttm6vZ9ipSd5nfWP8ijGgHHcRzMDRHDcu';
     const requestContract = new RequestContract(
         PublicKey.fromBase58(requestAddress)
     );
 
-    const rawState = (await fetchZkAppState(requestAddress)) || [];
+    const rawState =
+        (await Utils.fetchZkAppState(PublicKey.fromBase58(requestAddress))) ||
+        [];
     const committeeState = {
         requestStatusRoot: Field(rawState[0]),
         requesterRoot: Field(rawState[1]),
@@ -71,7 +72,10 @@ async function main() {
     // Provable.log('requester value root: ', requesterStorage.root);
 
     const fromState = committeeState.actionState;
-    const rawActions = await fetchActions(requestAddress, fromState);
+    const rawActions = await Utils.fetchActions(
+        PublicKey.fromBase58(requestAddress),
+        fromState
+    );
 
     const actions: RequestAction[] = rawActions.map((e) => {
         let action: Field[] = e.actions[0].map((e) => Field(e));

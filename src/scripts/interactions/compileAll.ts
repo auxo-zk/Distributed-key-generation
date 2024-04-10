@@ -33,31 +33,32 @@ async function main() {
     const profiler = Utils.getProfiler(profilerName, fs);
 
     try {
-        await Utils.compile(Rollup, cache, logger, profiler);
-        await Utils.compile(UpdateCommittee, cache, logger, profiler);
-        await Utils.compile(UpdateKey, cache, logger, profiler);
-        await Utils.compile(Elgamal, cache, logger, profiler);
-        await Utils.compile(BatchEncryption, cache, logger, profiler);
-        await Utils.compile(BatchDecryption, cache, logger, profiler);
-        await Utils.compile(FinalizeRound1, cache, logger, profiler);
-        await Utils.compile(FinalizeRound2, cache, logger, profiler);
-        await Utils.compile(UpdateRequest, cache, logger, profiler);
-        await Utils.compile(UpdateTask, cache, logger, profiler);
-        await Utils.compile(ComputeResponse, cache, logger, profiler);
-        await Utils.compile(FinalizeResponse, cache, logger, profiler);
-        await Utils.compile(ComputeResult, cache, logger, profiler);
+        await Utils.compile(Rollup, cache, profiler, logger);
+        await Utils.compile(UpdateCommittee, cache, profiler, logger);
+        await Utils.compile(UpdateKey, cache, profiler, logger);
+        await Utils.compile(Elgamal, cache, profiler, logger);
+        await Utils.compile(BatchEncryption, cache, profiler, logger);
+        await Utils.compile(BatchDecryption, cache, profiler, logger);
+        await Utils.compile(FinalizeRound1, cache, profiler, logger);
+        await Utils.compile(FinalizeRound2, cache, profiler, logger);
+        await Utils.compile(UpdateRequest, cache, profiler, logger);
+        await Utils.compile(UpdateTask, cache, profiler, logger);
+        await Utils.compile(ComputeResponse, cache, profiler, logger);
+        await Utils.compile(FinalizeResponse, cache, profiler, logger);
+        await Utils.compile(ComputeResult, cache, profiler, logger);
 
-        await Utils.compile(RollupContract, cache, logger, profiler);
-        await Utils.compile(CommitteeContract, cache, logger, profiler);
-        await Utils.compile(DkgContract, cache, logger, profiler);
-        await Utils.compile(Round1Contract, cache, logger, profiler);
-        await Utils.compile(Round2Contract, cache, logger, profiler);
-        await Utils.compile(RequestContract, cache, logger, profiler);
-        await Utils.compile(RequesterContract, cache, logger, profiler);
-        await Utils.compile(ResponseContract, cache, logger, profiler);
+        await Utils.compile(RollupContract, cache, profiler, logger);
+        await Utils.compile(CommitteeContract, cache, profiler, logger);
+        await Utils.compile(DkgContract, cache, profiler, logger);
+        await Utils.compile(Round1Contract, cache, profiler, logger);
+        await Utils.compile(Round2Contract, cache, profiler, logger);
+        await Utils.compile(RequestContract, cache, profiler, logger);
+        await Utils.compile(RequesterContract, cache, profiler, logger);
+        await Utils.compile(ResponseContract, cache, profiler, logger);
     } catch (error) {
-        await profiler.stop();
-        throw error;
+        console.error(error);
+    } finally {
+        profiler.store();
     }
 }
 

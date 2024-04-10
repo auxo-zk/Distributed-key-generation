@@ -1,3 +1,4 @@
+import fs from 'fs/promises';
 import {
     Field,
     Mina,
@@ -7,9 +8,7 @@ import {
     Scalar,
     Provable,
 } from 'o1js';
-
-import { getProfiler } from './helper/profiler.js';
-import randomAccounts from './helper/randomAccounts.js';
+import { Utils } from '@auxo-dev/auxo-libs';
 import { RequesterContract } from '../contracts/Requester.js';
 
 import { CustomScalar } from '@auxo-dev/auxo-libs';
@@ -30,18 +29,18 @@ describe('Requester', () => {
     const statusMerkleMap = new MerkleMap();
     const requesterMerkleMap = new MerkleMap();
 
-    let { keys, addresses } = randomAccounts(
+    let { keys, addresses } = Utils.randomAccounts([
         'requestHelper',
         'u1',
         'u2',
         'u3',
-        'publickey'
-    );
+        'publickey',
+    ]);
 
     const doProofs = true;
     const profiling = true;
     const cache = Cache.FileSystem('./caches');
-    const RequesterProfile = getProfiler('Benchmark RequesterHelper');
+    const RequesterProfile = Utils.getProfiler('Benchmark RequesterHelper', fs);
     let Local = Mina.LocalBlockchain({ proofsEnabled: doProofs });
     Mina.setActiveInstance(Local);
     let feePayerKey = Local.testAccounts[0].privateKey;
