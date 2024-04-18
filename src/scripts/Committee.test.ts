@@ -12,10 +12,10 @@ import {
 } from '../contracts/Committee.js';
 import { MemberArray } from '../libs/Committee.js';
 import { MemberStorage, SettingStorage } from '../storages/CommitteeStorage.js';
-import { prepare } from './interactions/prepare.js';
+import { prepare } from './helper/prepare.js';
 import { Network } from './helper/config.js';
 
-describe('Committee', () => {
+describe('DKG Committee', () => {
     const doProofs = false;
     const profiler = Utils.getProfiler('committee', fs);
     const logger = {
@@ -44,17 +44,12 @@ describe('Committee', () => {
         if (doProofs) {
             await Utils.compile(CommitteeContract, _.cache, profiler);
         }
-        committeeZkApp = {
-            key: _.accounts.committee,
-            contract: new CommitteeContract(_.accounts.committee.publicKey),
-            name: CommitteeContract.name,
-            actions: [],
-            events: [],
-        };
-        await Utils.deployZkApps(
-            [{ zkApp: committeeZkApp, initArgs: [] }],
-            _.feePayer
+        committeeZkApp = Utils.getZkApp(
+            _.accounts.committee,
+            new CommitteeContract(_.accounts.committee.publicKey),
+            CommitteeContract.name
         );
+        await Utils.deployZkApps([committeeZkApp], _.feePayer);
     });
 
     it('Should create committee with config T = 1, N = 2', async () => {
@@ -182,12 +177,13 @@ describe('Committee', () => {
         let proof = await Utils.prove(
             UpdateCommittee.name,
             'init',
-            UpdateCommittee.init(
-                Reducer.initialActionState,
-                memberStorage.root,
-                settingStorage.root,
-                committeeContract.nextCommitteeId.get()
-            ),
+            async () =>
+                UpdateCommittee.init(
+                    Reducer.initialActionState,
+                    memberStorage.root,
+                    settingStorage.root,
+                    committeeContract.nextCommitteeId.get()
+                ),
             profiler,
             logger
         );
@@ -196,12 +192,13 @@ describe('Committee', () => {
             proof = await Utils.prove(
                 UpdateCommittee.name,
                 'update',
-                UpdateCommittee.update(
-                    proof,
-                    CommitteeAction.fromFields(committeeZkApp.actions![i]),
-                    memberStorage.getLevel1Witness(Field(i)),
-                    settingStorage.getLevel1Witness(Field(i))
-                ),
+                async () =>
+                    UpdateCommittee.update(
+                        proof,
+                        CommitteeAction.fromFields(committeeZkApp.actions![i]),
+                        memberStorage.getLevel1Witness(Field(i)),
+                        settingStorage.getLevel1Witness(Field(i))
+                    ),
                 profiler,
                 logger
             );

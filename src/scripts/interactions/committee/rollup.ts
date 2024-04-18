@@ -15,7 +15,7 @@ import {
     SettingStorage,
 } from '../../../storages/CommitteeStorage.js';
 import { INSTANCE_LIMITS } from '../../../constants.js';
-import { prepare } from '../prepare.js';
+import { prepare } from '../../helper/prepare.js';
 
 async function main() {
     // Prepare for interactions

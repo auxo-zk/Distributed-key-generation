@@ -137,7 +137,7 @@ export {
     CommitmentArray,
     calculatePublicKeyFromPoints,
     generateEncryption,
-    recoverEncryption,
+    // recoverEncryption,
     accumulateEncryption,
     getResultVector,
     bruteForceResultVector,

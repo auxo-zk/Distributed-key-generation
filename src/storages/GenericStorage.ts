@@ -49,10 +49,10 @@ interface Storage<RawLeaf> {
 }
 
 abstract class GenericStorage<RawLeaf> implements Storage<RawLeaf> {
-    emptyLevel1Tree: () => MerkleTree;
-    generateLevel1Witness: (witness: Witness) => BaseMerkleWitness;
-    emptyLevel2Tree?: () => MerkleTree;
-    generateLevel2Witness?: (witness: Witness) => BaseMerkleWitness;
+    private emptyLevel1Tree: () => MerkleTree;
+    private generateLevel1Witness: (witness: Witness) => BaseMerkleWitness;
+    private emptyLevel2Tree?: () => MerkleTree;
+    private generateLevel2Witness?: (witness: Witness) => BaseMerkleWitness;
     private _level1: MerkleTree;
     private _level2s: { [key: string]: MerkleTree };
     private _leafs: {
@@ -131,17 +131,16 @@ abstract class GenericStorage<RawLeaf> implements Storage<RawLeaf> {
         );
     }
 
-    getLevel2Witness(
+    getLevel2Witness?(
         level1Index: Field,
         level2Index: Field
     ): BaseMerkleWitness {
         let level2 = this._level2s[level1Index.toString()];
         if (!this.emptyLevel2Tree)
             throw new Error('This storage does not support MerkleTree');
-        if (level2 === undefined)
+        if (level2 === undefined || this.generateLevel2Witness === undefined)
             throw new Error('Level 2 MT does not exist at this index');
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        return this.generateLevel2Witness!(
+        return this.generateLevel2Witness(
             level2.getWitness(level2Index.toBigInt())
         );
     }
@@ -155,7 +154,7 @@ abstract class GenericStorage<RawLeaf> implements Storage<RawLeaf> {
               level1: BaseMerkleWitness;
               level2: BaseMerkleWitness;
           } {
-        if (level2Index) {
+        if (level2Index && this.getLevel2Witness) {
             return {
                 level1: this.getLevel1Witness(level1Index),
                 level2: this.getLevel2Witness(level1Index, level2Index),

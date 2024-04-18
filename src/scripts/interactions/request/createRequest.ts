@@ -1,12 +1,11 @@
 import { Field, Mina, PublicKey, Group, Scalar } from 'o1js';
 import { Utils } from '@auxo-dev/auxo-libs';
-import { prepare } from '../prepare.js';
+import { prepare } from '../../helper/prepare.js';
 import { KeyStatusStorage } from '../../../storages/DkgStorage.js';
 import { KeyCounterStorage } from '../../../storages/CommitteeStorage.js';
 import { UpdateRequest } from '../../../contracts/Request.js';
 import { RequestContract } from '../../../contracts/Request.js';
 import {
-    recoverEncryption,
     accumulateEncryption,
     generateEncryption,
     RequestVector,

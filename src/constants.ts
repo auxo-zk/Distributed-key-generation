@@ -14,10 +14,10 @@ export {
 /**
  * Maximum amount of action processed in a recursive proof
  */
-const ACTION_PROCESS_LIMITS = 16;
+const ACTION_PROCESS_LIMITS = 8;
 
 /**
- * The size of an index value in bits for packing indexes array
+ * The size of an index value in bits for packing indices array
  */
 const INDEX_SIZE = 6;
 
@@ -27,7 +27,7 @@ const INDEX_SIZE = 6;
 const INSTANCE_LIMITS = {
     ACTION: 2 ** 10,
     ADDRESS: 2 ** 8,
-    MEMBER: 3,
+    MEMBER: 2,
     COMMITTEE: 2 ** 6,
     KEY: 2 ** 6,
     REQUEST: 2 ** 8,

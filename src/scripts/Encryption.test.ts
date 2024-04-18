@@ -118,7 +118,7 @@ describe('Encryption', () => {
         };
     });
 
-    xit('Should batch decrypt successfully', async () => {
+    it('Should batch decrypt successfully', async () => {
         console.log('Batch decryption');
         decryptions = [{ m: Scalar.from(0n) }];
         for (let i = 1; i < length; i++) {

@@ -458,56 +458,44 @@ class Round2Contract extends SmartContract {
         // Verify encryption proof
         proof.verify();
 
-        // Verify keyId
-        keyId.assertLessThanOrEqual(
-            INSTANCE_LIMITS.KEY,
-            Utils.buildAssertMessage(
-                Round2Contract.name,
-                'contribute',
-                ErrorEnum.KEY_COUNTER_LIMIT
-            )
-        );
-
         // Verify committee member
         committeeContract.verifyMember(
             new CommitteeMemberInput({
                 address: this.sender.getAndRequireSignature(),
-                committeeId: committeeId,
-                memberId: memberId,
-                memberWitness: memberWitness,
+                committeeId,
+                memberId,
+                memberWitness,
             })
         );
 
         // Verify round 1 public keys (C0[])
         // @todo Remove Provable.witness or adding assertion
-        let publicKeysLeaf = Provable.witness(Field, () => {
-            let publicKeysMT = DKG_LEVEL_2_TREE();
-            for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
-                let value = Provable.if(
-                    Field(i).greaterThanOrEqual(
-                        proof.publicInput.publicKeys.length
-                    ),
-                    Field(0),
-                    PublicKeyArray.hash(
-                        proof.publicInput.publicKeys.get(Field(i))
-                    )
-                );
-                publicKeysMT.setLeaf(BigInt(i), value);
-            }
-            return publicKeysMT.getRoot();
-        });
-        round1Contract.verifyEncPubKeys(
-            committeeId,
-            keyId,
-            publicKeysLeaf,
-            publicKeysWitness
-        );
+        // let publicKeysLeaf = Provable.witness(Field, () => {
+        // let publicKeysMT = DKG_LEVEL_2_TREE();
+        // for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
+        //     let value = Provable.if(
+        //         Field(i).greaterThanOrEqual(
+        //             proof.publicInput.publicKeys.length
+        //         ),
+        //         Field(0),
+        //         PublicKeyArray.hash(proof.publicInput.publicKeys.get(Field(i)))
+        //     );
+        //     publicKeysMT.setLeaf(BigInt(i), value);
+        // }
+        // return publicKeysMT.getRoot();
+        // });
+        // round1Contract.verifyEncPubKeys(
+        //     committeeId,
+        //     keyId,
+        //     publicKeysMT.getRoot(),
+        //     publicKeysWitness
+        // );
 
         // Create & dispatch action
         let action = new Action({
-            committeeId: committeeId,
-            keyId: keyId,
-            memberId: memberId,
+            committeeId,
+            keyId,
+            memberId,
             contribution: new Round2Contribution({
                 c: proof.publicInput.c,
                 U: proof.publicInput.U,
@@ -629,20 +617,20 @@ class Round2Contract extends SmartContract {
 
         // Verify encryption witness
         // @todo Remove Provable.witness or adding assertion
-        let encryptionLeaf = Provable.witness(Field, () => {
-            let encryptionHashesMT = DKG_LEVEL_2_TREE();
-            for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
-                let value = Provable.if(
-                    Field(i).greaterThanOrEqual(
-                        proof.publicOutput.encryptionHashes.length
-                    ),
-                    Field(0),
-                    proof.publicOutput.encryptionHashes.get(Field(i))
-                );
-                encryptionHashesMT.setLeaf(BigInt(i), value);
-            }
-            return encryptionHashesMT.getRoot();
-        });
+        // let encryptionLeaf = Provable.witness(Field, () => {
+        let encryptionHashesMT = DKG_LEVEL_2_TREE();
+        for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
+            let value = Provable.if(
+                Field(i).greaterThanOrEqual(
+                    proof.publicOutput.encryptionHashes.length
+                ),
+                Field(0),
+                proof.publicOutput.encryptionHashes.get(Field(i))
+            );
+            encryptionHashesMT.setLeaf(BigInt(i), value);
+        }
+        // return encryptionHashesMT.getRoot();
+        // });
         encryptionRoot.assertEquals(
             encryptionWitness.calculateRoot(Field(0)),
             Utils.buildAssertMessage(
@@ -663,7 +651,7 @@ class Round2Contract extends SmartContract {
         // Set new states
         this.contributionRoot.set(proof.publicOutput.nextContributionRoot);
         this.encryptionRoot.set(
-            encryptionWitness.calculateRoot(encryptionLeaf)
+            encryptionWitness.calculateRoot(encryptionHashesMT.getRoot())
         );
         this.processRoot.set(proof.publicOutput.nextProcessRoot);
 

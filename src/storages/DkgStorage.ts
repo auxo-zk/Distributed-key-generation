@@ -6,7 +6,6 @@ import {
     Poseidon,
     Struct,
 } from 'o1js';
-import { KeyStatus } from '../contracts/DKG.js';
 import { Round1Contribution, Round2Contribution } from '../libs/Committee.js';
 import { INSTANCE_LIMITS } from '../constants.js';
 import { GenericStorage, Witness } from './GenericStorage.js';
@@ -33,6 +32,8 @@ export {
 export {
     KeyStatusLeaf,
     KeyStatusStorage,
+    KeyLeaf,
+    KeyStorage,
     Round1ContributionLeaf,
     Round1ContributionStorage,
     PublicKeyLeaf,
@@ -65,14 +66,14 @@ const DKG_LEVEL_2_TREE = () => new Level2MT(LEVEL2_TREE_HEIGHT);
 const DKG_LEVEL_2_WITNESS = (witness: Witness) => new Level2Witness(witness);
 
 function calculateKeyIndex(committeeId: Field, keyId: Field): Field {
-    return Field.from(BigInt(INSTANCE_LIMITS.KEY)).mul(committeeId).add(keyId);
+    return Field.from(INSTANCE_LIMITS.KEY).mul(committeeId).add(keyId);
 }
 
 class ProcessedContributions extends FieldDynamicArray(
     INSTANCE_LIMITS.MEMBER
 ) {}
 
-type KeyStatusLeaf = KeyStatus;
+type KeyStatusLeaf = Field;
 class KeyStatusStorage extends GenericStorage<KeyStatusLeaf> {
     constructor(
         leafs?: {
@@ -91,7 +92,7 @@ class KeyStatusStorage extends GenericStorage<KeyStatusLeaf> {
     }
 
     static calculateLeaf(status: KeyStatusLeaf): Field {
-        return Field(status);
+        return status;
     }
 
     calculateLeaf(status: KeyStatusLeaf): Field {
@@ -124,6 +125,10 @@ class KeyStatusStorage extends GenericStorage<KeyStatusLeaf> {
         });
     }
 
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
+    }
+
     getWitness(level1Index: Field): Level1Witness {
         return super.getWitness(level1Index) as Level1Witness;
     }
@@ -135,6 +140,78 @@ class KeyStatusStorage extends GenericStorage<KeyStatusLeaf> {
     updateRawLeaf(
         { level1Index }: { level1Index: Field },
         rawLeaf: KeyStatusLeaf
+    ): void {
+        super.updateRawLeaf({ level1Index }, rawLeaf);
+    }
+}
+
+type KeyLeaf = Group;
+class KeyStorage extends GenericStorage<KeyLeaf> {
+    constructor(
+        leafs?: {
+            level1Index: Field;
+            leaf: KeyLeaf | Field;
+            isRaw: boolean;
+        }[]
+    ) {
+        super(
+            DKG_LEVEL_1_TREE,
+            DKG_LEVEL_1_WITNESS,
+            undefined,
+            undefined,
+            leafs
+        );
+    }
+
+    static calculateLeaf(key: KeyLeaf): Field {
+        return Poseidon.hash(key.toFields());
+    }
+
+    calculateLeaf(key: KeyLeaf): Field {
+        return KeyStorage.calculateLeaf(key);
+    }
+
+    static calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return Field.from(
+            committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) +
+                keyId.toBigInt()
+        );
+    }
+
+    calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return KeyStorage.calculateLevel1Index({
+            committeeId,
+            keyId,
+        });
+    }
+
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
+    }
+
+    getWitness(level1Index: Field): Level1Witness {
+        return super.getWitness(level1Index) as Level1Witness;
+    }
+
+    updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
+        super.updateLeaf({ level1Index }, leaf);
+    }
+
+    updateRawLeaf(
+        { level1Index }: { level1Index: Field },
+        rawLeaf: KeyLeaf
     ): void {
         super.updateRawLeaf({ level1Index }, rawLeaf);
     }
@@ -198,6 +275,17 @@ class Round1ContributionStorage extends GenericStorage<Round1ContributionLeaf> {
 
     calculateLevel2Index(memberId: Field): Field {
         return Round1ContributionStorage.calculateLevel2Index(memberId);
+    }
+
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
+    }
+
+    getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
+        return super.getLevel2Witness?.(
+            level1Index,
+            level2Index
+        ) as Level2Witness;
     }
 
     getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
@@ -285,6 +373,17 @@ class PublicKeyStorage extends GenericStorage<PublicKeyLeaf> {
         return PublicKeyStorage.calculateLevel2Index(memberId);
     }
 
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
+    }
+
+    getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
+        return super.getLevel2Witness?.(
+            level1Index,
+            level2Index
+        ) as Level2Witness;
+    }
+
     getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
         return super.getWitness(level1Index, level2Index) as FullMTWitness;
     }
@@ -368,6 +467,17 @@ class Round2ContributionStorage extends GenericStorage<Round2ContributionLeaf> {
 
     calculateLevel2Index(memberId: Field): Field {
         return Round2ContributionStorage.calculateLevel2Index(memberId);
+    }
+
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
+    }
+
+    getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
+        return super.getLevel2Witness?.(
+            level1Index,
+            level2Index
+        ) as Level2Witness;
     }
 
     getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
@@ -468,6 +578,17 @@ class EncryptionStorage extends GenericStorage<EncryptionLeaf> {
         return EncryptionStorage.calculateLevel2Index(memberId);
     }
 
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
+    }
+
+    getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
+        return super.getLevel2Witness?.(
+            level1Index,
+            level2Index
+        ) as Level2Witness;
+    }
+
     getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
         return super.getWitness(level1Index, level2Index) as FullMTWitness;
     }
@@ -536,6 +657,17 @@ class ResponseContributionStorage extends GenericStorage<ResponseContributionLea
         return ResponseContributionStorage.calculateLevel2Index(memberId);
     }
 
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
+    }
+
+    getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
+        return super.getLevel2Witness?.(
+            level1Index,
+            level2Index
+        ) as Level2Witness;
+    }
+
     getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
         return super.getWitness(level1Index, level2Index) as FullMTWitness;
     }
@@ -593,6 +725,10 @@ class ResponseStorage extends GenericStorage<ResponseLeaf> {
 
     calculateLevel1Index(requestId: Field): Field {
         return ResponseStorage.calculateLevel1Index(requestId);
+    }
+
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
     }
 
     getWitness(level1Index: Field): Level1Witness {

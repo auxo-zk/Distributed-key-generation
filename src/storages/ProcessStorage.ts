@@ -55,18 +55,10 @@ class ProcessStorage extends GenericStorage<ProcessLeaf> {
 
     static calculateLeaf(rawLeaf: ProcessLeaf): Field {
         let processId = rawLeaf.processId.value;
-        return Provable.switch(
-            [
-                processId.equals(0),
-                processId.equals(1),
-                processId.greaterThan(1),
-            ],
-            Field,
-            [
-                Field(0),
-                rawLeaf.actionState,
-                Poseidon.hash([rawLeaf.actionState, processId]),
-            ]
+        return Provable.if(
+            processId.greaterThan(0),
+            Poseidon.hash([rawLeaf.actionState, processId]),
+            rawLeaf.actionState
         );
     }
 

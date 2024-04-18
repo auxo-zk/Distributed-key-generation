@@ -359,7 +359,7 @@ const UpdateKey = ZkProgram({
                 // Verify the key's previous status
                 let keyIndex = calculateKeyIndex(
                     input.action.committeeId,
-                    input.action.keyId
+                    currKeyId
                 );
                 earlierProof.publicOutput.nextKeyStatusRoot.assertEquals(
                     keyStatusWitness.calculateRoot(Field(KeyStatus.EMPTY)),
@@ -450,13 +450,13 @@ class DkgContract extends SmartContract {
 
     /**
      * @description MT storing keys
-     * @todo To be implemented
+     * @see KeyStorage for off-chain storage implementation
      */
     @state(Field) keyRoot = State<Field>();
 
     /**
      * @description MT storing actions' process state
-     * @see ActionSto
+     * @see ProcessStorage for off-chain storage implementation
      */
     @state(Field) processRoot = State<Field>();
 
@@ -471,6 +471,7 @@ class DkgContract extends SmartContract {
         this.zkAppRoot.set(ADDRESS_MT().getRoot());
         this.keyCounterRoot.set(COMMITTEE_LEVEL_1_TREE().getRoot());
         this.keyStatusRoot.set(DKG_LEVEL_1_TREE().getRoot());
+        this.keyRoot.set(DKG_LEVEL_1_TREE().getRoot());
         this.processRoot.set(PROCESS_MT().getRoot());
     }
 
@@ -492,6 +493,7 @@ class DkgContract extends SmartContract {
         rollup: ZkAppRef,
         selfRef: ZkAppRef
     ) {
+        keyId.assertLessThanOrEqual(Field(-1));
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
 
@@ -518,12 +520,13 @@ class DkgContract extends SmartContract {
         const rollupContract = new RollupContract(rollup.address);
 
         // Verify committee member
+        let address = this.sender.getAndRequireSignature();
         committeeContract.verifyMember(
             new CommitteeMemberInput({
-                address: this.sender.getAndRequireSignature(),
-                committeeId: committeeId,
-                memberId: memberId,
-                memberWitness: memberWitness,
+                address,
+                committeeId,
+                memberId,
+                memberWitness,
             })
         );
 
@@ -540,23 +543,30 @@ class DkgContract extends SmartContract {
             );
 
         // Verify keyId
-        keyId.assertLessThanOrEqual(
-            INSTANCE_LIMITS.KEY,
-            Utils.buildAssertMessage(
-                DkgContract.name,
-                'committeeAction',
-                ErrorEnum.KEY_COUNTER_LIMIT
-            )
+        keyId = Provable.if(
+            actionType.equals(ActionEnum.GENERATE_KEY),
+            Field(-1),
+            keyId
         );
+        keyId
+            .lessThanOrEqual(INSTANCE_LIMITS.KEY)
+            .assertEquals(
+                Provable.if(
+                    actionType.equals(ActionEnum.GENERATE_KEY),
+                    Bool(false),
+                    Bool(true)
+                ),
+                Utils.buildAssertMessage(
+                    DkgContract.name,
+                    'committeeAction',
+                    ErrorEnum.KEY_COUNTER_LIMIT
+                )
+            );
 
         // Create & dispatch action
         let action = new Action({
             committeeId,
-            keyId: Provable.if(
-                actionType.equals(ActionEnum.GENERATE_KEY),
-                Field(-1),
-                keyId
-            ),
+            keyId,
             key: Group.zero,
             mask: ActionMask.createMask(actionType),
         });
@@ -735,9 +745,7 @@ class DkgContract extends SmartContract {
             )
         );
 
-        let keyIndex = Field.from(BigInt(INSTANCE_LIMITS.KEY))
-            .mul(input.committeeId)
-            .add(input.keyId);
+        let keyIndex = calculateKeyIndex(input.committeeId, input.keyId);
 
         this.keyStatusRoot
             .getAndRequireEquals()

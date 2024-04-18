@@ -9,7 +9,7 @@ import {
     fetchAccount,
 } from 'o1js';
 import { Utils } from '@auxo-dev/auxo-libs';
-import { Config, JSONKey, Key, Network } from '../helper/config.js';
+import { Config, JSONKey, Key, Network } from './config.js';
 
 export async function prepare(
     cacheDir = './caches',
@@ -43,6 +43,8 @@ export async function prepare(
             network = Mina.Network({
                 mina: process.env.LIGHTNET_MINA as string,
                 archive: process.env.LIGHTNET_ARCHIVE as string,
+                lightnetAccountManager: process.env
+                    .LIGHTNET_ACCOUNT_MANAGER as string,
             });
             break;
         case Network.Testnet:
@@ -74,6 +76,11 @@ export async function prepare(
                         publicKey: addresses[e],
                     },
                 });
+                // configJson.deployAliases[e] = {
+                //     ...accounts[e],
+                //     url: '',
+                //     keyPath: ''
+                // };
             } else {
                 let accountData: JSONKey = JSON.parse(
                     fs.readFileSync(configJson.deployAliases[e].keyPath, 'utf8')
@@ -94,13 +101,20 @@ export async function prepare(
         let acquiredAccounts = (await Lightnet.listAcquiredKeyPairs(
             {}
         )) as Key[];
-        if (Object.keys(accounts).length < DEFAULT_ACCOUNTS) {
-            for (let i = 0; i < DEFAULT_ACCOUNTS; i++) {
-                let account = (await Lightnet.acquireKeyPair()) as Key;
-                Object.assign(accounts, {
-                    [acquiredAccounts.length + i]: account,
-                });
+        if (acquiredAccounts.length < DEFAULT_ACCOUNTS) {
+            for (
+                let i = 0;
+                i < DEFAULT_ACCOUNTS - acquiredAccounts.length;
+                i++
+            ) {
+                await Lightnet.acquireKeyPair();
             }
+        }
+        acquiredAccounts = (await Lightnet.listAcquiredKeyPairs({})) as Key[];
+        for (let i = 0; i < acquiredAccounts.length; i++) {
+            Object.assign(accounts, {
+                [i]: acquiredAccounts[i],
+            });
         }
     } else if (networkOptions.type == Network.Local) {
         accounts = {
@@ -140,12 +154,12 @@ export async function prepare(
 
     if (networkOptions.type !== Network.Local)
         try {
-            console.log('Fetch nonce...');
             let { account, error } = await fetchAccount({
                 publicKey: feePayer.sender.publicKey,
             });
             if (error) throw error;
             if (account !== undefined) feePayer.nonce = Number(account.nonce);
+            console.log('Nonce:', feePayer.nonce || 0);
         } catch (error) {
             console.error(error);
         }

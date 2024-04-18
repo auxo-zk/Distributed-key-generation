@@ -15,6 +15,7 @@ import {
     UInt64,
     UInt8,
     UInt32,
+    PublicKey,
 } from 'o1js';
 import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
 import { ENCRYPTION_LIMITS, REQUEST_EXPIRATION } from '../constants.js';
@@ -54,7 +55,10 @@ export {
     UpdateTaskOutput,
     UpdateTask,
     UpdateTaskProof,
+    AddressBook as RequesterAddressBook,
     RequesterContract,
+    TaskManagerContract,
+    SubmissionContract,
 };
 
 class Action
@@ -62,7 +66,7 @@ class Action
         taskId: UInt32,
         keyIndex: Field,
         timestamp: UInt64,
-        indexes: Field,
+        indices: Field,
         R: RequestVector,
         M: RequestVector,
         commitments: CommitmentArray,
@@ -74,7 +78,7 @@ class Action
             taskId: UInt32.zero,
             keyIndex: Field(0),
             timestamp: UInt64.zero,
-            indexes: Field(0),
+            indices: Field(0),
             R: new RequestVector(),
             M: new RequestVector(),
             commitments: new CommitmentArray(),
@@ -157,9 +161,6 @@ const UpdateTask = ZkProgram({
                 // Verify earlier proof
                 earlierProof.verify();
 
-                // Verify task Id
-                earlierProof.publicOutput.taskId.assertEquals(input.taskId);
-
                 // Verify empty key Index
                 earlierProof.publicOutput.nextKeyIndexRoot.assertEquals(
                     keyIndexWitness.calculateRoot(Field(0)),
@@ -169,7 +170,7 @@ const UpdateTask = ZkProgram({
                         ErrorEnum.KEY_INDEX_ROOT
                     )
                 );
-                input.keyIndex.assertEquals(
+                input.taskId.value.assertEquals(
                     keyIndexWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateTask.name,
@@ -187,7 +188,7 @@ const UpdateTask = ZkProgram({
                         ErrorEnum.REQUEST_TIMESTAMP_ROOT
                     )
                 );
-                input.timestamp.value.assertEquals(
+                input.taskId.value.assertEquals(
                     timestampWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateTask.name,
@@ -260,7 +261,7 @@ const UpdateTask = ZkProgram({
                     );
                     let commitmentWitness = commitmentWitnesses.get(Field(i));
                     let index = Field.fromBits(
-                        input.indexes.toBits().slice(i * 8, (i + 1) * 8)
+                        input.indices.toBits().slice(i * 8, (i + 1) * 8)
                     );
 
                     // Verify accumulation data
@@ -367,7 +368,7 @@ class UpdateTaskProof extends ZkProgram.Proof(UpdateTask) {}
 
 enum AddressBook {
     TASK_MANAGER,
-    SUBMISSION_PROXY,
+    SUBMISSION,
     DKG,
 }
 
@@ -480,12 +481,12 @@ class RequesterContract extends SmartContract {
         keyIndex: Field,
         secrets: SecretVector,
         randoms: RandomVector,
-        indexes: Field,
+        indices: Field,
         nullifiers: NullifierArray,
         publicKey: Group,
         publicKeyWitness: DkgLevel1Witness,
         keyIndexWitness: RequesterLevel1Witness,
-        submissionProxy: ZkAppRef,
+        submission: ZkAppRef,
         dkg: ZkAppRef
     ) {
         // Get current state values
@@ -501,12 +502,12 @@ class RequesterContract extends SmartContract {
         );
 
         // Verify call from Submission Proxy Contract
-        Utils.requireCaller(submissionProxy.address, this);
+        Utils.requireCaller(submission.address, this);
         verifyZkApp(
             RequesterContract.name,
-            submissionProxy,
+            submission,
             zkAppRoot,
-            Field(RequesterContract.AddressBook.SUBMISSION_PROXY)
+            Field(RequesterContract.AddressBook.SUBMISSION)
         );
 
         const dkgContract = new DkgContract(dkg.address);
@@ -521,7 +522,7 @@ class RequesterContract extends SmartContract {
         let commitments = new CommitmentArray();
         for (let i = 0; i < ENCRYPTION_LIMITS.DIMENSION; i++) {
             let index = Field.fromBits(
-                indexes.toBits().slice(i * 8, (i + 1) * 8)
+                indices.toBits().slice(i * 8, (i + 1) * 8)
             );
             let random = randoms.get(Field(i)).toScalar();
             let secret = secrets.get(Field(i));
@@ -537,7 +538,12 @@ class RequesterContract extends SmartContract {
             );
             commitments.set(
                 Field(i),
-                calculateCommitment(nullifier, taskId.value, index, secret)
+                calculateCommitment(
+                    nullifier,
+                    taskId,
+                    UInt8.from(index),
+                    secret
+                )
             );
         }
 
@@ -546,7 +552,7 @@ class RequesterContract extends SmartContract {
             taskId,
             keyIndex,
             timestamp,
-            indexes,
+            indices,
             R,
             M,
             commitments,
@@ -782,6 +788,62 @@ class RequesterContract extends SmartContract {
                 'verifyCommitment',
                 ErrorEnum.COMMITMENT_INDEX
             )
+        );
+    }
+}
+
+class TaskManagerContract extends SmartContract {
+    @state(PublicKey) requesterAddress = State<PublicKey>();
+
+    init() {
+        super.init();
+    }
+
+    @method
+    async createTask(keyIndex: Field, timestamp: UInt64, selfRef: ZkAppRef) {
+        let requesterContract = new RequesterContract(
+            this.requesterAddress.getAndRequireEquals()
+        );
+        await requesterContract.createTask(keyIndex, timestamp, selfRef);
+    }
+}
+
+class SubmissionContract extends SmartContract {
+    @state(PublicKey) requesterAddress = State<PublicKey>();
+
+    init() {
+        super.init();
+    }
+
+    @method
+    async submitEncryption(
+        taskId: UInt32,
+        keyIndex: Field,
+        secrets: SecretVector,
+        randoms: RandomVector,
+        indices: Field,
+        nullifiers: NullifierArray,
+        publicKey: Group,
+        publicKeyWitness: DkgLevel1Witness,
+        keyIndexWitness: RequesterLevel1Witness,
+        submission: ZkAppRef,
+        dkg: ZkAppRef
+    ) {
+        let requesterContract = new RequesterContract(
+            this.requesterAddress.getAndRequireEquals()
+        );
+        await requesterContract.submitEncryption(
+            taskId,
+            keyIndex,
+            secrets,
+            randoms,
+            indices,
+            nullifiers,
+            publicKey,
+            publicKeyWitness,
+            keyIndexWitness,
+            submission,
+            dkg
         );
     }
 }

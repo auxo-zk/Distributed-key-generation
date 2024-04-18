@@ -90,7 +90,7 @@ class MemberStorage extends GenericStorage<MemberLeaf> {
     }
 
     getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
-        return super.getLevel2Witness(
+        return super.getLevel2Witness?.(
             level1Index,
             level2Index
         ) as Level2Witness;

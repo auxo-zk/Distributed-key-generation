@@ -1,6 +1,6 @@
 import { Field, Mina, PrivateKey, SmartContract, method } from 'o1js';
-import { KeyCounterStorage } from '../storages/CommitteeStorage.js';
-import { DkgLevel1Witness, PublicKeyStorage } from '../storages/DkgStorage.js';
+import { KeyCounterStorage } from './CommitteeStorage.js';
+import { DkgLevel1Witness, PublicKeyStorage } from './DkgStorage.js';
 
 describe('Storage', () => {
     const keyCounterStorage = new KeyCounterStorage();

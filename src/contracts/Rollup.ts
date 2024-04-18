@@ -18,7 +18,12 @@ import {
     RollupWitness,
     calculateActionIndex,
 } from '../storages/RollupStorage.js';
-import { ErrorEnum, EventEnum, ZkProgramEnum } from './constants.js';
+import {
+    ErrorEnum,
+    EventEnum,
+    ZkAppAction,
+    ZkProgramEnum,
+} from './constants.js';
 import { ZkAppRef } from '../storages/AddressStorage.js';
 
 export {
@@ -32,10 +37,26 @@ export {
     verifyRollup,
 };
 
-class Action extends Struct({
-    zkAppIndex: Field,
-    actionHash: Field,
-}) {}
+class Action
+    extends Struct({
+        zkAppIndex: Field,
+        actionHash: Field,
+    })
+    implements ZkAppAction
+{
+    static empty(): Action {
+        return new Action({
+            zkAppIndex: Field(0),
+            actionHash: Field(0),
+        });
+    }
+    static fromFields(fields: Field[]): Action {
+        return super.fromFields(fields) as Action;
+    }
+    hash(): Field {
+        return Poseidon.hash(Action.toFields(this));
+    }
+}
 
 class RollupOutput extends Struct({
     initialCounterRoot: Field,
@@ -60,9 +81,9 @@ const Rollup = ZkProgram({
                 initialActionState: Field
             ) {
                 return new RollupOutput({
-                    initialCounterRoot: initialCounterRoot,
-                    initialRollupRoot: initialRollupRoot,
-                    initialActionState: initialActionState,
+                    initialCounterRoot,
+                    initialRollupRoot,
+                    initialActionState,
                     nextCounterRoot: initialCounterRoot,
                     nextRollupRoot: initialRollupRoot,
                     nextActionState: initialActionState,
@@ -139,15 +160,10 @@ const Rollup = ZkProgram({
                 );
 
                 return new RollupOutput({
-                    initialCounterRoot:
-                        earlierProof.publicOutput.initialCounterRoot,
-                    initialRollupRoot:
-                        earlierProof.publicOutput.initialRollupRoot,
-                    initialActionState:
-                        earlierProof.publicOutput.initialActionState,
-                    nextCounterRoot: nextCounterRoot,
-                    nextRollupRoot: nextRollupRoot,
-                    nextActionState: nextActionState,
+                    ...earlierProof.publicOutput,
+                    nextCounterRoot,
+                    nextRollupRoot,
+                    nextActionState,
                 });
             },
         },

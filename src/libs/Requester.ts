@@ -25,7 +25,7 @@ export {
     calculatePublicKey as calculatePublicKeyFromPoints,
     calculateCommitment,
     generateEncryption,
-    recoverEncryption,
+    // recoverEncryption,
     accumulateEncryption,
     getResultVector,
     bruteForceResultVector,
@@ -167,45 +167,44 @@ function generateEncryption(
     };
 }
 
-function recoverEncryption(
-    taskIndex: number,
-    publicKey: Group,
-    r: Scalar[],
-    vector: bigint[],
-    indices: number[]
-): {
-    packedIndices: Field;
-    R: Group[];
-    M: Group[];
-    notes: SecretNote[];
-} {
-    let dimension = vector.length;
-    let R = new Array<Group>(dimension);
-    let M = new Array<Group>(dimension);
-    let notes = new Array<SecretNote>(dimension);
-    let packedIndices = Utils.packNumberArray(indices, 8);
-    for (let i = 0; i < dimension; i++) {
-        let random = r[i];
-        R[i] = Group.generator.scale(random);
-        M[i] =
-            vector[i] > 0n
-                ? Group.generator
-                      .scale(Scalar.from(vector[i]))
-                      .add(publicKey.scale(random))
-                : Group.zero.add(publicKey.scale(random));
-        let nullifier = Field.random();
-        let taskId = Field(taskIndex);
-        let index = Field(indices[i]);
-        // let commitment = calculateCommitment(
-        //     nullifier,
-        //     taskId,
-        //     index,
-        //     CustomScalar.fromScalar(Scalar.from(vector[i]))
-        // );
-        // notes[i] = { taskId, index, nullifier, commitment };
-    }
-    return { packedIndices, R, M, notes };
-}
+// function recoverEncryption(
+//     taskIndex: number,
+//     publicKey: Group,
+//     r: Scalar[],
+//     vector: { [key: number | string]: bigint | undefined }
+// ): {
+//     packedIndices: Field;
+//     R: Group[];
+//     M: Group[];
+//     notes: SecretNote[];
+// } {
+//     let dimension = vector.length;
+//     let R = new Array<Group>(dimension);
+//     let M = new Array<Group>(dimension);
+//     let notes = new Array<SecretNote>(dimension);
+//     let packedIndices = Utils.packNumberArray(indices, 8);
+//     for (let i = 0; i < dimension; i++) {
+//         let random = r[i];
+//         R[i] = Group.generator.scale(random);
+//         M[i] =
+//             vector[i] > 0n
+//                 ? Group.generator
+//                       .scale(Scalar.from(vector[i]))
+//                       .add(publicKey.scale(random))
+//                 : Group.zero.add(publicKey.scale(random));
+//         let nullifier = Field.random();
+//         let taskId = Field(taskIndex);
+//         let index = Field(indices[i]);
+//         // let commitment = calculateCommitment(
+//         //     nullifier,
+//         //     taskId,
+//         //     index,
+//         //     CustomScalar.fromScalar(Scalar.from(vector[i]))
+//         // );
+//         // notes[i] = { taskId, index, nullifier, commitment };
+//     }
+//     return { packedIndices, R, M, notes };
+// }
 
 function accumulateEncryption(
     R: Group[][],

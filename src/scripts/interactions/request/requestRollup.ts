@@ -8,7 +8,7 @@ import {
 } from '../../../contracts/Request.js';
 import { RequestContract } from '../../../contracts/Request.js';
 import axios from 'axios';
-import { prepare } from '../prepare.js';
+import { prepare } from '../../helper/prepare.js';
 
 async function main() {
     const { cache, feePayer } = await prepare();

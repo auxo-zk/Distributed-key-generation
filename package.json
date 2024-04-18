@@ -20,7 +20,7 @@
         "coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
         "format": "prettier --write --ignore-unknown **/*",
         "prepare": "husky install",
-        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --run-in-band",
+        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
         "testw": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
         "lint": "npx eslint src/* --fix",
         "publish": "rm -f package-lock.json && npm install && npm run build:publish && npm publish --access public"
@@ -68,7 +68,7 @@
         "zkapp-cli": "^0.15.0"
     },
     "dependencies": {
-        "@auxo-dev/auxo-libs": "^0.5.0",
+        "@auxo-dev/auxo-libs": "0.5.7",
         "o1js": "0.18.0"
     }
 }
