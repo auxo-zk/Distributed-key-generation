@@ -1,10 +1,16 @@
-import { Field, Group, Poseidon, Scalar } from 'o1js';
+import { Field, Group, Poseidon, Scalar, Struct, UInt32, UInt8 } from 'o1js';
 import {
     CustomScalar,
     GroupDynamicArray,
     StaticArray,
+    Utils,
 } from '@auxo-dev/auxo-libs';
-import { ENCRYPTION_LIMITS, SECRET_MAX, SECRET_UNIT } from '../constants.js';
+import {
+    ENCRYPTION_LIMITS,
+    INSTANCE_LIMITS,
+    SECRET_MAX,
+    SECRET_UNIT,
+} from '../constants.js';
 
 export {
     RArray,
@@ -43,12 +49,12 @@ class ResultVector extends StaticArray(
 ) {}
 class NullifierArray extends StaticArray(Field, ENCRYPTION_LIMITS.DIMENSION) {}
 class CommitmentArray extends StaticArray(Field, ENCRYPTION_LIMITS.DIMENSION) {}
-type SecretNote = {
-    taskId: Field;
-    index: Field;
-    nullifier: Field;
-    commitment: Field;
-};
+class SecretNote extends Struct({
+    taskId: UInt32,
+    index: UInt8,
+    nullifier: Field,
+    commitment: Field,
+}) {}
 
 function calculatePublicKey(contributedPublicKeys: Group[]): Group {
     let result = Group.zero;
@@ -60,51 +66,105 @@ function calculatePublicKey(contributedPublicKeys: Group[]): Group {
 
 function calculateCommitment(
     nullifier: Field,
-    taskId: Field,
-    index: Field,
+    taskId: UInt32,
+    index: UInt8,
     secret: CustomScalar
 ) {
-    return Poseidon.hash([nullifier, taskId, index, secret.toFields()].flat());
+    return Poseidon.hash(
+        [nullifier, taskId.value, index.value, secret.toFields()].flat()
+    );
 }
 
 function generateEncryption(
-    taskIndex: number,
+    taskId: number,
     publicKey: Group,
-    vector: bigint[],
-    indexes: number[]
+    vector: { [key: number | string]: bigint | undefined }
 ): {
-    r: Scalar[];
+    indices: number[];
+    packedIndices: Field;
+    secrets: SecretVector;
+    randoms: RandomVector;
+    nullifiers: NullifierArray;
     R: Group[];
     M: Group[];
     notes: SecretNote[];
 } {
-    let dimension = vector.length;
-    let r = new Array<Scalar>(dimension);
-    let R = new Array<Group>(dimension);
-    let M = new Array<Group>(dimension);
-    let notes = new Array<SecretNote>(dimension);
-    for (let i = 0; i < dimension; i++) {
+    if (Object.keys(vector).length > ENCRYPTION_LIMITS.DIMENSION)
+        throw new Error('Exceeds limit for submission dimension!');
+    let secrets = new SecretVector();
+    let randoms = new RandomVector();
+    let indices: number[] = [];
+    let nullifiers = new NullifierArray();
+    let notes: SecretNote[] = [];
+    let R = new Array<Group>(ENCRYPTION_LIMITS.FULL_DIMENSION).fill(Group.zero);
+    let M = new Array<Group>(ENCRYPTION_LIMITS.FULL_DIMENSION).fill(Group.zero);
+
+    Object.entries(vector).map(([key, value], i) => {
+        if (value === undefined || value < 0n)
+            throw new Error('Negative value is not allowed!');
+
+        let secret = Scalar.from(value);
         let random = Scalar.random();
-        r[i] = random;
-        R[i] = Group.generator.scale(random);
-        M[i] =
-            vector[i] > 0n
-                ? Group.generator
-                      .scale(Scalar.from(vector[i]))
-                      .add(publicKey.scale(random))
-                : Group.zero.add(publicKey.scale(random));
         let nullifier = Field.random();
-        let taskId = Field(taskIndex);
-        let index = Field(indexes[i]);
+        indices.push(Number(key));
+        secrets.set(Field(i), CustomScalar.fromScalar(secret));
+        randoms.set(Field(i), CustomScalar.fromScalar(random));
+        nullifiers.set(Field(i), nullifier);
+        let index = UInt8.from(Number(key));
         let commitment = calculateCommitment(
             nullifier,
-            taskId,
+            UInt32.from(taskId),
             index,
-            CustomScalar.fromScalar(Scalar.from(vector[i]))
+            CustomScalar.fromScalar(secret)
         );
-        notes[i] = { taskId, index, nullifier, commitment };
+        if (value > 0n)
+            notes.push({
+                taskId: UInt32.from(taskId),
+                index,
+                nullifier,
+                commitment,
+            });
+
+        R[Number(key)] = Group.generator.scale(random);
+        M[Number(key)] =
+            value > 0n
+                ? Group.generator.scale(secret).add(publicKey.scale(random))
+                : Group.zero.add(publicKey.scale(random));
+    });
+
+    for (
+        let i = Object.keys(vector).length;
+        i < ENCRYPTION_LIMITS.DIMENSION;
+        i++
+    ) {
+        let freeIndices = [
+            ...Array(ENCRYPTION_LIMITS.FULL_DIMENSION).keys(),
+        ].filter((e) => !indices.includes(e));
+        let randomIndex =
+            freeIndices[Math.floor(Math.random() * freeIndices.length)];
+
+        let secret = Scalar.from(0);
+        let random = Scalar.random();
+        let nullifier = Field.random();
+        indices.push(Number(randomIndex));
+        secrets.set(Field(i), CustomScalar.fromScalar(secret));
+        randoms.set(Field(i), CustomScalar.fromScalar(random));
+        nullifiers.set(Field(i), nullifier);
+        R[randomIndex] = Group.generator.scale(random);
+        M[randomIndex] = Group.zero.add(publicKey.scale(random));
     }
-    return { r, R, M, notes };
+
+    let packedIndices = Utils.packNumberArray(indices, 8);
+    return {
+        indices,
+        packedIndices,
+        secrets,
+        randoms,
+        nullifiers,
+        R,
+        M,
+        notes,
+    };
 }
 
 function recoverEncryption(
@@ -112,8 +172,9 @@ function recoverEncryption(
     publicKey: Group,
     r: Scalar[],
     vector: bigint[],
-    indexes: number[]
+    indices: number[]
 ): {
+    packedIndices: Field;
     R: Group[];
     M: Group[];
     notes: SecretNote[];
@@ -122,6 +183,7 @@ function recoverEncryption(
     let R = new Array<Group>(dimension);
     let M = new Array<Group>(dimension);
     let notes = new Array<SecretNote>(dimension);
+    let packedIndices = Utils.packNumberArray(indices, 8);
     for (let i = 0; i < dimension; i++) {
         let random = r[i];
         R[i] = Group.generator.scale(random);
@@ -133,16 +195,16 @@ function recoverEncryption(
                 : Group.zero.add(publicKey.scale(random));
         let nullifier = Field.random();
         let taskId = Field(taskIndex);
-        let index = Field(indexes[i]);
-        let commitment = calculateCommitment(
-            nullifier,
-            taskId,
-            index,
-            CustomScalar.fromScalar(Scalar.from(vector[i]))
-        );
-        notes[i] = { taskId, index, nullifier, commitment };
+        let index = Field(indices[i]);
+        // let commitment = calculateCommitment(
+        //     nullifier,
+        //     taskId,
+        //     index,
+        //     CustomScalar.fromScalar(Scalar.from(vector[i]))
+        // );
+        // notes[i] = { taskId, index, nullifier, commitment };
     }
-    return { R, M, notes };
+    return { packedIndices, R, M, notes };
 }
 
 function accumulateEncryption(

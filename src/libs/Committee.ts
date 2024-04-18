@@ -1,4 +1,12 @@
-import { Field, Group, MerkleTree, Poseidon, Scalar, Struct } from 'o1js';
+import {
+    Field,
+    Group,
+    MerkleTree,
+    Poseidon,
+    Provable,
+    Scalar,
+    Struct,
+} from 'o1js';
 import {
     Bit255,
     Bit255DynamicArray,
@@ -199,10 +207,13 @@ function getResponseContribution(
         Scalar.from(0n)
     );
 
-    let merkleTree = new MerkleTree(ENCRYPTION_LIMITS.FULL_DIMENSION);
+    let merkleTree = new MerkleTree(
+        Math.ceil(Math.log2(ENCRYPTION_LIMITS.FULL_DIMENSION)) + 1
+    );
     let D = new Array<Group>(R.length);
     for (let i = 0; i < R.length; i++) {
-        D[i] = R[i].scale(ski);
+        if (R[i].equals(Group.zero).toBoolean()) D[i] = Group.zero;
+        else D[i] = R[i].scale(ski);
         merkleTree.setLeaf(BigInt(i), Poseidon.hash(D[i].toFields()));
     }
 
