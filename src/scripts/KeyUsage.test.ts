@@ -1,27 +1,38 @@
-import fs from 'fs/promises';
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+import fs from 'fs';
 import {
     Field,
     Cache,
     Group,
-    Reducer,
     TokenId,
-    Mina,
-    AccountUpdate,
     Scalar,
     UInt64,
     PublicKey,
     UInt32,
+    UInt8,
+    Provable,
 } from 'o1js';
-import { IpfsHash, Utils } from '@auxo-dev/auxo-libs';
-import { UpdateRequest, ComputeResult } from '../contracts/Request.js';
+import { CustomScalar, IpfsHash, Utils } from '@auxo-dev/auxo-libs';
+import {
+    UpdateRequest,
+    ComputeResult,
+    RequestAction,
+    ComputeResultInput,
+} from '../contracts/Request.js';
 import { RequestContract } from '../contracts/Request.js';
 import {
     MemberArray,
+    ResponseContribution,
     Round1Contribution,
     Round2Contribution,
+    Round2Data,
     SecretPolynomial,
+    UArray,
+    accumulateResponses,
+    cArray,
     calculatePublicKeyFromContribution,
     generateRandomPolynomial,
+    getResponseContribution,
     getRound1Contribution,
     getRound2Contribution,
 } from '../libs/Committee.js';
@@ -38,10 +49,12 @@ import {
     SettingStorage,
 } from '../storages/CommitteeStorage.js';
 import {
+    DKG_LEVEL_2_TREE,
     EncryptionStorage,
     KeyStatusStorage,
     KeyStorage,
     PublicKeyStorage,
+    ResponseContributionStorage,
     ResponseStorage,
     Round1ContributionStorage,
     Round2ContributionStorage,
@@ -49,10 +62,12 @@ import {
 } from '../storages/DkgStorage.js';
 import { ProcessStorage } from '../storages/ProcessStorage.js';
 import { compile } from './helper/compile.js';
-import { Rollup, RollupContract } from '../contracts/Rollup.js';
+import { Rollup, RollupAction, RollupContract } from '../contracts/Rollup.js';
 import {
     ComputeResponse,
     FinalizeResponse,
+    FinalizeResponseInput,
+    ResponseAction,
     ResponseContract,
 } from '../contracts/Response.js';
 import {
@@ -68,33 +83,55 @@ import { DkgContract, KeyStatus, UpdateKey } from '../contracts/DKG.js';
 import { FinalizeRound1, Round1Contract } from '../contracts/Round1.js';
 import { FinalizeRound2, Round2Contract } from '../contracts/Round2.js';
 import { ZkAppIndex } from '../contracts/constants.js';
-import { BatchDecryption, BatchEncryption } from '../contracts/Encryption.js';
+import {
+    BatchDecryption,
+    BatchDecryptionInput,
+    BatchEncryption,
+    PlainArray,
+} from '../contracts/Encryption.js';
 import { fetchAccounts, waitUntil } from './helper/index.js';
 import {
     CommitmentStorage,
+    CommitmentWitnesses,
     RequesterAccumulationStorage,
+    RequesterCounters,
     RequesterKeyIndexStorage,
     TimestampStorage,
 } from '../storages/RequesterStorage.js';
 import {
     ExpirationStorage,
+    GroupVector,
+    GroupVectorStorage,
+    GroupVectorWitnesses,
+    REQUEST_LEVEL_2_TREE,
     RequestAccumulationStorage,
     RequestKeyIndexStorage,
     ResultStorage,
+    ScalarVectorStorage,
     TaskIdStorage,
 } from '../storages/RequestStorage.js';
-import { SecretVector } from '../libs/Requester.js';
+import {
+    NullifierArray,
+    RandomVector,
+    SecretNote,
+    SecretVector,
+    bruteForceResultVector,
+    calculateCommitment,
+    getResultVector,
+} from '../libs/Requester.js';
 import { Requester } from '../libs/index.js';
+import { ENCRYPTION_LIMITS, SECRET_UNIT } from '../constants.js';
 
 describe('Key usage', () => {
-    const doProofs = false;
+    const doProofs = true;
     const cache = Cache.FileSystem('./caches');
-    const profiler = Utils.getProfiler('key-usage', fs);
+    const profiler = Utils.getProfiler('key-usage', fs.promises);
     const logger: Utils.Logger = {
         info: true,
         error: true,
+        memoryUsage: false,
     };
-    const TX_FEE = 0.1 * 10e9;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let _: any;
     let users: Key[] = [];
     let rollupZkApp: Utils.ZkApp;
@@ -122,6 +159,10 @@ describe('Key usage', () => {
     let committeeSecrets: SecretPolynomial[] = [];
     let committeeId = Field(0);
     let keyId = Field(0);
+    let mockSecret: any;
+    const NUM_TASKS = 1;
+    const SUBMISSION_PERIOD = 1.5 * 60 * 1000; //ms
+
     let requests: {
         taskId: UInt32;
         keyIndex: Field;
@@ -135,7 +176,21 @@ describe('Key usage', () => {
         sumR: Group[];
         sumM: Group[];
         sumD: Group[];
+        accumulationRootR?: Field;
+        accumulationRootM?: Field;
+        accumulationRootD?: Field;
         result: { [key: number]: bigint };
+        encryptions: {
+            indices: number[];
+            packedIndices: Field;
+            secrets: SecretVector;
+            randoms: RandomVector;
+            nullifiers: NullifierArray;
+            R: Group[];
+            M: Group[];
+            notes: SecretNote[];
+        }[];
+        contributions: ResponseContribution[];
     }[] = [];
 
     // Address storages
@@ -151,20 +206,16 @@ describe('Key usage', () => {
     let settingStorage = new SettingStorage();
 
     // DkgContract storage
-    let keyCounterStorage = new KeyCounterStorage();
     let keyStatusStorage = new KeyStatusStorage();
     let keyStorage = new KeyStorage();
-    let dkgProcessStorage = new ProcessStorage();
 
     // Round1Contract storage
     let round1ContributionStorage = new Round1ContributionStorage();
     let publicKeyStorage = new PublicKeyStorage();
-    let round1ProcessStorage = new ProcessStorage();
 
     // Round2Contract storage
     let round2ContributionStorage = new Round2ContributionStorage();
     let encryptionStorage = new EncryptionStorage();
-    let round2ProcessStorage = new ProcessStorage();
 
     // RequesterContract storage
     let requesterKeyIndexStorage = new RequesterKeyIndexStorage();
@@ -180,14 +231,15 @@ describe('Key usage', () => {
     let resultStorage = new ResultStorage();
 
     // Response storage
-    let responseContributionStorage = new ResponseStorage();
+    let responseContributionStorage = new ResponseContributionStorage();
+    let responseStorage = new ResponseStorage();
     let responseProcessStorage = new ProcessStorage();
 
     beforeAll(async () => {
         // Prepare environment
         _ = await prepare(
             './caches',
-            { type: Network.Local, doProofs },
+            { type: Network.Lightnet, doProofs },
             {
                 aliases: [
                     'rollup',
@@ -203,7 +255,7 @@ describe('Key usage', () => {
                 ],
             }
         );
-        users = [_.accounts[0], _.accounts[1], _.accounts[2]];
+        users = [_.accounts[0], _.accounts[1]];
 
         // Prepare data for test cases
         committees = [
@@ -213,16 +265,6 @@ describe('Key usage', () => {
                     users[1].publicKey,
                 ]),
                 threshold: Field(1),
-                ipfsHash: IpfsHash.fromString(
-                    'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
-                ),
-            },
-            {
-                members: new MemberArray([
-                    users[0].publicKey,
-                    users[1].publicKey,
-                ]),
-                threshold: Field(2),
                 ipfsHash: IpfsHash.fromString(
                     'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
                 ),
@@ -245,6 +287,7 @@ describe('Key usage', () => {
                 ComputeResult,
                 UpdateTask,
                 ComputeResponse,
+                BatchDecryption,
                 FinalizeResponse,
             ],
             undefined,
@@ -257,9 +300,8 @@ describe('Key usage', () => {
                 [
                     UpdateCommittee,
                     UpdateKey,
-                    BatchEncryption,
                     FinalizeRound1,
-                    BatchDecryption,
+                    BatchEncryption,
                     FinalizeRound2,
                     RollupContract,
                     CommitteeContract,
@@ -269,6 +311,8 @@ describe('Key usage', () => {
                     RequestContract,
                     RequesterContract,
                     ResponseContract,
+                    TaskManagerContract,
+                    SubmissionContract,
                 ],
                 undefined,
                 logger
@@ -319,6 +363,10 @@ describe('Key usage', () => {
             Field(RequesterAddressBook.DKG),
             accounts.dkg.publicKey
         );
+        requesterAddressStorage.updateAddress(
+            Field(RequesterAddressBook.REQUEST),
+            accounts.request.publicKey
+        );
 
         // Calculate mock committee trees
         for (let i = 0; i < committees.length; i++) {
@@ -347,8 +395,26 @@ describe('Key usage', () => {
         let N = Number(committee.members.length);
         keys[0].round1Contributions = [];
         keys[0].round2Contributions = [];
+        let filename = `mock/secrets-${T}-${N}.json`;
+        let isMockSecretsUsed = fs.existsSync(filename);
+        console.log('Using mock secrets:', isMockSecretsUsed);
+        if (isMockSecretsUsed) {
+            mockSecret = JSON.parse(fs.readFileSync(filename, 'utf8'));
+        }
         for (let j = 0; j < N; j++) {
-            let secret = generateRandomPolynomial(T, N);
+            let secret = isMockSecretsUsed
+                ? {
+                      a: mockSecret.secrets[j].a.map((e: any) =>
+                          Scalar.from(e)
+                      ),
+                      C: mockSecret.secrets[j].C.map(
+                          (e: any) => new Group({ x: e.x, y: e.y })
+                      ),
+                      f: mockSecret.secrets[j].f.map((e: any) =>
+                          Scalar.from(e)
+                      ),
+                  }
+                : generateRandomPolynomial(T, N);
             committeeSecrets.push(secret);
             let round1Contribution = getRound1Contribution(secret);
             keys[0].round1Contributions.push(round1Contribution);
@@ -383,11 +449,14 @@ describe('Key usage', () => {
             keys[0].round1Contributions
         );
         for (let j = 0; j < N; j++) {
+            let randoms = isMockSecretsUsed
+                ? mockSecret.randoms[j]
+                : [...Array(N)].map(() => Scalar.random());
             let round2Contribution = getRound2Contribution(
                 committeeSecrets[j],
                 j,
                 keys[0].round1Contributions,
-                [...Array(N)].map(() => Scalar.random())
+                randoms
             );
             keys[0].round2Contributions.push(round2Contribution);
             round2ContributionStorage.updateRawLeaf(
@@ -433,7 +502,7 @@ describe('Key usage', () => {
         );
         keyStorage.updateRawLeaf(
             {
-                level1Index: KeyStatusStorage.calculateLevel1Index({
+                level1Index: KeyStorage.calculateLevel1Index({
                     committeeId,
                     keyId,
                 }),
@@ -464,7 +533,7 @@ describe('Key usage', () => {
             DkgContract.name,
             {
                 zkAppRoot: sharedAddressStorage.root,
-                keyStatusRoot: keyCounterStorage.root,
+                keyStatusRoot: keyStatusStorage.root,
                 keyRoot: keyStorage.root,
             }
         );
@@ -532,6 +601,20 @@ describe('Key usage', () => {
                 TokenId.derive(accounts.requester.publicKey)
             ),
         };
+        let requesterWithTaskManagerToken = {
+            ...requesterZkApp,
+            contract: new RequesterContract(
+                accounts.requester.publicKey,
+                TokenId.derive(accounts.taskmanager.publicKey)
+            ),
+        };
+        let requesterWithSubmissionToken = {
+            ...requesterZkApp,
+            contract: new RequesterContract(
+                accounts.requester.publicKey,
+                TokenId.derive(accounts.submission.publicKey)
+            ),
+        };
 
         // Deploy contract accounts
         await Utils.deployZkApps(
@@ -563,6 +646,14 @@ describe('Key usage', () => {
                     owner: requesterZkApp,
                     user: requestZkAppWithRequesterToken,
                 },
+                {
+                    owner: taskManagerZkApp,
+                    user: requesterWithTaskManagerToken,
+                },
+                {
+                    owner: submissionZkApp,
+                    user: requesterWithSubmissionToken,
+                },
             ],
             feePayer,
             true,
@@ -570,23 +661,8 @@ describe('Key usage', () => {
         );
     });
 
-    /**
-     * Test flow:
-     * - Create task
-     * - Update task
-     * - Submit encryption vectors
-     * - Accumulate submissions
-     * - Wait until submission period ends
-     * - Finalize task
-     * - Update request
-     * - Compute and submit response
-     * - Finalize response contribution
-     * - Update request
-     */
-
     it('Should create an encryption task', async () => {
         const { feePayer } = _;
-        const NUM_TASKS = 2;
         let keyIndex = calculateKeyIndex(committeeId, keyId);
         let requesterContract = requesterZkApp.contract as RequesterContract;
         let taskManagerContract =
@@ -598,7 +674,7 @@ describe('Key usage', () => {
 
         // Create task
         for (let i = 0; i < NUM_TASKS; i++) {
-            let submissionTs = UInt64.from(Date.now() + 20 * 60 * 1000);
+            let submissionTs = UInt64.from(Date.now() + SUBMISSION_PERIOD);
             await Utils.proveAndSendTx(
                 TaskManagerContract.name,
                 'createTask',
@@ -626,10 +702,18 @@ describe('Key usage', () => {
                 R: [],
                 M: [],
                 D: [],
-                sumR: [],
-                sumM: [],
-                sumD: [],
+                sumR: new Array<Group>(ENCRYPTION_LIMITS.FULL_DIMENSION).fill(
+                    Group.zero
+                ),
+                sumM: new Array<Group>(ENCRYPTION_LIMITS.FULL_DIMENSION).fill(
+                    Group.zero
+                ),
+                sumD: new Array<Group>(ENCRYPTION_LIMITS.FULL_DIMENSION).fill(
+                    Group.zero
+                ),
                 result: {},
+                encryptions: [],
+                contributions: [],
             });
             await fetchAccounts([
                 requesterZkApp.key.publicKey,
@@ -639,36 +723,39 @@ describe('Key usage', () => {
                 requesterZkApp.key.publicKey
             );
             let action = RequesterAction.fromFields(
-                actions[actions.length - 1].actions[0].map((e) => Field(e))
+                actions[i].actions[0].map((e) => Field(e))
             );
             requesterZkApp.actionStates.push(
                 requesterContract.account.actionState.get()
             );
-            requestZkApp.actions.push(RequesterAction.toFields(action));
+            requesterZkApp.actions.push(RequesterAction.toFields(action));
         }
 
         // Update task
+        let requesterCounters = RequesterCounters.fromFields([
+            requesterContract.counters.get(),
+        ]);
         let updateTaskProof = await Utils.prove(
             UpdateTask.name,
             'init',
             async () =>
                 UpdateTask.init(
                     RequesterAction.empty(),
-                    UInt32.from(0),
                     requesterContract.actionState.get(),
+                    requesterCounters.taskCounter,
                     requesterContract.keyIndexRoot.get(),
                     requesterContract.timestampRoot.get(),
                     requesterContract.accumulationRoot.get(),
-                    requesterContract.commitmentCounter.get(),
+                    requesterCounters.commitmentCounter,
                     requesterContract.commitmentRoot.get()
                 ),
             undefined,
             logger
         );
         for (let i = 0; i < NUM_TASKS; i++) {
-            let action = RequesterAction.fromFields(requestZkApp.actions[i]);
+            let action = RequesterAction.fromFields(requesterZkApp.actions[i]);
             let level1Index = RequesterKeyIndexStorage.calculateLevel1Index(
-                action.taskId.value
+                UInt32.from(i).value
             );
             updateTaskProof = await Utils.prove(
                 UpdateTask.name,
@@ -678,7 +765,8 @@ describe('Key usage', () => {
                         action,
                         updateTaskProof,
                         requesterKeyIndexStorage.getWitness(level1Index),
-                        timestampStorage.getWitness(level1Index)
+                        timestampStorage.getWitness(level1Index),
+                        requesterAccumulationStorage.getWitness(level1Index)
                     ),
                 undefined,
                 logger
@@ -690,6 +778,13 @@ describe('Key usage', () => {
                 action.keyIndex
             );
             timestampStorage.updateRawLeaf({ level1Index }, action.timestamp);
+            requesterAccumulationStorage.updateRawLeaf(
+                { level1Index },
+                {
+                    accumulationRootR: REQUEST_LEVEL_2_TREE().getRoot(),
+                    accumulationRootM: REQUEST_LEVEL_2_TREE().getRoot(),
+                }
+            );
         }
         await Utils.proveAndSendTx(
             RequesterContract.name,
@@ -706,26 +801,73 @@ describe('Key usage', () => {
     it('Should submit and accumulate encryption vectors', async () => {
         const { feePayer } = _;
         const submissions = [
-            { 0: 1000n, 3: 2000n, 15: 6000n },
-            { 0: 5000n, 45: 6000n },
-            { 3: 4000n },
+            { 0: 10n * BigInt(SECRET_UNIT), 2: 20n * BigInt(SECRET_UNIT) },
+            { 1: 25n * BigInt(SECRET_UNIT), 2: 15n * BigInt(SECRET_UNIT) },
+            { 0: 5n * BigInt(SECRET_UNIT) },
         ];
         let request = requests[0];
         let publicKey = keys[0].key || Group.zero;
         let requesterContract = requesterZkApp.contract as RequesterContract;
         let submissionContract = submissionZkApp.contract as SubmissionContract;
         await fetchAccounts([
+            dkgZkApp.key.publicKey,
             requesterZkApp.key.publicKey,
             submissionZkApp.key.publicKey,
         ]);
 
         // Submit encryptions
         for (let i = 0; i < submissions.length; i++) {
-            let encryption = Requester.generateEncryption(
-                Number(request.taskId),
-                publicKey,
-                submissions[i]
-            );
+            let submissionFile = `mock/submissions-${i}.json`;
+            let isMockCommitmentUsed = fs.existsSync(submissionFile);
+            let encryption: any;
+            if (isMockCommitmentUsed) {
+                let mockSubmission = JSON.parse(
+                    fs.readFileSync(submissionFile, 'utf8')
+                );
+                encryption = {
+                    indices: mockSubmission.indices,
+                    packedIndices: Field.from(mockSubmission.packedIndices),
+                    secrets: SecretVector.fromJSON(mockSubmission.secrets),
+                    randoms: RandomVector.fromJSON(mockSubmission.randoms),
+                    nullifiers: NullifierArray.fromJSON(
+                        mockSubmission.nullifiers
+                    ),
+                    R: mockSubmission.R.map(
+                        (e: any) => new Group({ x: e.x, y: e.y })
+                    ),
+                    M: mockSubmission.M.map(
+                        (e: any) => new Group({ x: e.x, y: e.y })
+                    ),
+                    notes: mockSubmission.notes.map(
+                        (e: any) =>
+                            new SecretNote({
+                                taskId: UInt32.from(e.taskId),
+                                index: UInt8.from(e.index.value),
+                                nullifier: Field(e.nullifier),
+                                commitment: Field(e.commitment),
+                            })
+                    ),
+                };
+            } else {
+                encryption = Requester.generateEncryption(
+                    Number(request.taskId),
+                    publicKey,
+                    submissions[i]
+                );
+                fs.writeFileSync(
+                    submissionFile,
+                    JSON.stringify({
+                        ...encryption,
+                        secrets: SecretVector.toJSON(encryption.secrets),
+                        randoms: RandomVector.toJSON(encryption.randoms),
+                        nullifiers: NullifierArray.toJSON(
+                            encryption.nullifiers
+                        ),
+                    })
+                );
+            }
+            Provable.log('Encryption:', encryption);
+            requests[0].encryptions.push(encryption);
             await Utils.proveAndSendTx(
                 SubmissionContract.name,
                 'submitEncryption',
@@ -767,120 +909,839 @@ describe('Key usage', () => {
                 requesterZkApp.key.publicKey,
                 submissionZkApp.key.publicKey,
             ]);
+            let actions = await Utils.fetchActions(
+                requesterZkApp.key.publicKey
+            );
+            let action = RequesterAction.fromFields(
+                actions[NUM_TASKS + i].actions[0].map((e) => Field(e))
+            );
+            requesterZkApp.actionStates.push(
+                requesterContract.account.actionState.get()
+            );
+            requesterZkApp.actions.push(RequesterAction.toFields(action));
         }
 
-        // Wait until the submission period ends
-        await waitUntil(Number(request.submissionTs));
+        // Accumulate submission
+        let requesterCounters = RequesterCounters.fromFields([
+            requesterContract.counters.get(),
+        ]);
+        let updateTaskProof = await Utils.prove(
+            UpdateTask.name,
+            'init',
+            async () =>
+                UpdateTask.init(
+                    RequesterAction.empty(),
+                    requesterContract.actionState.get(),
+                    requesterCounters.taskCounter,
+                    requesterContract.keyIndexRoot.get(),
+                    requesterContract.timestampRoot.get(),
+                    requesterContract.accumulationRoot.get(),
+                    requesterCounters.commitmentCounter,
+                    requesterContract.commitmentRoot.get()
+                ),
+            undefined,
+            logger
+        );
+        let actions = requesterZkApp.actions.slice(
+            NUM_TASKS,
+            NUM_TASKS + submissions.length
+        );
+        let accumulationStorageR = new GroupVectorStorage();
+        let accumulationStorageM = new GroupVectorStorage();
+        let commitmentCounter = requesterCounters.commitmentCounter;
+        for (let i = 0; i < actions.length; i++) {
+            let action = RequesterAction.fromFields(actions[i]);
+            let encryption = requests[0].encryptions[i];
+            let sumR = new GroupVector(
+                encryption.indices.map((e) => request.sumR[e])
+            );
+            let sumM = new GroupVector(
+                encryption.indices.map((e) => request.sumM[e])
+            );
+            let initialSumR = sumR.copy();
+            let initialSumM = sumM.copy();
+            let accumulationWitnessesR = new GroupVectorWitnesses();
+            let accumulationWitnessesM = new GroupVectorWitnesses();
+            let commitmentWitnesses = new CommitmentWitnesses();
+            for (let j = 0; j < ENCRYPTION_LIMITS.DIMENSION; j++) {
+                let index = encryption.indices[j];
+                // Get accumulation witnesses
+                accumulationWitnessesR.set(
+                    Field(j),
+                    accumulationStorageR.getWitness(Field(index))
+                );
+                accumulationWitnessesM.set(
+                    Field(j),
+                    accumulationStorageM.getWitness(Field(index))
+                );
+
+                // Update sum vectors
+                requests[0].sumR[index] = requests[0].sumR[index].add(
+                    encryption.R[index]
+                );
+                sumR.set(Field(j), requests[0].sumR[index]);
+                requests[0].sumM[index] = requests[0].sumM[index].add(
+                    encryption.M[index]
+                );
+                sumM.set(Field(j), requests[0].sumM[index]);
+
+                // Update accumulation storages
+                accumulationStorageR.updateRawLeaf(
+                    { level1Index: Field(index) },
+                    requests[0].sumR[index]
+                );
+                accumulationStorageM.updateRawLeaf(
+                    { level1Index: Field(index) },
+                    requests[0].sumM[index]
+                );
+
+                // Get commitment witness
+                commitmentWitnesses.set(
+                    Field(j),
+                    commitmentStorage.getWitness(commitmentCounter.value)
+                );
+
+                // Update commitment storage
+                commitmentStorage.updateRawLeaf(
+                    { level1Index: commitmentCounter.value },
+                    action.commitments.get(Field(j))
+                );
+                commitmentCounter = commitmentCounter.add(1);
+            }
+            updateTaskProof = await Utils.prove(
+                UpdateTask.name,
+                'accumulate',
+                async () =>
+                    UpdateTask.accumulate(
+                        action,
+                        updateTaskProof,
+                        initialSumR,
+                        initialSumM,
+                        requesterAccumulationStorage.getWitness(Field(0)),
+                        accumulationWitnessesR,
+                        accumulationWitnessesM,
+                        commitmentWitnesses
+                    ),
+                undefined,
+                logger
+            );
+        }
+        requests[0].accumulationRootR = accumulationStorageR.root;
+        requests[0].accumulationRootM = accumulationStorageM.root;
+        await Utils.proveAndSendTx(
+            RequesterContract.name,
+            'updateTasks',
+            async () => requesterContract.updateTasks(updateTaskProof),
+            feePayer,
+            true,
+            undefined,
+            logger
+        );
+        await fetchAccounts([requesterZkApp.key.publicKey]);
     });
 
-    // it('Create proof for requestInput1 and rollup', async () => {
-    //     console.log('Create UpdateRequest.init requestInput1...');
-    //     ActionRequestProfiler.start('UpdateRequest.init');
-    //     proof = await UpdateRequest.init(
-    //         requestContract.actionState.get(),
-    //         requestStatusMap.getRoot(),
-    //         requesterMap.getRoot()
-    //     );
-    //     ActionRequestProfiler.stop().store();
-    //     expect(proof.publicOutput.initialActionState).toEqual(
-    //         requestContract.actionState.get()
-    //     );
+    it('Should finalize task and create request', async () => {
+        const { feePayer } = _;
+        let request = requests[0];
+        let requestContract = requestZkApp.contract as RequestContract;
+        let requesterContract = requesterZkApp.contract as RequesterContract;
+        await fetchAccounts([
+            requestZkApp.key.publicKey,
+            requesterZkApp.key.publicKey,
+        ]);
 
-    //     console.log('Create UpdateRequest.nextStep requestInput1...');
-    //     ActionRequestProfiler.start('UpdateRequest.nextStep');
-    //     proof = await UpdateRequest.nextStep(
-    //         proof,
-    //         action1,
-    //         requestStatusMap.getWitness(input1.requestId()),
-    //         requesterMap.getWitness(input1.requestId()),
-    //         addresses.requester1
-    //     );
-    //     ActionRequestProfiler.stop().store();
+        // Wait until the submission period ends and finalize task
+        await waitUntil(Number(request.submissionTs));
+        let level1Index = request.taskId.value;
+        await Utils.proveAndSendTx(
+            RequesterContract.name,
+            'finalizeTask',
+            async () =>
+                requesterContract.finalizeTask(
+                    request.taskId,
+                    UInt8.from(ENCRYPTION_LIMITS.FULL_DIMENSION),
+                    request.keyIndex,
+                    request.accumulationRootR!,
+                    request.accumulationRootM!,
+                    requesterKeyIndexStorage.getWitness(level1Index),
+                    requesterAccumulationStorage.getWitness(level1Index),
+                    requesterAddressStorage.getZkAppRef(
+                        RequesterAddressBook.REQUEST,
+                        requestZkApp.key.publicKey
+                    )
+                ),
+            feePayer,
+            true,
+            undefined,
+            logger
+        );
+        await fetchAccounts([requestZkApp.key.publicKey]);
+        let actions = await Utils.fetchActions(requestZkApp.key.publicKey);
+        let action = RequestAction.fromFields(
+            actions[0].actions[0].map((e) => Field(e))
+        );
+        requestZkApp.actionStates.push(
+            requestContract.account.actionState.get()
+        );
+        requestZkApp.actions.push(RequestAction.toFields(action));
 
-    //     let tx = await Mina.transaction(feePayer, async () => {
-    //         requestContract.rollupRequest(proof);
-    //     });
-    //     await tx.prove();
-    //     await tx.sign([feePayerKey]).send();
+        // Initialize request
+        let updateRequestProof = await Utils.prove(
+            UpdateRequest.name,
+            'init',
+            async () =>
+                UpdateRequest.init(
+                    RequestAction.empty(),
+                    requestContract.requestCounter.get(),
+                    requestContract.keyIndexRoot.get(),
+                    requestContract.taskIdRoot.get(),
+                    requestContract.accumulationRoot.get(),
+                    requestContract.expirationRoot.get(),
+                    requestContract.resultRoot.get(),
+                    requestContract.actionState.get()
+                ),
+            undefined,
+            logger
+        );
+        updateRequestProof = await Utils.prove(
+            UpdateRequest.name,
+            'initialize',
+            async () =>
+                UpdateRequest.initialize(
+                    action,
+                    updateRequestProof,
+                    requestKeyIndexStorage.getWitness(Field(0)),
+                    taskIdStorage.getWitness(Field(0)),
+                    requestAccumulationStorage.getWitness(Field(0)),
+                    expirationStorage.getWitness(Field(0))
+                ),
+            undefined,
+            logger
+        );
+        requestKeyIndexStorage.updateRawLeaf(
+            {
+                level1Index: Field(0),
+            },
+            request.keyIndex
+        );
+        taskIdStorage.updateRawLeaf(
+            {
+                level1Index: Field(0),
+            },
+            {
+                requester: request.requester,
+                taskId: request.taskId,
+            }
+        );
+        requestAccumulationStorage.updateRawLeaf(
+            {
+                level1Index: Field(0),
+            },
+            {
+                accumulationRootR: request.accumulationRootR!,
+                accumulationRootM: request.accumulationRootM!,
+                dimension: UInt32.from(ENCRYPTION_LIMITS.FULL_DIMENSION),
+            }
+        );
+        expirationStorage.updateRawLeaf(
+            {
+                level1Index: Field(0),
+            },
+            action.expirationTimestamp
+        );
+        await Utils.proveAndSendTx(
+            RequestContract.name,
+            'update',
+            async () => requestContract.update(updateRequestProof),
+            feePayer,
+            true,
+            undefined,
+            logger
+        );
+        await fetchAccounts([requestZkApp.key.publicKey]);
+    });
 
-    //     ////// update local state:
-    //     requesterMap.set(
-    //         input1.requestId(),
-    //         Poseidon.hash(PublicKey.toFields(addresses.requester1))
-    //     );
-    //     // turn to request state
-    //     requestStatusMap.set(
-    //         input1.requestId(),
-    //         Field(RequestStatusEnum.REQUESTING)
-    //     );
-    // });
+    it('Should contribute response and resolve request', async () => {
+        const { feePayer } = _;
+        let committee = committees[Number(committeeId)];
+        let T = Number(committee.threshold);
+        let N = Number(committee.members.length);
+        let request = requests[0];
+        let requestContract = requestZkApp.contract as RequestContract;
+        let responseContract = responseZkApp.contract as ResponseContract;
+        let rollupContract = rollupZkApp.contract as RollupContract;
+        await fetchAccounts([
+            requestZkApp.key.publicKey,
+            responseZkApp.key.publicKey,
+            rollupZkApp.key.publicKey,
+        ]);
 
-    // it('Respone contract send requestInput2', async () => {
-    //     console.log(
-    //         'Contract actionState last: ',
-    //         requestContract.actionState.get()
-    //     );
-    //     console.log('Contract action before responsee: ');
-    //     await Mina.fetchActions(addresses.request).then((actions) => {
-    //         Provable.log(actions);
-    //         if (Array.isArray(actions)) {
-    //             for (let action of actions) {
-    //                 Provable.log(
-    //                     'requestAction: ',
-    //                     RequestAction.fromFields(
-    //                         action.actions[0].map((e) => Field(e))
-    //                     )
-    //                 );
-    //             }
-    //         }
-    //     });
-    //     console.log('Respone contract send requestInput2');
-    //     let balanceBefore = Number(Account(addresses.response).balance.get());
-    //     let tx = await Mina.transaction(feePayer, async () => {
-    //         responseContract.resolve(addresses.request, input2);
-    //     });
-    //     await tx.prove();
-    //     await tx.sign([feePayerKey]).send();
-    //     let balanceAfter = Number(Account(addresses.response).balance.get());
-    //     expect(balanceAfter - balanceBefore).toEqual(Number(RequestFee)); // resolved earn fee
-    // });
+        // Prepare accumulation storage for R and M
+        let accumulationStorageR = new GroupVectorStorage();
+        let accumulationStorageM = new GroupVectorStorage();
+        for (let i = 0; i < ENCRYPTION_LIMITS.FULL_DIMENSION; i++) {
+            if (request.sumR[i].equals(Group.zero).not().toBoolean()) {
+                accumulationStorageR.updateRawLeaf(
+                    { level1Index: Field(i) },
+                    request.sumR[i]
+                );
+                accumulationStorageM.updateRawLeaf(
+                    { level1Index: Field(i) },
+                    request.sumM[i]
+                );
+            }
+        }
 
-    // it('Create proof for requestInput2 and rollup', async () => {
-    //     console.log('Create proof for requestInput2 and rollup');
-    //     proof = await UpdateRequest.init(
-    //         requestContract.actionState.get(),
-    //         requestStatusMap.getRoot(),
-    //         requesterMap.getRoot()
-    //     );
+        let responseStoragesD: GroupVectorStorage[] = [];
+        for (let i = 0; i < T; i++) {
+            let memberId = i;
+            let responseStorageD = new GroupVectorStorage();
+            // Generate decryption proof for secret shares
+            let c = new cArray(
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                keys[0].round2Contributions!.map((e) =>
+                    e.c.get(Field(memberId))
+                )
+            );
+            let U = new UArray(
+                keys[0].round2Contributions!.map((e) =>
+                    e.U.get(Field(memberId))
+                )
+            );
+            let decryptionProof = await Utils.prove(
+                BatchDecryption.name,
+                'decrypt',
+                async () =>
+                    BatchDecryption.decrypt(
+                        new BatchDecryptionInput({
+                            publicKey: committeeSecrets[memberId].C[0],
+                            c,
+                            U,
+                            memberId: Field(memberId),
+                        }),
+                        new PlainArray(
+                            committeeSecrets.map((e) =>
+                                CustomScalar.fromScalar(e.f[memberId])
+                            )
+                        ),
+                        committeeSecrets[memberId].a[0]
+                    ),
+                undefined,
+                logger
+            );
 
-    //     Provable.log(
-    //         'proof.publicOutput.finalActionState: ',
-    //         proof.publicOutput.finalActionState
-    //     );
+            // Get response contribution
+            let round2Data: Round2Data[] = keys[0].round2Contributions!.map(
+                (e) =>
+                    ({
+                        c: e.c.get(Field(memberId)),
+                        U: e.U.get(Field(memberId)),
+                    } as Round2Data)
+            );
+            let [contribution, ski] = getResponseContribution(
+                committeeSecrets[memberId],
+                i,
+                round2Data,
+                requests[0].sumR
+            );
+            requests[0].contributions.push(contribution);
 
-    //     console.log('Create UpdateRequest.nextStep requestInput2...');
-    //     proof = await UpdateRequest.nextStep(
-    //         proof,
-    //         action2,
-    //         requestStatusMap.getWitness(input2.requestId),
-    //         requesterMap.getWitness(input2.requestId),
-    //         addresses.requester1
-    //     );
+            // Generate compute response proof
+            let computeResponseProof = await Utils.prove(
+                ComputeResponse.name,
+                'init',
+                async () =>
+                    ComputeResponse.init(
+                        accumulationStorageR.root,
+                        CustomScalar.fromScalar(ski)
+                    ),
+                undefined,
+                logger
+            );
+            for (let j = 0; j < ENCRYPTION_LIMITS.FULL_DIMENSION; j++) {
+                computeResponseProof = await Utils.prove(
+                    ComputeResponse.name,
+                    'compute',
+                    async () =>
+                        ComputeResponse.compute(
+                            computeResponseProof,
+                            CustomScalar.fromScalar(ski),
+                            request.sumR[j],
+                            accumulationStorageR.getWitness(Field(j)),
+                            responseStorageD.getWitness(Field(j))
+                        ),
+                    undefined,
+                    logger
+                );
+                responseStorageD.updateRawLeaf(
+                    {
+                        level1Index: Field(j),
+                    },
+                    request.sumR[j]
+                        .add(Group.generator)
+                        .scale(ski)
+                        .sub(decryptionProof.publicOutput)
+                );
+            }
+            responseStoragesD.push(responseStorageD);
 
-    //     ////// update local state:
-    //     // requesterMap doesnt change
-    //     // update request status state
-    //     requestStatusMap.set(input2.requestId, action2.hashD());
+            let action = new ResponseAction({
+                committeeId,
+                keyId,
+                memberId: Field(memberId),
+                requestId: Field(0),
+                dimension: UInt8.from(ENCRYPTION_LIMITS.FULL_DIMENSION),
+                responseRootD: responseStorageD.root,
+            });
 
-    //     let balanceBefore = Number(Account(addresses.response).balance.get());
-    //     // rollUp
-    //     console.log('Rollup requestInput2...');
-    //     let tx = await Mina.transaction(feePayer, async () => {
-    //         requestContract.rollupRequest(proof);
-    //     });
-    //     await tx.prove();
-    //     await tx.sign([feePayerKey]).send();
-    //     let balanceAfter = Number(Account(addresses.response).balance.get());
-    //     expect(balanceAfter - balanceBefore).toEqual(Number(0));
-    // });
+            let memberWitness = memberStorage.getWitness(
+                MemberStorage.calculateLevel1Index(committeeId),
+                MemberStorage.calculateLevel2Index(Field(memberId))
+            );
+
+            await Utils.proveAndSendTx(
+                ResponseContract.name,
+                'contribute',
+                async () =>
+                    responseContract.contribute(
+                        decryptionProof,
+                        computeResponseProof,
+                        keyId,
+                        Field(0),
+                        accumulationStorageM.root,
+                        memberWitness,
+                        publicKeyStorage.getWitness(
+                            PublicKeyStorage.calculateLevel1Index({
+                                committeeId,
+                                keyId,
+                            }),
+                            PublicKeyStorage.calculateLevel2Index(Field(i))
+                        ),
+                        encryptionStorage.getWitness(
+                            EncryptionStorage.calculateLevel1Index({
+                                committeeId,
+                                keyId,
+                            }),
+                            EncryptionStorage.calculateLevel2Index(Field(i))
+                        ),
+                        requestAccumulationStorage.getWitness(Field(0)),
+                        sharedAddressStorage.getZkAppRef(
+                            ZkAppIndex.COMMITTEE,
+                            committeeZkApp.key.publicKey
+                        ),
+                        sharedAddressStorage.getZkAppRef(
+                            ZkAppIndex.ROUND1,
+                            round1ZkApp.key.publicKey
+                        ),
+                        sharedAddressStorage.getZkAppRef(
+                            ZkAppIndex.ROUND2,
+                            round2ZkApp.key.publicKey
+                        ),
+                        sharedAddressStorage.getZkAppRef(
+                            ZkAppIndex.REQUEST,
+                            requestZkApp.key.publicKey
+                        ),
+                        sharedAddressStorage.getZkAppRef(
+                            ZkAppIndex.ROLLUP,
+                            rollupZkApp.key.publicKey
+                        ),
+                        sharedAddressStorage.getZkAppRef(
+                            ZkAppIndex.RESPONSE,
+                            responseZkApp.key.publicKey
+                        )
+                    ),
+                feePayer,
+                true,
+                undefined,
+                logger
+            );
+            await fetchAccounts([
+                responseZkApp.key.publicKey,
+                rollupZkApp.key.publicKey,
+            ]);
+            let rollupAction = new RollupAction({
+                zkAppIndex: Field(ZkAppIndex.RESPONSE),
+                actionHash: action.hash(),
+            });
+            responseZkApp.actionStates.push(
+                responseContract.account.actionState.get()
+            );
+            responseZkApp.actions.push(ResponseAction.toFields(action));
+            rollupZkApp.actionStates.push(
+                rollupContract.account.actionState.get()
+            );
+            rollupZkApp.actions.push(RollupAction.toFields(rollupAction));
+        }
+
+        // Rollup dkg action
+        let rollupProof = await Utils.prove(
+            Rollup.name,
+            'init',
+            async () =>
+                Rollup.init(
+                    RollupAction.empty(),
+                    rollupContract.counterRoot.get(),
+                    rollupContract.rollupRoot.get(),
+                    rollupContract.actionState.get()
+                ),
+            undefined,
+            logger
+        );
+        for (let i = 0; i < T; i++) {
+            let action = RollupAction.fromFields(rollupZkApp.actions[i]);
+            rollupProof = await Utils.prove(
+                Rollup.name,
+                'rollup',
+                async () =>
+                    Rollup.rollup(
+                        action,
+                        rollupProof,
+                        Field(i),
+                        rollupCounterStorage.getWitness(
+                            RollupCounterStorage.calculateLevel1Index(
+                                Field(ZkAppIndex.RESPONSE)
+                            )
+                        ),
+                        rollupStorage.getWitness(
+                            RollupStorage.calculateLevel1Index({
+                                zkAppIndex: Field(ZkAppIndex.RESPONSE),
+                                actionId: Field(i),
+                            })
+                        )
+                    ),
+                undefined,
+                logger
+            );
+            rollupCounterStorage.updateRawLeaf(
+                {
+                    level1Index: RollupCounterStorage.calculateLevel1Index(
+                        Field(ZkAppIndex.RESPONSE)
+                    ),
+                },
+                Field(i + 1)
+            );
+            rollupStorage.updateRawLeaf(
+                {
+                    level1Index: RollupStorage.calculateLevel1Index({
+                        zkAppIndex: Field(ZkAppIndex.RESPONSE),
+                        actionId: Field(i),
+                    }),
+                },
+                action.actionHash
+            );
+        }
+        await Utils.proveAndSendTx(
+            RollupContract.name,
+            'rollup',
+            async () => rollupContract.rollup(rollupProof),
+            feePayer,
+            true,
+            undefined,
+            logger
+        );
+        await fetchAccounts([rollupZkApp.key.publicKey]);
+
+        // Finalize response contributions
+        let finalizeResponseProof = await Utils.prove(
+            FinalizeResponse.name,
+            'init',
+            async () =>
+                FinalizeResponse.init(
+                    new FinalizeResponseInput({
+                        previousActionState: Field(0),
+                        action: ResponseAction.empty(),
+                        actionId: Field(0),
+                    }),
+                    Field(T),
+                    Field(N),
+                    UInt8.from(ENCRYPTION_LIMITS.FULL_DIMENSION),
+                    Field(0),
+                    Field(0),
+                    responseContract.contributionRoot.get(),
+                    responseContract.processRoot.get(),
+                    rollupContract.rollupRoot.get(),
+                    responseContributionStorage.getLevel1Witness(Field(0))
+                ),
+            undefined,
+            logger
+        );
+        responseContributionStorage.updateInternal(
+            Field(0),
+            DKG_LEVEL_2_TREE()
+        );
+        responseStorage.updateRawLeaf(
+            { level1Index: Field(0) },
+            REQUEST_LEVEL_2_TREE().getRoot()
+        );
+
+        for (let i = 0; i < T; i++) {
+            let action = ResponseAction.fromFields(responseZkApp.actions[i]);
+            let actionId = Field(i);
+            finalizeResponseProof = await Utils.prove(
+                FinalizeResponse.name,
+                'contribute',
+                async () =>
+                    FinalizeResponse.contribute(
+                        new FinalizeResponseInput({
+                            previousActionState: responseZkApp.actionStates[i],
+                            action,
+                            actionId,
+                        }),
+                        finalizeResponseProof,
+                        responseContributionStorage.getWitness(
+                            Field(0),
+                            Field(i)
+                        ),
+                        rollupStorage.getWitness(
+                            RollupStorage.calculateLevel1Index({
+                                zkAppIndex: Field(ZkAppIndex.RESPONSE),
+                                actionId,
+                            })
+                        ),
+                        responseProcessStorage.getWitness(
+                            ProcessStorage.calculateIndex(actionId)
+                        )
+                    ),
+                undefined,
+                logger
+            );
+            responseContributionStorage.updateRawLeaf(
+                {
+                    level1Index: Field(0),
+                    level2Index: Field(i),
+                },
+                action.responseRootD
+            );
+            responseProcessStorage.updateRawLeaf(
+                {
+                    level1Index: ProcessStorage.calculateLevel1Index(actionId),
+                },
+                {
+                    actionState: responseZkApp.actionStates[i + 1],
+                    processId: UInt8.from(0),
+                }
+            );
+        }
+        let responseStorageD = new GroupVectorStorage();
+        let sumD = accumulateResponses(
+            [...Array(T).keys()],
+            request.contributions.map((e) => e.D.values)
+        );
+        for (let i = 0; i < request.sumR.length; i++) {
+            for (let j = 0; j < T; j++) {
+                let action = ResponseAction.fromFields(
+                    responseZkApp.actions[j]
+                );
+                let actionId = Field(j);
+                finalizeResponseProof = await Utils.prove(
+                    FinalizeResponse.name,
+                    'compute',
+                    async () =>
+                        FinalizeResponse.compute(
+                            new FinalizeResponseInput({
+                                previousActionState:
+                                    responseZkApp.actionStates[j],
+                                action,
+                                actionId,
+                            }),
+                            finalizeResponseProof,
+                            request.contributions[j].D.get(Field(i)),
+                            responseStoragesD[j].getWitness(Field(i)),
+                            responseProcessStorage.getWitness(
+                                ProcessStorage.calculateIndex(actionId)
+                            )
+                        ),
+                    undefined,
+                    logger
+                );
+                responseProcessStorage.updateRawLeaf(
+                    {
+                        level1Index:
+                            ProcessStorage.calculateLevel1Index(actionId),
+                    },
+                    {
+                        actionState: responseZkApp.actionStates[j + 1],
+                        processId: UInt8.from(i + 1),
+                    }
+                );
+            }
+            requests[0].sumD[i] = sumD[i];
+            finalizeResponseProof = await Utils.prove(
+                FinalizeResponse.name,
+                'finalize',
+                async () =>
+                    FinalizeResponse.finalize(
+                        new FinalizeResponseInput({
+                            previousActionState: Field(0),
+                            action: ResponseAction.empty(),
+                            actionId: Field(0),
+                        }),
+                        finalizeResponseProof,
+                        responseStorageD.getWitness(Field(i))
+                    ),
+                undefined,
+                logger
+            );
+            responseStorageD.updateRawLeaf(
+                { level1Index: Field(i) },
+                requests[0].sumD[i]
+            );
+        }
+        await Utils.proveAndSendTx(
+            ResponseContract.name,
+            'finalize',
+            async () =>
+                responseContract.finalize(
+                    finalizeResponseProof,
+                    settingStorage.getWitness(committeeId),
+                    requestKeyIndexStorage.getWitness(Field(0)),
+                    responseStorage.getWitness(Field(0)),
+                    sharedAddressStorage.getZkAppRef(
+                        ZkAppIndex.COMMITTEE,
+                        committeeZkApp.key.publicKey
+                    ),
+                    sharedAddressStorage.getZkAppRef(
+                        ZkAppIndex.REQUEST,
+                        requestZkApp.key.publicKey
+                    ),
+                    sharedAddressStorage.getZkAppRef(
+                        ZkAppIndex.ROLLUP,
+                        rollupZkApp.key.publicKey
+                    )
+                ),
+            feePayer,
+            true,
+            undefined,
+            logger
+        );
+        await fetchAccounts([responseZkApp.key.publicKey]);
+
+        // Resolve request
+        let rawResultStorage = new ScalarVectorStorage();
+        let rawResult = bruteForceResultVector(
+            getResultVector(requests[0].sumD, requests[0].sumM)
+        );
+        for (let i = 0; i < ENCRYPTION_LIMITS.FULL_DIMENSION; i++) {
+            rawResultStorage.updateRawLeaf(
+                { level1Index: Field(i) },
+                rawResult[i]
+            );
+        }
+        let computeResultProof = await Utils.prove(
+            ComputeResult.name,
+            'init',
+            async () =>
+                ComputeResult.init(
+                    new ComputeResultInput({
+                        M: Group.zero,
+                        D: Group.zero,
+                        result: Scalar.from(0),
+                    }),
+                    accumulationStorageM.root,
+                    responseStorageD.root,
+                    rawResultStorage.root
+                ),
+            undefined,
+            logger
+        );
+        for (let i = 0; i < ENCRYPTION_LIMITS.FULL_DIMENSION; i++) {
+            let sumMi = requests[0].sumM[i];
+            let sumDi = requests[0].sumD[i];
+            let result = rawResult[i];
+            computeResultProof = await Utils.prove(
+                ComputeResult.name,
+                'compute',
+                async () =>
+                    ComputeResult.compute(
+                        new ComputeResultInput({
+                            M: sumMi,
+                            D: sumDi,
+                            result,
+                        }),
+                        computeResultProof,
+                        accumulationStorageM.getWitness(Field(i)),
+                        responseStorageD.getWitness(Field(i)),
+                        rawResultStorage.getWitness(Field(i))
+                    ),
+                undefined,
+                logger
+            );
+        }
+        await Utils.proveAndSendTx(
+            RequestContract.name,
+            'resolve',
+            async () =>
+                requestContract.resolve(
+                    computeResultProof,
+                    request.expirationTs,
+                    accumulationStorageR.root,
+                    expirationStorage.getWitness(Field(0)),
+                    requestAccumulationStorage.getWitness(Field(0)),
+                    responseStorage.getWitness(Field(0)),
+                    resultStorage.getWitness(Field(0)),
+                    sharedAddressStorage.getZkAppRef(
+                        ZkAppIndex.RESPONSE,
+                        responseZkApp.key.publicKey
+                    )
+                ),
+            feePayer,
+            true,
+            undefined,
+            logger
+        );
+        await fetchAccounts([requestZkApp.key.publicKey]);
+        let action = new RequestAction({
+            ...RequestAction.empty(),
+            requestId: Field(0),
+            resultRoot: computeResultProof.publicOutput.resultRoot,
+        });
+        requestZkApp.actionStates.push(
+            requestContract.account.actionState.get()
+        );
+        requestZkApp.actions.push(RequestAction.toFields(action));
+
+        let updateRequestProof = await Utils.prove(
+            UpdateRequest.name,
+            'init',
+            async () =>
+                UpdateRequest.init(
+                    RequestAction.empty(),
+                    requestContract.requestCounter.get(),
+                    requestContract.keyIndexRoot.get(),
+                    requestContract.taskIdRoot.get(),
+                    requestContract.accumulationRoot.get(),
+                    requestContract.expirationRoot.get(),
+                    requestContract.resultRoot.get(),
+                    requestContract.actionState.get()
+                ),
+            undefined,
+            logger
+        );
+        updateRequestProof = await Utils.prove(
+            UpdateRequest.name,
+            'resolve',
+            async () =>
+                UpdateRequest.resolve(
+                    action,
+                    updateRequestProof,
+                    resultStorage.getWitness(Field(0))
+                ),
+            undefined,
+            logger
+        );
+        resultStorage.updateRawLeaf(
+            { level1Index: Field(0) },
+            computeResultProof.publicOutput.resultRoot
+        );
+        await Utils.proveAndSendTx(
+            RequestContract.name,
+            'update',
+            async () => requestContract.update(updateRequestProof),
+            feePayer,
+            true,
+            undefined,
+            logger
+        );
+        await fetchAccounts([requestZkApp.key.publicKey]);
+    });
 });

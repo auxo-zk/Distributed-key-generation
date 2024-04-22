@@ -226,7 +226,6 @@ const BatchDecryption = ZkProgram({
                     kBits.push(Bool(false));
                     let kBitsPadded = Bit255.fromBits(kBits);
                     let decrypted = Bit255.xor(kBitsPadded, cipher);
-
                     Provable.if(
                         input.memberId
                             .equals(iField)
@@ -243,8 +242,7 @@ const BatchDecryption = ZkProgram({
                             ErrorEnum.ELGAMAL_DECRYPTION
                         )
                     );
-
-                    ski.add(Group.generator.scale(decrypted.toScalar()));
+                    ski = ski.add(Group.generator.scale(plain.toScalar()));
                 }
                 return ski;
             },

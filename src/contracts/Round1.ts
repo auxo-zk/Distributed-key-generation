@@ -463,6 +463,7 @@ class Round1Contract extends SmartContract {
         const committeeContract = new CommitteeContract(committee.address);
         const rollupContract = new RollupContract(rollup.address);
 
+        // FIXME - "Option.value_exn None" error
         // Verify keyId
         // keyId.assertLessThanOrEqual(
         //     INSTANCE_LIMITS.KEY,

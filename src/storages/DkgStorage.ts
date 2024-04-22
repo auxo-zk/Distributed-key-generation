@@ -13,6 +13,7 @@ import { FieldDynamicArray } from '@auxo-dev/auxo-libs';
 import {
     REQUEST_LEVEL_1_TREE,
     REQUEST_LEVEL_1_WITNESS,
+    RequestLevel1Witness,
 } from './RequestStorage.js';
 
 export {
@@ -26,6 +27,7 @@ export {
     Level2MT as DkgLevel2MT,
     Level2Witness as DkgLevel2Witness,
     FullMTWitness as DKGWitness,
+    ResponseContributionWitness,
     ProcessedContributions,
 };
 
@@ -615,11 +617,16 @@ class EncryptionStorage extends GenericStorage<EncryptionLeaf> {
 }
 
 type ResponseContributionLeaf = Field;
+class ResponseContributionWitness extends Struct({
+    level1: RequestLevel1Witness,
+    level2: Level2Witness,
+}) {}
 
 class ResponseContributionStorage extends GenericStorage<ResponseContributionLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
+            level2Index: Field;
             leaf: ResponseContributionLeaf | Field;
             isRaw: boolean;
         }[]
@@ -657,8 +664,8 @@ class ResponseContributionStorage extends GenericStorage<ResponseContributionLea
         return ResponseContributionStorage.calculateLevel2Index(memberId);
     }
 
-    getLevel1Witness(level1Index: Field): Level1Witness {
-        return super.getLevel1Witness(level1Index) as Level1Witness;
+    getLevel1Witness(level1Index: Field): RequestLevel1Witness {
+        return super.getLevel1Witness(level1Index) as RequestLevel1Witness;
     }
 
     getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
@@ -668,8 +675,14 @@ class ResponseContributionStorage extends GenericStorage<ResponseContributionLea
         ) as Level2Witness;
     }
 
-    getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
-        return super.getWitness(level1Index, level2Index) as FullMTWitness;
+    getWitness(
+        level1Index: Field,
+        level2Index: Field
+    ): ResponseContributionWitness {
+        return super.getWitness(
+            level1Index,
+            level2Index
+        ) as ResponseContributionWitness;
     }
 
     updateLeaf(
@@ -703,8 +716,8 @@ class ResponseStorage extends GenericStorage<ResponseLeaf> {
         }[]
     ) {
         super(
-            DKG_LEVEL_1_TREE,
-            DKG_LEVEL_1_WITNESS,
+            REQUEST_LEVEL_1_TREE,
+            REQUEST_LEVEL_1_WITNESS,
             undefined,
             undefined,
             leafs
@@ -735,10 +748,7 @@ class ResponseStorage extends GenericStorage<ResponseLeaf> {
         return super.getWitness(level1Index) as Level1Witness;
     }
 
-    updateLeafWithR(
-        { level1Index }: { level1Index: Field },
-        leaf: Field
-    ): void {
+    updateLeaf1({ level1Index }: { level1Index: Field }, leaf: Field): void {
         super.updateLeaf({ level1Index }, leaf);
     }
 

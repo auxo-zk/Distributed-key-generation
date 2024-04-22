@@ -37,6 +37,7 @@ export {
     ExpirationStorage,
     ResultLeaf,
     ResultStorage,
+    GroupVector,
     GroupVectorLeaf,
     GroupVectorStorage,
     GroupVectorWitnesses,
@@ -340,6 +341,7 @@ class AccumulationStorage extends GenericStorage<AccumulationLeaf> {
 }
 
 type GroupVectorLeaf = Group;
+class GroupVector extends StaticArray(Group, ENCRYPTION_LIMITS.DIMENSION) {}
 class GroupVectorWitnesses extends StaticArray(
     Level2Witness,
     ENCRYPTION_LIMITS.DIMENSION
@@ -348,7 +350,6 @@ class GroupVectorStorage extends GenericStorage<GroupVectorLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
-            level2Index: Field;
             leaf: GroupVectorLeaf | Field;
             isRaw: boolean;
         }[]
@@ -382,10 +383,7 @@ class GroupVectorStorage extends GenericStorage<GroupVectorLeaf> {
         return super.getWitness(level1Index) as Level2Witness;
     }
 
-    updateLeafWithR(
-        { level1Index }: { level1Index: Field },
-        leaf: Field
-    ): void {
+    updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
         super.updateLeaf({ level1Index }, leaf);
     }
 
@@ -440,10 +438,7 @@ class ScalarVectorStorage extends GenericStorage<ScalarVectorLeaf> {
         return super.getWitness(level1Index) as Level2Witness;
     }
 
-    updateLeafWithR(
-        { level1Index }: { level1Index: Field },
-        leaf: Field
-    ): void {
+    updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
         super.updateLeaf({ level1Index }, leaf);
     }
 

@@ -1,16 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
-import fs from 'fs/promises';
-import {
-    AccountUpdate,
-    Cache,
-    Field,
-    Group,
-    Provable,
-    Scalar,
-    TokenId,
-    UInt8,
-} from 'o1js';
+import { Cache, Field, Group, Provable, Scalar, TokenId, UInt8 } from 'o1js';
 import { CustomScalar, IpfsHash, Utils } from '@auxo-dev/auxo-libs';
 import { CommitteeContract, UpdateCommittee } from '../contracts/Committee.js';
 import {
@@ -35,7 +23,6 @@ import {
     FinalizeRound2Input,
 } from '../contracts/Round2.js';
 import {
-    BatchDecryption,
     BatchEncryption,
     BatchEncryptionInput,
     PlainArray,
@@ -90,8 +77,8 @@ describe('Key generation', () => {
         error: true,
         memoryUsage: false,
     };
-    const TX_FEE = 0.1 * 10e9;
     const NUM_KEYS = 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let _: any;
     let users: Key[] = [];
     let rollupZkApp: Utils.ZkApp;
@@ -182,10 +169,9 @@ describe('Key generation', () => {
             [
                 Rollup,
                 UpdateKey,
-                BatchEncryption,
                 FinalizeRound1,
-                BatchDecryption,
                 FinalizeRound2,
+                BatchEncryption,
             ],
             undefined,
             logger
@@ -327,7 +313,7 @@ describe('Key generation', () => {
         // Deploy contract accounts
         await Utils.deployZkApps(
             [rollupZkApp, committeeZkApp, dkgZkApp, round1ZkApp, round2ZkApp],
-            _.feePayer,
+            feePayer,
             true,
             logger
         );
@@ -356,7 +342,7 @@ describe('Key generation', () => {
                     user: dkgZkAppWithRound2Token,
                 },
             ],
-            _.feePayer,
+            feePayer,
             true,
             logger
         );
@@ -457,8 +443,8 @@ describe('Key generation', () => {
             profiler,
             logger
         );
-        for (let i = 0; i < rollupZkApp.actions!.length; i++) {
-            let action = RollupAction.fromFields(rollupZkApp.actions![i]);
+        for (let i = 0; i < rollupZkApp.actions.length; i++) {
+            let action = RollupAction.fromFields(rollupZkApp.actions[i]);
             rollupProof = await Utils.prove(
                 Rollup.name,
                 'rollup',
@@ -532,11 +518,11 @@ describe('Key generation', () => {
             logger
         );
         for (let i = 0; i < NUM_KEYS; i++) {
-            let action = DkgAction.fromFields(dkgZkApp.actions![i]);
+            let action = DkgAction.fromFields(dkgZkApp.actions[i]);
             let actionId = Field(i);
             let keyId = Field(i);
             let input = new UpdateKeyInput({
-                previousActionState: dkgZkApp.actionStates![i],
+                previousActionState: dkgZkApp.actionStates[i],
                 action,
                 actionId,
             });
@@ -599,7 +585,7 @@ describe('Key generation', () => {
                     level1Index: ProcessStorage.calculateLevel1Index(actionId),
                 },
                 {
-                    actionState: dkgZkApp.actionStates![i + 1],
+                    actionState: dkgZkApp.actionStates[i + 1],
                     processId: UInt8.from(0),
                 }
             );
@@ -702,10 +688,10 @@ describe('Key generation', () => {
             rollupZkApp.actionStates?.push(
                 rollupContract.account.actionState.get()
             );
-            keys[Number(keyId)].round1Contributions!.push(contribution);
+            keys[Number(keyId)].round1Contributions?.push(contribution);
         }
         keys[Number(keyId)].key = calculatePublicKey(
-            keys[Number(keyId)].round1Contributions!
+            keys[Number(keyId)].round1Contributions || []
         );
 
         // Rollup round 1 actions
@@ -723,8 +709,8 @@ describe('Key generation', () => {
             logger
         );
         let actions = rollupZkApp.actions?.slice(NUM_KEYS, NUM_KEYS + N);
-        for (let i = 0; i < actions!.length; i++) {
-            let action = RollupAction.fromFields(actions![i]);
+        for (let i = 0; i < actions.length; i++) {
+            let action = RollupAction.fromFields(actions[i]);
             rollupProof = await Utils.prove(
                 Rollup.name,
                 'rollup',
@@ -829,7 +815,7 @@ describe('Key generation', () => {
             DKG_LEVEL_2_TREE()
         );
         for (let i = 0; i < N; i++) {
-            let action = Round1Action.fromFields(round1ZkApp.actions![i]);
+            let action = Round1Action.fromFields(round1ZkApp.actions[i]);
             let actionId = Field(i);
             finalizeProof = await Utils.prove(
                 FinalizeRound1.name,
@@ -837,7 +823,7 @@ describe('Key generation', () => {
                 async () =>
                     FinalizeRound1.contribute(
                         new FinalizeRound1Input({
-                            previousActionState: round1ZkApp.actionStates![i],
+                            previousActionState: round1ZkApp.actionStates[i],
                             action,
                             actionId,
                         }),
@@ -902,12 +888,13 @@ describe('Key generation', () => {
                     level1Index: ProcessStorage.calculateLevel1Index(actionId),
                 },
                 {
-                    actionState: round1ZkApp.actionStates![i + 1],
+                    actionState: round1ZkApp.actionStates[i + 1],
                     processId: UInt8.from(0),
                 }
             );
         }
         finalizeProof.publicOutput.publicKey.assertEquals(
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             keys[Number(keyId)].key!
         );
         await Utils.proveAndSendTx(
@@ -963,12 +950,10 @@ describe('Key generation', () => {
             zkAppIndex: Field(ZkAppIndex.DKG),
             actionHash: action.hash(),
         });
-        dkgZkApp.actionStates!.push(dkgContract.account.actionState.get());
-        dkgZkApp.actions!.push(DkgAction.toFields(action));
-        rollupZkApp.actionStates!.push(
-            rollupContract.account.actionState.get()
-        );
-        rollupZkApp.actions!.push(RollupAction.toFields(rollupAction));
+        dkgZkApp.actionStates.push(dkgContract.account.actionState.get());
+        dkgZkApp.actions.push(DkgAction.toFields(action));
+        rollupZkApp.actionStates.push(rollupContract.account.actionState.get());
+        rollupZkApp.actions.push(RollupAction.toFields(rollupAction));
 
         // Rollup dkg action
         rollupProof = await Utils.prove(Rollup.name, 'init', async () =>
@@ -1050,7 +1035,7 @@ describe('Key generation', () => {
         );
 
         let input = new UpdateKeyInput({
-            previousActionState: dkgZkApp.actionStates![NUM_KEYS],
+            previousActionState: dkgZkApp.actionStates[NUM_KEYS],
             action,
             actionId,
         });
@@ -1107,6 +1092,7 @@ describe('Key generation', () => {
                     keyId: action.keyId,
                 }),
             },
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             keys[Number(keyId)].key!
         );
         dkgProcessStorage.updateRawLeaf(
@@ -1114,7 +1100,7 @@ describe('Key generation', () => {
                 level1Index: ProcessStorage.calculateLevel1Index(actionId),
             },
             {
-                actionState: dkgZkApp.actionStates![Number(actionId) + 1],
+                actionState: dkgZkApp.actionStates[Number(actionId) + 1],
                 processId: UInt8.from(0),
             }
         );
@@ -1153,6 +1139,7 @@ describe('Key generation', () => {
         ]);
         let T = Number(committee.threshold);
         let N = Number(committee.members.length);
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         let round1Contributions = keys[Number(keyId)].round1Contributions!;
         keys[Number(keyId)].round2Contributions = [];
 
@@ -1245,14 +1232,14 @@ describe('Key generation', () => {
                 round2ZkApp.key.publicKey,
                 rollupZkApp.key.publicKey,
             ]);
-            round2ZkApp.actionStates!.push(
+            round2ZkApp.actionStates.push(
                 round2Contract.account.actionState.get()
             );
-            round2ZkApp.actions!.push(Round2Action.toFields(action));
-            rollupZkApp.actionStates!.push(
+            round2ZkApp.actions.push(Round2Action.toFields(action));
+            rollupZkApp.actionStates.push(
                 rollupContract.account.actionState.get()
             );
-            rollupZkApp.actions!.push(
+            rollupZkApp.actions.push(
                 RollupAction.toFields(
                     new RollupAction({
                         zkAppIndex: Field(ZkAppIndex.ROUND2),
@@ -1260,7 +1247,7 @@ describe('Key generation', () => {
                     })
                 )
             );
-            keys[Number(keyId)].round2Contributions!.push(contribution);
+            keys[Number(keyId)].round2Contributions?.push(contribution);
         }
 
         //  Rollup round 2 contribution actions
@@ -1281,8 +1268,8 @@ describe('Key generation', () => {
             NUM_KEYS + N + 1,
             NUM_KEYS + 2 * N + 1
         );
-        for (let i = 0; i < actions!.length; i++) {
-            let action = RollupAction.fromFields(actions![i]);
+        for (let i = 0; i < actions.length; i++) {
+            let action = RollupAction.fromFields(actions[i]);
             rollupProof = await Utils.prove(
                 Rollup.name,
                 'rollup',
@@ -1384,7 +1371,7 @@ describe('Key generation', () => {
             DKG_LEVEL_2_TREE()
         );
         for (let i = 0; i < N; i++) {
-            let action = Round2Action.fromFields(round2ZkApp.actions![i]);
+            let action = Round2Action.fromFields(round2ZkApp.actions[i]);
             let actionId = Field(i);
             finalizeProof = await Utils.prove(
                 FinalizeRound2.name,
@@ -1392,7 +1379,7 @@ describe('Key generation', () => {
                 async () =>
                     FinalizeRound2.contribute(
                         new FinalizeRound2Input({
-                            previousActionState: round2ZkApp.actionStates![i],
+                            previousActionState: round2ZkApp.actionStates[i],
                             action,
                             actionId,
                         }),
@@ -1444,7 +1431,8 @@ describe('Key generation', () => {
                     ),
                 },
                 {
-                    contributions: keys[Number(keyId)].round2Contributions!,
+                    contributions:
+                        keys[Number(keyId)].round2Contributions || [],
                     memberId: action.memberId,
                 }
             );
@@ -1453,7 +1441,7 @@ describe('Key generation', () => {
                     level1Index: ProcessStorage.calculateLevel1Index(actionId),
                 },
                 {
-                    actionState: round2ZkApp.actionStates![i + 1],
+                    actionState: round2ZkApp.actionStates[i + 1],
                     processId: UInt8.from(0),
                 }
             );
@@ -1517,12 +1505,10 @@ describe('Key generation', () => {
             zkAppIndex: Field(ZkAppIndex.DKG),
             actionHash: action.hash(),
         });
-        dkgZkApp.actionStates!.push(dkgContract.account.actionState.get());
-        dkgZkApp.actions!.push(DkgAction.toFields(action));
-        rollupZkApp.actionStates!.push(
-            rollupContract.account.actionState.get()
-        );
-        rollupZkApp.actions!.push(RollupAction.toFields(rollupAction));
+        dkgZkApp.actionStates.push(dkgContract.account.actionState.get());
+        dkgZkApp.actions.push(DkgAction.toFields(action));
+        rollupZkApp.actionStates.push(rollupContract.account.actionState.get());
+        rollupZkApp.actions.push(RollupAction.toFields(rollupAction));
 
         // Rollup dkg action
         rollupProof = await Utils.prove(Rollup.name, 'init', async () =>
@@ -1604,7 +1590,7 @@ describe('Key generation', () => {
         );
 
         let input = new UpdateKeyInput({
-            previousActionState: dkgZkApp.actionStates![Number(actionId)],
+            previousActionState: dkgZkApp.actionStates[Number(actionId)],
             action,
             actionId,
         });
@@ -1654,7 +1640,7 @@ describe('Key generation', () => {
                 level1Index: ProcessStorage.calculateLevel1Index(actionId),
             },
             {
-                actionState: dkgZkApp.actionStates![Number(actionId) + 1],
+                actionState: dkgZkApp.actionStates[Number(actionId) + 1],
                 processId: UInt8.from(0),
             }
         );
@@ -1678,287 +1664,8 @@ describe('Key generation', () => {
         await fetchAccounts([dkgZkApp.key.publicKey]);
     });
 
-    // it('Should contribute response successfully', async () => {
-    //     let responseContract = contracts[Contract.RESPONSE]
-    //         .contract as ResponseContract;
-    //     for (let i = 0; i < mockRequests.length; i++) {
-    //         let encryptedVector = generateEncryption(
-    //             calculatePublicKey(round1Actions.map((e) => e.contribution)),
-    //             mockRequests[i]
-    //         );
-    //         R.push(encryptedVector.R);
-    //         M.push(encryptedVector.M);
-    //     }
-
-    //     let accumulatedEncryption = accumulateEncryption(R, M);
-    //     sumR = accumulatedEncryption.sumR;
-    //     sumM = accumulatedEncryption.sumM;
-
-    //     for (let i = 0; i < T; i++) {
-    //         let memberId = respondedMembers[i];
-    //         let [contribution, ski] = getResponseContribution(
-    //             secrets[memberId],
-    //             memberId,
-    //             round2Actions.map(
-    //                 (e) =>
-    //                     ({
-    //                         c: e.contribution.c.get(Field(memberId)),
-    //                         U: e.contribution.U.get(Field(memberId)),
-    //                     } as Round2Data)
-    //             ),
-    //             sumR
-    //         );
-    //         let action = new ResponseAction({
-    //             committeeId: Field(0),
-    //             keyId: Field(0),
-    //             memberId: Field(memberId),
-    //             requestId: requestId,
-    //             contribution: contribution,
-    //         });
-    //         responseActions.push(action);
-
-    //         D.push(contribution.D.values);
-
-    //         console.log(`Generate proof BatchDecryption...`);
-    //         if (profiling) DKGProfiler.start('BatchDecryption.decrypt');
-    //         let decryptionProof = await BatchDecryption.decrypt(
-    //             new BatchDecryptionInput({
-    //                 publicKey: secrets[memberId].C[0],
-    //                 c: new cArray(
-    //                     round2Actions.map((e) =>
-    //                         e.contribution.c.get(Field(memberId))
-    //                     )
-    //                 ),
-    //                 U: new UArray(
-    //                     round2Actions.map((e) =>
-    //                         e.contribution.U.get(Field(memberId))
-    //                     )
-    //                 ),
-    //                 memberId: Field(memberId),
-    //             }),
-    //             new PlainArray(
-    //                 secrets.map((e) => CustomScalar.fromScalar(e.f[memberId]))
-    //             ),
-    //             secrets[memberId].a[0]
-    //         );
-    //         if (profiling) DKGProfiler.stop();
-    //         console.log('DONE!');
-    //         decryptionProofs.push(decryptionProof);
-
-    //         let memberWitness = memberStorage.getWitness(
-    //             MemberStorage.calculateLevel1Index(committeeIndex),
-    //             MemberStorage.calculateLevel2Index(Field(memberId))
-    //         );
-
-    //         // let tx = await Mina.transaction(
-    //         //     members[respondedMembers[i]].publicKey,
-    //         //     () => {
-    //         //         responseContract.contribute(
-    //         //             action.committeeId,
-    //         //             action.keyId,
-    //         //             action.requestId,
-    //         //             decryptionProof,
-    //         //             new RArray(sumR),
-    //         //             ski,
-    //         //             responseAddressStorage.getZkAppRef(
-    //         //                 ZkAppIndex.COMMITTEE,
-    //         //                 contracts[Contract.COMMITTEE].contract.address
-    //         //             ),
-    //         //             responseAddressStorage.getZkAppRef(
-    //         //                 ZkAppIndex.ROUND1,
-    //         //                 contracts[Contract.ROUND1].contract.address
-    //         //             ),
-    //         //             responseAddressStorage.getZkAppRef(
-    //         //                 ZkAppIndex.ROUND2,
-    //         //                 contracts[Contract.ROUND2].contract.address
-    //         //             ),
-    //         //             memberWitness,
-    //         //             publicKeyStorage.getWitness(
-    //         //                 PublicKeyStorage.calculateLevel1Index({
-    //         //                     committeeId: action.committeeId,
-    //         //                     keyId: action.keyId,
-    //         //                 }),
-    //         //                 PublicKeyStorage.calculateLevel2Index(
-    //         //                     action.memberId
-    //         //                 )
-    //         //             ),
-    //         //             encryptionStorage.getWitness(
-    //         //                 EncryptionStorage.calculateLevel1Index({
-    //         //                     committeeId: action.committeeId,
-    //         //                     keyId: action.keyId,
-    //         //                 }),
-    //         //                 EncryptionStorage.calculateLevel2Index(
-    //         //                     action.memberId
-    //         //                 )
-    //         //             )
-    //         //         );
-    //         //     }
-    //         // );
-    //         // await proveAndSend(
-    //         //     tx,
-    //         //     members[respondedMembers[i]],
-    //         //     'ResponseContract',
-    //         //     'contribute'
-    //         // );
-    //         contracts[Contract.RESPONSE].actionStates.push(
-    //             responseContract.account.actionState.get()
-    //         );
-    //     }
-    // });
-
-    // it('Should reduce response successfully', async () => {
-    //     let responseContract = contracts[Contract.RESPONSE]
-    //         .contract as ResponseContract;
-    //     let initialReduceState = responseContract.processRoot.get();
-    //     let initialActionState = contracts[Contract.RESPONSE].actionStates[0];
-
-    //     console.log('Generate first step proof RollupResponse...');
-    //     if (profiling) DKGProfiler.start('RollupResponse.init');
-    //     let reduceProof = await RollupResponse.init(
-    //         responseActions[0],
-    //         initialReduceState,
-    //         initialActionState
-    //     );
-    //     if (profiling) DKGProfiler.stop();
-    //     console.log('DONE!');
-
-    //     for (let i = 0; i < T; i++) {
-    //         let action = responseActions[i];
-    //         console.log(`Generate step ${i + 1} proof RollupResponse...`);
-    //         if (profiling) DKGProfiler.start('RollupResponse.nextStep');
-    //         // reduceProof = await RollupResponse.nextStep(
-    //         //     action,
-    //         //     reduceProof,
-    //         //     responseActionStorage.getWitness(
-    //         //         contracts[Contract.RESPONSE].actionStates[i + 1]
-    //         //     )
-    //         // );
-    //         if (profiling) DKGProfiler.stop();
-    //         console.log('DONE!');
-
-    //         responseActionStorage.updateLeaf(
-    //             responseActionStorage.calculateIndex(
-    //                 contracts[Contract.RESPONSE].actionStates[i + 1]
-    //             ),
-    //             responseActionStorage.calculateLeaf(RollupStatus.ROLLUPED)
-    //         );
-    //     }
-
-    //     let tx = await Mina.transaction(feePayerKey.publicKey, () => {
-    //         responseContract.rollup(reduceProof);
-    //     });
-    //     await proveAndSend(tx, feePayerKey, 'ResponseContract', 'reduce');
-    // });
-
-    // it('Should complete response correctly', async () => {
-    //     let responseContract = contracts[Contract.RESPONSE]
-    //         .contract as ResponseContract;
-    //     let initialContributionRoot = responseContract.contributionRoot.get();
-    //     let reduceStateRoot = responseContract.processRoot.get();
-
-    //     console.log('Generate first step proof FinalizeResponse...');
-    //     if (profiling) DKGProfiler.start('FinalizeResponse.init');
-    //     let completeProof = await FinalizeResponse.init(
-    //         new FinalizeResponseInput({
-    //             previousActionState: Field(0),
-    //             action: ResponseAction.empty(),
-    //         }),
-    //         Field(T),
-    //         Field(N),
-    //         initialContributionRoot,
-    //         reduceStateRoot,
-    //         requestId,
-    //         Field(mockResult.length),
-    //         Utils.packNumberArray(respondedMembers, INDEX_SIZE),
-    //         responseContributionStorage.getLevel1Witness(
-    //             ResponseContributionStorage.calculateLevel1Index(requestId)
-    //         )
-    //     );
-    //     if (profiling) DKGProfiler.stop();
-    //     console.log('DONE!');
-
-    //     responseContributionStorage.updateInternal(
-    //         ResponseContributionStorage.calculateLevel1Index(requestId),
-    //         DKG_LEVEL_2_TREE()
-    //     );
-
-    //     for (let i = 0; i < T; i++) {
-    //         logMemUsage();
-    //         let action = responseActions[i];
-    //         console.log(`Generate step ${i + 1} proof FinalizeResponse...`);
-    //         if (profiling) DKGProfiler.start('FinalizeResponse.nextStep');
-    //         completeProof = await FinalizeResponse.nextStep(
-    //             new FinalizeResponseInput({
-    //                 previousActionState:
-    //                     contracts[Contract.RESPONSE].actionStates[i],
-    //                 action: action,
-    //             }),
-    //             completeProof,
-    //             responseContributionStorage.getWitness(
-    //                 ResponseContributionStorage.calculateLevel1Index(requestId),
-    //                 ResponseContributionStorage.calculateLevel2Index(
-    //                     action.memberId
-    //                 )
-    //             ),
-    //             responseActionStorage.getWitness(
-    //                 responseActionStorage.calculateIndex(
-    //                     contracts[Contract.RESPONSE].actionStates[i + 1]
-    //                 )
-    //             )
-    //         );
-    //         if (profiling) DKGProfiler.stop();
-    //         console.log('DONE!');
-
-    //         responseContributionStorage.updateLeaf(
-    //             {
-    //                 level1Index:
-    //                     ResponseContributionStorage.calculateLevel1Index(
-    //                         requestId
-    //                     ),
-    //                 level2Index:
-    //                     ResponseContributionStorage.calculateLevel2Index(
-    //                         action.memberId
-    //                     ),
-    //             },
-    //             ResponseContributionStorage.calculateLeaf(action.contribution)
-    //         );
-    //     }
-
-    //     // let tx = await Mina.transaction(feePayerKey.publicKey, () => {
-    //     //     responseContract.finalize(
-    //     //         completeProof,
-    //     //         responseAddressStorage.getZkAppRef(
-    //     //             ZkAppIndex.COMMITTEE,
-    //     //             contracts[Contract.COMMITTEE].contract.address
-    //     //         ),
-    //     //         responseAddressStorage.getZkAppRef(
-    //     //             ZkAppIndex.DKG,
-    //     //             contracts[Contract.DKG].contract.address
-    //     //         ),
-    //     //         responseAddressStorage.getZkAppRef(
-    //     //             ZkAppIndex.REQUEST,
-    //     //             contracts[Contract.REQUEST].contract.address
-    //     //         ),
-    //     //         settingStorage.getWitness(committeeIndex),
-    //     //         keyStatusStorage.getWitness(
-    //     //             KeyStatusStorage.calculateLevel1Index({
-    //     //                 committeeId: Field(0),
-    //     //                 keyId: Field(0),
-    //     //             })
-    //     //         )
-    //     //     );
-    //     // });
-    //     // await proveAndSend(tx, feePayerKey, 'ResponseContract', 'complete');
-
-    //     // let resultVector = getResultVector(respondedMembers, D, sumM);
-    //     // let result = Array<Group>(mockResult.length);
-    //     // for (let i = 0; i < result.length; i++) {
-    //     //   result[i] = sumM[i].sub(completeProof.publicOutput.D.get(Field(i)));
-    //     //   result[i].assertEquals(resultVector[i]);
-    //     // }
-    // });
-
     afterAll(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (profiler) (profiler as any).store();
     });
 });

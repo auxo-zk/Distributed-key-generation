@@ -10,6 +10,7 @@ import {
 import {
     Bit255,
     Bit255DynamicArray,
+    CustomScalar,
     FieldDynamicArray,
     GroupDynamicArray,
     PublicKeyDynamicArray,

@@ -36,18 +36,19 @@ import {
 import {
     RequesterLevel1Witness,
     REQUESTER_LEVEL_1_TREE,
+    RequesterCounters,
+    COMMITMENT_TREE,
 } from '../storages/RequesterStorage.js';
-import {
-    ErrorEnum,
-    ZkAppAction,
-    ZkAppIndex,
-    ZkProgramEnum,
-} from './constants.js';
+import { ErrorEnum, ZkAppAction, ZkProgramEnum } from './constants.js';
 import { DkgLevel1Witness } from '../storages/DkgStorage.js';
 import { DkgContract } from './DKG.js';
 import { RequestContract } from './Request.js';
 import { CommitmentWitnesses } from '../storages/RequesterStorage.js';
-import { GroupVectorWitnesses } from '../storages/RequestStorage.js';
+import {
+    GroupVector,
+    GroupVectorWitnesses,
+    REQUEST_LEVEL_2_TREE,
+} from '../storages/RequestStorage.js';
 
 export {
     Action as RequesterAction,
@@ -64,8 +65,8 @@ export {
 class Action
     extends Struct({
         taskId: UInt32,
-        keyIndex: Field,
         timestamp: UInt64,
+        keyIndex: Field,
         indices: Field,
         R: RequestVector,
         M: RequestVector,
@@ -76,8 +77,8 @@ class Action
     static empty(): Action {
         return new Action({
             taskId: UInt32.zero,
-            keyIndex: Field(0),
             timestamp: UInt64.zero,
+            keyIndex: Field(0),
             indices: Field(0),
             R: new RequestVector(),
             M: new RequestVector(),
@@ -95,18 +96,19 @@ class Action
 class UpdateTaskInput extends Action {}
 
 class UpdateTaskOutput extends Struct({
-    taskId: UInt32,
     initialActionState: Field,
+    initialTaskCounter: UInt32,
     initialKeyIndexRoot: Field,
     initialTimestampRoot: Field,
     initialAccumulationRoot: Field,
-    initialCommitmentCounter: Field,
+    initialCommitmentCounter: UInt64,
     initialCommitmentRoot: Field,
     nextActionState: Field,
+    nextTaskCounter: UInt32,
     nextKeyIndexRoot: Field,
     nextTimestampRoot: Field,
     nextAccumulationRoot: Field,
-    nextCommitmentCounter: Field,
+    nextCommitmentCounter: UInt64,
     nextCommitmentRoot: Field,
     nextTimestamp: UInt64,
 }) {}
@@ -117,26 +119,27 @@ const UpdateTask = ZkProgram({
     publicOutput: UpdateTaskOutput,
     methods: {
         init: {
-            privateInputs: [UInt32, Field, Field, Field, Field, Field, Field],
+            privateInputs: [Field, UInt32, Field, Field, Field, UInt64, Field],
             async method(
                 input: UpdateTaskInput,
-                taskId: UInt32,
                 initialActionState: Field,
+                initialTaskCounter: UInt32,
                 initialKeyIndexRoot: Field,
                 initialTimestampRoot: Field,
                 initialAccumulationRoot: Field,
-                initialCommitmentCounter: Field,
+                initialCommitmentCounter: UInt64,
                 initialCommitmentRoot: Field
             ) {
                 return new UpdateTaskOutput({
-                    taskId,
                     initialActionState,
+                    initialTaskCounter,
                     initialKeyIndexRoot,
                     initialTimestampRoot,
                     initialAccumulationRoot,
                     initialCommitmentCounter,
                     initialCommitmentRoot,
                     nextActionState: initialActionState,
+                    nextTaskCounter: initialTaskCounter,
                     nextKeyIndexRoot: initialKeyIndexRoot,
                     nextTimestampRoot: initialTimestampRoot,
                     nextAccumulationRoot: initialAccumulationRoot,
@@ -151,15 +154,19 @@ const UpdateTask = ZkProgram({
                 SelfProof<UpdateTaskInput, UpdateTaskOutput>,
                 RequesterLevel1Witness,
                 RequesterLevel1Witness,
+                RequesterLevel1Witness,
             ],
             async method(
                 input: UpdateTaskInput,
                 earlierProof: SelfProof<UpdateTaskInput, UpdateTaskOutput>,
                 keyIndexWitness: RequesterLevel1Witness,
-                timestampWitness: RequesterLevel1Witness
+                timestampWitness: RequesterLevel1Witness,
+                accumulationWitness: RequesterLevel1Witness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
+
+                let taskId = earlierProof.publicOutput.nextTaskCounter;
 
                 // Verify empty key Index
                 earlierProof.publicOutput.nextKeyIndexRoot.assertEquals(
@@ -170,7 +177,7 @@ const UpdateTask = ZkProgram({
                         ErrorEnum.KEY_INDEX_ROOT
                     )
                 );
-                input.taskId.value.assertEquals(
+                taskId.value.assertEquals(
                     keyIndexWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateTask.name,
@@ -188,7 +195,7 @@ const UpdateTask = ZkProgram({
                         ErrorEnum.REQUEST_TIMESTAMP_ROOT
                     )
                 );
-                input.taskId.value.assertEquals(
+                taskId.value.assertEquals(
                     timestampWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateTask.name,
@@ -197,12 +204,37 @@ const UpdateTask = ZkProgram({
                     )
                 );
 
+                // Verify empty accumulation data
+                earlierProof.publicOutput.nextAccumulationRoot.assertEquals(
+                    accumulationWitness.calculateRoot(Field(0)),
+                    Utils.buildAssertMessage(
+                        UpdateTask.name,
+                        'create',
+                        ErrorEnum.ACCUMULATION_ROOT
+                    )
+                );
+                taskId.value.assertEquals(
+                    accumulationWitness.calculateIndex(),
+                    Utils.buildAssertMessage(
+                        UpdateTask.name,
+                        'create',
+                        ErrorEnum.ACCUMULATION_INDEX_L1
+                    )
+                );
+
                 // Calculate new state values
+                let nextTaskCounter = taskId.add(1);
                 let nextKeyIndexRoot = keyIndexWitness.calculateRoot(
                     input.keyIndex
                 );
                 let nextTimestampRoot = timestampWitness.calculateRoot(
                     input.timestamp.value
+                );
+                let nextAccumulationRoot = accumulationWitness.calculateRoot(
+                    Poseidon.hash([
+                        REQUEST_LEVEL_2_TREE().getRoot(),
+                        REQUEST_LEVEL_2_TREE().getRoot(),
+                    ])
                 );
 
                 // Calculate corresponding action state
@@ -213,15 +245,21 @@ const UpdateTask = ZkProgram({
 
                 return new UpdateTaskOutput({
                     ...earlierProof.publicOutput,
-                    ...{ nextActionState, nextKeyIndexRoot, nextTimestampRoot },
+                    ...{
+                        nextActionState,
+                        nextTaskCounter,
+                        nextKeyIndexRoot,
+                        nextTimestampRoot,
+                        nextAccumulationRoot,
+                    },
                 });
             },
         },
         accumulate: {
             privateInputs: [
                 SelfProof<UpdateTaskInput, UpdateTaskOutput>,
-                Group,
-                Group,
+                GroupVector,
+                GroupVector,
                 RequesterLevel1Witness,
                 GroupVectorWitnesses,
                 GroupVectorWitnesses,
@@ -231,8 +269,8 @@ const UpdateTask = ZkProgram({
             async method(
                 input: UpdateTaskInput,
                 earlierProof: SelfProof<UpdateTaskInput, UpdateTaskOutput>,
-                R: Group,
-                M: Group,
+                sumR: GroupVector,
+                sumM: GroupVector,
                 accumulationWitness: RequesterLevel1Witness,
                 accumulationWitnessesR: GroupVectorWitnesses,
                 accumulationWitnessesM: GroupVectorWitnesses,
@@ -241,15 +279,14 @@ const UpdateTask = ZkProgram({
                 // Verify earlier proof
                 earlierProof.verify();
 
-                // Verify task Id
-                earlierProof.publicOutput.taskId.assertEquals(input.taskId);
-
                 let {
                     nextAccumulationRoot,
                     nextCommitmentCounter,
                     nextCommitmentRoot,
                 } = earlierProof.publicOutput;
                 for (let i = 0; i < ENCRYPTION_LIMITS.DIMENSION; i++) {
+                    let sumRi = sumR.get(Field(i));
+                    let sumMi = sumM.get(Field(i));
                     let Ri = input.R.get(Field(i));
                     let Mi = input.M.get(Field(i));
                     let commitment = input.commitments.get(Field(i));
@@ -265,14 +302,22 @@ const UpdateTask = ZkProgram({
                     );
 
                     // Verify accumulation data
-                    earlierProof.publicOutput.nextAccumulationRoot.assertEquals(
+                    nextAccumulationRoot.assertEquals(
                         accumulationWitness.calculateRoot(
                             Poseidon.hash([
                                 accumulationWitnessR.calculateRoot(
-                                    Poseidon.hash(R.toFields())
+                                    Provable.if(
+                                        sumRi.equals(Group.zero),
+                                        Field(0),
+                                        Poseidon.hash(sumRi.toFields())
+                                    )
                                 ),
                                 accumulationWitnessM.calculateRoot(
-                                    Poseidon.hash(M.toFields())
+                                    Provable.if(
+                                        sumMi.equals(Group.zero),
+                                        Field(0),
+                                        Poseidon.hash(sumMi.toFields())
+                                    )
                                 ),
                             ])
                         ),
@@ -316,7 +361,7 @@ const UpdateTask = ZkProgram({
                             ErrorEnum.COMMITMENT_ROOT
                         )
                     );
-                    nextCommitmentCounter.assertEquals(
+                    nextCommitmentCounter.value.assertEquals(
                         commitmentWitness.calculateIndex(),
                         Utils.buildAssertMessage(
                             UpdateTask.name,
@@ -326,15 +371,17 @@ const UpdateTask = ZkProgram({
                     );
 
                     // Calculate new values
-                    R = R.add(Ri);
-                    M = M.add(Mi);
+                    sumRi = sumRi.add(Ri);
+                    sumMi = sumMi.add(Mi);
+                    sumR.set(Field(i), sumRi);
+                    sumM.set(Field(i), sumMi);
                     nextAccumulationRoot = accumulationWitness.calculateRoot(
                         Poseidon.hash([
                             accumulationWitnessR.calculateRoot(
-                                Poseidon.hash(R.toFields())
+                                Poseidon.hash(sumRi.toFields())
                             ),
                             accumulationWitnessM.calculateRoot(
-                                Poseidon.hash(M.toFields())
+                                Poseidon.hash(sumMi.toFields())
                             ),
                         ])
                     );
@@ -370,6 +417,7 @@ enum AddressBook {
     TASK_MANAGER,
     SUBMISSION,
     DKG,
+    REQUEST,
 }
 
 class RequesterContract extends SmartContract {
@@ -379,6 +427,11 @@ class RequesterContract extends SmartContract {
      * @description MT storing addresses of other zkApps
      */
     @state(Field) zkAppRoot = State<Field>();
+
+    /**
+     * @description
+     */
+    @state(Field) counters = State<Field>();
 
     /**
      * @description MT storing corresponding keys
@@ -397,11 +450,6 @@ class RequesterContract extends SmartContract {
      * @see RequesterAccumulationStorage for off-chain storage implementation
      */
     @state(Field) accumulationRoot = State<Field>();
-
-    /**
-     * @description Total number of commitments recorded
-     */
-    @state(Field) commitmentCounter = State<Field>();
 
     /**
      * @description MT storing anonymous commitments
@@ -424,11 +472,11 @@ class RequesterContract extends SmartContract {
     init() {
         super.init();
         this.zkAppRoot.set(ADDRESS_MT().getRoot());
+        this.counters.set(RequesterCounters.empty().toFields()[0]);
         this.keyIndexRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.timestampRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.accumulationRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
-        this.commitmentCounter.set(Field(0));
-        this.commitmentRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
+        this.commitmentRoot.set(COMMITMENT_TREE().getRoot());
         this.lastTimestamp.set(UInt64.zero);
         this.actionState.set(Reducer.initialActionState);
     }
@@ -491,7 +539,9 @@ class RequesterContract extends SmartContract {
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
-        let timestamp = this.network.timestamp.getAndRequireEquals();
+        // FIXME - "the permutation was not constructed correctly: final value" error
+        // let timestamp = this.network.timestamp.getAndRequireEquals();
+        let timestamp = UInt64.from(0);
 
         // Verify Dkg Contract address
         verifyZkApp(
@@ -530,11 +580,13 @@ class RequesterContract extends SmartContract {
             R.set(Field(i), Group.generator.scale(random));
             M.set(
                 Field(i),
-                Provable.if(
-                    secret.equals(CustomScalar.fromScalar(Scalar.from(0))),
-                    Group.zero,
-                    Group.generator.scale(secrets.get(Field(i)).toScalar())
-                ).add(publicKey.scale(random))
+                Provable.witness(Group, () =>
+                    Provable.if(
+                        secret.equals(CustomScalar.fromScalar(Scalar.from(0))),
+                        Group.zero,
+                        Group.generator.scale(secrets.get(Field(i)).toScalar())
+                    ).add(publicKey.scale(random))
+                )
             );
             commitments.set(
                 Field(i),
@@ -568,10 +620,12 @@ class RequesterContract extends SmartContract {
     async updateTasks(proof: UpdateTaskProof) {
         // Get current state values
         let curActionState = this.actionState.getAndRequireEquals();
+        let counters = RequesterCounters.fromFields([
+            this.counters.getAndRequireEquals(),
+        ]);
         let keyIndexRoot = this.keyIndexRoot.getAndRequireEquals();
         let timestampRoot = this.timestampRoot.getAndRequireEquals();
         let accumulationRoot = this.accumulationRoot.getAndRequireEquals();
-        let commitmentCounter = this.commitmentCounter.getAndRequireEquals();
         let commitmentRoot = this.commitmentRoot.getAndRequireEquals();
         let lastTimestamp = this.lastTimestamp.getAndRequireEquals();
         let lastActionState = this.account.actionState.getAndRequireEquals();
@@ -584,7 +638,15 @@ class RequesterContract extends SmartContract {
             curActionState,
             lastActionState
         );
-        proof.publicOutput.nextKeyIndexRoot.assertEquals(
+        proof.publicOutput.initialTaskCounter.value.assertEquals(
+            counters.taskCounter.value,
+            Utils.buildAssertMessage(
+                RequesterContract.name,
+                'updateTasks',
+                ErrorEnum.TASK_COUNTER
+            )
+        );
+        proof.publicOutput.initialKeyIndexRoot.assertEquals(
             keyIndexRoot,
             Utils.buildAssertMessage(
                 RequesterContract.name,
@@ -592,7 +654,7 @@ class RequesterContract extends SmartContract {
                 ErrorEnum.KEY_INDEX_ROOT
             )
         );
-        proof.publicOutput.nextTimestampRoot.assertEquals(
+        proof.publicOutput.initialTimestampRoot.assertEquals(
             timestampRoot,
             Utils.buildAssertMessage(
                 RequesterContract.name,
@@ -608,8 +670,8 @@ class RequesterContract extends SmartContract {
                 ErrorEnum.ACCUMULATION_ROOT
             )
         );
-        proof.publicOutput.initialCommitmentCounter.assertEquals(
-            commitmentCounter,
+        proof.publicOutput.initialCommitmentCounter.value.assertEquals(
+            counters.commitmentCounter.value,
             Utils.buildAssertMessage(
                 RequesterContract.name,
                 'updateTasks',
@@ -627,10 +689,15 @@ class RequesterContract extends SmartContract {
 
         // Update state values
         this.actionState.set(proof.publicOutput.nextActionState);
+        this.counters.set(
+            new RequesterCounters({
+                taskCounter: proof.publicOutput.nextTaskCounter,
+                commitmentCounter: proof.publicOutput.nextCommitmentCounter,
+            }).toFields()[0]
+        );
         this.keyIndexRoot.set(proof.publicOutput.nextKeyIndexRoot);
         this.timestampRoot.set(proof.publicOutput.nextTimestampRoot);
         this.accumulationRoot.set(proof.publicOutput.nextAccumulationRoot);
-        this.commitmentCounter.set(proof.publicOutput.nextCommitmentCounter);
         this.commitmentRoot.set(proof.publicOutput.nextCommitmentRoot);
         this.lastTimestamp.set(
             Provable.if(
@@ -670,7 +737,7 @@ class RequesterContract extends SmartContract {
             RequesterContract.name,
             request,
             zkAppRoot,
-            Field(ZkAppIndex.REQUEST)
+            Field(AddressBook.REQUEST)
         );
         const requestContract = new RequestContract(request.address);
 

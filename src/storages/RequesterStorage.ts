@@ -1,4 +1,12 @@
-import { Field, MerkleTree, MerkleWitness, Poseidon, UInt64 } from 'o1js';
+import {
+    Field,
+    MerkleTree,
+    MerkleWitness,
+    Poseidon,
+    Struct,
+    UInt32,
+    UInt64,
+} from 'o1js';
 import { StaticArray } from '@auxo-dev/auxo-libs';
 import { ENCRYPTION_LIMITS, INSTANCE_LIMITS } from '../constants.js';
 import { GenericStorage, Witness } from './GenericStorage.js';
@@ -15,6 +23,7 @@ export {
 };
 
 export {
+    RequesterCounters,
     KeyIndexLeaf as RequesterKeyIndexLeaf,
     KeyIndexStorage as RequesterKeyIndexStorage,
     TimestampLeaf,
@@ -40,6 +49,62 @@ const REQUESTER_LEVEL_1_WITNESS = (witness: Witness) =>
     new Level1Witness(witness);
 const COMMITMENT_TREE = () => new CommitmentMT(COMMITMENT_TREE_HEIGHT);
 const COMMITMENT_WITNESS = (witness: Witness) => new CommitmentWitness(witness);
+
+class RequesterCounters extends Struct({
+    taskCounter: UInt32,
+    commitmentCounter: UInt64,
+}) {
+    static fromFields(fields: Field[]): RequesterCounters {
+        return new RequesterCounters({
+            taskCounter: UInt32.fromFields([
+                Field.fromBits(fields[0].toBits().slice(0, 32)),
+            ]),
+            commitmentCounter: UInt64.fromFields([
+                Field.fromBits(fields[0].toBits().slice(32, 96)),
+            ]),
+        });
+    }
+
+    static toFields({
+        taskCounter,
+        commitmentCounter,
+    }: {
+        taskCounter: UInt32;
+        commitmentCounter: UInt64;
+    }): Field[] {
+        return [
+            Field.fromBits([
+                ...taskCounter.value.toBits(32),
+                ...commitmentCounter.value.toBits(64),
+            ]),
+        ];
+    }
+
+    static hash({
+        taskCounter,
+        commitmentCounter,
+    }: {
+        taskCounter: UInt32;
+        commitmentCounter: UInt64;
+    }): Field {
+        return Poseidon.hash([taskCounter.value, commitmentCounter.value]);
+    }
+
+    static empty(): RequesterCounters {
+        return new RequesterCounters({
+            taskCounter: UInt32.zero,
+            commitmentCounter: UInt64.zero,
+        });
+    }
+
+    toFields(): Field[] {
+        return RequesterCounters.toFields(this);
+    }
+
+    hash(): Field {
+        return RequesterCounters.hash(this);
+    }
+}
 
 type KeyIndexLeaf = Field;
 class KeyIndexStorage extends GenericStorage<KeyIndexLeaf> {
@@ -147,7 +212,6 @@ class AccumulationStorage extends GenericStorage<AccumulationLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
-            level2Index: Field;
             leaf: AccumulationLeaf | Field;
             isRaw: boolean;
         }[]
@@ -178,14 +242,6 @@ class AccumulationStorage extends GenericStorage<AccumulationLeaf> {
 
     calculateLevel1Index(taskId: Field): Field {
         return AccumulationStorage.calculateLevel1Index(taskId);
-    }
-
-    static calculateLevel2Index(dimensionIndex: Field): Field {
-        return dimensionIndex;
-    }
-
-    calculateLevel2Index(dimensionIndex: Field): Field {
-        return AccumulationStorage.calculateLevel2Index(dimensionIndex);
     }
 
     getWitness(level1Index: Field): Level1Witness {
@@ -220,13 +276,7 @@ class CommitmentStorage extends GenericStorage<CommitmentLeaf> {
             isRaw: boolean;
         }[]
     ) {
-        super(
-            REQUESTER_LEVEL_1_TREE,
-            REQUESTER_LEVEL_1_WITNESS,
-            undefined,
-            undefined,
-            leafs
-        );
+        super(COMMITMENT_TREE, COMMITMENT_WITNESS, undefined, undefined, leafs);
     }
 
     static calculateLeaf(commitment: CommitmentLeaf): Field {

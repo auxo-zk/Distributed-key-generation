@@ -5,12 +5,7 @@ import {
     StaticArray,
     Utils,
 } from '@auxo-dev/auxo-libs';
-import {
-    ENCRYPTION_LIMITS,
-    INSTANCE_LIMITS,
-    SECRET_MAX,
-    SECRET_UNIT,
-} from '../constants.js';
+import { ENCRYPTION_LIMITS, SECRET_MAX, SECRET_UNIT } from '../constants.js';
 
 export {
     RArray,
@@ -22,6 +17,7 @@ export {
     ResultVector,
     NullifierArray,
     CommitmentArray,
+    SecretNote,
     calculatePublicKey as calculatePublicKeyFromPoints,
     calculateCommitment,
     generateEncryption,

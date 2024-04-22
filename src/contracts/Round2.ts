@@ -616,8 +616,6 @@ class Round2Contract extends SmartContract {
         );
 
         // Verify encryption witness
-        // @todo Remove Provable.witness or adding assertion
-        // let encryptionLeaf = Provable.witness(Field, () => {
         let encryptionHashesMT = DKG_LEVEL_2_TREE();
         for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
             let value = Provable.if(
@@ -629,8 +627,6 @@ class Round2Contract extends SmartContract {
             );
             encryptionHashesMT.setLeaf(BigInt(i), value);
         }
-        // return encryptionHashesMT.getRoot();
-        // });
         encryptionRoot.assertEquals(
             encryptionWitness.calculateRoot(Field(0)),
             Utils.buildAssertMessage(

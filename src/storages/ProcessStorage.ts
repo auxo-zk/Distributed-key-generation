@@ -122,7 +122,7 @@ function processAction(
                 [
                     Field(0),
                     actionState,
-                    Poseidon.hash([actionState, processId.value]),
+                    Poseidon.hash([actionState, processId.value.sub(1)]),
                 ]
             )
         ),

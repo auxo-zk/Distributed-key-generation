@@ -132,6 +132,7 @@ enum ErrorEnum {
     ENCRYPTION_INDEX_L2 = 'Incorrect public key MT level 2 index',
 
     // RequesterContract errors
+    TASK_COUNTER = 'Incorrect commitment task',
     REQUEST_VECTOR_DIM = 'Incorrect dimension',
     REQUEST_COUNTER = 'Incorrect request counter',
     REQUEST_ID_ROOT = 'Incorrect request Id MT root',

@@ -136,12 +136,12 @@ describe('DKG', () => {
                           },
                 {}
             );
-            let responseContribution = getResponseContribution(
+            let [responseContribution, ski] = getResponseContribution(
                 committees[respondedMembers[i]].secretPolynomial,
                 committees[respondedMembers[i]].memberId,
                 round2Data,
                 sumR
-            )[0];
+            );
             committees[respondedMembers[i]].responseContribution =
                 responseContribution;
             responseContributions.push(responseContribution);

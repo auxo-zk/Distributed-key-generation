@@ -25,19 +25,19 @@ const INDEX_SIZE = 6;
  * Maximum amount for each entity
  */
 const INSTANCE_LIMITS = {
-    ACTION: 2 ** 10,
-    ADDRESS: 2 ** 8,
+    ACTION: 2 ** 5,
+    ADDRESS: 2 ** 4,
     MEMBER: 2,
-    COMMITTEE: 2 ** 6,
-    KEY: 2 ** 6,
-    REQUEST: 2 ** 8,
+    COMMITTEE: 2 ** 5,
+    KEY: 2 ** 5,
+    REQUEST: 2 ** 5,
     REQUESTER: 2 ** 3,
 };
 
 const ENCRYPTION_LIMITS = {
-    DIMENSION: 3,
-    FULL_DIMENSION: 2 ** 6,
-    SUBMISSION: 2 ** 10,
+    DIMENSION: 2,
+    FULL_DIMENSION: 3,
+    SUBMISSION: 2 ** 5,
 };
 
 /**
