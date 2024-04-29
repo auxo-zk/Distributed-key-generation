@@ -176,7 +176,7 @@ async function main() {
         CommitteeContract.name,
         'updateCommittee',
         async () => {
-            committeeContract.updateCommittees(proof);
+            committeeContract.update(proof);
         },
         feePayer
     );

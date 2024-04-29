@@ -30,9 +30,13 @@ const PROCESS_WITNESS = (witness: Witness) => new ProcessWitness(witness);
 
 class ProcessedActions extends FieldDynamicArray(ACTION_PROCESS_LIMITS) {}
 
+/**
+ * @param actionState nextActionState
+ * @param processCounter how many time this action has been processed
+ */
 type ProcessLeaf = {
     actionState: Field;
-    processId: UInt8;
+    processCounter: UInt8;
 };
 class ProcessStorage extends GenericStorage<ProcessLeaf> {
     constructor(
@@ -54,10 +58,10 @@ class ProcessStorage extends GenericStorage<ProcessLeaf> {
     }
 
     static calculateLeaf(rawLeaf: ProcessLeaf): Field {
-        let processId = rawLeaf.processId.value;
+        let processCounter = rawLeaf.processCounter.value;
         return Provable.if(
-            processId.greaterThan(0),
-            Poseidon.hash([rawLeaf.actionState, processId]),
+            processCounter.greaterThan(0),
+            Poseidon.hash([rawLeaf.actionState, processCounter]),
             rawLeaf.actionState
         );
     }
@@ -105,7 +109,7 @@ class ProcessStorage extends GenericStorage<ProcessLeaf> {
 function processAction(
     programName: string,
     actionId: Field,
-    processId: UInt8,
+    processCounter: UInt8,
     actionState: Field,
     previousRoot: Field,
     witness: ProcessWitness
@@ -114,15 +118,15 @@ function processAction(
         witness.calculateRoot(
             Provable.switch(
                 [
-                    processId.value.equals(0),
-                    processId.value.equals(1),
-                    processId.value.greaterThan(1),
+                    processCounter.value.equals(0),
+                    processCounter.value.equals(1),
+                    processCounter.value.greaterThan(1),
                 ],
                 Field,
                 [
                     Field(0),
                     actionState,
-                    Poseidon.hash([actionState, processId.value.sub(1)]),
+                    Poseidon.hash([actionState, processCounter.value.sub(1)]),
                 ]
             )
         ),
@@ -139,8 +143,8 @@ function processAction(
 
     return witness.calculateRoot(
         Provable.if(
-            processId.value.greaterThan(0),
-            Poseidon.hash([actionState, processId.value]),
+            processCounter.value.greaterThan(0),
+            Poseidon.hash([actionState, processCounter.value]),
             actionState
         )
     );

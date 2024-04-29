@@ -70,8 +70,8 @@ describe('DKG Committee', () => {
         let committeeContract = committeeZkApp.contract as CommitteeContract;
         await Utils.proveAndSendTx(
             CommitteeContract.name,
-            'createCommittee',
-            async () => committeeContract.createCommittee(action),
+            'create',
+            async () => committeeContract.create(action),
             feePayer,
             undefined,
             profiler
@@ -104,8 +104,8 @@ describe('DKG Committee', () => {
         let committeeContract = committeeZkApp.contract as CommitteeContract;
         await Utils.proveAndSendTx(
             CommitteeContract.name,
-            'createCommittee',
-            async () => committeeContract.createCommittee(action),
+            'create',
+            async () => committeeContract.create(action),
             feePayer
         );
 
@@ -137,8 +137,8 @@ describe('DKG Committee', () => {
         expect(
             Utils.proveAndSendTx(
                 CommitteeContract.name,
-                'createCommittee',
-                async () => committeeContract.createCommittee(action),
+                'create',
+                async () => committeeContract.create(action),
                 feePayer
             )
         ).rejects.toThrow();
@@ -163,8 +163,8 @@ describe('DKG Committee', () => {
         expect(
             Utils.proveAndSendTx(
                 CommitteeContract.name,
-                'createCommittee',
-                async () => committeeContract.createCommittee(action),
+                'create',
+                async () => committeeContract.create(action),
                 feePayer
             )
         ).rejects.toThrow();
@@ -222,8 +222,8 @@ describe('DKG Committee', () => {
 
         await Utils.proveAndSendTx(
             CommitteeContract.name,
-            'updateCommittees',
-            async () => committeeContract.updateCommittees(proof),
+            'update',
+            async () => committeeContract.update(proof),
             feePayer,
             true,
             profiler,

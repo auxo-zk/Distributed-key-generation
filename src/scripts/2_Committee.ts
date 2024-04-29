@@ -110,19 +110,19 @@
 //         arrayAddress.push(addresses.p1, addresses.p2);
 //         let myMemberArray1 = new MemberArray(arrayAddress);
 
-//         console.log('committeeContract.createCommittee: ');
+//         console.log('committeeContract.create: ');
 //         let action = new CommitteeAction({
 //             addresses: myMemberArray1,
 //             threshold: Field(1),
 //             ipfsHash: IpfsHash.fromString('testing'),
 //         });
 //         tx = await Mina.transaction(feePayer, async () => {
-//             committeeContract.createCommittee(action);
+//             committeeContract.create(action);
 //         });
 //         await tx.prove();
 //         await tx.sign([feePayerKey]).send();
 
-//         console.log('committeeContract.createCommittee sent!...');
+//         console.log('committeeContract.create sent!...');
 //         console.log(
 //             'actionState in Committee contract (account):',
 //             committeeContract.account.actionState.get()
@@ -137,18 +137,18 @@
 //         });
 //         let myMemberArray2 = new MemberArray(arrayAddress);
 
-//         console.log('committeeContract.createCommittee: ');
+//         console.log('committeeContract.create: ');
 //         action = new CommitteeAction({
 //             addresses: myMemberArray2,
 //             threshold: Field(2),
 //             ipfsHash: IpfsHash.fromString('testing'),
 //         });
 //         tx = await Mina.transaction(feePayer, async () => {
-//             committeeContract.createCommittee(action);
+//             committeeContract.create(action);
 //         });
 //         await tx.prove();
 //         await tx.sign([feePayerKey]).send();
-//         console.log('committeeContract.createCommittee sent!...');
+//         console.log('committeeContract.create sent!...');
 //         console.log(
 //             'actionState in Committee contract (account):',
 //             committeeContract.account.actionState.get()
@@ -339,7 +339,7 @@
 //         // );
 
 //         if (actionn == 1) {
-//             console.log('committeeContract.createCommittee: ');
+//             console.log('committeeContract.create: ');
 //             let action = new CommitteeAction({
 //                 addresses: myMemberArray1,
 //                 threshold: Field(1),
@@ -350,12 +350,12 @@
 //             let tx = await Mina.transaction(
 //                 { sender: feePayer, fee, nonce: currentNonce },
 //                 () => {
-//                     committeeContract.createCommittee(action);
+//                     committeeContract.create(action);
 //                 }
 //             );
 //             await tx.prove();
 //             await tx.sign([feePayerKey]).send();
-//             console.log('committeeContract.createCommittee sent!...');
+//             console.log('committeeContract.create sent!...');
 //         }
 
 //         // if (actionn == 2) {

@@ -586,15 +586,15 @@ describe('Key generation', () => {
                 },
                 {
                     actionState: dkgZkApp.actionStates[i + 1],
-                    processId: UInt8.from(0),
+                    processCounter: UInt8.from(0),
                 }
             );
         }
         await Utils.proveAndSendTx(
             DkgContract.name,
-            'updateKeys',
+            'update',
             async () =>
-                dkgContract.updateKeys(
+                dkgContract.update(
                     updateKeyProof,
                     sharedAddressStorage.getZkAppRef(
                         ZkAppIndex.ROLLUP,
@@ -889,7 +889,7 @@ describe('Key generation', () => {
                 },
                 {
                     actionState: round1ZkApp.actionStates[i + 1],
-                    processId: UInt8.from(0),
+                    processCounter: UInt8.from(0),
                 }
             );
         }
@@ -1101,15 +1101,15 @@ describe('Key generation', () => {
             },
             {
                 actionState: dkgZkApp.actionStates[Number(actionId) + 1],
-                processId: UInt8.from(0),
+                processCounter: UInt8.from(0),
             }
         );
 
         await Utils.proveAndSendTx(
             DkgContract.name,
-            'updateKeys',
+            'update',
             async () =>
-                dkgContract.updateKeys(
+                dkgContract.update(
                     updateKeyProof,
                     sharedAddressStorage.getZkAppRef(
                         ZkAppIndex.ROLLUP,
@@ -1442,7 +1442,7 @@ describe('Key generation', () => {
                 },
                 {
                     actionState: round2ZkApp.actionStates[i + 1],
-                    processId: UInt8.from(0),
+                    processCounter: UInt8.from(0),
                 }
             );
         }
@@ -1641,15 +1641,15 @@ describe('Key generation', () => {
             },
             {
                 actionState: dkgZkApp.actionStates[Number(actionId) + 1],
-                processId: UInt8.from(0),
+                processCounter: UInt8.from(0),
             }
         );
 
         await Utils.proveAndSendTx(
             DkgContract.name,
-            'updateKeys',
+            'update',
             async () =>
-                dkgContract.updateKeys(
+                dkgContract.update(
                     updateKeyProof,
                     sharedAddressStorage.getZkAppRef(
                         ZkAppIndex.ROLLUP,

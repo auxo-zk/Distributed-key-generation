@@ -658,7 +658,7 @@ class DkgContract extends SmartContract {
      * @param proof Verification proof
      */
     @method
-    async updateKeys(proof: UpdateKeyProof, rollup: ZkAppRef) {
+    async update(proof: UpdateKeyProof, rollup: ZkAppRef) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
         let keyCounterRoot = this.keyCounterRoot.getAndRequireEquals();
@@ -681,7 +681,7 @@ class DkgContract extends SmartContract {
             rollupContract.rollupRoot.getAndRequireEquals(),
             Utils.buildAssertMessage(
                 DkgContract.name,
-                'updateKeys',
+                'update',
                 ErrorEnum.ROLLUP_ROOT
             )
         );
@@ -689,7 +689,7 @@ class DkgContract extends SmartContract {
             keyCounterRoot,
             Utils.buildAssertMessage(
                 DkgContract.name,
-                'updateKeys',
+                'update',
                 ErrorEnum.KEY_COUNTER_ROOT
             )
         );
@@ -697,7 +697,7 @@ class DkgContract extends SmartContract {
             keyStatusRoot,
             Utils.buildAssertMessage(
                 DkgContract.name,
-                'updateKeys',
+                'update',
                 ErrorEnum.KEY_STATUS_ROOT
             )
         );
@@ -705,7 +705,7 @@ class DkgContract extends SmartContract {
             keyRoot,
             Utils.buildAssertMessage(
                 DkgContract.name,
-                'updateKeys',
+                'update',
                 ErrorEnum.KEY_ROOT
             )
         );
@@ -713,7 +713,7 @@ class DkgContract extends SmartContract {
             processRoot,
             Utils.buildAssertMessage(
                 DkgContract.name,
-                'updateKeys',
+                'update',
                 ErrorEnum.PROCESS_ROOT
             )
         );

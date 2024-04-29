@@ -182,10 +182,10 @@
 //             nonce: feePayer.nonce++,
 //         },
 //         () => {
-//             dkgContract.updateKeys(proof);
+//             dkgContract.update(proof);
 //         }
 //     );
-//     await proveAndSend(tx, feePayer.key, 'DkgContract', 'updateKeys');
+//     await proveAndSend(tx, feePayer.key, 'DkgContract', 'update');
 // }
 
 // main()

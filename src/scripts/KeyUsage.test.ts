@@ -1518,7 +1518,7 @@ describe('Key usage', () => {
                 },
                 {
                     actionState: responseZkApp.actionStates[i + 1],
-                    processId: UInt8.from(0),
+                    processCounter: UInt8.from(0),
                 }
             );
         }
@@ -1561,7 +1561,7 @@ describe('Key usage', () => {
                     },
                     {
                         actionState: responseZkApp.actionStates[j + 1],
-                        processId: UInt8.from(i + 1),
+                        processCounter: UInt8.from(i + 1),
                     }
                 );
             }

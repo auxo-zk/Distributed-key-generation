@@ -74,13 +74,13 @@ async function compile(
     }
 }
 
-compile(undefined, [], undefined, {
-    error: true,
-    info: true,
-    memoryUsage: false,
-})
-    .then()
-    .catch((err) => {
-        console.error(err);
-        process.exit(1);
-    });
+// compile(undefined, [], undefined, {
+//     error: true,
+//     info: true,
+//     memoryUsage: false,
+// })
+//     .then()
+//     .catch((err) => {
+//         console.error(err);
+//         process.exit(1);
+//     });

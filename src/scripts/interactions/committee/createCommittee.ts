@@ -45,7 +45,7 @@
 
 //     await fetchZkAppState(committeeAddress);
 
-//     console.log('committeeContract.createCommittee: ');
+//     console.log('committeeContract.create: ');
 
 //     let configJson: Config = JSON.parse(
 //         await fs.readFile('config.json', 'utf8')
@@ -92,14 +92,14 @@
 //             nonce: feePayer.nonce++,
 //         },
 //         () => {
-//             committeeContract.createCommittee(committeeAction);
+//             committeeContract.create(committeeAction);
 //         }
 //     );
 //     await proveAndSend(
 //         tx,
 //         feePayer.key,
 //         'CommitteeContract',
-//         'createCommittee'
+//         'create'
 //     );
 // }
 

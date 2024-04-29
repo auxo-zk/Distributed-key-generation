@@ -777,10 +777,10 @@
 //     // tx = await Mina.transaction(
 //     //   { sender: feePayerKey.publicKey, fee, nonce: ++feePayerNonce },
 //     //   () => {
-//     //     dkgContract.updateKeys(updateKeyProof);
+//     //     dkgContract.update(updateKeyProof);
 //     //   }
 //     // );
-//     // await proveAndSend(tx, feePayerKey, 'DkgContract', 'updateKeys');
+//     // await proveAndSend(tx, feePayerKey, 'DkgContract', 'update');
 
 //     // await wait();
 //     // await fetchAllContract(contracts);
@@ -1079,10 +1079,10 @@
 //     // tx = await Mina.transaction(
 //     //   { sender: feePayerKey.publicKey, fee, nonce: ++feePayerNonce },
 //     //   () => {
-//     //     dkgContract.updateKeys(updateKeyProof);
+//     //     dkgContract.update(updateKeyProof);
 //     //   }
 //     // );
-//     // await proveAndSend(tx, feePayerKey, 'DkgContract', 'updateKeys');
+//     // await proveAndSend(tx, feePayerKey, 'DkgContract', 'update');
 //     // await wait();
 //     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //     // await fetchAllContract(contracts);
@@ -1398,11 +1398,11 @@
 //     // tx = await Mina.transaction(
 //     //   { sender: feePayerKey.publicKey, fee, nonce: ++feePayerNonce },
 //     //   () => {
-//     //     dkgContract.updateKeys(updateKeyProof);
+//     //     dkgContract.update(updateKeyProof);
 //     //   }
 //     // );
 
-//     // await proveAndSend(tx, feePayerKey, 'DkgContract', 'updateKeys');
+//     // await proveAndSend(tx, feePayerKey, 'DkgContract', 'update');
 //     // await wait();
 //     // await fetchAllContract(contracts);
 //     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

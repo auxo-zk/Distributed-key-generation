@@ -214,7 +214,7 @@ class UpdateCommitteeProof extends ZkProgram.Proof(UpdateCommittee) {}
 
 // interface ICommitteeContract {
 //     zkAppRoot: State<Field>;
-//     createCommittee: (...args: any) => Promise<void>;
+//     create: (...args: any) => Promise<void>;
 // }
 
 /**
@@ -266,7 +266,7 @@ class CommitteeContract extends SmartContract {
     reducer = Reducer({ actionType: Action });
 
     events = {
-        [EventEnum.ROLLUPED]: Field,
+        [EventEnum.PROCESSED]: Field,
     };
 
     init() {
@@ -281,13 +281,13 @@ class CommitteeContract extends SmartContract {
      * @param action Committee's information
      */
     @method
-    async createCommittee(action: Action) {
+    async create(action: Action) {
         // Verify committee threshold
         action.threshold.assertGreaterThanOrEqual(
             1,
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                'createCommittee',
+                'create',
                 ErrorEnum.COMMITTEE_THRESHOLD
             )
         );
@@ -303,7 +303,7 @@ class CommitteeContract extends SmartContract {
                     .assertFalse(
                         Utils.buildAssertMessage(
                             CommitteeContract.name,
-                            CommitteeContract.prototype.createCommittee.name,
+                            'create',
                             ErrorEnum.DUPLICATED_MEMBER
                         )
                     );
@@ -317,7 +317,7 @@ class CommitteeContract extends SmartContract {
      * @param proof Verification proof
      */
     @method
-    async updateCommittees(proof: UpdateCommitteeProof) {
+    async update(proof: UpdateCommitteeProof) {
         // Verify proof
         proof.verify();
 
@@ -341,7 +341,7 @@ class CommitteeContract extends SmartContract {
             proof.publicOutput.initialCommitteeId,
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                'updateCommittees',
+                'update',
                 ErrorEnum.NEXT_COMMITTEE_ID
             )
         );
@@ -351,7 +351,7 @@ class CommitteeContract extends SmartContract {
             proof.publicOutput.initialMemberRoot,
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                'updateCommittees',
+                'update',
                 ErrorEnum.MEMBER_ROOT
             )
         );
@@ -361,7 +361,7 @@ class CommitteeContract extends SmartContract {
             proof.publicOutput.initialSettingRoot,
             Utils.buildAssertMessage(
                 CommitteeContract.name,
-                'updateCommittees',
+                'update',
                 ErrorEnum.SETTING_ROOT
             )
         );
@@ -373,7 +373,7 @@ class CommitteeContract extends SmartContract {
         this.settingRoot.set(proof.publicOutput.nextSettingRoot);
 
         // Emit rollup event
-        this.emitEvent(EventEnum.ROLLUPED, lastActionState);
+        this.emitEvent(EventEnum.PROCESSED, lastActionState);
     }
 
     /**
