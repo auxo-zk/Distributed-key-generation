@@ -78,24 +78,74 @@ export {
 
 class Action
     extends Struct({
-        committeeId: Field,
-        keyId: Field,
-        memberId: Field,
+        packedId: Field,
         contribution: Round2Contribution,
     })
     implements ZkAppAction
 {
+    // static empty(): Action {
+    //     return new Action({
+    //         committeeId: Field(0),
+    //         keyId: Field(0),
+    //         memberId: Field(0),
+    //         contribution: Round2Contribution.empty(),
+    //     });
+    // }
+
     static empty(): Action {
         return new Action({
-            committeeId: Field(0),
-            keyId: Field(0),
-            memberId: Field(0),
+            packedId: Field(0),
             contribution: Round2Contribution.empty(),
         });
     }
+
+    static packId(committeeId: Field, keyId: Field, memberId: Field): Field {
+        let committeeIdLength =
+            Math.floor(Math.log2(INSTANCE_LIMITS.COMMITTEE)) + 1;
+        let keyIdLength = Math.floor(Math.log2(INSTANCE_LIMITS.KEY)) + 1;
+        let memberIdLength = Math.floor(Math.log2(INSTANCE_LIMITS.MEMBER)) + 1;
+
+        return Field.fromBits([
+            ...committeeId.toBits().slice(0, committeeIdLength),
+            ...keyId.toBits().slice(0, keyIdLength),
+            ...memberId.toBits().slice(0, memberIdLength),
+        ]);
+    }
+
+    static unpackId(packedId: Field): {
+        committeeId: Field;
+        keyId: Field;
+        memberId: Field;
+    } {
+        let committeeIdLength =
+            Math.floor(Math.log2(INSTANCE_LIMITS.COMMITTEE)) + 1;
+        let keyIdLength = Math.floor(Math.log2(INSTANCE_LIMITS.KEY)) + 1;
+        let memberIdLength = Math.floor(Math.log2(INSTANCE_LIMITS.MEMBER)) + 1;
+
+        return {
+            committeeId: Field.fromBits(
+                packedId.toBits().slice(0, committeeIdLength)
+            ),
+            keyId: Field.fromBits(
+                packedId
+                    .toBits()
+                    .slice(committeeIdLength, committeeIdLength + keyIdLength)
+            ),
+            memberId: Field.fromBits(
+                packedId
+                    .toBits()
+                    .slice(
+                        committeeIdLength + keyIdLength,
+                        committeeIdLength + keyIdLength + memberIdLength
+                    )
+            ),
+        };
+    }
+
     static fromFields(fields: Field[]): Action {
         return super.fromFields(fields) as Action;
     }
+
     hash(): Field {
         return Poseidon.hash(Action.toFields(this));
     }
@@ -216,7 +266,10 @@ const FinalizeRound2 = ZkProgram({
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
-                input.action.memberId.assertEquals(
+                let { committeeId, keyId, memberId } = Action.unpackId(
+                    input.action.packedId
+                );
+                memberId.assertEquals(
                     earlierProof.publicOutput.processedActions.length,
                     Utils.buildAssertMessage(
                         FinalizeRound2.name,
@@ -234,10 +287,7 @@ const FinalizeRound2 = ZkProgram({
                 );
 
                 // Verify contributionRoot using the same keyIndex
-                let keyIndex = calculateKeyIndex(
-                    input.action.committeeId,
-                    input.action.keyId
-                );
+                let keyIndex = calculateKeyIndex(committeeId, keyId);
                 keyIndex.assertEquals(
                     earlierProof.publicOutput.keyIndex,
                     Utils.buildAssertMessage(
@@ -266,7 +316,7 @@ const FinalizeRound2 = ZkProgram({
                         ErrorEnum.R2_CONTRIBUTION_INDEX_L1
                     )
                 );
-                input.action.memberId.assertEquals(
+                memberId.assertEquals(
                     contributionWitness.level2.calculateIndex(),
                     Utils.buildAssertMessage(
                         FinalizeRound2.name,
@@ -341,18 +391,12 @@ const FinalizeRound2 = ZkProgram({
                 );
 
                 return new FinalizeRound2Output({
-                    rollupRoot: earlierProof.publicOutput.rollupRoot,
-                    T: earlierProof.publicOutput.T,
-                    N: earlierProof.publicOutput.N,
-                    initialContributionRoot:
-                        earlierProof.publicOutput.initialContributionRoot,
-                    initialProcessRoot:
-                        earlierProof.publicOutput.initialProcessRoot,
-                    nextContributionRoot: nextContributionRoot,
-                    nextProcessRoot: nextProcessRoot,
-                    keyIndex: keyIndex,
-                    encryptionHashes: encryptionHashes,
-                    processedActions: processedActions,
+                    ...earlierProof.publicOutput,
+                    nextContributionRoot,
+                    nextProcessRoot,
+                    keyIndex,
+                    encryptionHashes,
+                    processedActions,
                 });
             },
         },
@@ -493,9 +537,7 @@ class Round2Contract extends SmartContract {
 
         // Create & dispatch action
         let action = new Action({
-            committeeId,
-            keyId,
-            memberId,
+            packedId: Action.packId(committeeId, keyId, memberId),
             contribution: new Round2Contribution({
                 c: proof.publicInput.c,
                 U: proof.publicInput.U,
@@ -534,8 +576,9 @@ class Round2Contract extends SmartContract {
         let encryptionRoot = this.encryptionRoot.getAndRequireEquals();
         let processRoot = this.processRoot.getAndRequireEquals();
 
-        let committeeId = proof.publicInput.action.committeeId;
-        let keyId = proof.publicInput.action.keyId;
+        let { committeeId, keyId } = Action.unpackId(
+            proof.publicInput.action.packedId
+        );
 
         // Verify CommitteeContract address
         verifyZkApp(

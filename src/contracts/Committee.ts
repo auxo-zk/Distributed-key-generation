@@ -12,6 +12,8 @@ import {
     ZkProgram,
     PublicKey,
     Void,
+    Group,
+    Bool,
 } from 'o1js';
 import { IpfsHash, Utils } from '@auxo-dev/auxo-libs';
 import {
@@ -296,17 +298,28 @@ class CommitteeContract extends SmartContract {
         // Verify committee members
         for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
             for (let j = i + 1; j < INSTANCE_LIMITS.MEMBER; j++) {
-                Poseidon.hash(action.addresses.get(Field(i)).toFields())
-                    .equals(
+                let iOutOfRange = Field(i).greaterThanOrEqual(
+                    action.addresses.length
+                );
+                let jOutOfRange = Field(j).greaterThanOrEqual(
+                    action.addresses.length
+                );
+
+                Provable.if(
+                    iOutOfRange.and(jOutOfRange),
+                    Bool(false),
+                    Poseidon.hash(
+                        action.addresses.get(Field(i)).toFields()
+                    ).equals(
                         Poseidon.hash(action.addresses.get(Field(j)).toFields())
                     )
-                    .assertFalse(
-                        Utils.buildAssertMessage(
-                            CommitteeContract.name,
-                            'create',
-                            ErrorEnum.DUPLICATED_MEMBER
-                        )
-                    );
+                ).assertFalse(
+                    Utils.buildAssertMessage(
+                        CommitteeContract.name,
+                        'create',
+                        ErrorEnum.DUPLICATED_MEMBER
+                    )
+                );
             }
         }
         this.reducer.dispatch(action);

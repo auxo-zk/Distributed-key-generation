@@ -36,7 +36,7 @@ export async function fetchAccounts(
         default:
             throw new Error('Unknown network!');
     }
-    await Promise.all(
+    return await Promise.all(
         accounts.map((e) => fetchAccount({ publicKey: e }, graphqlEndpoint))
     );
 }

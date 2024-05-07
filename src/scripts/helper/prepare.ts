@@ -76,11 +76,6 @@ export async function prepare(
                         publicKey: addresses[e],
                     },
                 });
-                // configJson.deployAliases[e] = {
-                //     ...accounts[e],
-                //     url: '',
-                //     keyPath: ''
-                // };
             } else {
                 let accountData: JSONKey = JSON.parse(
                     fs.readFileSync(configJson.deployAliases[e].keyPath, 'utf8')
@@ -98,9 +93,8 @@ export async function prepare(
     }
 
     if (networkOptions.type == Network.Lightnet) {
-        let acquiredAccounts = (await Lightnet.listAcquiredKeyPairs(
-            {}
-        )) as Key[];
+        let acquiredAccounts = ((await Lightnet.listAcquiredKeyPairs({})) ||
+            []) as Key[];
         if (acquiredAccounts.length < DEFAULT_ACCOUNTS) {
             for (
                 let i = 0;
@@ -128,6 +122,26 @@ export async function prepare(
                     {}
                 ),
         };
+    } else if (networkOptions.type == Network.Testnet) {
+        for (let i = 0; i < DEFAULT_ACCOUNTS; i++) {
+            let alias = `acc${i}`;
+            if (configJson.deployAliases[alias] !== undefined) {
+                let accountData: JSONKey = JSON.parse(
+                    fs.readFileSync(
+                        configJson.deployAliases[alias].keyPath,
+                        'utf8'
+                    )
+                );
+                Object.assign(accounts, {
+                    [i]: {
+                        privateKey: PrivateKey.fromBase58(
+                            accountData.privateKey
+                        ),
+                        publicKey: PublicKey.fromBase58(accountData.publicKey),
+                    },
+                });
+            }
+        }
     }
 
     if (

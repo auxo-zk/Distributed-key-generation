@@ -20,8 +20,8 @@
         "coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
         "format": "prettier --write --ignore-unknown **/*",
         "prepare": "husky install",
-        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-        "testw": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
+        "testw": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch --runInBand",
         "lint": "npx eslint src/* --fix",
         "publish": "rm -f package-lock.json && npm install && npm run build:publish && npm publish --access public"
     },

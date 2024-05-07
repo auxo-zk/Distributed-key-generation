@@ -11,12 +11,15 @@ let filesData: key[] = [];
 
 // Define the file names as an array
 const fileNames = [
-    'dkg.json',
-    'round1.json',
-    'round2.json',
+    // 'rollup.json',
+    // 'committee.json',
+    // 'dkg.json',
+    // 'round1.json',
+    // 'round2.json',
     'response.json',
     'request.json',
-    'committee.json',
+    'taskmanager.json',
+    'submission.json',
 ];
 
 function createFileData() {

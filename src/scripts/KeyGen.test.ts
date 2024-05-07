@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { Cache, Field, Group, Provable, Scalar, TokenId, UInt8 } from 'o1js';
 import { CustomScalar, IpfsHash, Utils } from '@auxo-dev/auxo-libs';
 import { CommitteeContract, UpdateCommittee } from '../contracts/Committee.js';
@@ -60,7 +61,7 @@ import {
 } from '../storages/RollupStorage.js';
 import { AddressStorage } from '../storages/AddressStorage.js';
 import { prepare } from './helper/prepare.js';
-import { Key, Network } from './helper/config.js';
+import { Network } from './helper/config.js';
 import { compile } from './helper/compile.js';
 import { ZkAppIndex } from '../contracts/constants.js';
 import { Rollup, RollupAction, RollupContract } from '../contracts/Rollup.js';
@@ -80,12 +81,14 @@ describe('Key generation', () => {
     const NUM_KEYS = 1;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let _: any;
-    let users: Key[] = [];
+    let users: Utils.Key[] = [];
     let rollupZkApp: Utils.ZkApp;
     let committeeZkApp: Utils.ZkApp;
     let dkgZkApp: Utils.ZkApp;
     let round1ZkApp: Utils.ZkApp;
     let round2ZkApp: Utils.ZkApp;
+    let mockSecret: any;
+    let committeeDeployed = true;
     let committees: {
         members: MemberArray;
         threshold: Field;
@@ -136,7 +139,7 @@ describe('Key generation', () => {
                 aliases: ['rollup', 'committee', 'dkg', 'round1', 'round2'],
             }
         );
-        users = [_.accounts[0], _.accounts[1]];
+        users = [_.accounts[0], _.accounts[1], _.accounts[2]];
 
         // Prepare data for test cases
         committees = [
@@ -154,8 +157,9 @@ describe('Key generation', () => {
                 members: new MemberArray([
                     users[0].publicKey,
                     users[1].publicKey,
+                    users[2].publicKey,
                 ]),
-                threshold: Field(2),
+                threshold: Field(3),
                 ipfsHash: IpfsHash.fromString(
                     'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
                 ),
@@ -311,12 +315,28 @@ describe('Key generation', () => {
         };
 
         // Deploy contract accounts
-        await Utils.deployZkApps(
-            [rollupZkApp, committeeZkApp, dkgZkApp, round1ZkApp, round2ZkApp],
-            feePayer,
-            true,
-            logger
-        );
+        if (committeeDeployed) {
+            await fetchAccounts([committeeZkApp.key.publicKey]);
+            await Utils.deployZkApps(
+                [rollupZkApp, dkgZkApp, round1ZkApp, round2ZkApp],
+                feePayer,
+                true,
+                logger
+            );
+        } else {
+            await Utils.deployZkApps(
+                [
+                    rollupZkApp,
+                    committeeZkApp,
+                    dkgZkApp,
+                    round1ZkApp,
+                    round2ZkApp,
+                ],
+                feePayer,
+                true,
+                logger
+            );
+        }
 
         // Deploy contract accounts with tokens
         await Utils.deployZkAppsWithToken(
@@ -407,11 +427,11 @@ describe('Key generation', () => {
                         Field(DkgActionEnum.GENERATE_KEY)
                     ),
                 });
-                dkgZkApp.actions?.push(DkgAction.toFields(action));
-                dkgZkApp.actionStates?.push(
+                dkgZkApp.actions.push(DkgAction.toFields(action));
+                dkgZkApp.actionStates.push(
                     dkgContract.account.actionState.get()
                 );
-                rollupZkApp.actions?.push(
+                rollupZkApp.actions.push(
                     RollupAction.toFields(
                         new RollupAction({
                             zkAppIndex: Field(ZkAppIndex.DKG),
@@ -419,7 +439,7 @@ describe('Key generation', () => {
                         })
                     )
                 );
-                rollupZkApp.actionStates?.push(
+                rollupZkApp.actionStates.push(
                     rollupContract.account.actionState.get()
                 );
                 keys.push({
@@ -625,10 +645,27 @@ describe('Key generation', () => {
         let T = Number(committee.threshold);
         let N = Number(committee.members.length);
         keys[Number(keyId)].round1Contributions = [];
+        let filename = `mock/secrets-${T}-${N}.json`;
+        let isMockSecretsUsed = fs.existsSync(filename);
+        if (isMockSecretsUsed) {
+            mockSecret = JSON.parse(fs.readFileSync(filename, 'utf8'));
+        }
 
         // Members' round 1 contribution actions
         for (let i = 0; i < N; i++) {
-            let secret = generateRandomPolynomial(T, N);
+            let secret = isMockSecretsUsed
+                ? {
+                      a: mockSecret.secrets[i].a.map((e: any) =>
+                          Scalar.from(e)
+                      ),
+                      C: mockSecret.secrets[i].C.map(
+                          (e: any) => new Group({ x: e.x, y: e.y })
+                      ),
+                      f: mockSecret.secrets[i].f.map((e: any) =>
+                          Scalar.from(e)
+                      ),
+                  }
+                : generateRandomPolynomial(T, N);
             committeeSecrets.push(secret);
             let contribution = getRound1Contribution(secret);
             let action = new Round1Action({
@@ -673,11 +710,11 @@ describe('Key generation', () => {
                 round1ZkApp.key.publicKey,
                 rollupZkApp.key.publicKey,
             ]);
-            round1ZkApp.actions?.push(Round1Action.toFields(action));
-            round1ZkApp.actionStates?.push(
+            round1ZkApp.actions.push(Round1Action.toFields(action));
+            round1ZkApp.actionStates.push(
                 round1Contract.account.actionState.get()
             );
-            rollupZkApp.actions?.push(
+            rollupZkApp.actions.push(
                 RollupAction.toFields(
                     new RollupAction({
                         zkAppIndex: Field(ZkAppIndex.ROUND1),
@@ -685,7 +722,7 @@ describe('Key generation', () => {
                     })
                 )
             );
-            rollupZkApp.actionStates?.push(
+            rollupZkApp.actionStates.push(
                 rollupContract.account.actionState.get()
             );
             keys[Number(keyId)].round1Contributions?.push(contribution);
@@ -708,7 +745,7 @@ describe('Key generation', () => {
             profiler,
             logger
         );
-        let actions = rollupZkApp.actions?.slice(NUM_KEYS, NUM_KEYS + N);
+        let actions = rollupZkApp.actions.slice(NUM_KEYS, NUM_KEYS + N);
         for (let i = 0; i < actions.length; i++) {
             let action = RollupAction.fromFields(actions[i]);
             rollupProof = await Utils.prove(
@@ -940,7 +977,8 @@ describe('Key generation', () => {
         let action = new DkgAction({
             committeeId,
             keyId,
-            key: finalizeProof.publicOutput.publicKey,
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            key: keys[Number(keyId)].key!,
             mask: DkgActionMask.createMask(
                 Field(DkgActionEnum.FINALIZE_ROUND_1)
             ),
@@ -1142,10 +1180,17 @@ describe('Key generation', () => {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         let round1Contributions = keys[Number(keyId)].round1Contributions!;
         keys[Number(keyId)].round2Contributions = [];
+        let filename = `mock/secrets-${T}-${N}.json`;
+        let isMockSecretsUsed = fs.existsSync(filename);
+        if (isMockSecretsUsed) {
+            mockSecret = JSON.parse(fs.readFileSync(filename, 'utf8'));
+        }
 
         // Members' contribution actions
         for (let i = 0; i < N; i++) {
-            let randoms = [...Array(N)].map(() => Scalar.random());
+            let randoms = isMockSecretsUsed
+                ? mockSecret.randoms[i]
+                : [...Array(N)].map(() => Scalar.random());
             let contribution = getRound2Contribution(
                 committeeSecrets[i],
                 i,
@@ -1153,9 +1198,7 @@ describe('Key generation', () => {
                 randoms
             );
             let action = new Round2Action({
-                committeeId,
-                keyId,
-                memberId: Field(i),
+                packedId: Round2Action.packId(committeeId, keyId, Field(i)),
                 contribution,
             });
 
@@ -1180,7 +1223,9 @@ describe('Key generation', () => {
                             )
                         ),
                         new RandomArray(
-                            randoms.map((e) => CustomScalar.fromScalar(e))
+                            randoms.map((e: string) =>
+                                CustomScalar.fromScalar(Scalar.from(e))
+                            )
                         )
                     ),
                 profiler,
@@ -1264,7 +1309,7 @@ describe('Key generation', () => {
             profiler,
             logger
         );
-        let actions = rollupZkApp.actions?.slice(
+        let actions = rollupZkApp.actions.slice(
             NUM_KEYS + N + 1,
             NUM_KEYS + 2 * N + 1
         );
@@ -1373,6 +1418,9 @@ describe('Key generation', () => {
         for (let i = 0; i < N; i++) {
             let action = Round2Action.fromFields(round2ZkApp.actions[i]);
             let actionId = Field(i);
+            let { committeeId, keyId, memberId } = Round2Action.unpackId(
+                action.packedId
+            );
             finalizeProof = await Utils.prove(
                 FinalizeRound2.name,
                 'finalize',
@@ -1386,11 +1434,11 @@ describe('Key generation', () => {
                         finalizeProof,
                         round2ContributionStorage.getWitness(
                             Round2ContributionStorage.calculateLevel1Index({
-                                committeeId: action.committeeId,
-                                keyId: action.keyId,
+                                committeeId,
+                                keyId,
                             }),
                             Round2ContributionStorage.calculateLevel2Index(
-                                action.memberId
+                                memberId
                             )
                         ),
                         rollupStorage.getWitness(
@@ -1410,30 +1458,30 @@ describe('Key generation', () => {
                 {
                     level1Index: Round2ContributionStorage.calculateLevel1Index(
                         {
-                            committeeId: action.committeeId,
-                            keyId: action.keyId,
+                            committeeId,
+                            keyId,
                         }
                     ),
-                    level2Index: Round2ContributionStorage.calculateLevel2Index(
-                        action.memberId
-                    ),
+                    level2Index:
+                        Round2ContributionStorage.calculateLevel2Index(
+                            memberId
+                        ),
                 },
                 action.contribution
             );
             encryptionStorage.updateRawLeaf(
                 {
                     level1Index: EncryptionStorage.calculateLevel1Index({
-                        committeeId: action.committeeId,
-                        keyId: action.keyId,
+                        committeeId,
+                        keyId,
                     }),
-                    level2Index: EncryptionStorage.calculateLevel2Index(
-                        action.memberId
-                    ),
+                    level2Index:
+                        EncryptionStorage.calculateLevel2Index(memberId),
                 },
                 {
                     contributions:
                         keys[Number(keyId)].round2Contributions || [],
-                    memberId: action.memberId,
+                    memberId,
                 }
             );
             round2ProcessStorage.updateRawLeaf(

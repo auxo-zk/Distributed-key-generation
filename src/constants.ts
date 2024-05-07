@@ -14,7 +14,7 @@ export {
 /**
  * Maximum amount of action processed in a recursive proof
  */
-const ACTION_PROCESS_LIMITS = 8;
+const ACTION_PROCESS_LIMITS = 10;
 
 /**
  * The size of an index value in bits for packing indices array
@@ -25,19 +25,19 @@ const INDEX_SIZE = 6;
  * Maximum amount for each entity
  */
 const INSTANCE_LIMITS = {
-    ACTION: 2 ** 5,
+    ACTION: 2 ** 8,
     ADDRESS: 2 ** 4,
-    MEMBER: 2,
-    COMMITTEE: 2 ** 5,
-    KEY: 2 ** 5,
-    REQUEST: 2 ** 5,
+    MEMBER: 3,
+    COMMITTEE: 2 ** 8,
+    KEY: 2 ** 8,
+    REQUEST: 2 ** 8,
     REQUESTER: 2 ** 3,
 };
 
 const ENCRYPTION_LIMITS = {
     DIMENSION: 2,
-    FULL_DIMENSION: 3,
-    SUBMISSION: 2 ** 5,
+    FULL_DIMENSION: 10,
+    SUBMISSION: 2 ** 8,
 };
 
 /**

@@ -144,6 +144,8 @@ describe('Key usage', () => {
     let taskManagerZkApp: Utils.ZkApp;
     let submissionZkApp: Utils.ZkApp;
     let requesterZkApp: Utils.ZkApp;
+    let mockSecret: any;
+    let dkgDeployed = true;
     let committees: {
         members: MemberArray;
         threshold: Field;
@@ -159,7 +161,6 @@ describe('Key usage', () => {
     let committeeSecrets: SecretPolynomial[] = [];
     let committeeId = Field(0);
     let keyId = Field(0);
-    let mockSecret: any;
     const NUM_TASKS = 1;
     const SUBMISSION_PERIOD = 1.5 * 60 * 1000; //ms
 
@@ -255,7 +256,7 @@ describe('Key usage', () => {
                 ],
             }
         );
-        users = [_.accounts[0], _.accounts[1]];
+        users = [_.accounts[0], _.accounts[1], _.accounts[2]];
 
         // Prepare data for test cases
         committees = [
@@ -265,6 +266,17 @@ describe('Key usage', () => {
                     users[1].publicKey,
                 ]),
                 threshold: Field(1),
+                ipfsHash: IpfsHash.fromString(
+                    'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
+                ),
+            },
+            {
+                members: new MemberArray([
+                    users[0].publicKey,
+                    users[1].publicKey,
+                    users[2].publicKey,
+                ]),
+                threshold: Field(3),
                 ipfsHash: IpfsHash.fromString(
                     'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
                 ),
@@ -397,7 +409,6 @@ describe('Key usage', () => {
         keys[0].round2Contributions = [];
         let filename = `mock/secrets-${T}-${N}.json`;
         let isMockSecretsUsed = fs.existsSync(filename);
-        console.log('Using mock secrets:', isMockSecretsUsed);
         if (isMockSecretsUsed) {
             mockSecret = JSON.parse(fs.readFileSync(filename, 'utf8'));
         }
@@ -617,23 +628,45 @@ describe('Key usage', () => {
         };
 
         // Deploy contract accounts
-        await Utils.deployZkApps(
-            [
-                rollupZkApp,
-                committeeZkApp,
-                dkgZkApp,
-                round1ZkApp,
-                round2ZkApp,
-                requestZkApp,
-                responseZkApp,
-                requesterZkApp,
-                taskManagerZkApp,
-                submissionZkApp,
-            ],
-            feePayer,
-            true,
-            logger
-        );
+        if (dkgDeployed) {
+            await fetchAccounts([
+                rollupZkApp.key.publicKey,
+                committeeZkApp.key.publicKey,
+                dkgZkApp.key.publicKey,
+                round1ZkApp.key.publicKey,
+                round2ZkApp.key.publicKey,
+            ]);
+            await Utils.deployZkApps(
+                [
+                    requestZkApp,
+                    responseZkApp,
+                    requesterZkApp,
+                    taskManagerZkApp,
+                    submissionZkApp,
+                ],
+                feePayer,
+                true,
+                logger
+            );
+        } else {
+            await Utils.deployZkApps(
+                [
+                    rollupZkApp,
+                    committeeZkApp,
+                    dkgZkApp,
+                    round1ZkApp,
+                    round2ZkApp,
+                    requestZkApp,
+                    responseZkApp,
+                    requesterZkApp,
+                    taskManagerZkApp,
+                    submissionZkApp,
+                ],
+                feePayer,
+                true,
+                logger
+            );
+        }
 
         // Deploy contract accounts with tokens
         await Utils.deployZkAppsWithToken(

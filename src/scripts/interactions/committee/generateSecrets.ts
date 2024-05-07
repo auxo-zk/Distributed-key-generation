@@ -6,8 +6,8 @@ import {
 import { Scalar } from 'o1js';
 
 async function main() {
-    const T = 1,
-        N = 2;
+    const T = 3,
+        N = 3;
     const filename = `mock/secrets-${T}-${N}.json`;
     let data: {
         secrets: SecretPolynomial[];

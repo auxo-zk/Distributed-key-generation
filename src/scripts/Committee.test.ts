@@ -14,15 +14,17 @@ import { MemberArray } from '../libs/Committee.js';
 import { MemberStorage, SettingStorage } from '../storages/CommitteeStorage.js';
 import { prepare } from './helper/prepare.js';
 import { Network } from './helper/config.js';
+import { fetchAccounts } from './helper/index.js';
 
 describe('DKG Committee', () => {
-    const doProofs = false;
+    const doProofs = true;
     const profiler = Utils.getProfiler('committee', fs);
     const logger = {
         info: true,
-        debug: true,
+        error: true,
     };
     let _: any;
+    let users: Utils.Key[] = [];
     let committeeZkApp: Utils.ZkApp;
     let memberStorage = new MemberStorage();
     let settingStorage = new SettingStorage();
@@ -35,28 +37,30 @@ describe('DKG Committee', () => {
     beforeAll(async () => {
         _ = await prepare(
             './caches',
-            { type: Network.Local, doProofs },
+            { type: Network.Lightnet, doProofs },
             {
-                aliases: ['committee', 'user1', 'user2', 'user3'],
+                aliases: ['committee'],
             }
         );
-        await Utils.compile(UpdateCommittee, _.cache, profiler);
+        users = [_.accounts[0], _.accounts[1], _.accounts[2]];
+        await Utils.compile(UpdateCommittee, _.cache, profiler, logger);
         if (doProofs) {
-            await Utils.compile(CommitteeContract, _.cache, profiler);
+            await Utils.compile(CommitteeContract, _.cache, profiler, logger);
         }
         committeeZkApp = Utils.getZkApp(
             _.accounts.committee,
             new CommitteeContract(_.accounts.committee.publicKey),
             CommitteeContract.name
         );
-        await Utils.deployZkApps([committeeZkApp], _.feePayer);
+        await Utils.deployZkApps([committeeZkApp], _.feePayer, true, logger);
+        // await fetchAccounts([committeeZkApp.key.publicKey]);
     });
 
     it('Should create committee with config T = 1, N = 2', async () => {
-        let { accounts, feePayer } = _;
+        let { feePayer } = _;
         let memberArray = new MemberArray([
-            accounts.user1.publicKey,
-            accounts.user2.publicKey,
+            users[0].publicKey,
+            users[1].publicKey,
         ]);
 
         let action = new CommitteeAction({
@@ -73,9 +77,11 @@ describe('DKG Committee', () => {
             'create',
             async () => committeeContract.create(action),
             feePayer,
-            undefined,
-            profiler
+            true,
+            profiler,
+            logger
         );
+        await fetchAccounts([committeeZkApp.key.publicKey]);
 
         committees.push({
             members: action.addresses,
@@ -86,11 +92,11 @@ describe('DKG Committee', () => {
     });
 
     it('Should create committee with config T = 3, N = 3', async () => {
-        let { accounts, feePayer } = _;
+        let { feePayer } = _;
         let memberArray = new MemberArray([
-            accounts.user1.publicKey,
-            accounts.user2.publicKey,
-            accounts.user3.publicKey,
+            users[0].publicKey,
+            users[1].publicKey,
+            users[2].publicKey,
         ]);
 
         let action = new CommitteeAction({
@@ -106,8 +112,12 @@ describe('DKG Committee', () => {
             CommitteeContract.name,
             'create',
             async () => committeeContract.create(action),
-            feePayer
+            feePayer,
+            true,
+            profiler,
+            logger
         );
+        await fetchAccounts([committeeZkApp.key.publicKey]);
 
         committees.push({
             members: action.addresses,
@@ -115,59 +125,6 @@ describe('DKG Committee', () => {
             ipfsHash: action.ipfsHash,
         });
         committeeZkApp.actions!.push(CommitteeAction.toFields(action));
-    });
-
-    it('Should not create committee with duplicated members', async () => {
-        let { accounts, feePayer } = _;
-        let memberArray = new MemberArray([
-            accounts.user1.publicKey,
-            accounts.user2.publicKey,
-            accounts.user1.publicKey,
-        ]);
-
-        let action = new CommitteeAction({
-            addresses: memberArray,
-            threshold: Field(1),
-            ipfsHash: IpfsHash.fromString(
-                'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
-            ),
-        });
-
-        let committeeContract = committeeZkApp.contract as CommitteeContract;
-        expect(
-            Utils.proveAndSendTx(
-                CommitteeContract.name,
-                'create',
-                async () => committeeContract.create(action),
-                feePayer
-            )
-        ).rejects.toThrow();
-    });
-
-    it('Should not create committee with threshold T = 0', async () => {
-        let { accounts, feePayer } = _;
-        let memberArray = new MemberArray([
-            accounts.user1.publicKey,
-            accounts.user2.publicKey,
-        ]);
-
-        let action = new CommitteeAction({
-            addresses: memberArray,
-            threshold: Field(0),
-            ipfsHash: IpfsHash.fromString(
-                'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
-            ),
-        });
-
-        let committeeContract = committeeZkApp.contract as CommitteeContract;
-        expect(
-            Utils.proveAndSendTx(
-                CommitteeContract.name,
-                'create',
-                async () => committeeContract.create(action),
-                feePayer
-            )
-        ).rejects.toThrow();
     });
 
     it('Should rollup actions and update committees...', async () => {
@@ -229,19 +186,76 @@ describe('DKG Committee', () => {
             profiler,
             logger
         );
+        await fetchAccounts([committeeZkApp.key.publicKey]);
 
-        Provable.log(memberStorage.root);
-        Provable.log(committeeContract.memberRoot.get());
         expect(committeeContract.memberRoot.get()).toEqual(memberStorage.root);
         expect(committeeContract.settingRoot.get()).toEqual(
             settingStorage.root
         );
     });
 
+    it('Should not create committee with duplicated members', async () => {
+        let { feePayer } = _;
+        let memberArray = new MemberArray([
+            users[0].publicKey,
+            users[1].publicKey,
+            users[0].publicKey,
+        ]);
+
+        let action = new CommitteeAction({
+            addresses: memberArray,
+            threshold: Field(1),
+            ipfsHash: IpfsHash.fromString(
+                'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
+            ),
+        });
+
+        let committeeContract = committeeZkApp.contract as CommitteeContract;
+        expect(
+            Utils.proveAndSendTx(
+                CommitteeContract.name,
+                'create',
+                async () => committeeContract.create(action),
+                feePayer,
+                true,
+                undefined,
+                logger
+            )
+        ).rejects.toThrow();
+    });
+
+    it('Should not create committee with threshold T = 0', async () => {
+        let { accounts, feePayer } = _;
+        let memberArray = new MemberArray([
+            users[0].publicKey,
+            users[1].publicKey,
+        ]);
+
+        let action = new CommitteeAction({
+            addresses: memberArray,
+            threshold: Field(0),
+            ipfsHash: IpfsHash.fromString(
+                'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
+            ),
+        });
+
+        let committeeContract = committeeZkApp.contract as CommitteeContract;
+        expect(
+            Utils.proveAndSendTx(
+                CommitteeContract.name,
+                'create',
+                async () => committeeContract.create(action),
+                feePayer,
+                true,
+                undefined,
+                logger
+            )
+        ).rejects.toThrow();
+    });
+
     it('Should verify committee membership', async () => {
-        let { accounts } = _;
         let memberVerification = new CommitteeMemberInput({
-            address: accounts.user1.publicKey,
+            address: users[0].publicKey,
             committeeId: Field(0),
             memberId: Field(0),
             memberWitness: memberStorage.getWitness(Field(0), Field(0)),
@@ -251,13 +265,12 @@ describe('DKG Committee', () => {
     });
 
     it('Should verify committee non-membership', async () => {
-        let { accounts } = _;
         // Check if member belong to committeeId
         let memberVerification = new CommitteeMemberInput({
-            address: accounts.user3.publicKey,
+            address: users[2].publicKey,
             committeeId: Field(0),
-            memberId: Field(1),
-            memberWitness: memberStorage.getWitness(Field(0), Field(1)),
+            memberId: Field(2),
+            memberWitness: memberStorage.getWitness(Field(0), Field(2)),
         });
         let committeeContract = committeeZkApp.contract as CommitteeContract;
         expect(() =>
