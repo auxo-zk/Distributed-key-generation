@@ -647,6 +647,7 @@ describe('Key generation', () => {
         keys[Number(keyId)].round1Contributions = [];
         let filename = `mock/secrets-${T}-${N}.json`;
         let isMockSecretsUsed = fs.existsSync(filename);
+        console.log('Is mock secret used:', isMockSecretsUsed);
         if (isMockSecretsUsed) {
             mockSecret = JSON.parse(fs.readFileSync(filename, 'utf8'));
         }
@@ -674,6 +675,7 @@ describe('Key generation', () => {
                 memberId: Field(i),
                 contribution,
             });
+            Provable.log(`Member ${i} round 1 contribution`, contribution.C);
             let memberWitness = memberStorage.getWitness(
                 MemberStorage.calculateLevel1Index(committeeId),
                 MemberStorage.calculateLevel2Index(Field(i))
@@ -1182,6 +1184,7 @@ describe('Key generation', () => {
         keys[Number(keyId)].round2Contributions = [];
         let filename = `mock/secrets-${T}-${N}.json`;
         let isMockSecretsUsed = fs.existsSync(filename);
+        console.log('Is mock secret used:', isMockSecretsUsed);
         if (isMockSecretsUsed) {
             mockSecret = JSON.parse(fs.readFileSync(filename, 'utf8'));
         }
@@ -1197,11 +1200,13 @@ describe('Key generation', () => {
                 round1Contributions,
                 randoms
             );
+            Provable.log(`Member ${i} round 2 contribution:`);
+            Provable.log(contribution.c);
+            Provable.log(contribution.U);
             let action = new Round2Action({
                 packedId: Round2Action.packId(committeeId, keyId, Field(i)),
                 contribution,
             });
-
             let encryptionProof = await Utils.prove(
                 BatchEncryption.name,
                 'encrypt',
@@ -1223,7 +1228,7 @@ describe('Key generation', () => {
                             )
                         ),
                         new RandomArray(
-                            randoms.map((e: string) =>
+                            randoms.map((e: any) =>
                                 CustomScalar.fromScalar(Scalar.from(e))
                             )
                         )

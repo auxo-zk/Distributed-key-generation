@@ -404,7 +404,6 @@ class ScalarVectorStorage extends GenericStorage<ScalarVectorLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
-            level2Index: Field;
             leaf: ScalarVectorLeaf | Field;
             isRaw: boolean;
         }[]

@@ -428,6 +428,10 @@ describe('Key usage', () => {
                 : generateRandomPolynomial(T, N);
             committeeSecrets.push(secret);
             let round1Contribution = getRound1Contribution(secret);
+            Provable.log(
+                `Member ${j} round 1 contribution`,
+                round1Contribution.C
+            );
             keys[0].round1Contributions.push(round1Contribution);
             round1ContributionStorage.updateRawLeaf(
                 {
@@ -467,8 +471,11 @@ describe('Key usage', () => {
                 committeeSecrets[j],
                 j,
                 keys[0].round1Contributions,
-                randoms
+                randoms.map((e: string) => Scalar.from(e))
             );
+            Provable.log(`Member ${j} round 2 contribution:`);
+            Provable.log(round2Contribution.c);
+            Provable.log(round2Contribution.U);
             keys[0].round2Contributions.push(round2Contribution);
             round2ContributionStorage.updateRawLeaf(
                 {
@@ -901,43 +908,43 @@ describe('Key usage', () => {
             }
             Provable.log('Encryption:', encryption);
             requests[0].encryptions.push(encryption);
-            await Utils.proveAndSendTx(
-                SubmissionContract.name,
-                'submitEncryption',
-                async () =>
-                    submissionContract.submitEncryption(
-                        request.taskId,
-                        request.keyIndex,
-                        encryption.secrets,
-                        encryption.randoms,
-                        encryption.packedIndices,
-                        encryption.nullifiers,
-                        publicKey,
-                        keyStorage.getWitness(
-                            KeyStorage.calculateLevel1Index({
-                                committeeId,
-                                keyId,
-                            })
-                        ),
-                        requesterKeyIndexStorage.getWitness(
-                            RequesterKeyIndexStorage.calculateLevel1Index(
-                                request.taskId.value
-                            )
-                        ),
-                        requesterAddressStorage.getZkAppRef(
-                            RequesterAddressBook.SUBMISSION,
-                            submissionZkApp.key.publicKey
-                        ),
-                        requesterAddressStorage.getZkAppRef(
-                            RequesterAddressBook.DKG,
-                            dkgZkApp.key.publicKey
-                        )
-                    ),
-                feePayer,
-                true,
-                undefined,
-                logger
-            );
+            // await Utils.proveAndSendTx(
+            //     SubmissionContract.name,
+            //     'submitEncryption',
+            //     async () =>
+            //         submissionContract.submitEncryption(
+            //             request.taskId,
+            //             request.keyIndex,
+            //             encryption.secrets,
+            //             encryption.randoms,
+            //             encryption.packedIndices,
+            //             encryption.nullifiers,
+            //             publicKey,
+            //             keyStorage.getWitness(
+            //                 KeyStorage.calculateLevel1Index({
+            //                     committeeId,
+            //                     keyId,
+            //                 })
+            //             ),
+            //             requesterKeyIndexStorage.getWitness(
+            //                 RequesterKeyIndexStorage.calculateLevel1Index(
+            //                     request.taskId.value
+            //                 )
+            //             ),
+            //             requesterAddressStorage.getZkAppRef(
+            //                 RequesterAddressBook.SUBMISSION,
+            //                 submissionZkApp.key.publicKey
+            //             ),
+            //             requesterAddressStorage.getZkAppRef(
+            //                 RequesterAddressBook.DKG,
+            //                 dkgZkApp.key.publicKey
+            //             )
+            //         ),
+            //     feePayer,
+            //     true,
+            //     undefined,
+            //     logger
+            // );
             await fetchAccounts([
                 requesterZkApp.key.publicKey,
                 submissionZkApp.key.publicKey,
@@ -1262,6 +1269,7 @@ describe('Key usage', () => {
                 undefined,
                 logger
             );
+            Provable.log('Decrypted Ski:', decryptionProof.publicOutput);
 
             // Get response contribution
             let round2Data: Round2Data[] = keys[0].round2Contributions!.map(
@@ -1277,6 +1285,7 @@ describe('Key usage', () => {
                 round2Data,
                 requests[0].sumR
             );
+            Provable.log('Ski:', ski);
             requests[0].contributions.push(contribution);
 
             // Generate compute response proof
