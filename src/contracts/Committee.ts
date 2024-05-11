@@ -39,7 +39,6 @@ export {
     UpdateCommitteeOutput,
     UpdateCommittee,
     UpdateCommitteeProof,
-    // ICommitteeContract,
     CommitteeContract,
 };
 

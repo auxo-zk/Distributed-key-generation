@@ -41,7 +41,7 @@ import {
 import { BatchDecryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
 import { Round2Contract } from './Round2.js';
-import { INSTANCE_LIMITS } from '../constants.js';
+import { ENCRYPTION_LIMITS, INSTANCE_LIMITS } from '../constants.js';
 import {
     ADDRESS_MT,
     ZkAppRef,
@@ -69,6 +69,9 @@ import { RequestContract } from './Request.js';
 
 export {
     Action as ResponseAction,
+    FinalizedEvent,
+    RespondedDArrayEvent,
+    FinalizedDArrayEvent,
     ComputeResponseOutput,
     ComputeResponse,
     ComputeResponseProof,
@@ -107,9 +110,21 @@ class Action
     }
 }
 
-class FinalizeEvent extends Struct({
+class FinalizedEvent extends Struct({
+    requestId: Field,
     actions: ProcessedContributions,
-    D: DArray,
+}) {}
+
+class RespondedDArrayEvent extends Struct({
+    requestId: Field,
+    dimensionIndex: UInt8,
+    Di: Group,
+}) {}
+
+class FinalizedDArrayEvent extends Struct({
+    requestId: Field,
+    dimensionIndex: UInt8,
+    Di: Group,
 }) {}
 
 class ComputeResponseOutput extends Struct({
@@ -117,6 +132,7 @@ class ComputeResponseOutput extends Struct({
     responseRootD: Field,
     skiCommitment: Group,
     dimension: UInt8,
+    responseVector: DArray,
 }) {}
 
 const ComputeResponse = ZkProgram({
@@ -131,6 +147,7 @@ const ComputeResponse = ZkProgram({
                     responseRootD: REQUEST_LEVEL_2_TREE().getRoot(),
                     skiCommitment: Group.generator.scale(ski.toScalar()),
                     dimension: UInt8.from(0),
+                    responseVector: new DArray(),
                 });
             },
         },
@@ -647,7 +664,9 @@ class ResponseContract extends SmartContract {
     reducer = Reducer({ actionType: Action });
 
     events = {
-        [EventEnum.PROCESSED]: FinalizeEvent,
+        [EventEnum.RespondedDArray]: RespondedDArrayEvent,
+        [EventEnum.FinalizedDArray]: FinalizedDArrayEvent,
+        [EventEnum.PROCESSED]: FinalizedEvent,
     };
 
     init() {
@@ -743,10 +762,10 @@ class ResponseContract extends SmartContract {
         const requestContract = new RequestContract(request.address);
         const rollupContract = new RollupContract(rollup.address);
 
-        // FIXME - "Option.value_exn None" error
-        // // Verify decryption proof
-        // decryptionProof.verify();
+        // Verify decryption proof
+        decryptionProof.verify();
 
+        // FIXME - "Option.value_exn None" error
         // // Verify keyId
         // keyId.assertLessThanOrEqual(
         //     INSTANCE_LIMITS.KEY,
@@ -810,8 +829,8 @@ class ResponseContract extends SmartContract {
         //     accumulationWitness
         // );
 
-        // // Verify response proof
-        // responseProof.verify();
+        // Verify response proof
+        responseProof.verify();
         // responseProof.publicOutput.skiCommitment.assertEquals(
         //     decryptionProof.publicOutput,
         //     Utils.buildAssertMessage(
@@ -835,6 +854,17 @@ class ResponseContract extends SmartContract {
         // Record action for rollup
         selfRef.address.assertEquals(this.address);
         await rollupContract.recordAction(action.hash(), selfRef);
+
+        for (let i = 0; i < ENCRYPTION_LIMITS.FULL_DIMENSION; i++) {
+            this.emitEvent(
+                EventEnum.FinalizedDArray,
+                new RespondedDArrayEvent({
+                    requestId,
+                    dimensionIndex: UInt8.from(i),
+                    Di: responseProof.publicOutput.responseVector.get(Field(i)),
+                })
+            );
+        }
     }
 
     /**
@@ -860,6 +890,8 @@ class ResponseContract extends SmartContract {
         let contributionRoot = this.contributionRoot.getAndRequireEquals();
         let processRoot = this.processRoot.getAndRequireEquals();
         let responseRoot = this.responseRoot.getAndRequireEquals();
+
+        let requestId = proof.publicOutput.requestId;
 
         // Verify CommitteeContract address
         verifyZkApp(
@@ -970,12 +1002,23 @@ class ResponseContract extends SmartContract {
         this.responseRoot.set(nextResponseRoot);
         this.processRoot.set(proof.publicOutput.nextProcessRoot);
 
+        for (let i = 0; i < ENCRYPTION_LIMITS.FULL_DIMENSION; i++) {
+            this.emitEvent(
+                EventEnum.FinalizedDArray,
+                new FinalizedDArrayEvent({
+                    requestId,
+                    dimensionIndex: UInt8.from(i),
+                    Di: proof.publicOutput.responseVector.get(Field(i)),
+                })
+            );
+        }
+
         // Emit events
         this.emitEvent(
             EventEnum.PROCESSED,
-            new FinalizeEvent({
+            new FinalizedEvent({
+                requestId,
                 actions: proof.publicOutput.processedActions,
-                D: proof.publicOutput.responseVector,
             })
         );
     }

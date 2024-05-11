@@ -12,14 +12,14 @@ import { ErrorEnum } from '../contracts/constants.js';
 import { GenericStorage, Witness } from './GenericStorage.js';
 
 export {
+    PROCESS_MT,
+    PROCESS_WITNESS,
+    processAction,
     ProcessMT,
     ProcessWitness,
     ProcessedActions,
     ProcessLeaf,
     ProcessStorage,
-    PROCESS_MT,
-    PROCESS_WITNESS,
-    processAction,
 };
 
 const PROCESS_TREE_HEIGHT = Math.ceil(Math.log2(INSTANCE_LIMITS.ACTION)) + 1;

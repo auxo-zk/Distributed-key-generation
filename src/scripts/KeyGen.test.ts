@@ -136,7 +136,18 @@ describe('Key generation', () => {
             './caches',
             { type: Network.Lightnet, doProofs },
             {
-                aliases: ['rollup', 'committee', 'dkg', 'round1', 'round2'],
+                aliases: [
+                    'rollup',
+                    'committee',
+                    'dkg',
+                    'round1',
+                    'round2',
+                    'request',
+                    'requester',
+                    'response',
+                    'taskmanager',
+                    'submission',
+                ],
             }
         );
         users = [_.accounts[0], _.accounts[1], _.accounts[2]];
@@ -220,6 +231,14 @@ describe('Key generation', () => {
         sharedAddressStorage.updateAddress(
             Field(ZkAppIndex.ROUND2),
             accounts.round2.publicKey
+        );
+        sharedAddressStorage.updateAddress(
+            Field(ZkAppIndex.REQUEST),
+            accounts.request.publicKey
+        );
+        sharedAddressStorage.updateAddress(
+            Field(ZkAppIndex.RESPONSE),
+            accounts.response.publicKey
         );
 
         // Calculate mock committee trees

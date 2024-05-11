@@ -99,6 +99,10 @@ class KeyIndexStorage extends GenericStorage<KeyIndexLeaf> {
         return KeyIndexStorage.calculateLevel1Index(requestId);
     }
 
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
+    }
+
     getWitness(level1Index: Field): Level1Witness {
         return super.getWitness(level1Index) as Level1Witness;
     }
@@ -154,6 +158,10 @@ class TaskIdStorage extends GenericStorage<TaskIdLeaf> {
         return TaskIdStorage.calculateLevel1Index(requestId);
     }
 
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
+    }
+
     getWitness(level1Index: Field): Level1Witness {
         return super.getWitness(level1Index) as Level1Witness;
     }
@@ -202,6 +210,10 @@ class ExpirationStorage extends GenericStorage<ExpirationLeaf> {
 
     calculateLevel1Index(requestId: Field): Field {
         return ExpirationStorage.calculateLevel1Index(requestId);
+    }
+
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
     }
 
     getWitness(level1Index: Field): Level1Witness {
@@ -254,14 +266,9 @@ class ResultStorage extends GenericStorage<ResultLeaf> {
         return ResultStorage.calculateLevel1Index(requestId);
     }
 
-    static calculateLevel2Index(dimensionIndex: Field): Field {
-        return dimensionIndex;
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
     }
-
-    calculateLevel2Index(dimensionIndex: Field): Field {
-        return ResultStorage.calculateLevel2Index(dimensionIndex);
-    }
-
     getWitness(level1Index: Field): Level1Witness {
         return super.getWitness(level1Index) as Level1Witness;
     }
@@ -319,6 +326,10 @@ class AccumulationStorage extends GenericStorage<AccumulationLeaf> {
 
     calculateLevel1Index(requestId: Field): Field {
         return AccumulationStorage.calculateLevel1Index(requestId);
+    }
+
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
     }
 
     getWitness(level1Index: Field): Level1Witness {
@@ -379,6 +390,10 @@ class GroupVectorStorage extends GenericStorage<GroupVectorLeaf> {
         return GroupVectorStorage.calculateLevel1Index(dimensionIndex);
     }
 
+    getLevel1Witness(level1Index: Field): Level2Witness {
+        return super.getLevel1Witness(level1Index) as Level2Witness;
+    }
+
     getWitness(level1Index: Field): Level2Witness {
         return super.getWitness(level1Index) as Level2Witness;
     }
@@ -431,6 +446,10 @@ class ScalarVectorStorage extends GenericStorage<ScalarVectorLeaf> {
 
     calculateLevel1Index(dimensionIndex: Field): Field {
         return ScalarVectorStorage.calculateLevel1Index(dimensionIndex);
+    }
+
+    getLevel1Witness(level1Index: Field): Level2Witness {
+        return super.getLevel1Witness(level1Index) as Level2Witness;
     }
 
     getWitness(level1Index: Field): Level2Witness {

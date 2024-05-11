@@ -93,23 +93,31 @@ export async function prepare(
     }
 
     if (networkOptions.type == Network.Lightnet) {
-        let acquiredAccounts = ((await Lightnet.listAcquiredKeyPairs({})) ||
-            []) as Key[];
-        if (acquiredAccounts.length < DEFAULT_ACCOUNTS) {
-            for (
-                let i = 0;
-                i < DEFAULT_ACCOUNTS - acquiredAccounts.length;
-                i++
-            ) {
-                await Lightnet.acquireKeyPair();
-            }
-        }
-        acquiredAccounts = (await Lightnet.listAcquiredKeyPairs({})) as Key[];
-        for (let i = 0; i < acquiredAccounts.length; i++) {
+        // let acquiredAccounts = ((await Lightnet.listAcquiredKeyPairs({})) ||
+        //     []) as Key[];
+        // if (acquiredAccounts.length < DEFAULT_ACCOUNTS) {
+        for (let i = 0; i < DEFAULT_ACCOUNTS; i++) {
+            let accountData: JSONKey = JSON.parse(
+                fs.readFileSync(
+                    configJson.deployAliases[`lightnet${i}`].keyPath,
+                    'utf8'
+                )
+            );
             Object.assign(accounts, {
-                [i]: acquiredAccounts[i],
+                [i]: {
+                    privateKey: PrivateKey.fromBase58(accountData.privateKey),
+                    publicKey: PublicKey.fromBase58(accountData.publicKey),
+                },
             });
         }
+        // }
+        // acquiredAccounts = (await Lightnet.listAcquiredKeyPairs({})) as Key[];
+
+        // for (let i = 0; i < acquiredAccounts.length; i++) {
+        //     Object.assign(accounts, {
+        //         [i]: acquiredAccounts[i],
+        //     });
+        // }
     } else if (networkOptions.type == Network.Local) {
         accounts = {
             ...accounts,

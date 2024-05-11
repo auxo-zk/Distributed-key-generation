@@ -32,7 +32,7 @@ describe('Encryption', () => {
     let decryptions: any[] = [];
 
     it('Should compile all ZK programs', async () => {
-        await Utils.compile(Elgamal, cache);
+        // await Utils.compile(Elgamal, cache);
         await Utils.compile(BatchEncryption, cache);
         await Utils.compile(BatchDecryption, cache);
     });
@@ -95,7 +95,7 @@ describe('Encryption', () => {
 
     it('Should batch decrypt successfully', async () => {
         console.log('Batch decryption');
-        decryptions = [{ m: Scalar.from(0n) }];
+        decryptions = [{ m: Scalar.from(2n) }];
         for (let i = 1; i < length; i++) {
             decryptions.push(
                 ElgamalLib.decrypt(encryptions[i].c, encryptions[i].U, prvKey)

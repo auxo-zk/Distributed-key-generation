@@ -11,7 +11,9 @@ import { GenericStorage, Witness } from './GenericStorage.js';
 
 export {
     EMPTY_LEVEL_1_TREE as COMMITTEE_LEVEL_1_TREE,
+    LEVEL_1_WITNESS as COMMITTEE_LEVEL_1_WITNESS,
     EMPTY_LEVEL_2_TREE as COMMITTEE_LEVEL_2_TREE,
+    LEVEL_2_WITNESS as COMMITTEE_LEVEL_2_WITNESS,
     Level1MT as CommitteeLevel1MT,
     Level1Witness as CommitteeLevel1Witness,
     Level2MT as CommitteeLevel2MT,
@@ -198,6 +200,10 @@ class KeyCounterStorage extends GenericStorage<KeyCounterLeaf> {
 
     calculateLevel1Index(committeeId: Field): Field {
         return KeyCounterStorage.calculateLevel1Index(committeeId);
+    }
+
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
     }
 
     getWitness(level1Index: Field): Level1Witness {

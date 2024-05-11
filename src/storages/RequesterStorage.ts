@@ -139,6 +139,10 @@ class KeyIndexStorage extends GenericStorage<KeyIndexLeaf> {
         return KeyIndexStorage.calculateLevel1Index(taskId);
     }
 
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
+    }
+
     getWitness(level1Index: Field): Level1Witness {
         return super.getWitness(level1Index) as Level1Witness;
     }
@@ -182,6 +186,10 @@ class TimestampStorage extends GenericStorage<TimestampLeaf> {
 
     static calculateLevel1Index(taskId: Field): Field {
         return taskId;
+    }
+
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
     }
 
     calculateLevel1Index(taskId: Field): Field {
@@ -244,6 +252,10 @@ class AccumulationStorage extends GenericStorage<AccumulationLeaf> {
         return AccumulationStorage.calculateLevel1Index(taskId);
     }
 
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
+    }
+
     getWitness(level1Index: Field): Level1Witness {
         return super.getWitness(level1Index) as Level1Witness;
     }
@@ -293,6 +305,10 @@ class CommitmentStorage extends GenericStorage<CommitmentLeaf> {
 
     calculateLevel1Index(index: Field): Field {
         return CommitmentStorage.calculateLevel1Index(index);
+    }
+
+    getLevel1Witness(level1Index: Field): Level1Witness {
+        return super.getLevel1Witness(level1Index) as Level1Witness;
     }
 
     getWitness(level1Index: Field): CommitmentWitness {

@@ -242,6 +242,7 @@ const BatchDecryption = ZkProgram({
                             ErrorEnum.ELGAMAL_DECRYPTION
                         )
                     );
+                    // FIXME - Field.inv error, requires update to o1js@^1.0.1
                     ski = ski.add(Group.generator.scale(plain.toScalar()));
                 }
                 return ski;

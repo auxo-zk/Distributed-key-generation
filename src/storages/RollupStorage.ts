@@ -8,7 +8,13 @@ import {
     ADDRESS_WITNESS,
 } from './AddressStorage.js';
 
-export { ROLLUP_MT, ROLLUP_COUNTER_MT, calculateActionIndex };
+export {
+    ROLLUP_MT,
+    ROLLUP_WITNESS,
+    ROLLUP_COUNTER_MT,
+    ROLLUP_COUNTER_WITNESS,
+    calculateActionIndex,
+};
 
 export {
     RollupMT,

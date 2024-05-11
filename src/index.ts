@@ -64,6 +64,10 @@ export {
 export {
     RequestStatus,
     RequestAction,
+    ComputeResultInput,
+    ComputeResultOutput,
+    ComputeResult,
+    ComputeResultProof,
     UpdateRequestInput,
     UpdateRequestOutput,
     UpdateRequest,
@@ -77,11 +81,20 @@ export {
     UpdateTaskOutput,
     UpdateTask,
     UpdateTaskProof,
+    RequesterAddressBook,
     RequesterContract,
+    TaskManagerContract,
+    SubmissionContract,
 } from './contracts/Requester.js';
 
 export {
     ResponseAction,
+    FinalizedEvent,
+    RespondedDArrayEvent,
+    FinalizedDArrayEvent,
+    ComputeResponseOutput,
+    ComputeResponse,
+    ComputeResponseProof,
     FinalizeResponseInput,
     FinalizeResponse,
     FinalizeResponseProof,
@@ -100,6 +113,8 @@ export {
 } from './contracts/Rollup.js';
 
 // ========== Libs ==========
+
+export { encrypt, decrypt } from './libs/Elgamal.js';
 
 export {
     MemberArray,
@@ -149,6 +164,7 @@ export { GenericStorage } from './storages/GenericStorage.js';
 
 export {
     ADDRESS_MT,
+    ADDRESS_WITNESS,
     getZkAppRef,
     verifyZkApp,
     AddressMT,
@@ -158,18 +174,21 @@ export {
 } from './storages/AddressStorage.js';
 
 export {
+    PROCESS_MT,
+    PROCESS_WITNESS,
+    processAction,
     ProcessMT,
     ProcessWitness,
     ProcessedActions,
     ProcessLeaf,
     ProcessStorage,
-    PROCESS_MT,
-    processAction,
 } from './storages/ProcessStorage.js';
 
 export {
     ROLLUP_MT,
+    ROLLUP_WITNESS,
     ROLLUP_COUNTER_MT,
+    ROLLUP_COUNTER_WITNESS,
     calculateActionIndex,
     RollupMT,
     RollupWitness,
@@ -183,7 +202,9 @@ export {
 
 export {
     COMMITTEE_LEVEL_1_TREE,
+    COMMITTEE_LEVEL_1_WITNESS,
     COMMITTEE_LEVEL_2_TREE,
+    COMMITTEE_LEVEL_2_WITNESS,
     CommitteeLevel1MT,
     CommitteeLevel1Witness,
     CommitteeLevel2MT,
@@ -199,16 +220,21 @@ export {
 
 export {
     DKG_LEVEL_1_TREE,
+    DKG_LEVEL_1_WITNESS,
     DKG_LEVEL_2_TREE,
+    DKG_LEVEL_2_WITNESS,
     calculateKeyIndex,
     DkgLevel1MT,
     DkgLevel1Witness,
     DkgLevel2MT,
     DkgLevel2Witness,
     DKGWitness,
+    ResponseContributionWitness,
     ProcessedContributions,
     KeyStatusLeaf,
     KeyStatusStorage,
+    KeyLeaf,
+    KeyStorage,
     Round1ContributionLeaf,
     Round1ContributionStorage,
     PublicKeyLeaf,
@@ -225,7 +251,9 @@ export {
 
 export {
     REQUEST_LEVEL_1_TREE,
+    REQUEST_LEVEL_1_WITNESS,
     REQUEST_LEVEL_2_TREE,
+    REQUEST_LEVEL_2_WITNESS,
     RequestLevel1MT,
     RequestLevel1Witness,
     RequestLevel2MT,
@@ -241,6 +269,7 @@ export {
     ExpirationStorage,
     ResultLeaf,
     ResultStorage,
+    GroupVector,
     GroupVectorLeaf,
     GroupVectorStorage,
     GroupVectorWitnesses,
@@ -251,11 +280,14 @@ export {
 
 export {
     REQUESTER_LEVEL_1_TREE,
+    REQUESTER_LEVEL_1_WITNESS,
     COMMITMENT_TREE,
+    COMMITMENT_WITNESS,
     RequesterLevel1MT,
     RequesterLevel1Witness,
     CommitmentMT,
     CommitmentWitness,
+    RequesterCounters,
     RequesterKeyIndexLeaf,
     RequesterKeyIndexStorage,
     TimestampLeaf,

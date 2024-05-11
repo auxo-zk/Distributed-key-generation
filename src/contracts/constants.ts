@@ -62,6 +62,9 @@ enum ZkAppEnum {
 enum EventEnum {
     ROLLUPED = 'actions-rolluped',
     PROCESSED = 'actions-processed',
+
+    RespondedDArray = 'responded-d-array',
+    FinalizedDArray = 'finalized-d-array',
 }
 
 enum ErrorEnum {

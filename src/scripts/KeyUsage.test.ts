@@ -145,7 +145,7 @@ describe('Key usage', () => {
     let submissionZkApp: Utils.ZkApp;
     let requesterZkApp: Utils.ZkApp;
     let mockSecret: any;
-    let dkgDeployed = true;
+    let dkgDeployed = false;
     let committees: {
         members: MemberArray;
         threshold: Field;
@@ -908,43 +908,43 @@ describe('Key usage', () => {
             }
             Provable.log('Encryption:', encryption);
             requests[0].encryptions.push(encryption);
-            // await Utils.proveAndSendTx(
-            //     SubmissionContract.name,
-            //     'submitEncryption',
-            //     async () =>
-            //         submissionContract.submitEncryption(
-            //             request.taskId,
-            //             request.keyIndex,
-            //             encryption.secrets,
-            //             encryption.randoms,
-            //             encryption.packedIndices,
-            //             encryption.nullifiers,
-            //             publicKey,
-            //             keyStorage.getWitness(
-            //                 KeyStorage.calculateLevel1Index({
-            //                     committeeId,
-            //                     keyId,
-            //                 })
-            //             ),
-            //             requesterKeyIndexStorage.getWitness(
-            //                 RequesterKeyIndexStorage.calculateLevel1Index(
-            //                     request.taskId.value
-            //                 )
-            //             ),
-            //             requesterAddressStorage.getZkAppRef(
-            //                 RequesterAddressBook.SUBMISSION,
-            //                 submissionZkApp.key.publicKey
-            //             ),
-            //             requesterAddressStorage.getZkAppRef(
-            //                 RequesterAddressBook.DKG,
-            //                 dkgZkApp.key.publicKey
-            //             )
-            //         ),
-            //     feePayer,
-            //     true,
-            //     undefined,
-            //     logger
-            // );
+            await Utils.proveAndSendTx(
+                SubmissionContract.name,
+                'submitEncryption',
+                async () =>
+                    submissionContract.submitEncryption(
+                        request.taskId,
+                        request.keyIndex,
+                        encryption.secrets,
+                        encryption.randoms,
+                        encryption.packedIndices,
+                        encryption.nullifiers,
+                        publicKey,
+                        keyStorage.getWitness(
+                            KeyStorage.calculateLevel1Index({
+                                committeeId,
+                                keyId,
+                            })
+                        ),
+                        requesterKeyIndexStorage.getWitness(
+                            RequesterKeyIndexStorage.calculateLevel1Index(
+                                request.taskId.value
+                            )
+                        ),
+                        requesterAddressStorage.getZkAppRef(
+                            RequesterAddressBook.SUBMISSION,
+                            submissionZkApp.key.publicKey
+                        ),
+                        requesterAddressStorage.getZkAppRef(
+                            RequesterAddressBook.DKG,
+                            dkgZkApp.key.publicKey
+                        )
+                    ),
+                feePayer,
+                true,
+                undefined,
+                logger
+            );
             await fetchAccounts([
                 requesterZkApp.key.publicKey,
                 submissionZkApp.key.publicKey,
@@ -1322,7 +1322,7 @@ describe('Key usage', () => {
                     request.sumR[j]
                         .add(Group.generator)
                         .scale(ski)
-                        .sub(decryptionProof.publicOutput)
+                        .sub(Group.generator.scale(ski))
                 );
             }
             responseStoragesD.push(responseStorageD);
