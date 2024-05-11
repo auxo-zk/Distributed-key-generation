@@ -1,408 +1,418 @@
-// import { Field, Group, Mina, Provable, PublicKey, Reducer } from 'o1js';
-// import {
-//     compile,
-//     fetchActions,
-//     fetchZkAppState,
-//     proveAndSend,
-// } from '../../helper/deploy.js';
-// import { prepare } from '../prepare.js';
-// import {
-//     BatchEncryption,
-//     CommitteeContract,
-//     UpdateCommittee,
-//     DkgContract,
-//     FinalizeRound1,
-//     FinalizeRound2,
-//     RollupRound1,
-//     Round1Contract,
-//     Round2Action,
-//     Round2Contract,
-//     RollupDkg,
-// } from '../../../index.js';
-// import {
-//     Level1Witness as DKGLevel1Witness,
-//     KeyStatusStorage,
-//     EMPTY_LEVEL_2_TREE,
-//     Round2ContributionStorage,
-//     EncryptionStorage,
-// } from '../../../storages/DKGStorage.js';
-// import {
-//     Level1Witness as CommitteeLevel1Witness,
-//     SettingStorage,
-// } from '../../../storages/CommitteeStorage.js';
-// import axios from 'axios';
-// import {
-//     AddressWitness,
-//     ProcessWitness,
-//     ZkAppRef,
-// } from '../../../storages/SharedStorage.js';
-// import { ZkAppIndex } from '../../../constants.js';
-// import {
-//     RollupRound2,
-//     FinalizeRound2Input,
-// } from '../../../contracts/Round2.js';
-// import {
-//     EncryptionHashArray,
-//     Round2Contribution,
-//     UArray,
-//     cArray,
-// } from '../../../libs/Committee.js';
-// import { Bit255 } from '@auxo-dev/auxo-libs';
+import axios from 'axios';
+import { Field, Provable, Reducer, UInt8 } from 'o1js';
+import { Network } from '../../helper/config.js';
+import { prepare } from '../../helper/prepare.js';
+import { Utils } from '@auxo-dev/auxo-libs';
+import { Rollup, RollupContract } from '../../../contracts/Rollup.js';
+import { DkgContract, UpdateKey } from '../../../contracts/DKG.js';
+import {
+    FinalizeRound1,
+    FinalizeRound1Input,
+    Round1Action,
+    Round1Contract,
+} from '../../../contracts/Round1.js';
+import { fetchAccounts } from '../../helper/index.js';
+import { AddressStorage } from '../../../storages/AddressStorage.js';
+import {
+    DKG_LEVEL_2_TREE,
+    EncryptionStorage,
+    KeyStatusStorage,
+    PublicKeyStorage,
+    Round1ContributionStorage,
+    Round2ContributionStorage,
+} from '../../../storages/DkgStorage.js';
+import { ProcessStorage } from '../../../storages/ProcessStorage.js';
+import { RollupStorage } from '../../../storages/RollupStorage.js';
+import { SettingStorage } from '../../../storages/CommitteeStorage.js';
+import { ZkAppIndex } from '../../../contracts/constants.js';
+import { BatchEncryption } from '../../../contracts/Encryption.js';
+import {
+    FinalizeRound2,
+    FinalizeRound2Input,
+    Round2Action,
+    Round2Contract,
+} from '../../../contracts/Round2.js';
+import { EncryptionHashArray } from '../../../libs/Committee.js';
 
-// async function main() {
-//     const { cache, feePayer } = await prepare();
+async function main() {
+    const logger: Utils.Logger = {
+        info: true,
+        error: true,
+        memoryUsage: false,
+    };
+    const { accounts, cache, feePayer } = await prepare(
+        './caches',
+        { type: Network.Lightnet, doProofs: true },
+        {
+            aliases: ['rollup', 'committee', 'dkg', 'round1', 'round2'],
+        }
+    );
 
-//     // Compile programs
-//     await compile(UpdateCommittee, cache);
-//     await compile(CommitteeContract, cache);
-//     await compile(RollupDkg, cache);
-//     await compile(DkgContract, cache);
-//     await compile(RollupRound1, cache);
-//     await compile(FinalizeRound1, cache);
-//     await compile(Round1Contract, cache);
-//     await compile(RollupRound2, cache);
-//     await compile(BatchEncryption, cache);
-//     await compile(FinalizeRound2, cache);
-//     await compile(Round2Contract, cache);
-//     const committeeAddress =
-//         'B62qjDLMhAw54JMrJLNZsrBRcoSjbQHQwn4ryceizpsQi8rwHQLA6R1';
-//     const dkgAddress =
-//         'B62qogHpAHHNP7PXAiRzHkpKnojERnjZq34GQ1PjjAv5wCLgtbYthAS';
-//     const round1Address =
-//         'B62qony53NMnmq49kxhtW1ttrQ8xvr58SNoX5jwgPY17pMChKLrjjWc';
-//     const round2Address =
-//         'B62qpvKFv8ey9FhsGAdcXxkg8yg1vZJQGoB2EySqJDZdANwP6Mh8SZ7';
-//     const round2Contract = new Round2Contract(
-//         PublicKey.fromBase58(round2Address)
-//     );
+    // Compile programs
+    await Utils.compile(Rollup, cache);
+    await Utils.compile(RollupContract, cache);
+    await Utils.compile(UpdateKey, cache);
+    await Utils.compile(DkgContract, cache);
+    await Utils.compile(FinalizeRound1, cache);
+    await Utils.compile(Round1Contract, cache);
+    await Utils.compile(BatchEncryption, cache);
+    await Utils.compile(FinalizeRound2, cache);
+    await Utils.compile(Round2Contract, cache);
 
-//     // Fetch storage trees
-//     const contributionStorage = new Round2ContributionStorage();
-//     const encryptionStorage = new EncryptionStorage();
+    // Get zkApps
+    let rollupZkApp = Utils.getZkApp(
+        accounts.rollup,
+        new RollupContract(accounts.rollup.publicKey),
+        RollupContract.name
+    );
+    let dkgZkApp = Utils.getZkApp(
+        accounts.dkg,
+        new DkgContract(accounts.dkg.publicKey),
+        DkgContract.name
+    );
+    let round1ZkApp = Utils.getZkApp(
+        accounts.round1,
+        new Round1Contract(accounts.round1.publicKey),
+        Round1Contract.name
+    );
+    let round2ZkApp = Utils.getZkApp(
+        accounts.round2,
+        new Round2Contract(accounts.round2.publicKey),
+        Round2Contract.name
+    );
+    let rollupContract = rollupZkApp.contract as RollupContract;
+    let round2Contract = round2ZkApp.contract as Round2Contract;
+    await fetchAccounts([
+        rollupZkApp.key.publicKey,
+        dkgZkApp.key.publicKey,
+        round1ZkApp.key.publicKey,
+        round2ZkApp.key.publicKey,
+    ]);
 
-//     const committeeId = Field(3);
-//     const keyId = Field(0);
-//     const [committees, committee, round2ZkApp, reduce, setting, keyStatus] =
-//         await Promise.all([
-//             (await axios.get(`https://api.auxo.fund/v0/committees/`)).data,
-//             (
-//                 await axios.get(
-//                     `https://api.auxo.fund/v0/committees/${Number(committeeId)}`
-//                 )
-//             ).data,
-//             (
-//                 await axios.get(
-//                     'https://api.auxo.fund/v0/storages/round2/zkapps'
-//                 )
-//             ).data,
-//             (
-//                 await axios.get(
-//                     'https://api.auxo.fund/v0/storages/round2/reduce'
-//                 )
-//             ).data,
-//             (
-//                 await axios.get(
-//                     'https://api.auxo.fund/v0/storages/committee/setting/level1'
-//                 )
-//             ).data,
-//             (
-//                 await axios.get(
-//                     'https://api.auxo.fund/v0/storages/dkg/key-status/level1'
-//                 )
-//             ).data,
-//         ]);
+    const committeeId = Field(0);
+    const keyId = Field(1);
 
-//     const keys = await Promise.all(
-//         [...Array(committees.length).keys()].map(
-//             async (e) =>
-//                 (
-//                     await axios.get(
-//                         `https://api.auxo.fund/v0/committees/${e}/keys`
-//                     )
-//                 ).data
-//         )
-//     );
+    // Fetch and rebuild storage trees
+    const sharedAddressStorage = new AddressStorage();
+    const settingStorage = new SettingStorage();
+    const keyStatusStorage = new KeyStatusStorage();
+    const contributionStorage = new Round2ContributionStorage();
+    const encryptionStorage = new EncryptionStorage();
+    const processStorage = new ProcessStorage();
+    const rollupStorage = new RollupStorage();
 
-//     keys.map((e: any, id: number) => {
-//         if (e.length == 0) return;
-//         e.map((key: any) => {
-//             if (key.status <= 2) return;
-//             console.log(
-//                 `Adding key ${key.keyId} of committee ${key.committeeId} to storage...`
-//             );
-//             console.log(key.round2s);
-//             let contributionLevel2Tree = EMPTY_LEVEL_2_TREE();
-//             let encryptionLevel2Tree = EMPTY_LEVEL_2_TREE();
-//             for (let i = 0; i < key.round2s.length; i++) {
-//                 contributionLevel2Tree.setLeaf(
-//                     Round2ContributionStorage.calculateLevel2Index(
-//                         Field(key.round1s[i].memberId)
-//                     ).toBigInt(),
-//                     Round2ContributionStorage.calculateLeaf(
-//                         new Round2Contribution({
-//                             c: new cArray(
-//                                 key.round2s[i].contribution.c.map((e: any) =>
-//                                     Bit255.fromBigInt(BigInt(e))
-//                                 )
-//                             ),
-//                             U: new UArray(
-//                                 key.round2s[i].contribution.u.map((e: any) =>
-//                                     Group.from(e.x, e.y)
-//                                 )
-//                             ),
-//                         })
-//                     )
-//                 );
-//                 encryptionLevel2Tree.setLeaf(
-//                     EncryptionStorage.calculateLevel2Index(
-//                         Field(key.round1s[i].memberId)
-//                     ).toBigInt(),
-//                     EncryptionStorage.calculateLeaf({
-//                         contributions: key.round2s.map(
-//                             (item: any) =>
-//                                 new Round2Contribution({
-//                                     c: new cArray(
-//                                         item.contribution.c.map((e: any) =>
-//                                             Bit255.fromBigInt(BigInt(e))
-//                                         )
-//                                     ),
-//                                     U: new UArray(
-//                                         item.contribution.u.map((e: any) =>
-//                                             Group.from(e.x, e.y)
-//                                         )
-//                                     ),
-//                                 })
-//                         ),
-//                         memberId: Field(key.round2s[i].memberId),
-//                     })
-//                 );
-//             }
-//             contributionStorage.updateInternal(
-//                 Round2ContributionStorage.calculateLevel1Index({
-//                     committeeId: Field(key.committeeId),
-//                     keyId: Field(key.keyId),
-//                 }),
-//                 contributionLevel2Tree
-//             );
-//             encryptionStorage.updateInternal(
-//                 EncryptionStorage.calculateLevel1Index({
-//                     committeeId: Field(key.committeeId),
-//                     keyId: Field(key.keyId),
-//                 }),
-//                 encryptionLevel2Tree
-//             );
-//             console.log('Done');
-//         });
-//     });
+    const [
+        addressLeafs,
+        settingLeafs,
+        keyStatusLeafs,
+        contributionLeafs,
+        encryptionLeafs,
+        processLeafs,
+        rollupLeafs,
+    ] = await Promise.all([
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/round2/zkapp/leafs'
+            )
+        ).data,
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/committee/setting/leafs'
+            )
+        ).data,
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/dkg/key-status/leafs'
+            )
+        ).data,
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/round2/contribution/leafs'
+            )
+        ).data,
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/round2/encryption/leafs'
+            )
+        ).data,
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/round2/process/leafs'
+            )
+        ).data,
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/rollup/rollup/leafs'
+            )
+        ).data,
+    ]);
 
-//     // Fetch state and actions
-//     await Promise.all([
-//         fetchZkAppState(committeeAddress),
-//         fetchZkAppState(dkgAddress),
-//         fetchZkAppState(round1Address),
-//     ]);
-//     const rawState = (await fetchZkAppState(round2Address)) || [];
-//     const round2State = {
-//         zkApps: rawState[0],
-//         reduceState: rawState[1],
-//         contributions: rawState[2],
-//         encryptions: rawState[3],
-//     };
-//     Provable.log(round2State);
+    Object.entries(addressLeafs).map(([index, data]: [string, any]) => {
+        sharedAddressStorage.updateLeaf(
+            { level1Index: Field.from(index) },
+            Field.from(data.leaf)
+        );
+    });
+    Object.entries(settingLeafs).map(([index, data]: [string, any]) => {
+        settingStorage.updateLeaf(
+            { level1Index: Field.from(index) },
+            Field.from(data.leaf)
+        );
+    });
+    Object.entries(keyStatusLeafs).map(([index, data]: [string, any]) => {
+        keyStatusStorage.updateLeaf(
+            { level1Index: Field.from(index) },
+            Field.from(data.leaf)
+        );
+    });
+    Object.entries(contributionLeafs).map(([index, data]: [string, any]) => {
+        let [level1Index, level2Index] = index.split('-').map((e) => Field(e));
+        contributionStorage.updateLeaf(
+            { level1Index, level2Index },
+            Field.from(data.leaf)
+        );
+    });
+    Object.entries(encryptionLeafs).map(([index, data]: [string, any]) => {
+        let [level1Index, level2Index] = index.split('-').map((e) => Field(e));
+        encryptionStorage.updateLeaf(
+            { level1Index, level2Index },
+            Field.from(data.leaf)
+        );
+    });
+    Object.entries(processLeafs).map(([index, data]: [string, any]) => {
+        processStorage.updateLeaf(
+            { level1Index: Field.from(index) },
+            Field.from(data.leaf)
+        );
+    });
+    Object.entries(rollupLeafs).map(([index, data]: [string, any]) => {
+        rollupStorage.updateLeaf(
+            { level1Index: Field.from(index) },
+            Field.from(data.leaf)
+        );
+    });
 
-//     const fromState =
-//         Field(
-//             25079927036070901246064867767436987657692091363973573142121686150614948079097n
-//         );
-//     const toState = undefined;
+    // Fetch state and action
+    const fromActionState = Reducer.initialActionState;
+    const endActionState = undefined;
 
-//     const previousHashes = [
-//         Field(
-//             3002645259254748059366326797881051020484995819572253660420901388439392213732n
-//         ),
-//         Field(
-//             2950985295131352328349196989984342832680400793321473398895433393360534242666n
-//         ),
-//     ];
+    const actionIds = [3, 2];
+    const contributionOrder = [1, 0];
+    const previousHashes = [
+        Field(
+            12462783225281412162894431339277438629001681076236681076841908061249107453738n
+        ),
+        Field(
+            16030499483815551524673590315351370170715930349087749666310392556068603745839n
+        ),
+    ];
 
-//     const currentHashes = [
-//         Field(
-//             28740186825970104501987994653143602060975942001740910365858873911535619353813n
-//         ),
-//         Field(
-//             3002645259254748059366326797881051020484995819572253660420901388439392213732n
-//         ),
-//     ];
+    const currentHashes = [
+        Field(
+            19901200321464961021286562358597054525981496551262727599968019034215674584662n
+        ),
+        Field(
+            12462783225281412162894431339277438629001681076236681076841908061249107453738n
+        ),
+    ];
 
-//     const contributionOrder = [1, 0];
+    const rawActions = (
+        await Utils.fetchActions(
+            round2ZkApp.key.publicKey,
+            fromActionState
+            // toState
+        )
+    ).filter((action) =>
+        currentHashes.map((e) => e.toString()).includes(action.hash)
+    );
+    const actions: Round2Action[] = rawActions.map((e) => {
+        let action: Field[] = e.actions[0].map((e) => Field(e));
+        return Round2Action.fromFields(action);
+    });
+    console.log('Finalizing Actions:');
+    const orderedActions = ((actionList) => {
+        let newList = [];
+        for (let i = 0; i < currentHashes.length; i++) {
+            newList.push(actionList[contributionOrder[i]]);
+        }
+        return newList;
+    })(actions);
+    orderedActions.map((e) => Provable.log(e));
 
-//     const rawActions = (
-//         await fetchActions(round2Address, fromState, toState)
-//     ).filter((action) =>
-//         currentHashes.map((e) => e.toString()).includes(action.hash)
-//     );
-//     const actions: Round2Action[] = rawActions.map((e) => {
-//         let action: Field[] = e.actions[0].map((e) => Field(e));
-//         return Round2Action.fromFields(action);
-//     });
+    const T = Number(settingLeafs[Number(committeeId)].raw.T);
+    const N = Number(settingLeafs[Number(committeeId)].raw.N);
+    let initialHashArray = new EncryptionHashArray(
+        [...Array(N)].map(() => Field(0))
+    );
+    let finalizeProof = await Utils.prove(
+        FinalizeRound2.name,
+        'init',
+        async () =>
+            FinalizeRound2.init(
+                new FinalizeRound2Input({
+                    previousActionState: Field(0),
+                    action: Round2Action.empty(),
+                    actionId: Field(0),
+                }),
+                rollupContract.rollupRoot.get(),
+                Field(T),
+                Field(N),
+                round2Contract.contributionRoot.get(),
+                round2Contract.processRoot.get(),
+                Round2ContributionStorage.calculateLevel1Index({
+                    committeeId,
+                    keyId,
+                }),
+                initialHashArray,
+                contributionStorage.getLevel1Witness(
+                    Round2ContributionStorage.calculateLevel1Index({
+                        committeeId,
+                        keyId,
+                    })
+                )
+            ),
+        undefined,
+        logger
+    );
 
-//     console.log('Finalizing Actions:');
-//     const orderedActions = ((actionList) => {
-//         let newList = [];
-//         for (let i = 0; i < currentHashes.length; i++) {
-//             newList.push(actionList[contributionOrder[i]]);
-//         }
-//         return newList;
-//     })(actions);
+    contributionStorage.updateInternal(
+        Round2ContributionStorage.calculateLevel1Index({
+            committeeId,
+            keyId,
+        }),
+        DKG_LEVEL_2_TREE()
+    );
 
-//     orderedActions.map((e) => Provable.log(e));
+    encryptionStorage.updateInternal(
+        EncryptionStorage.calculateLevel1Index({
+            committeeId,
+            keyId,
+        }),
+        DKG_LEVEL_2_TREE()
+    );
 
-//     console.log('FinalizeRound2.init...');
-//     let initialHashArray = new EncryptionHashArray(
-//         [...Array(committee.numberOfMembers).keys()].map(() => Field(0))
-//     );
-//     let proof = await FinalizeRound2.init(
-//         new FinalizeRound2Input({
-//             previousActionState: Field(0),
-//             action: Round2Action.empty(),
-//         }),
-//         Field(committee.threshold),
-//         Field(committee.numberOfMembers),
-//         round2State.contributions,
-//         round2State.reduceState,
-//         Round2ContributionStorage.calculateLevel1Index({
-//             committeeId: committeeId,
-//             keyId: keyId,
-//         }),
-//         initialHashArray,
-//         contributionStorage.getLevel1Witness(
-//             Round2ContributionStorage.calculateLevel1Index({
-//                 committeeId: committeeId,
-//                 keyId: keyId,
-//             })
-//         )
-//     );
-//     console.log('Done');
+    for (let i = 0; i < orderedActions.length; i++) {
+        let action = orderedActions[i];
+        let actionId = Field(actionIds[i]);
+        let memberId = Round2Action.unpackId(action.packedId).memberId;
+        finalizeProof = await Utils.prove(
+            FinalizeRound2.name,
+            'finalize',
+            async () =>
+                FinalizeRound2.contribute(
+                    new FinalizeRound2Input({
+                        previousActionState: previousHashes[i],
+                        action,
+                        actionId,
+                    }),
+                    finalizeProof,
+                    contributionStorage.getWitness(
+                        Round2ContributionStorage.calculateLevel1Index({
+                            committeeId,
+                            keyId,
+                        }),
+                        Round2ContributionStorage.calculateLevel2Index(memberId)
+                    ),
+                    rollupStorage.getWitness(
+                        RollupStorage.calculateLevel1Index({
+                            zkAppIndex: Field(ZkAppIndex.ROUND2),
+                            actionId,
+                        })
+                    ),
+                    processStorage.getWitness(
+                        ProcessStorage.calculateIndex(actionId)
+                    )
+                ),
+            undefined,
+            logger
+        );
 
-//     contributionStorage.updateInternal(
-//         Round2ContributionStorage.calculateLevel1Index({
-//             committeeId: committeeId,
-//             keyId: keyId,
-//         }),
-//         EMPTY_LEVEL_2_TREE()
-//     );
+        contributionStorage.updateLeaf(
+            {
+                level1Index: Round2ContributionStorage.calculateLevel1Index({
+                    committeeId,
+                    keyId,
+                }),
+                level2Index:
+                    Round2ContributionStorage.calculateLevel2Index(memberId),
+            },
+            Round2ContributionStorage.calculateLeaf(action.contribution)
+        );
+        encryptionStorage.updateLeaf(
+            {
+                level1Index: EncryptionStorage.calculateLevel1Index({
+                    committeeId,
+                    keyId,
+                }),
+                level2Index: EncryptionStorage.calculateLevel2Index(memberId),
+            },
+            EncryptionStorage.calculateLeaf({
+                contributions: actions.map((e) => e.contribution),
+                memberId: memberId,
+            })
+        );
+        processStorage.updateRawLeaf(
+            {
+                level1Index: ProcessStorage.calculateLevel1Index(actionId),
+            },
+            {
+                actionState: currentHashes[i],
+                processCounter: UInt8.from(0),
+            }
+        );
+    }
 
-//     encryptionStorage.updateInternal(
-//         EncryptionStorage.calculateLevel1Index({
-//             committeeId: committeeId,
-//             keyId: keyId,
-//         }),
-//         EMPTY_LEVEL_2_TREE()
-//     );
+    await Utils.proveAndSendTx(
+        Round2Contract.name,
+        'finalize',
+        async () =>
+            round2Contract.finalize(
+                finalizeProof,
+                encryptionStorage.getLevel1Witness(
+                    EncryptionStorage.calculateLevel1Index({
+                        committeeId,
+                        keyId,
+                    })
+                ),
+                settingStorage.getWitness(committeeId),
+                keyStatusStorage.getLevel1Witness(
+                    KeyStatusStorage.calculateLevel1Index({
+                        committeeId,
+                        keyId,
+                    })
+                ),
+                sharedAddressStorage.getZkAppRef(
+                    ZkAppIndex.COMMITTEE,
+                    accounts.committee.publicKey
+                ),
+                sharedAddressStorage.getZkAppRef(
+                    ZkAppIndex.DKG,
+                    dkgZkApp.key.publicKey
+                ),
+                sharedAddressStorage.getZkAppRef(
+                    ZkAppIndex.ROLLUP,
+                    rollupZkApp.key.publicKey
+                ),
+                sharedAddressStorage.getZkAppRef(
+                    ZkAppIndex.ROUND2,
+                    round2ZkApp.key.publicKey
+                )
+            ),
+        feePayer,
+        true,
+        undefined,
+        logger
+    );
+    await fetchAccounts([
+        dkgZkApp.key.publicKey,
+        round2ZkApp.key.publicKey,
+        rollupZkApp.key.publicKey,
+    ]);
+}
 
-//     for (let i = 0; i < orderedActions.length; i++) {
-//         let action = orderedActions[i];
-//         console.log('FinalizeRound2.nextStep...');
-//         proof = await FinalizeRound2.nextStep(
-//             new FinalizeRound2Input({
-//                 previousActionState: previousHashes[Number(action.memberId)],
-//                 action: action,
-//             }),
-//             proof,
-//             contributionStorage.getWitness(
-//                 Round2ContributionStorage.calculateLevel1Index({
-//                     committeeId: action.committeeId,
-//                     keyId: action.keyId,
-//                 }),
-//                 Round2ContributionStorage.calculateLevel2Index(action.memberId)
-//             ),
-//             ProcessWitness.fromJSON(
-//                 reduce[currentHashes[Number(action.memberId)].toString()]
-//             )
-//         );
-//         console.log('Done');
-
-//         contributionStorage.updateLeaf(
-//             {
-//                 level1Index: Round2ContributionStorage.calculateLevel1Index({
-//                     committeeId: action.committeeId,
-//                     keyId: action.keyId,
-//                 }),
-//                 level2Index: Round2ContributionStorage.calculateLevel2Index(
-//                     action.memberId
-//                 ),
-//             },
-//             Round2ContributionStorage.calculateLeaf(action.contribution)
-//         );
-
-//         encryptionStorage.updateLeaf(
-//             {
-//                 level1Index: EncryptionStorage.calculateLevel1Index({
-//                     committeeId: action.committeeId,
-//                     keyId: action.keyId,
-//                 }),
-//                 level2Index: EncryptionStorage.calculateLevel2Index(
-//                     action.memberId
-//                 ),
-//             },
-//             EncryptionStorage.calculateLeaf({
-//                 contributions: actions.map((e) => e.contribution),
-//                 memberId: action.memberId,
-//             })
-//         );
-//     }
-
-//     let tx = await Mina.transaction(
-//         {
-//             sender: feePayer.key.publicKey,
-//             fee: feePayer.fee,
-//             nonce: feePayer.nonce++,
-//         },
-//         () => {
-//             round2Contract.finalize(
-//                 proof,
-//                 encryptionStorage.getLevel1Witness(
-//                     EncryptionStorage.calculateLevel1Index({
-//                         committeeId: committeeId,
-//                         keyId: keyId,
-//                     })
-//                 ),
-//                 new ZkAppRef({
-//                     address: PublicKey.fromBase58(committeeAddress),
-//                     witness: AddressWitness.fromJSON(
-//                         round2ZkApp[ZkAppIndex.COMMITTEE]
-//                     ),
-//                 }),
-//                 new ZkAppRef({
-//                     address: PublicKey.fromBase58(dkgAddress),
-//                     witness: AddressWitness.fromJSON(
-//                         round2ZkApp[ZkAppIndex.DKG]
-//                     ),
-//                 }),
-//                 CommitteeLevel1Witness.fromJSON(
-//                     setting[
-//                         Number(SettingStorage.calculateLevel1Index(committeeId))
-//                     ]
-//                 ),
-//                 DKGLevel1Witness.fromJSON(
-//                     keyStatus[
-//                         Number(
-//                             KeyStatusStorage.calculateLevel1Index({
-//                                 committeeId: committeeId,
-//                                 keyId: keyId,
-//                             })
-//                         )
-//                     ]
-//                 )
-//             );
-//         }
-//     );
-//     await proveAndSend(tx, feePayer.key, 'FinalizeRound2', 'finalize');
-// }
-
-// main()
-//     .then()
-//     .catch((err) => {
-//         console.error(err);
-//         process.exit(1);
-//     });
+main()
+    .then()
+    .catch((err) => {
+        console.error(err);
+        process.exit(1);
+    });

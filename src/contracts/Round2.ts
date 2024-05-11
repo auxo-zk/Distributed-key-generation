@@ -433,7 +433,6 @@ class Round2Contract extends SmartContract {
     reducer = Reducer({ actionType: Action });
 
     events = {
-        [EventEnum.ROLLUPED]: Field,
         [EventEnum.PROCESSED]: ProcessedContributions,
     };
 

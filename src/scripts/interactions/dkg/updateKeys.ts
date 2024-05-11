@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Field, Mina, Provable, PublicKey, UInt8 } from 'o1js';
+import { Field, Provable, UInt8 } from 'o1js';
 import { Utils } from '@auxo-dev/auxo-libs';
 import { prepare } from '../../helper/prepare.js';
 import { Rollup, RollupContract } from '../../../contracts/Rollup.js';
@@ -11,11 +11,7 @@ import {
     UpdateKeyInput,
 } from '../../../contracts/DKG.js';
 import { Network } from '../../helper/config.js';
-import {
-    DkgLevel1Witness,
-    KeyStatusStorage,
-    KeyStorage,
-} from '../../../storages/DkgStorage.js';
+import { KeyStatusStorage, KeyStorage } from '../../../storages/DkgStorage.js';
 import { KeyCounterStorage } from '../../../storages/CommitteeStorage.js';
 import { RollupStorage } from '../../../storages/RollupStorage.js';
 import { ZkAppIndex } from '../../../contracts/constants.js';
@@ -77,26 +73,26 @@ async function main() {
         (
             await axios.get('https://api.auxo.fund/v0/storages/dkg/zkapp/leafs')
         ).data,
-        // (
-        //     await axios.get(
-        //         'https://api.auxo.fund/v0/storages/dkg/key-status/leafs'
-        //     )
-        // ).data,
-        // (
-        //     await axios.get(
-        //         'https://api.auxo.fund/v0/storages/dkg/key-counter/leafs'
-        //     )
-        // ).data,
-        Promise.resolve({
-            '0': {
-                leaf: '3',
-            },
-        }),
-        Promise.resolve({
-            '0': {
-                leaf: '1',
-            },
-        }),
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/dkg/key-status/leafs'
+            )
+        ).data,
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/dkg/key-counter/leafs'
+            )
+        ).data,
+        // Promise.resolve({
+        //     '0': {
+        //         leaf: '3',
+        //     },
+        // }),
+        // Promise.resolve({
+        //     '0': {
+        //         leaf: '1',
+        //     },
+        // }),
         (
             await axios.get('https://api.auxo.fund/v0/storages/dkg/key/leafs')
         ).data,
@@ -178,19 +174,17 @@ async function main() {
     };
     Provable.log('States:', dkgState);
 
-    const initialActionId = 3;
+    const initialActionId = 6;
     const fromActionState =
         Field(
-            28373415368718815380090794071598870635399146496579544406480489604358814828499n
+            22126959051895231307405889944910288267532471827757404273048235711007139356000n
         );
     const endActionState = Field(0n);
     const previousActionStates = [
-        28373415368718815380090794071598870635399146496579544406480489604358814828499n,
-        11025269394169325154998764678062122259066653015749050276811201457322150100582n,
+        22126959051895231307405889944910288267532471827757404273048235711007139356000n,
     ];
     const nextActionStates = [
-        11025269394169325154998764678062122259066653015749050276811201457322150100582n,
-        2730287779788458241635886841059422355463247784045664877683654612313189985677n,
+        18628073894538149679700507158003773732300614559946531559896052254722478125949n,
     ];
 
     const rawActions = await Utils.fetchActions(

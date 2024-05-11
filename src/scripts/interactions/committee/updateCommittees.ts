@@ -66,13 +66,14 @@ async function main() {
         ).data,
     ]);
     Object.entries(memberLeafs).map(([index, data]: [string, any]) => {
-        memberLeafs.updateLeaf(
-            { level1Index: Field.from(index) },
+        let [level1Index, level2Index] = index.split('-').map((e) => Field(e));
+        memberStorage.updateLeaf(
+            { level1Index, level2Index },
             Field.from(data.leaf)
         );
     });
     Object.entries(settingLeafs).map(([index, data]: [string, any]) => {
-        settingLeafs.updateLeaf(
+        settingStorage.updateLeaf(
             { level1Index: Field.from(index) },
             Field.from(data.leaf)
         );
@@ -92,10 +93,8 @@ async function main() {
     // Fetch actions
     const fromActionState =
         Field(
-            28373415368718815380090794071598870635399146496579544406480489604358814828499n
+            21166803974692735058660148109833107898105970494632393192141507482925562781216n
         );
-    const endActionState = Field(0n);
-    const initialActionId = 3;
     const rawActions = await Utils.fetchActions(
         committeeZkApp.key.publicKey,
         fromActionState
@@ -114,9 +113,9 @@ async function main() {
         'init',
         async () =>
             UpdateCommittee.init(
-                Reducer.initialActionState,
-                memberStorage.root,
-                settingStorage.root,
+                committeeContract.actionState.get(),
+                committeeContract.memberRoot.get(),
+                committeeContract.settingRoot.get(),
                 committeeContract.nextCommitteeId.get()
             ),
         undefined,
@@ -124,6 +123,7 @@ async function main() {
     );
 
     for (let i = 0; i < actions.length; i++) {
+        let committeeId = Field(Object.keys(settingLeafs).length + i);
         let action = actions[i];
         proof = await Utils.prove(
             UpdateCommittee.name,
@@ -132,26 +132,28 @@ async function main() {
                 UpdateCommittee.update(
                     proof,
                     action,
-                    memberStorage.getLevel1Witness(Field(i)),
-                    settingStorage.getLevel1Witness(Field(i))
+                    memberStorage.getLevel1Witness(committeeId),
+                    settingStorage.getLevel1Witness(committeeId)
                 ),
             undefined,
             logger
         );
 
-        for (let j = 0; j < Number(action.addresses.length); j++)
+        for (let j = 0; j < Number(action.addresses.length); j++) {
+            let memberId = Field(j);
             memberStorage.updateRawLeaf(
                 {
-                    level1Index: Field(i),
-                    level2Index: Field(j),
+                    level1Index: committeeId,
+                    level2Index: memberId,
                 },
-                action.addresses.get(Field(j))
+                action.addresses.get(memberId)
             );
+        }
 
         settingStorage.updateRawLeaf(
-            { level1Index: Field(i) },
+            { level1Index: committeeId },
             {
-                T: committees[i].threshold,
+                T: action.threshold,
                 N: Field(action.addresses.length),
             }
         );

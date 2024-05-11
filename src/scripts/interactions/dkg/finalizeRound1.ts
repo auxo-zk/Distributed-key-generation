@@ -1,365 +1,397 @@
-// import { Field, Group, Mina, Provable, PublicKey, Reducer } from 'o1js';
-// import {
-//     compile,
-//     fetchActions,
-//     fetchEvents,
-//     fetchZkAppState,
-//     proveAndSend,
-// } from '../../helper/deploy.js';
-// import { prepare } from '../prepare.js';
-// import {
-//     CommitteeContract,
-//     UpdateCommittee,
-//     DkgContract,
-//     FinalizeRound1,
-//     RollupRound1,
-//     Round1Action,
-//     Round1Contract,
-//     Round1Contribution,
-//     RollupDkg,
-// } from '../../../index.js';
-// import {
-//     Level1Witness as DKGLevel1Witness,
-//     KeyStatusStorage,
-//     PublicKeyStorage,
-//     Round1ContributionStorage,
-//     EMPTY_LEVEL_2_TREE,
-// } from '../../../storages/DKGStorage.js';
-// import {
-//     Level1Witness as CommitteeLevel1Witness,
-//     SettingStorage,
-// } from '../../../storages/CommitteeStorage.js';
-// import axios from 'axios';
-// import {
-//     AddressWitness,
-//     ProcessWitness,
-//     ZkAppRef,
-// } from '../../../storages/SharedStorage.js';
-// import { FinalizeRound1Input } from '../../../contracts/Round1.js';
-// import { ZkAppIndex } from '../../../constants.js';
-// import { CArray } from '../../../libs/Committee.js';
+import axios from 'axios';
+import { Field, Provable, UInt8 } from 'o1js';
+import { Network } from '../../helper/config.js';
+import { prepare } from '../../helper/prepare.js';
+import { Utils } from '@auxo-dev/auxo-libs';
+import { Rollup, RollupContract } from '../../../contracts/Rollup.js';
+import { DkgContract, UpdateKey } from '../../../contracts/DKG.js';
+import {
+    FinalizeRound1,
+    FinalizeRound1Input,
+    Round1Action,
+    Round1Contract,
+} from '../../../contracts/Round1.js';
+import { fetchAccounts } from '../../helper/index.js';
+import { AddressStorage } from '../../../storages/AddressStorage.js';
+import {
+    DKG_LEVEL_2_TREE,
+    KeyStatusStorage,
+    PublicKeyStorage,
+    Round1ContributionStorage,
+} from '../../../storages/DkgStorage.js';
+import { ProcessStorage } from '../../../storages/ProcessStorage.js';
+import { RollupStorage } from '../../../storages/RollupStorage.js';
+import { SettingStorage } from '../../../storages/CommitteeStorage.js';
+import { ZkAppIndex } from '../../../contracts/constants.js';
 
-// async function main() {
-//     const { cache, feePayer } = await prepare();
+async function main() {
+    const logger: Utils.Logger = {
+        info: true,
+        error: true,
+        memoryUsage: false,
+    };
+    const { accounts, cache, feePayer } = await prepare(
+        './caches',
+        { type: Network.Lightnet, doProofs: true },
+        {
+            aliases: ['rollup', 'committee', 'dkg', 'round1'],
+        }
+    );
 
-//     // Compile programs
-//     await compile(UpdateCommittee, cache);
-//     await compile(CommitteeContract, cache);
-//     await compile(RollupDkg, cache);
-//     await compile(DkgContract, cache);
-//     await compile(RollupRound1, cache);
-//     await compile(FinalizeRound1, cache);
-//     await compile(Round1Contract, cache);
-//     const committeeAddress =
-//         'B62qjDLMhAw54JMrJLNZsrBRcoSjbQHQwn4ryceizpsQi8rwHQLA6R1';
-//     const dkgAddress =
-//         'B62qogHpAHHNP7PXAiRzHkpKnojERnjZq34GQ1PjjAv5wCLgtbYthAS';
-//     const round1Address =
-//         'B62qony53NMnmq49kxhtW1ttrQ8xvr58SNoX5jwgPY17pMChKLrjjWc';
-//     const round1Contract = new Round1Contract(
-//         PublicKey.fromBase58(round1Address)
-//     );
+    // Compile programs
+    await Utils.compile(Rollup, cache);
+    await Utils.compile(RollupContract, cache);
+    await Utils.compile(UpdateKey, cache);
+    await Utils.compile(DkgContract, cache);
+    await Utils.compile(FinalizeRound1, cache);
+    await Utils.compile(Round1Contract, cache);
 
-//     const committeeId = Field(3);
-//     const keyId = Field(0);
+    // Get zkApps
+    let rollupZkApp = Utils.getZkApp(
+        accounts.rollup,
+        new RollupContract(accounts.rollup.publicKey),
+        RollupContract.name
+    );
+    let dkgZkApp = Utils.getZkApp(
+        accounts.dkg,
+        new DkgContract(accounts.dkg.publicKey),
+        DkgContract.name
+    );
+    let round1ZkApp = Utils.getZkApp(
+        accounts.round1,
+        new Round1Contract(accounts.round1.publicKey),
+        Round1Contract.name
+    );
+    let rollupContract = rollupZkApp.contract as RollupContract;
+    let round1Contract = round1ZkApp.contract as Round1Contract;
+    await fetchAccounts([
+        rollupZkApp.key.publicKey,
+        dkgZkApp.key.publicKey,
+        round1ZkApp.key.publicKey,
+    ]);
 
-//     const [committees, committee, round1ZkApp, reduce, setting, keyStatus] =
-//         await Promise.all([
-//             (await axios.get(`https://api.auxo.fund/v0/committees/`)).data,
-//             (
-//                 await axios.get(
-//                     `https://api.auxo.fund/v0/committees/${Number(committeeId)}`
-//                 )
-//             ).data,
-//             (
-//                 await axios.get(
-//                     'https://api.auxo.fund/v0/storages/round1/zkapps'
-//                 )
-//             ).data,
-//             (
-//                 await axios.get(
-//                     'https://api.auxo.fund/v0/storages/round1/reduce'
-//                 )
-//             ).data,
-//             (
-//                 await axios.get(
-//                     'https://api.auxo.fund/v0/storages/committee/setting/level1'
-//                 )
-//             ).data,
-//             (
-//                 await axios.get(
-//                     'https://api.auxo.fund/v0/storages/dkg/key-status/level1'
-//                 )
-//             ).data,
-//         ]);
-//     const keys = await Promise.all(
-//         [...Array(committees.length).keys()].map(
-//             async (e) =>
-//                 (
-//                     await axios.get(
-//                         `https://api.auxo.fund/v0/committees/${e}/keys`
-//                     )
-//                 ).data
-//         )
-//     );
-//     // Fetch storage trees
-//     const contributionStorage = new Round1ContributionStorage();
-//     const publicKeyStorage = new PublicKeyStorage();
+    const committeeId = Field(0);
+    const keyId = Field(1);
 
-//     keys.map((e: any, id: number) => {
-//         if (e.length == 0) return;
-//         e.map((key: any) => {
-//             if (key.status <= 1) return;
-//             console.log(
-//                 `Adding key ${key.keyId} of committee ${key.committeeId} to storage...`
-//             );
-//             let contributionLevel2Tree = EMPTY_LEVEL_2_TREE();
-//             let publicKeyLevel2Tree = EMPTY_LEVEL_2_TREE();
-//             for (let i = 0; i < key.round1s.length; i++) {
-//                 contributionLevel2Tree.setLeaf(
-//                     Round1ContributionStorage.calculateLevel2Index(
-//                         Field(key.round1s[i].memberId)
-//                     ).toBigInt(),
-//                     Round1ContributionStorage.calculateLeaf(
-//                         new Round1Contribution({
-//                             C: new CArray(
-//                                 key.round1s[i].contribution.map(
-//                                     (group: any) =>
-//                                         new Group({ x: group.x, y: group.y })
-//                                 )
-//                             ),
-//                         })
-//                     )
-//                 );
-//                 publicKeyLevel2Tree.setLeaf(
-//                     PublicKeyStorage.calculateLevel2Index(
-//                         Field(key.round1s[i].memberId)
-//                     ).toBigInt(),
-//                     PublicKeyStorage.calculateLeaf(
-//                         new Group({
-//                             x: key.round1s[i].contribution[0].x,
-//                             y: key.round1s[i].contribution[0].y,
-//                         })
-//                     )
-//                 );
-//             }
-//             contributionStorage.updateInternal(
-//                 Round1ContributionStorage.calculateLevel1Index({
-//                     committeeId: Field(key.committeeId),
-//                     keyId: Field(key.keyId),
-//                 }),
-//                 contributionLevel2Tree
-//             );
-//             publicKeyStorage.updateInternal(
-//                 PublicKeyStorage.calculateLevel1Index({
-//                     committeeId: Field(key.committeeId),
-//                     keyId: Field(key.keyId),
-//                 }),
-//                 publicKeyLevel2Tree
-//             );
-//             console.log('Done');
-//         });
-//     });
+    // Fetch and rebuild storage trees
+    const sharedAddressStorage = new AddressStorage();
+    const settingStorage = new SettingStorage();
+    const keyStatusStorage = new KeyStatusStorage();
+    const contributionStorage = new Round1ContributionStorage();
+    const publicKeyStorage = new PublicKeyStorage();
+    const processStorage = new ProcessStorage();
+    const rollupStorage = new RollupStorage();
 
-//     // Fetch state and actions
-//     await Promise.all([
-//         fetchZkAppState(committeeAddress),
-//         fetchZkAppState(dkgAddress),
-//     ]);
-//     const rawState = (await fetchZkAppState(round1Address)) || [];
-//     const round1State = {
-//         zkApps: rawState[0],
-//         reduceState: rawState[1],
-//         contributions: rawState[2],
-//         publicKeys: rawState[3],
-//     };
-//     Provable.log('Round 1 states:', round1State);
+    const [
+        addressLeafs,
+        settingLeafs,
+        keyStatusLeafs,
+        contributionLeafs,
+        publicKeyLeafs,
+        processLeafs,
+        rollupLeafs,
+    ] = await Promise.all([
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/round1/zkapp/leafs'
+            )
+        ).data,
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/committee/setting/leafs'
+            )
+        ).data,
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/dkg/key-status/leafs'
+            )
+        ).data,
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/round1/contribution/leafs'
+            )
+        ).data,
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/round1/public-key/leafs'
+            )
+        ).data,
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/round1/process/leafs'
+            )
+        ).data,
+        (
+            await axios.get(
+                'https://api.auxo.fund/v0/storages/rollup/rollup/leafs'
+            )
+        ).data,
+    ]);
 
-//     const fromState =
-//         Field(
-//             8481153099833621817349097282911289219126620074665421844518804541945637548392n
-//         );
-//     const toState = undefined;
+    Object.entries(addressLeafs).map(([index, data]: [string, any]) => {
+        sharedAddressStorage.updateLeaf(
+            { level1Index: Field.from(index) },
+            Field.from(data.leaf)
+        );
+    });
+    Object.entries(settingLeafs).map(([index, data]: [string, any]) => {
+        settingStorage.updateLeaf(
+            { level1Index: Field.from(index) },
+            Field.from(data.leaf)
+        );
+    });
+    Object.entries(keyStatusLeafs).map(([index, data]: [string, any]) => {
+        keyStatusStorage.updateLeaf(
+            { level1Index: Field.from(index) },
+            Field.from(data.leaf)
+        );
+    });
+    Object.entries(contributionLeafs).map(([index, data]: [string, any]) => {
+        let [level1Index, level2Index] = index.split('-').map((e) => Field(e));
+        contributionStorage.updateLeaf(
+            { level1Index, level2Index },
+            Field.from(data.leaf)
+        );
+    });
+    Object.entries(publicKeyLeafs).map(([index, data]: [string, any]) => {
+        let [level1Index, level2Index] = index.split('-').map((e) => Field(e));
+        publicKeyStorage.updateLeaf(
+            { level1Index, level2Index },
+            Field.from(data.leaf)
+        );
+    });
+    Object.entries(processLeafs).map(([index, data]: [string, any]) => {
+        processStorage.updateLeaf(
+            { level1Index: Field.from(index) },
+            Field.from(data.leaf)
+        );
+    });
+    Object.entries(rollupLeafs).map(([index, data]: [string, any]) => {
+        rollupStorage.updateLeaf(
+            { level1Index: Field.from(index) },
+            Field.from(data.leaf)
+        );
+    });
 
-//     const previousHashes = [
-//         Field(
-//             8481153099833621817349097282911289219126620074665421844518804541945637548392n
-//         ),
-//         Field(
-//             21769863472704035169109686949668942603687423803443025319900892543188653515100n
-//         ),
-//     ];
+    // Fetch state and actions
+    const fromActionState =
+        Field(
+            6803625946086018452598705039620679515213457161077862313461629549127215823911n
+        );
+    const endActionState = undefined;
 
-//     const currentHashes = [
-//         Field(
-//             21769863472704035169109686949668942603687423803443025319900892543188653515100n
-//         ),
-//         Field(
-//             8302243030199083598511859698356353009770072315020564208363554095230974460094n
-//         ),
-//     ];
+    const actionIds = [2, 3];
+    const previousHashes = [
+        Field(
+            6803625946086018452598705039620679515213457161077862313461629549127215823911n
+        ),
+        Field(
+            14636295595744228947495750518328083237509545151896270768203993303991364063415n
+        ),
+    ];
+    const currentHashes = [
+        Field(
+            14636295595744228947495750518328083237509545151896270768203993303991364063415n
+        ),
+        Field(
+            26085979524577151463015068549718748852348038974812695892528175434793673878044n
+        ),
+    ];
 
-//     const rawActions = (
-//         await fetchActions(round1Address, fromState, toState)
-//     ).filter((action) =>
-//         currentHashes.map((e) => e.toString()).includes(action.hash)
-//     );
-//     // rawActions.map((e) => Provable.log(e));
-//     const actions: Round1Action[] = rawActions.map((e) => {
-//         let action: Field[] = e.actions[0].map((e) => Field(e));
-//         return Round1Action.fromFields(action);
-//     });
-//     console.log('Finalizing Actions:');
-//     actions.map((e) => Provable.log(e));
+    const rawActions = (
+        await Utils.fetchActions(
+            round1ZkApp.key.publicKey,
+            fromActionState
+            // toState
+        )
+    ).filter((action) =>
+        currentHashes.map((e) => e.toString()).includes(action.hash)
+    );
+    // rawActions.map((e) => Provable.log(e));
+    const actions: Round1Action[] = rawActions.map((e) => {
+        let action: Field[] = e.actions[0].map((e) => Field(e));
+        return Round1Action.fromFields(action);
+    });
+    console.log('Finalizing Actions:');
+    actions.map((e) => Provable.log(e));
 
-//     console.log('FinalizeRound1.init...');
-//     let proof = await FinalizeRound1.init(
-//         new FinalizeRound1Input({
-//             previousActionState: Field(0),
-//             action: Round1Action.empty(),
-//         }),
-//         Field(committee.threshold),
-//         Field(committee.numberOfMembers),
-//         round1State.contributions,
-//         round1State.publicKeys,
-//         round1State.reduceState,
-//         Round1ContributionStorage.calculateLevel1Index({
-//             committeeId: committeeId,
-//             keyId: keyId,
-//         }),
-//         contributionStorage.getLevel1Witness(
-//             Round1ContributionStorage.calculateLevel1Index({
-//                 committeeId: committeeId,
-//                 keyId: keyId,
-//             })
-//         ),
-//         publicKeyStorage.getLevel1Witness(
-//             PublicKeyStorage.calculateLevel1Index({
-//                 committeeId: committeeId,
-//                 keyId: keyId,
-//             })
-//         )
-//     );
-//     console.log('Done');
+    let finalizeProof = await Utils.prove(
+        FinalizeRound1.name,
+        'init',
+        async () =>
+            FinalizeRound1.init(
+                new FinalizeRound1Input({
+                    previousActionState: Field(0),
+                    action: Round1Action.empty(),
+                    actionId: Field(0),
+                }),
+                rollupContract.rollupRoot.get(),
+                Field(settingLeafs[Number(committeeId)].raw.T),
+                Field(settingLeafs[Number(committeeId)].raw.N),
+                round1Contract.contributionRoot.get(),
+                round1Contract.publicKeyRoot.get(),
+                round1Contract.processRoot.get(),
+                Round1ContributionStorage.calculateLevel1Index({
+                    committeeId,
+                    keyId,
+                }),
+                contributionStorage.getLevel1Witness(
+                    Round1ContributionStorage.calculateLevel1Index({
+                        committeeId,
+                        keyId,
+                    })
+                ),
+                publicKeyStorage.getLevel1Witness(
+                    PublicKeyStorage.calculateLevel1Index({
+                        committeeId,
+                        keyId,
+                    })
+                )
+            ),
+        undefined,
+        logger
+    );
 
-//     contributionStorage.updateInternal(
-//         Round1ContributionStorage.calculateLevel1Index({
-//             committeeId: committeeId,
-//             keyId: keyId,
-//         }),
-//         EMPTY_LEVEL_2_TREE()
-//     );
+    contributionStorage.updateInternal(
+        Round1ContributionStorage.calculateLevel1Index({
+            committeeId,
+            keyId,
+        }),
+        DKG_LEVEL_2_TREE()
+    );
 
-//     publicKeyStorage.updateInternal(
-//         PublicKeyStorage.calculateLevel1Index({
-//             committeeId: committeeId,
-//             keyId: keyId,
-//         }),
-//         EMPTY_LEVEL_2_TREE()
-//     );
+    publicKeyStorage.updateInternal(
+        PublicKeyStorage.calculateLevel1Index({
+            committeeId: committeeId,
+            keyId: keyId,
+        }),
+        DKG_LEVEL_2_TREE()
+    );
 
-//     for (let i = 0; i < actions.length; i++) {
-//         let action = actions[i];
-//         Provable.log(action);
-//         console.log('FinalizeRound1.nextStep...');
-//         proof = await FinalizeRound1.nextStep(
-//             new FinalizeRound1Input({
-//                 previousActionState: previousHashes[Number(action.memberId)],
-//                 action: action,
-//             }),
-//             proof,
-//             contributionStorage.getWitness(
-//                 Round1ContributionStorage.calculateLevel1Index({
-//                     committeeId: action.committeeId,
-//                     keyId: action.keyId,
-//                 }),
-//                 Round1ContributionStorage.calculateLevel2Index(action.memberId)
-//             ),
-//             publicKeyStorage.getWitness(
-//                 PublicKeyStorage.calculateLevel1Index({
-//                     committeeId: action.committeeId,
-//                     keyId: action.keyId,
-//                 }),
-//                 PublicKeyStorage.calculateLevel2Index(action.memberId)
-//             ),
-//             ProcessWitness.fromJSON(
-//                 reduce[currentHashes[Number(action.memberId)].toString()]
-//             )
-//         );
-//         console.log('Done');
+    for (let i = 0; i < actions.length; i++) {
+        let action = actions[i];
+        let actionId = Field(actionIds[i]);
+        finalizeProof = await Utils.prove(
+            FinalizeRound1.name,
+            'contribute',
+            async () =>
+                FinalizeRound1.contribute(
+                    new FinalizeRound1Input({
+                        previousActionState: Field(previousHashes[i]),
+                        action,
+                        actionId,
+                    }),
+                    finalizeProof,
+                    contributionStorage.getWitness(
+                        Round1ContributionStorage.calculateLevel1Index({
+                            committeeId: action.committeeId,
+                            keyId: action.keyId,
+                        }),
+                        Round1ContributionStorage.calculateLevel2Index(
+                            action.memberId
+                        )
+                    ),
+                    publicKeyStorage.getWitness(
+                        PublicKeyStorage.calculateLevel1Index({
+                            committeeId: action.committeeId,
+                            keyId: action.keyId,
+                        }),
+                        PublicKeyStorage.calculateLevel2Index(Field(i))
+                    ),
+                    rollupStorage.getWitness(
+                        RollupStorage.calculateLevel1Index({
+                            zkAppIndex: Field(ZkAppIndex.ROUND1),
+                            actionId,
+                        })
+                    ),
+                    processStorage.getWitness(
+                        ProcessStorage.calculateIndex(actionId)
+                    )
+                ),
+            undefined,
+            logger
+        );
 
-//         contributionStorage.updateLeaf(
-//             {
-//                 level1Index: Round1ContributionStorage.calculateLevel1Index({
-//                     committeeId: action.committeeId,
-//                     keyId: action.keyId,
-//                 }),
-//                 level2Index: Round1ContributionStorage.calculateLevel2Index(
-//                     action.memberId
-//                 ),
-//             },
-//             Round1ContributionStorage.calculateLeaf(action.contribution)
-//         );
+        contributionStorage.updateLeaf(
+            {
+                level1Index: Round1ContributionStorage.calculateLevel1Index({
+                    committeeId: action.committeeId,
+                    keyId: action.keyId,
+                }),
+                level2Index: Round1ContributionStorage.calculateLevel2Index(
+                    action.memberId
+                ),
+            },
+            Round1ContributionStorage.calculateLeaf(action.contribution)
+        );
+        publicKeyStorage.updateLeaf(
+            {
+                level1Index: PublicKeyStorage.calculateLevel1Index({
+                    committeeId: action.committeeId,
+                    keyId: action.keyId,
+                }),
+                level2Index: PublicKeyStorage.calculateLevel2Index(
+                    action.memberId
+                ),
+            },
+            PublicKeyStorage.calculateLeaf(action.contribution.C.get(Field(0)))
+        );
+        processStorage.updateRawLeaf(
+            {
+                level1Index: ProcessStorage.calculateLevel1Index(actionId),
+            },
+            {
+                actionState: Field(currentHashes[i]),
+                processCounter: UInt8.from(0),
+            }
+        );
+    }
 
-//         publicKeyStorage.updateLeaf(
-//             {
-//                 level1Index: PublicKeyStorage.calculateLevel1Index({
-//                     committeeId: action.committeeId,
-//                     keyId: action.keyId,
-//                 }),
-//                 level2Index: PublicKeyStorage.calculateLevel2Index(
-//                     action.memberId
-//                 ),
-//             },
-//             PublicKeyStorage.calculateLeaf(action.contribution.C.get(Field(0)))
-//         );
-//     }
+    await Utils.proveAndSendTx(
+        Round1Contract.name,
+        'finalize',
+        async () =>
+            round1Contract.finalize(
+                finalizeProof,
+                settingStorage.getWitness(committeeId),
+                keyStatusStorage.getWitness(
+                    KeyStatusStorage.calculateLevel1Index({
+                        committeeId,
+                        keyId,
+                    })
+                ),
+                sharedAddressStorage.getZkAppRef(
+                    ZkAppIndex.COMMITTEE,
+                    accounts.committee.publicKey
+                ),
+                sharedAddressStorage.getZkAppRef(
+                    ZkAppIndex.DKG,
+                    dkgZkApp.key.publicKey
+                ),
+                sharedAddressStorage.getZkAppRef(
+                    ZkAppIndex.ROLLUP,
+                    rollupZkApp.key.publicKey
+                ),
+                sharedAddressStorage.getZkAppRef(
+                    ZkAppIndex.ROUND1,
+                    round1ZkApp.key.publicKey
+                )
+            ),
+        feePayer,
+        true,
+        undefined,
+        logger
+    );
+    await fetchAccounts([
+        dkgZkApp.key.publicKey,
+        round1ZkApp.key.publicKey,
+        rollupZkApp.key.publicKey,
+    ]);
+}
 
-//     let tx = await Mina.transaction(
-//         {
-//             sender: feePayer.key.publicKey,
-//             fee: feePayer.fee,
-//             nonce: feePayer.nonce++,
-//         },
-//         () => {
-//             round1Contract.finalize(
-//                 proof,
-//                 new ZkAppRef({
-//                     address: PublicKey.fromBase58(committeeAddress),
-//                     witness: AddressWitness.fromJSON(
-//                         round1ZkApp[ZkAppIndex.COMMITTEE]
-//                     ),
-//                 }),
-//                 new ZkAppRef({
-//                     address: PublicKey.fromBase58(dkgAddress),
-//                     witness: AddressWitness.fromJSON(
-//                         round1ZkApp[ZkAppIndex.DKG]
-//                     ),
-//                 }),
-//                 CommitteeLevel1Witness.fromJSON(
-//                     setting[
-//                         Number(SettingStorage.calculateLevel1Index(committeeId))
-//                     ]
-//                 ),
-//                 DKGLevel1Witness.fromJSON(
-//                     keyStatus[
-//                         Number(
-//                             KeyStatusStorage.calculateLevel1Index({
-//                                 committeeId: committeeId,
-//                                 keyId: keyId,
-//                             })
-//                         )
-//                     ]
-//                 )
-//             );
-//         }
-//     );
-//     await proveAndSend(tx, feePayer.key, 'Round1Contract', 'finalize');
-// }
-
-// main()
-//     .then()
-//     .catch((err) => {
-//         console.error(err);
-//         process.exit(1);
-//     });
+main()
+    .then()
+    .catch((err) => {
+        console.error(err);
+        process.exit(1);
+    });

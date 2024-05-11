@@ -117,6 +117,7 @@ class FinalizedEvent extends Struct({
 
 class RespondedDArrayEvent extends Struct({
     requestId: Field,
+    memberId: Field,
     dimensionIndex: UInt8,
     Di: Group,
 }) {}
@@ -857,9 +858,10 @@ class ResponseContract extends SmartContract {
 
         for (let i = 0; i < ENCRYPTION_LIMITS.FULL_DIMENSION; i++) {
             this.emitEvent(
-                EventEnum.FinalizedDArray,
+                EventEnum.RespondedDArray,
                 new RespondedDArrayEvent({
                     requestId,
+                    memberId,
                     dimensionIndex: UInt8.from(i),
                     Di: responseProof.publicOutput.responseVector.get(Field(i)),
                 })

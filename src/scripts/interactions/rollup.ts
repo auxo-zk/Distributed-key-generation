@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Field, Mina, Provable, PublicKey } from 'o1js';
+import { Field, Provable } from 'o1js';
 import { Utils } from '@auxo-dev/auxo-libs';
 import { prepare } from '../helper/prepare.js';
 import {
@@ -12,7 +12,6 @@ import {
     RollupCounterStorage,
     RollupStorage,
 } from '../../storages/RollupStorage.js';
-import { ZkAppIndex } from '../../contracts/constants.js';
 import { fetchAccounts } from '../helper/index.js';
 import { AddressStorage } from '../../storages/AddressStorage.js';
 
@@ -87,9 +86,8 @@ async function main() {
     // Fetch actions
     const fromActionState =
         Field(
-            2923982852507802585300453784436713854820452704685427105200899025896050458915n
+            27821323453975531556670850729426828341759509442553722796995014853831170665396n
         );
-    const endActionState = Field(0n);
 
     const rawActions = await Utils.fetchActions(
         rollupZkApp.key.publicKey,
