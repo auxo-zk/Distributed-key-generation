@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
+import axios from 'axios';
 import fs from 'fs';
 import {
     Field,
@@ -145,7 +146,7 @@ describe('Key usage', () => {
     let submissionZkApp: Utils.ZkApp;
     let requesterZkApp: Utils.ZkApp;
     let mockSecret: any;
-    let dkgDeployed = false;
+    let dkgDeployed = true;
     let committees: {
         members: MemberArray;
         threshold: Field;
@@ -379,6 +380,22 @@ describe('Key usage', () => {
             Field(RequesterAddressBook.REQUEST),
             accounts.request.publicKey
         );
+
+        // Rollup tree
+        if (dkgDeployed) {
+            const rollupLeafs = (
+                await axios.get(
+                    'https://api.auxo.fund/v0/storages/rollup/rollup/leafs'
+                )
+            ).data;
+
+            Object.entries(rollupLeafs).map(([index, data]: [string, any]) => {
+                rollupStorage.updateLeaf(
+                    { level1Index: Field.from(index) },
+                    Field.from(data.leaf)
+                );
+            });
+        }
 
         // Calculate mock committee trees
         for (let i = 0; i < committees.length; i++) {
@@ -857,7 +874,9 @@ describe('Key usage', () => {
 
         // Submit encryptions
         for (let i = 0; i < submissions.length; i++) {
-            let submissionFile = `mock/submissions-${i}.json`;
+            let submissionFile = `mock/submissions-${Number(
+                request.taskId
+            )}-${i}.json`;
             let isMockCommitmentUsed = fs.existsSync(submissionFile);
             let encryption: any;
             if (isMockCommitmentUsed) {

@@ -70,10 +70,11 @@ async function main() {
         );
     });
     Object.entries(rollupCounterLeafs).map(([index, data]: [string, any]) => {
-        rollupCounterStorage.updateLeaf(
-            { level1Index: Field.from(index) },
-            Field.from(data.leaf)
-        );
+        if (data.leaf !== '0')
+            rollupCounterStorage.updateLeaf(
+                { level1Index: Field.from(index) },
+                Field.from(data.leaf)
+            );
         Object.assign(actionCounters, { [Number(index)]: Number(data.leaf) });
     });
     Object.entries(rollupLeafs).map(([index, data]: [string, any]) => {
@@ -86,7 +87,7 @@ async function main() {
     // Fetch actions
     const fromActionState =
         Field(
-            27821323453975531556670850729426828341759509442553722796995014853831170665396n
+            6142150741903469959487399934181833683923050987919089738773230258248953740685n
         );
 
     const rawActions = await Utils.fetchActions(
@@ -119,6 +120,7 @@ async function main() {
         let action = actions[i];
         let zkAppIndex = action.zkAppIndex;
         let actionId = Field(actionCounters[Number(zkAppIndex)]);
+        Provable.log('Action ID:', actionId);
         rollupProof = await Utils.prove(
             Rollup.name,
             'rollup',

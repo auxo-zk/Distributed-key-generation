@@ -67,7 +67,7 @@ describe('DKG Committee', () => {
             addresses: memberArray,
             threshold: Field(1),
             ipfsHash: IpfsHash.fromString(
-                'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
+                'QmXJofK5TCzogTqut9Kpx1Dh93NgiEnQ8ib3oiWtYuM883'
             ),
         });
 
@@ -103,7 +103,7 @@ describe('DKG Committee', () => {
             addresses: memberArray,
             threshold: Field(3),
             ipfsHash: IpfsHash.fromString(
-                'QmdZyvZxREgPctoRguikD1PTqsXJH3Mg2M3hhRhVNSx4tn'
+                'QmSUEHkTCwfcSeumeYXgvd6jXtS76tYLfab94Sk22hBmyE'
             ),
         });
 
