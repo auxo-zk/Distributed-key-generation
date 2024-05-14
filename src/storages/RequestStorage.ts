@@ -29,8 +29,8 @@ export {
 export {
     KeyIndexLeaf as RequestKeyIndexLeaf,
     KeyIndexStorage as RequestKeyIndexStorage,
-    TaskIdLeaf,
-    TaskIdStorage,
+    TaskLeaf,
+    TaskStorage,
     AccumulationLeaf as RequestAccumulationLeaf,
     AccumulationStorage as RequestAccumulationStorage,
     ExpirationLeaf,
@@ -119,15 +119,15 @@ class KeyIndexStorage extends GenericStorage<KeyIndexLeaf> {
     }
 }
 
-type TaskIdLeaf = {
+type TaskLeaf = {
     requester: PublicKey;
     taskId: UInt32;
 };
-class TaskIdStorage extends GenericStorage<TaskIdLeaf> {
+class TaskStorage extends GenericStorage<TaskLeaf> {
     constructor(
         leafs?: {
             level1Index: Field;
-            leaf: TaskIdLeaf | Field;
+            leaf: TaskLeaf | Field;
             isRaw: boolean;
         }[]
     ) {
@@ -140,14 +140,14 @@ class TaskIdStorage extends GenericStorage<TaskIdLeaf> {
         );
     }
 
-    static calculateLeaf(rawLeaf: TaskIdLeaf): Field {
+    static calculateLeaf(rawLeaf: TaskLeaf): Field {
         return Poseidon.hash(
             [rawLeaf.requester.toFields(), rawLeaf.taskId.value].flat()
         );
     }
 
-    calculateLeaf(rawLeaf: TaskIdLeaf): Field {
-        return TaskIdStorage.calculateLeaf(rawLeaf);
+    calculateLeaf(rawLeaf: TaskLeaf): Field {
+        return TaskStorage.calculateLeaf(rawLeaf);
     }
 
     static calculateLevel1Index(requestId: Field): Field {
@@ -155,7 +155,7 @@ class TaskIdStorage extends GenericStorage<TaskIdLeaf> {
     }
 
     calculateLevel1Index(requestId: Field): Field {
-        return TaskIdStorage.calculateLevel1Index(requestId);
+        return TaskStorage.calculateLevel1Index(requestId);
     }
 
     getLevel1Witness(level1Index: Field): Level1Witness {
@@ -172,7 +172,7 @@ class TaskIdStorage extends GenericStorage<TaskIdLeaf> {
 
     updateRawLeaf(
         { level1Index }: { level1Index: Field },
-        rawLeaf: TaskIdLeaf
+        rawLeaf: TaskLeaf
     ): void {
         super.updateRawLeaf({ level1Index }, rawLeaf);
     }

@@ -65,6 +65,8 @@ enum EventEnum {
 
     RespondedDArray = 'responded-d-array',
     FinalizedDArray = 'finalized-d-array',
+
+    ResultArray = 'result-array',
 }
 
 enum ErrorEnum {

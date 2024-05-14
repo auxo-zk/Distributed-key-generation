@@ -1,4 +1,13 @@
-import { Field, Group, Poseidon, Scalar, Struct, UInt32, UInt8 } from 'o1js';
+import {
+    Field,
+    Group,
+    Poseidon,
+    PublicKey,
+    Scalar,
+    Struct,
+    UInt32,
+    UInt8,
+} from 'o1js';
 import {
     CustomScalar,
     GroupDynamicArray,
@@ -20,6 +29,7 @@ export {
     SecretNote,
     calculatePublicKey as calculatePublicKeyFromPoints,
     calculateCommitment,
+    calculateTaskReference,
     generateEncryption,
     // recoverEncryption,
     accumulateEncryption,
@@ -41,7 +51,7 @@ class RandomVector extends StaticArray(
 class RequestVector extends StaticArray(Group, ENCRYPTION_LIMITS.DIMENSION) {}
 class ResultVector extends StaticArray(
     CustomScalar,
-    ENCRYPTION_LIMITS.DIMENSION
+    ENCRYPTION_LIMITS.FULL_DIMENSION
 ) {}
 class NullifierArray extends StaticArray(Field, ENCRYPTION_LIMITS.DIMENSION) {}
 class CommitmentArray extends StaticArray(Field, ENCRYPTION_LIMITS.DIMENSION) {}
@@ -69,6 +79,10 @@ function calculateCommitment(
     return Poseidon.hash(
         [nullifier, taskId.value, index.value, secret.toFields()].flat()
     );
+}
+
+function calculateTaskReference(requester: PublicKey, taskId: UInt32) {
+    return Poseidon.hash([requester.toFields(), taskId.value].flat());
 }
 
 function generateEncryption(

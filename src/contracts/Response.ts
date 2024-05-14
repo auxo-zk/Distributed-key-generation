@@ -219,6 +219,8 @@ const ComputeResponse = ZkProgram({
                 let D = R.add(Group.generator)
                     .scale(ski.toScalar())
                     .sub(skiCommitment);
+                let responseVector = earlierProof.publicOutput.responseVector;
+                responseVector.push(D);
                 let responseRootD = responseWitness.calculateRoot(
                     Poseidon.hash(D.toFields())
                 );
@@ -228,6 +230,7 @@ const ComputeResponse = ZkProgram({
                     responseRootD,
                     skiCommitment,
                     dimension: earlierProof.publicOutput.dimension.add(1),
+                    responseVector,
                 });
             },
         },

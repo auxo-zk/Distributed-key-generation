@@ -18,9 +18,10 @@ import {
     UInt32,
 } from 'o1js';
 import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
-import { REQUEST_FEE } from '../constants.js';
+import { ENCRYPTION_LIMITS, REQUEST_FEE } from '../constants.js';
 import {
     ErrorEnum,
+    EventEnum,
     ZkAppAction,
     ZkAppIndex,
     ZkProgramEnum,
@@ -37,10 +38,12 @@ import {
 } from '../storages/RequestStorage.js';
 import { rollup } from './Rollup.js';
 import { ResponseContract } from './Response.js';
+import { ResultVector, calculateTaskReference } from '../libs/Requester.js';
 
 export {
     RequestStatus,
     Action as RequestAction,
+    ResultArrayEvent,
     ComputeResultInput,
     ComputeResultOutput,
     ComputeResult,
@@ -62,7 +65,7 @@ class Action
     extends Struct({
         requestId: Field,
         keyIndex: Field,
-        taskId: Field,
+        task: Field,
         expirationTimestamp: UInt64,
         accumulationRoot: Field,
         resultRoot: Field,
@@ -73,7 +76,7 @@ class Action
         return new Action({
             requestId: Field(0),
             keyIndex: Field(0),
-            taskId: Field(0),
+            task: Field(0),
             expirationTimestamp: UInt64.zero,
             accumulationRoot: Field(0),
             resultRoot: Field(0),
@@ -87,6 +90,12 @@ class Action
     }
 }
 
+class ResultArrayEvent extends Struct({
+    requestId: Field,
+    dimensionIndex: UInt8,
+    result: CustomScalar,
+}) {}
+
 class ComputeResultInput extends Struct({
     M: Group,
     D: Group,
@@ -98,6 +107,7 @@ class ComputeResultOutput extends Struct({
     responseRootD: Field,
     resultRoot: Field,
     dimension: UInt8,
+    resultVector: ResultVector,
 }) {}
 
 const ComputeResult = ZkProgram({
@@ -118,6 +128,7 @@ const ComputeResult = ZkProgram({
                     responseRootD,
                     resultRoot,
                     dimension: UInt8.from(0),
+                    resultVector: new ResultVector(),
                 });
             },
         },
@@ -220,10 +231,16 @@ const ComputeResult = ZkProgram({
                 //         ErrorEnum.REQUEST_RESULT
                 //     )
                 // );
+                let resultVector = earlierProof.publicOutput.resultVector;
+                resultVector.set(
+                    earlierProof.publicOutput.dimension.value,
+                    CustomScalar.fromScalar(input.result)
+                );
 
                 return new ComputeResultOutput({
                     ...earlierProof.publicOutput,
                     dimension: earlierProof.publicOutput.dimension.add(1),
+                    resultVector,
                 });
             },
         },
@@ -304,7 +321,7 @@ const UpdateRequest = ZkProgram({
                     UpdateRequestOutput
                 >,
                 keyIndexWitness: RequestLevel1Witness,
-                taskIdWitness: RequestLevel1Witness,
+                taskWitness: RequestLevel1Witness,
                 accumulationWitness: RequestLevel1Witness,
                 expirationWitness: RequestLevel1Witness
             ) {
@@ -344,7 +361,7 @@ const UpdateRequest = ZkProgram({
 
                 // Verify empty task Id
                 earlierProof.publicOutput.nextTaskIdRoot.assertEquals(
-                    taskIdWitness.calculateRoot(Field(0)),
+                    taskWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
                         'initialize',
@@ -352,7 +369,7 @@ const UpdateRequest = ZkProgram({
                     )
                 );
                 requestId.assertEquals(
-                    taskIdWitness.calculateIndex(),
+                    taskWitness.calculateIndex(),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
                         'initialize',
@@ -401,14 +418,12 @@ const UpdateRequest = ZkProgram({
                 let nextKeyIndexRoot = keyIndexWitness.calculateRoot(
                     input.keyIndex
                 );
-                let nextTaskIdRoot = taskIdWitness.calculateRoot(
-                    Poseidon.hash(input.taskId.toFields())
-                );
+                let nextTaskIdRoot = taskWitness.calculateRoot(input.task);
                 let nextAccumulationRoot = accumulationWitness.calculateRoot(
                     input.accumulationRoot
                 );
                 let nextExpirationRoot = expirationWitness.calculateRoot(
-                    Poseidon.hash(input.expirationTimestamp.toFields())
+                    input.expirationTimestamp.value
                 );
 
                 // Calculate corresponding action state
@@ -536,10 +551,10 @@ class RequestContract extends SmartContract {
     @state(Field) keyIndexRoot = State<Field>();
 
     /**
-     * @description MT storing global taskId = Hash(requester | taskId)
-     * @see TaskIdStorage for off-chain storage implementation
+     * @description MT storing global task = Hash(requester | taskId)
+     * @see TaskStorage for off-chain storage implementation
      */
-    @state(Field) taskIdRoot = State<Field>();
+    @state(Field) taskRoot = State<Field>();
 
     /**
      * @description MT storing accumulation data
@@ -567,12 +582,14 @@ class RequestContract extends SmartContract {
 
     reducer = Reducer({ actionType: Action });
 
+    events = { [EventEnum.ResultArray]: ResultArrayEvent };
+
     init() {
         super.init();
         this.zkAppRoot.set(ADDRESS_MT().getRoot());
         this.requestCounter.set(Field(0));
         this.keyIndexRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
-        this.taskIdRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
+        this.taskRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
         this.accumulationRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
         this.expirationRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
         this.resultRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
@@ -605,7 +622,7 @@ class RequestContract extends SmartContract {
         let action = new Action({
             requestId: Field(-1),
             keyIndex: keyIndex,
-            taskId: Poseidon.hash([requester.toFields(), taskId.value].flat()),
+            task: calculateTaskReference(requester, taskId),
             expirationTimestamp: timestamp.add(expirationPeriod),
             accumulationRoot,
             resultRoot: Field(0),
@@ -688,6 +705,17 @@ class RequestContract extends SmartContract {
             ...{ requestId, resultRoot: proof.publicOutput.resultRoot },
         });
         this.reducer.dispatch(action);
+
+        for (let i = 0; i < ENCRYPTION_LIMITS.FULL_DIMENSION; i++) {
+            this.emitEvent(
+                EventEnum.ResultArray,
+                new ResultArrayEvent({
+                    requestId,
+                    dimensionIndex: UInt8.from(i),
+                    result: proof.publicOutput.resultVector.get(Field(i)),
+                })
+            );
+        }
     }
 
     /**
@@ -700,7 +728,7 @@ class RequestContract extends SmartContract {
         let curActionState = this.actionState.getAndRequireEquals();
         let requestCounter = this.requestCounter.getAndRequireEquals();
         let keyIndexRoot = this.keyIndexRoot.getAndRequireEquals();
-        let taskIdRoot = this.taskIdRoot.getAndRequireEquals();
+        let taskRoot = this.taskRoot.getAndRequireEquals();
         let accumulationRoot = this.accumulationRoot.getAndRequireEquals();
         let expirationRoot = this.expirationRoot.getAndRequireEquals();
         let resultRoot = this.resultRoot.getAndRequireEquals();
@@ -731,7 +759,7 @@ class RequestContract extends SmartContract {
             )
         );
         proof.publicOutput.initialTaskIdRoot.assertEquals(
-            taskIdRoot,
+            taskRoot,
             Utils.buildAssertMessage(
                 RequestContract.name,
                 'update',
@@ -766,7 +794,7 @@ class RequestContract extends SmartContract {
         // Update state values
         this.requestCounter.set(proof.publicOutput.nextRequestCounter);
         this.keyIndexRoot.set(proof.publicOutput.nextKeyIndexRoot);
-        this.taskIdRoot.set(proof.publicOutput.nextTaskIdRoot);
+        this.taskRoot.set(proof.publicOutput.nextTaskIdRoot);
         this.accumulationRoot.set(proof.publicOutput.nextAccumulationRoot);
         this.expirationRoot.set(proof.publicOutput.nextExpirationRoot);
         this.resultRoot.set(proof.publicOutput.nextResultRoot);
@@ -827,15 +855,13 @@ class RequestContract extends SmartContract {
     verifyTaskId(
         requestId: Field,
         address: PublicKey,
-        taskId: Field,
+        taskId: UInt32,
         witness: RequestLevel1Witness
     ) {
-        this.taskIdRoot
+        this.taskRoot
             .getAndRequireEquals()
             .assertEquals(
-                witness.calculateRoot(
-                    Poseidon.hash([address.toFields(), taskId].flat())
-                ),
+                witness.calculateRoot(calculateTaskReference(address, taskId)),
                 Utils.buildAssertMessage(
                     RequestContract.name,
                     'verifyTaskId',
@@ -880,11 +906,7 @@ class RequestContract extends SmartContract {
         );
         let isExpired = this.expirationRoot
             .getAndRequireEquals()
-            .equals(
-                expirationWitness.calculateRoot(
-                    Poseidon.hash(expirationTimestamp.toFields())
-                )
-            );
+            .equals(expirationWitness.calculateRoot(expirationTimestamp.value));
         // FIXME - "the permutation was not constructed correctly: final value" error
         // .and(
         //     this.network.timestamp
