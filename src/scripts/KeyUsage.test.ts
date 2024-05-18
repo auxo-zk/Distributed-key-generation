@@ -117,7 +117,6 @@ import {
     SecretNote,
     SecretVector,
     bruteForceResultVector,
-    calculateCommitment,
     getResultVector,
 } from '../libs/Requester.js';
 import { Requester } from '../libs/index.js';
@@ -227,7 +226,7 @@ describe('Key usage', () => {
 
     // RequestContract storage
     let requestKeyIndexStorage = new RequestKeyIndexStorage();
-    let taskIdStorage = new TaskStorage();
+    let taskStorage = new TaskStorage();
     let requestAccumulationStorage = new RequestAccumulationStorage();
     let expirationStorage = new ExpirationStorage();
     let resultStorage = new ResultStorage();
@@ -942,43 +941,43 @@ describe('Key usage', () => {
             }
             Provable.log('Encryption:', encryption);
             requests[0].encryptions.push(encryption);
-            // await Utils.proveAndSendTx(
-            //     SubmissionContract.name,
-            //     'submitEncryption',
-            //     async () =>
-            //         submissionContract.submitEncryption(
-            //             request.taskId,
-            //             request.keyIndex,
-            //             encryption.secrets,
-            //             encryption.randoms,
-            //             encryption.packedIndices,
-            //             encryption.nullifiers,
-            //             publicKey,
-            //             keyStorage.getWitness(
-            //                 KeyStorage.calculateLevel1Index({
-            //                     committeeId,
-            //                     keyId,
-            //                 })
-            //             ),
-            //             requesterKeyIndexStorage.getWitness(
-            //                 RequesterKeyIndexStorage.calculateLevel1Index(
-            //                     request.taskId.value
-            //                 )
-            //             ),
-            //             requesterAddressStorage.getZkAppRef(
-            //                 RequesterAddressBook.SUBMISSION,
-            //                 submissionZkApp.key.publicKey
-            //             ),
-            //             requesterAddressStorage.getZkAppRef(
-            //                 RequesterAddressBook.DKG,
-            //                 dkgZkApp.key.publicKey
-            //             )
-            //         ),
-            //     feePayer,
-            //     true,
-            //     undefined,
-            //     logger
-            // );
+            await Utils.proveAndSendTx(
+                SubmissionContract.name,
+                'submitEncryption',
+                async () =>
+                    submissionContract.submitEncryption(
+                        request.taskId,
+                        request.keyIndex,
+                        encryption.secrets,
+                        encryption.randoms,
+                        encryption.packedIndices,
+                        encryption.nullifiers,
+                        publicKey,
+                        keyStorage.getWitness(
+                            KeyStorage.calculateLevel1Index({
+                                committeeId,
+                                keyId,
+                            })
+                        ),
+                        requesterKeyIndexStorage.getWitness(
+                            RequesterKeyIndexStorage.calculateLevel1Index(
+                                request.taskId.value
+                            )
+                        ),
+                        requesterAddressStorage.getZkAppRef(
+                            RequesterAddressBook.SUBMISSION,
+                            submissionZkApp.key.publicKey
+                        ),
+                        requesterAddressStorage.getZkAppRef(
+                            RequesterAddressBook.DKG,
+                            dkgZkApp.key.publicKey
+                        )
+                    ),
+                feePayer,
+                true,
+                undefined,
+                logger
+            );
             await fetchAccounts([
                 requesterZkApp.key.publicKey,
                 submissionZkApp.key.publicKey,
@@ -1127,28 +1126,28 @@ describe('Key usage', () => {
         // Wait until the submission period ends and finalize task
         await waitUntil(Number(request.submissionTs));
         let level1Index = request.taskId.value;
-        // await Utils.proveAndSendTx(
-        //     RequesterContract.name,
-        //     'finalizeTask',
-        //     async () =>
-        //         requesterContract.finalizeTask(
-        //             request.taskId,
-        //             UInt8.from(ENCRYPTION_LIMITS.FULL_DIMENSION),
-        //             request.keyIndex,
-        //             request.accumulationRootR!,
-        //             request.accumulationRootM!,
-        //             requesterKeyIndexStorage.getWitness(level1Index),
-        //             requesterAccumulationStorage.getWitness(level1Index),
-        //             requesterAddressStorage.getZkAppRef(
-        //                 RequesterAddressBook.REQUEST,
-        //                 requestZkApp.key.publicKey
-        //             )
-        //         ),
-        //     feePayer,
-        //     true,
-        //     undefined,
-        //     logger
-        // );
+        await Utils.proveAndSendTx(
+            RequesterContract.name,
+            'finalizeTask',
+            async () =>
+                requesterContract.finalizeTask(
+                    request.taskId,
+                    UInt8.from(ENCRYPTION_LIMITS.FULL_DIMENSION),
+                    request.keyIndex,
+                    request.accumulationRootR!,
+                    request.accumulationRootM!,
+                    requesterKeyIndexStorage.getWitness(level1Index),
+                    requesterAccumulationStorage.getWitness(level1Index),
+                    requesterAddressStorage.getZkAppRef(
+                        RequesterAddressBook.REQUEST,
+                        requestZkApp.key.publicKey
+                    )
+                ),
+            feePayer,
+            true,
+            undefined,
+            logger
+        );
         await fetchAccounts([requestZkApp.key.publicKey]);
         let actions = await Utils.fetchActions(requestZkApp.key.publicKey);
         let action = RequestAction.fromFields(
@@ -1168,7 +1167,7 @@ describe('Key usage', () => {
         //             RequestAction.empty(),
         //             requestContract.requestCounter.get(),
         //             requestContract.keyIndexRoot.get(),
-        //             requestContract.taskIdRoot.get(),
+        //             requestContract.taskRoot.get(),
         //             requestContract.accumulationRoot.get(),
         //             requestContract.expirationRoot.get(),
         //             requestContract.resultRoot.get(),
@@ -1185,7 +1184,7 @@ describe('Key usage', () => {
         //             action,
         //             updateRequestProof,
         //             requestKeyIndexStorage.getWitness(Field(0)),
-        //             taskIdStorage.getWitness(Field(0)),
+        //             taskStorage.getWitness(Field(0)),
         //             requestAccumulationStorage.getWitness(Field(0)),
         //             expirationStorage.getWitness(Field(0))
         //         ),
@@ -1198,7 +1197,7 @@ describe('Key usage', () => {
             },
             request.keyIndex
         );
-        taskIdStorage.updateRawLeaf(
+        taskStorage.updateRawLeaf(
             {
                 level1Index: Field(0),
             },
