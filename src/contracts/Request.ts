@@ -16,6 +16,7 @@ import {
     Scalar,
     UInt8,
     UInt32,
+    Bool,
 } from 'o1js';
 import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
 import { ENCRYPTION_LIMITS, REQUEST_FEE } from '../constants.js';
@@ -904,10 +905,11 @@ class RequestContract extends SmartContract {
                 ErrorEnum.REQUEST_RESULT_INDEX_L1
             )
         );
-        let isExpired = this.expirationRoot
-            .getAndRequireEquals()
-            .equals(expirationWitness.calculateRoot(expirationTimestamp.value));
+        let isExpired = Bool(false);
         // FIXME - "the permutation was not constructed correctly: final value" error
+        // let isExpired = this.expirationRoot
+        //     .getAndRequireEquals()
+        //     .equals(expirationWitness.calculateRoot(expirationTimestamp.value));
         // .and(
         //     this.network.timestamp
         //         .getAndRequireEquals()
@@ -956,8 +958,13 @@ class RequestContract extends SmartContract {
             this.getRequestStatus(
                 requestId,
                 expirationTimestamp,
-                resultWitness,
-                expirationWitness
+                expirationWitness,
+                resultWitness
+            ),
+            Utils.buildAssertMessage(
+                RequestContract.name,
+                'verifyRequestStatus',
+                ErrorEnum.REQUEST_STATUS
             )
         );
     }

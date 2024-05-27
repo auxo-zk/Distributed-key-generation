@@ -1,16 +1,7 @@
-import {
-    Field,
-    Group,
-    MerkleTree,
-    Poseidon,
-    Provable,
-    Scalar,
-    Struct,
-} from 'o1js';
+import { Field, Group, MerkleTree, Poseidon, Scalar, Struct } from 'o1js';
 import {
     Bit255,
     Bit255DynamicArray,
-    CustomScalar,
     FieldDynamicArray,
     GroupDynamicArray,
     PublicKeyDynamicArray,

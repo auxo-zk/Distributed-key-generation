@@ -1,5 +1,5 @@
 import 'dotenv/config.js';
-import { Mina, Provable, PublicKey, fetchAccount } from 'o1js';
+import { Mina, Provable, PublicKey, Reducer, fetchAccount } from 'o1js';
 import { fetchAccounts } from './index.js';
 import { Utils } from '@auxo-dev/auxo-libs';
 
@@ -20,15 +20,16 @@ async function main() {
     // const fetchedAccount = (await fetchAccounts(ACCOUNTS))![0];
     const fetchedAccount = await fetchAccount({
         publicKey: PublicKey.fromBase58(
-            'B62qqv5fPwCKAu585VqBSB14w1Y8w5DJHYvwpzSeySmegb9nqjssE1q'
+            'B62qrAvDSuSYgrysqENcFHRnocQ32mmtnCK4UrXBNt1i2ZjLM7KUJ5h'
         ),
     });
     Provable.log(fetchedAccount.account?.zkapp);
 
     const data = await Mina.fetchActions(
         PublicKey.fromBase58(
-            'B62qqv5fPwCKAu585VqBSB14w1Y8w5DJHYvwpzSeySmegb9nqjssE1q'
-        )
+            'B62qrAvDSuSYgrysqENcFHRnocQ32mmtnCK4UrXBNt1i2ZjLM7KUJ5h'
+        ),
+        { fromActionState: Reducer.initialActionState }
     );
     Provable.log(data);
 }
