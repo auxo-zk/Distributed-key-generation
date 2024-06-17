@@ -28,7 +28,7 @@ async function main() {
 
     let _ = await prepare(
         './caches',
-        { type: Network.Local, doProofs },
+        { type: Network.Lightnet, doProofs },
         {
             aliases: [
                 'rollup',
@@ -224,12 +224,16 @@ async function main() {
 
     // Deploy zkApps
     await Utils.deployZkApps(
+        [rollupZkApp, committeeZkApp, dkgZkApp, round1ZkApp, round2ZkApp].map(
+            (e) => e as unknown as Utils.ZkApp
+        ),
+        _.feePayer,
+        true,
+        logger
+    );
+
+    await Utils.deployZkApps(
         [
-            rollupZkApp,
-            committeeZkApp,
-            dkgZkApp,
-            round1ZkApp,
-            round2ZkApp,
             requestZkApp,
             responseZkApp,
             requesterZkApp,
@@ -264,6 +268,13 @@ async function main() {
                 owner: round2ZkApp,
                 user: dkgZkAppWithRound2Token,
             },
+        ],
+        _.feePayer,
+        true,
+        logger
+    );
+    await Utils.deployZkAppsWithToken(
+        [
             {
                 owner: responseZkApp,
                 user: rollupZkAppWithResponseToken,

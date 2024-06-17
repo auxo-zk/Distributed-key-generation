@@ -579,7 +579,7 @@ class Round2Contract extends SmartContract {
             proof.publicInput.action.packedId
         );
 
-        // Verify CommitteeContract address
+        // Verify Committee Contract address
         verifyZkApp(
             Round2Contract.name,
             committee,
@@ -587,7 +587,7 @@ class Round2Contract extends SmartContract {
             Field(ZkAppIndex.COMMITTEE)
         );
 
-        // Verify Round1Contract address
+        // Verify Dkg Contract address
         verifyZkApp(Round2Contract.name, dkg, zkAppRoot, Field(ZkAppIndex.DKG));
 
         // Verify Rollup Contract address

@@ -244,7 +244,11 @@ function getResultVector(D: Group[], M: Group[]): Group[] {
     return result;
 }
 
-function bruteForceResultVector(resultVector: Group[]): Scalar[] {
+function bruteForceResultVector(
+    resultVector: Group[],
+    unitValue = SECRET_UNIT,
+    maxValue = SECRET_MAX
+): Scalar[] {
     let dimension = resultVector.length;
     let rawResult = [...Array(dimension).keys()].map(() => Scalar.from(0));
     let coefficient = [...Array(dimension).keys()].map(() => BigInt(0));
@@ -253,9 +257,7 @@ function bruteForceResultVector(resultVector: Group[]): Scalar[] {
         let found = false;
         let targetPoint = resultVector[i];
         while (!found) {
-            let testingValue = Scalar.from(
-                coefficient[i] * BigInt(SECRET_UNIT)
-            );
+            let testingValue = Scalar.from(coefficient[i] * BigInt(unitValue));
             found = targetPoint
                 .sub(Group.generator.scale(testingValue))
                 .equals(Group.zero)
@@ -264,7 +266,7 @@ function bruteForceResultVector(resultVector: Group[]): Scalar[] {
             if (found) rawResult[i] = testingValue;
             else {
                 coefficient[i] += BigInt(1);
-                if (testingValue.toBigInt() == BigInt(SECRET_MAX))
+                if (testingValue.toBigInt() == BigInt(maxValue))
                     throw new Error('No valid value found!');
             }
         }
