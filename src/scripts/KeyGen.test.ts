@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { Cache, Field, Group, Provable, Scalar, TokenId, UInt8 } from 'o1js';
-import { CustomScalar, IpfsHash, Utils } from '@auxo-dev/auxo-libs';
+import { IpfsHash, Utils } from '@auxo-dev/auxo-libs';
 import { CommitteeContract, UpdateCommittee } from '../contracts/Committee.js';
 import {
     DkgAction,
@@ -88,7 +88,7 @@ describe('Key generation', () => {
     let round1ZkApp: Utils.ZkApp;
     let round2ZkApp: Utils.ZkApp;
     let mockSecret: any;
-    let committeeDeployed = true;
+    let committeeDeployed = false;
     let committees: {
         members: MemberArray;
         threshold: Field;
@@ -266,36 +266,46 @@ describe('Key generation', () => {
         rollupZkApp = Utils.getZkApp(
             accounts.rollup,
             new RollupContract(accounts.rollup.publicKey),
-            RollupContract.name,
-            { zkAppRoot: sharedAddressStorage.root }
+            {
+                name: RollupContract.name,
+                initArgs: { zkAppRoot: sharedAddressStorage.root },
+            }
         );
         committeeZkApp = Utils.getZkApp(
             accounts.committee,
             new CommitteeContract(accounts.committee.publicKey),
-            CommitteeContract.name,
             {
-                zkAppRoot: sharedAddressStorage.root,
-                memberRoot: memberStorage.root,
-                settingRoot: settingStorage.root,
+                name: CommitteeContract.name,
+                initArgs: {
+                    zkAppRoot: sharedAddressStorage.root,
+                    memberRoot: memberStorage.root,
+                    settingRoot: settingStorage.root,
+                },
             }
         );
         dkgZkApp = Utils.getZkApp(
             accounts.dkg,
             new DkgContract(accounts.dkg.publicKey),
-            DkgContract.name,
-            { zkAppRoot: sharedAddressStorage.root }
+            {
+                name: DkgContract.name,
+                initArgs: { zkAppRoot: sharedAddressStorage.root },
+            }
         );
         round1ZkApp = Utils.getZkApp(
             accounts.round1,
             new Round1Contract(accounts.round1.publicKey),
-            Round1Contract.name,
-            { zkAppRoot: sharedAddressStorage.root }
+            {
+                name: Round1Contract.name,
+                initArgs: { zkAppRoot: sharedAddressStorage.root },
+            }
         );
         round2ZkApp = Utils.getZkApp(
             accounts.round2,
             new Round2Contract(accounts.round2.publicKey),
-            Round2Contract.name,
-            { zkAppRoot: sharedAddressStorage.root }
+            {
+                name: Round2Contract.name,
+                initArgs: { zkAppRoot: sharedAddressStorage.root },
+            }
         );
         let rollupZkAppWithDkgToken = {
             ...rollupZkApp,
@@ -340,7 +350,7 @@ describe('Key generation', () => {
                 [rollupZkApp, dkgZkApp, round1ZkApp, round2ZkApp],
                 feePayer,
                 true,
-                logger
+                { logger }
             );
         } else {
             await Utils.deployZkApps(
@@ -353,7 +363,7 @@ describe('Key generation', () => {
                 ],
                 feePayer,
                 true,
-                logger
+                { logger }
             );
         }
 
@@ -383,7 +393,7 @@ describe('Key generation', () => {
             ],
             feePayer,
             true,
-            logger
+            { logger }
         );
     });
 
@@ -431,8 +441,7 @@ describe('Key generation', () => {
                         sender: users[j],
                     },
                     true,
-                    profiler,
-                    logger
+                    { profiler, logger }
                 );
                 await fetchAccounts([
                     dkgZkApp.key.publicKey,
@@ -479,8 +488,7 @@ describe('Key generation', () => {
                     rollupContract.rollupRoot.get(),
                     rollupContract.actionState.get()
                 ),
-            profiler,
-            logger
+            { profiler, logger }
         );
         for (let i = 0; i < rollupZkApp.actions.length; i++) {
             let action = RollupAction.fromFields(rollupZkApp.actions[i]);
@@ -504,8 +512,7 @@ describe('Key generation', () => {
                             })
                         )
                     ),
-                profiler,
-                logger
+                { profiler, logger }
             );
             rollupCounterStorage.updateRawLeaf(
                 {
@@ -531,8 +538,7 @@ describe('Key generation', () => {
             async () => rollupContract.rollup(rollupProof),
             feePayer,
             true,
-            profiler,
-            logger
+            { profiler, logger }
         );
         await fetchAccounts([rollupZkApp.key.publicKey]);
 
@@ -553,8 +559,7 @@ describe('Key generation', () => {
                     dkgContract.keyRoot.get(),
                     dkgContract.processRoot.get()
                 ),
-            profiler,
-            logger
+            { profiler, logger }
         );
         for (let i = 0; i < NUM_KEYS; i++) {
             let action = DkgAction.fromFields(dkgZkApp.actions[i]);
@@ -594,8 +599,7 @@ describe('Key generation', () => {
                             ProcessStorage.calculateIndex(actionId)
                         )
                     ),
-                profiler,
-                logger
+                { profiler, logger }
             );
             keyCounterStorage.updateRawLeaf(
                 {
@@ -642,8 +646,7 @@ describe('Key generation', () => {
                 ),
             feePayer,
             true,
-            profiler,
-            logger
+            { profiler, logger }
         );
         await fetchAccounts([dkgZkApp.key.publicKey]);
     });
@@ -724,8 +727,7 @@ describe('Key generation', () => {
                     sender: users[i],
                 },
                 true,
-                profiler,
-                logger
+                { profiler, logger }
             );
             await fetchAccounts([
                 round1ZkApp.key.publicKey,
@@ -763,8 +765,7 @@ describe('Key generation', () => {
                     rollupContract.rollupRoot.get(),
                     rollupContract.actionState.get()
                 ),
-            profiler,
-            logger
+            { profiler, logger }
         );
         let actions = rollupZkApp.actions.slice(NUM_KEYS, NUM_KEYS + N);
         for (let i = 0; i < actions.length; i++) {
@@ -789,8 +790,7 @@ describe('Key generation', () => {
                             })
                         )
                     ),
-                profiler,
-                logger
+                { profiler, logger }
             );
             rollupCounterStorage.updateRawLeaf(
                 {
@@ -816,8 +816,7 @@ describe('Key generation', () => {
             async () => rollupContract.rollup(rollupProof),
             feePayer,
             true,
-            profiler,
-            logger
+            { profiler, logger }
         );
         await fetchAccounts([rollupZkApp.key.publicKey]);
 
@@ -855,8 +854,7 @@ describe('Key generation', () => {
                         })
                     )
                 ),
-            profiler,
-            logger
+            { profiler, logger }
         );
         round1ContributionStorage.updateInternal(
             Round1ContributionStorage.calculateLevel1Index({
@@ -912,8 +910,7 @@ describe('Key generation', () => {
                             ProcessStorage.calculateIndex(actionId)
                         )
                     ),
-                profiler,
-                logger
+                { profiler, logger }
             );
             round1ContributionStorage.updateRawLeaf(
                 {
@@ -987,8 +984,7 @@ describe('Key generation', () => {
                 ),
             feePayer,
             true,
-            profiler,
-            logger
+            { profiler, logger }
         );
         await fetchAccounts([
             dkgZkApp.key.publicKey,
@@ -1043,8 +1039,7 @@ describe('Key generation', () => {
                         })
                     )
                 ),
-            profiler,
-            logger
+            { profiler, logger }
         );
         rollupCounterStorage.updateRawLeaf(
             {
@@ -1069,8 +1064,7 @@ describe('Key generation', () => {
             async () => rollupContract.rollup(rollupProof),
             feePayer,
             true,
-            profiler,
-            logger
+            { profiler, logger }
         );
         await fetchAccounts([rollupZkApp.key.publicKey]);
 
@@ -1127,8 +1121,7 @@ describe('Key generation', () => {
                         ProcessStorage.calculateIndex(actionId)
                     )
                 ),
-            profiler,
-            logger
+            { profiler, logger }
         );
         keyStatusStorage.updateRawLeaf(
             {
@@ -1177,8 +1170,7 @@ describe('Key generation', () => {
                 ),
             feePayer,
             true,
-            profiler,
-            logger
+            { profiler, logger }
         );
         await fetchAccounts([dkgZkApp.key.publicKey]);
     });
@@ -1241,19 +1233,10 @@ describe('Key generation', () => {
                             U: action.contribution.U,
                             memberId: Field(i),
                         }),
-                        new PlainArray(
-                            committeeSecrets[i].f.map((e) =>
-                                CustomScalar.fromScalar(e)
-                            )
-                        ),
-                        new RandomArray(
-                            randoms.map((e: any) =>
-                                CustomScalar.fromScalar(Scalar.from(e))
-                            )
-                        )
+                        new PlainArray(committeeSecrets[i].f),
+                        new RandomArray(randoms.map((e: any) => Scalar.from(e)))
                     ),
-                profiler,
-                logger
+                { profiler, logger }
             );
             let memberWitness = memberStorage.getWitness(
                 MemberStorage.calculateLevel1Index(committeeId),
@@ -1294,8 +1277,7 @@ describe('Key generation', () => {
                     sender: users[i],
                 },
                 true,
-                profiler,
-                logger
+                { profiler, logger }
             );
             await fetchAccounts([
                 round2ZkApp.key.publicKey,
@@ -1330,8 +1312,7 @@ describe('Key generation', () => {
                     rollupContract.rollupRoot.get(),
                     rollupContract.actionState.get()
                 ),
-            profiler,
-            logger
+            { profiler, logger }
         );
         let actions = rollupZkApp.actions.slice(
             NUM_KEYS + N + 1,
@@ -1359,8 +1340,7 @@ describe('Key generation', () => {
                             })
                         )
                     ),
-                profiler,
-                logger
+                { profiler, logger }
             );
             rollupCounterStorage.updateRawLeaf(
                 {
@@ -1386,8 +1366,7 @@ describe('Key generation', () => {
             async () => rollupContract.rollup(rollupProof),
             feePayer,
             true,
-            profiler,
-            logger
+            { profiler, logger }
         );
         await fetchAccounts([rollupZkApp.key.publicKey]);
 
@@ -1422,8 +1401,7 @@ describe('Key generation', () => {
                         })
                     )
                 ),
-            profiler,
-            logger
+            { profiler, logger }
         );
         round2ContributionStorage.updateInternal(
             Round2ContributionStorage.calculateLevel1Index({
@@ -1475,8 +1453,7 @@ describe('Key generation', () => {
                             ProcessStorage.calculateIndex(actionId)
                         )
                     ),
-                profiler,
-                logger
+                { profiler, logger }
             );
             round2ContributionStorage.updateRawLeaf(
                 {
@@ -1556,8 +1533,7 @@ describe('Key generation', () => {
                 ),
             feePayer,
             true,
-            profiler,
-            logger
+            { profiler, logger }
         );
         await fetchAccounts([
             dkgZkApp.key.publicKey,
@@ -1611,8 +1587,7 @@ describe('Key generation', () => {
                         })
                     )
                 ),
-            profiler,
-            logger
+            { profiler, logger }
         );
         rollupCounterStorage.updateRawLeaf(
             {
@@ -1637,8 +1612,7 @@ describe('Key generation', () => {
             async () => rollupContract.rollup(rollupProof),
             feePayer,
             true,
-            profiler,
-            logger
+            { profiler, logger }
         );
         await fetchAccounts([rollupZkApp.key.publicKey]);
 
@@ -1730,8 +1704,7 @@ describe('Key generation', () => {
                 ),
             feePayer,
             true,
-            profiler,
-            logger
+            { profiler, logger }
         );
         await fetchAccounts([dkgZkApp.key.publicKey]);
     });

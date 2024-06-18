@@ -30,14 +30,14 @@ async function main() {
     );
 
     // Compile programs
-    await Utils.compile(Rollup, cache);
-    await Utils.compile(RollupContract, cache);
+    await Utils.compile(Rollup, { cache });
+    await Utils.compile(RollupContract, { cache });
 
     // Get zkApps
     let rollupZkApp = Utils.getZkApp(
         accounts.rollup,
         new RollupContract(accounts.rollup.publicKey),
-        RollupContract.name
+        { name: RollupContract.name }
     );
     let rollupContract = rollupZkApp.contract as RollupContract;
     await fetchAccounts([rollupZkApp.key.publicKey]);
@@ -112,8 +112,7 @@ async function main() {
                 rollupContract.rollupRoot.get(),
                 rollupContract.actionState.get()
             ),
-        undefined,
-        logger
+        { logger }
     );
 
     for (let i = 0; i < actions.length; i++) {
@@ -139,8 +138,7 @@ async function main() {
                         })
                     )
                 ),
-            undefined,
-            logger
+            { logger }
         );
         rollupStorage.updateRawLeaf(
             {
@@ -168,8 +166,7 @@ async function main() {
         async () => rollupContract.rollup(rollupProof),
         feePayer,
         true,
-        undefined,
-        logger
+        { logger }
     );
     await fetchAccounts([rollupZkApp.key.publicKey]);
 }

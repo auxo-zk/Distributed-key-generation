@@ -9,7 +9,7 @@ import {
 import { Round1Contribution, Round2Contribution } from '../libs/Committee.js';
 import { INSTANCE_LIMITS } from '../constants.js';
 import { GenericStorage, Witness } from './GenericStorage.js';
-import { FieldDynamicArray } from '@auxo-dev/auxo-libs';
+import { Bit255, FieldDynamicArray } from '@auxo-dev/auxo-libs';
 import {
     REQUEST_LEVEL_1_TREE,
     REQUEST_LEVEL_1_WITNESS,
@@ -534,7 +534,11 @@ class EncryptionStorage extends GenericStorage<EncryptionLeaf> {
             hashChain = Poseidon.hash(
                 [
                     hashChain,
-                    rawLeaf.contributions[i].c.get(rawLeaf.memberId).toFields(),
+                    (
+                        rawLeaf.contributions[i].c.get(
+                            rawLeaf.memberId
+                        ) as Bit255
+                    ).toFields(),
                     rawLeaf.contributions[i].U.get(rawLeaf.memberId).toFields(),
                 ].flat()
             );

@@ -15,7 +15,7 @@ import {
     method,
     state,
 } from 'o1js';
-import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
+import { Bit255, CustomScalar, Utils } from '@auxo-dev/auxo-libs';
 import {
     CommitteeWitness,
     CommitteeLevel1Witness,
@@ -770,79 +770,83 @@ class ResponseContract extends SmartContract {
         decryptionProof.verify();
 
         // FIXME - "Option.value_exn None" error
-        // // Verify keyId
-        // keyId.assertLessThanOrEqual(
-        //     INSTANCE_LIMITS.KEY,
-        //     Utils.buildAssertMessage(
-        //         ResponseContract.name,
-        //         'contribute',
-        //         ErrorEnum.KEY_COUNTER_LIMIT
-        //     )
-        // );
+        // Verify keyId
+        keyId.assertLessThanOrEqual(
+            INSTANCE_LIMITS.KEY,
+            Utils.buildAssertMessage(
+                ResponseContract.name,
+                'contribute',
+                ErrorEnum.KEY_COUNTER_LIMIT
+            )
+        );
 
-        // // Verify committee member
-        // committeeContract.verifyMember(
-        //     new CommitteeMemberInput({
-        //         address: this.sender.getAndRequireSignature(),
-        //         committeeId: committeeId,
-        //         memberId: memberId,
-        //         memberWitness: memberWitness,
-        //     })
-        // );
+        // Verify committee member
+        committeeContract.verifyMember(
+            new CommitteeMemberInput({
+                address: this.sender.getAndRequireSignature(),
+                committeeId: committeeId,
+                memberId: memberId,
+                memberWitness: memberWitness,
+            })
+        );
 
-        // // Verify round 1 public key (C0)
-        // round1Contract.verifyEncPubKey(
-        //     committeeId,
-        //     keyId,
-        //     memberId,
-        //     decryptionProof.publicInput.publicKey,
-        //     publicKeyWitness
-        // );
+        // Verify round 1 public key (C0)
+        round1Contract.verifyEncPubKey(
+            committeeId,
+            keyId,
+            memberId,
+            decryptionProof.publicInput.publicKey,
+            publicKeyWitness
+        );
 
-        // // Verify round 2 encryptions (hashes)
-        // let encryptionHashChain = Field(0);
-        // for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
-        //     encryptionHashChain = Provable.if(
-        //         Field(i).greaterThanOrEqual(
-        //             decryptionProof.publicInput.c.length
-        //         ),
-        //         encryptionHashChain,
-        //         Poseidon.hash(
-        //             [
-        //                 encryptionHashChain,
-        //                 decryptionProof.publicInput.c.get(Field(i)).toFields(),
-        //                 decryptionProof.publicInput.U.get(Field(i)).toFields(),
-        //             ].flat()
-        //         )
-        //     );
-        // }
-        // round2Contract.verifyEncHashChain(
-        //     committeeId,
-        //     keyId,
-        //     memberId,
-        //     encryptionHashChain,
-        //     encryptionWitness
-        // );
+        // Verify round 2 encryptions (hashes)
+        let encryptionHashChain = Field(0);
+        for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
+            encryptionHashChain = Provable.if(
+                Field(i).greaterThanOrEqual(
+                    decryptionProof.publicInput.c.length
+                ),
+                encryptionHashChain,
+                Poseidon.hash(
+                    [
+                        encryptionHashChain,
+                        (
+                            decryptionProof.publicInput.c.get(
+                                Field(i)
+                            ) as Bit255
+                        ).toFields(),
+                        decryptionProof.publicInput.U.get(Field(i)).toFields(),
+                    ].flat()
+                )
+            );
+        }
+        round2Contract.verifyEncHashChain(
+            committeeId,
+            keyId,
+            memberId,
+            encryptionHashChain,
+            encryptionWitness
+        );
 
-        // // Verify accumulation root
-        // requestContract.verifyAccumulationData(
-        //     requestId,
-        //     responseProof.publicOutput.accumulationRootR,
-        //     accumulationRootM,
-        //     responseProof.publicOutput.dimension,
-        //     accumulationWitness
-        // );
+        // Verify accumulation root
+        requestContract.verifyAccumulationData(
+            requestId,
+            responseProof.publicOutput.accumulationRootR,
+            accumulationRootM,
+            responseProof.publicOutput.dimension,
+            accumulationWitness
+        );
 
         // Verify response proof
         responseProof.verify();
-        // responseProof.publicOutput.skiCommitment.assertEquals(
-        //     decryptionProof.publicOutput,
-        //     Utils.buildAssertMessage(
-        //         ResponseContract.name,
-        //         'contribute',
-        //         ErrorEnum.SECRET_SHARE
-        //     )
-        // );
+        responseProof.publicOutput.skiCommitment.assertEquals(
+            decryptionProof.publicOutput,
+            Utils.buildAssertMessage(
+                ResponseContract.name,
+                'contribute',
+                ErrorEnum.SECRET_SHARE
+            )
+        );
 
         // Create & dispatch action to DkgContract
         let action = new Action({

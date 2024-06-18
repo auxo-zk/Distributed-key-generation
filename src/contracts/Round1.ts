@@ -465,14 +465,14 @@ class Round1Contract extends SmartContract {
 
         // FIXME - "Option.value_exn None" error
         // Verify keyId
-        // keyId.assertLessThanOrEqual(
-        //     INSTANCE_LIMITS.KEY,
-        //     Utils.buildAssertMessage(
-        //         Round1Contract.name,
-        //         'contribute',
-        //         ErrorEnum.KEY_COUNTER_LIMIT
-        //     )
-        // );
+        keyId.assertLessThanOrEqual(
+            INSTANCE_LIMITS.KEY,
+            Utils.buildAssertMessage(
+                Round1Contract.name,
+                'contribute',
+                ErrorEnum.KEY_COUNTER_LIMIT
+            )
+        );
 
         // Verify committee member
         committeeContract.verifyMember(
@@ -699,23 +699,23 @@ class Round1Contract extends SmartContract {
         witness: DkgLevel1Witness
     ) {
         let keyIndex = calculateKeyIndex(committeeId, keyId);
-        // this.publicKeyRoot
-        //     .getAndRequireEquals()
-        //     .assertEquals(
-        //         witness.calculateRoot(leaf),
-        //         Utils.buildAssertMessage(
-        //             Round1Contract.name,
-        //             'verifyEncPubKeys',
-        //             ErrorEnum.ENC_PUBKEY_ROOT
-        //         )
-        //     );
-        // keyIndex.assertEquals(
-        //     witness.calculateIndex(),
-        //     Utils.buildAssertMessage(
-        //         Round1Contract.name,
-        //         'verifyEncPubKeys',
-        //         ErrorEnum.ENC_PUBKEY_INDEX_L1
-        //     )
-        // );
+        this.publicKeyRoot
+            .getAndRequireEquals()
+            .assertEquals(
+                witness.calculateRoot(leaf),
+                Utils.buildAssertMessage(
+                    Round1Contract.name,
+                    'verifyEncPubKeys',
+                    ErrorEnum.ENC_PUBKEY_ROOT
+                )
+            );
+        keyIndex.assertEquals(
+            witness.calculateIndex(),
+            Utils.buildAssertMessage(
+                Round1Contract.name,
+                'verifyEncPubKeys',
+                ErrorEnum.ENC_PUBKEY_INDEX_L1
+            )
+        );
     }
 }

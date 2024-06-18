@@ -13,7 +13,7 @@ import {
     UInt8,
     ZkProgram,
 } from 'o1js';
-import { Utils } from '@auxo-dev/auxo-libs';
+import { Bit255, Utils } from '@auxo-dev/auxo-libs';
 import {
     EncryptionHashArray,
     PublicKeyArray,
@@ -83,15 +83,6 @@ class Action
     })
     implements ZkAppAction
 {
-    // static empty(): Action {
-    //     return new Action({
-    //         committeeId: Field(0),
-    //         keyId: Field(0),
-    //         memberId: Field(0),
-    //         contribution: Round2Contribution.empty(),
-    //     });
-    // }
-
     static empty(): Action {
         return new Action({
             packedId: Field(0),
@@ -346,9 +337,11 @@ const FinalizeRound2 = ZkProgram({
                         Poseidon.hash(
                             [
                                 hashChain,
-                                input.action.contribution.c
-                                    .get(Field(i))
-                                    .toFields(),
+                                (
+                                    input.action.contribution.c.get(
+                                        Field(i)
+                                    ) as Bit255
+                                ).toFields(),
                                 input.action.contribution.U.get(
                                     Field(i)
                                 ).toFields(),
@@ -513,26 +506,28 @@ class Round2Contract extends SmartContract {
 
         // Verify round 1 public keys (C0[])
         // @todo Remove Provable.witness or adding assertion
-        // let publicKeysLeaf = Provable.witness(Field, () => {
-        // let publicKeysMT = DKG_LEVEL_2_TREE();
-        // for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
-        //     let value = Provable.if(
-        //         Field(i).greaterThanOrEqual(
-        //             proof.publicInput.publicKeys.length
-        //         ),
-        //         Field(0),
-        //         PublicKeyArray.hash(proof.publicInput.publicKeys.get(Field(i)))
-        //     );
-        //     publicKeysMT.setLeaf(BigInt(i), value);
-        // }
-        // return publicKeysMT.getRoot();
-        // });
-        // round1Contract.verifyEncPubKeys(
-        //     committeeId,
-        //     keyId,
-        //     publicKeysMT.getRoot(),
-        //     publicKeysWitness
-        // );
+        let publicKeysLeaf = Provable.witness(Field, () => {
+            let publicKeysMT = DKG_LEVEL_2_TREE();
+            for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
+                let value = Provable.if(
+                    Field(i).greaterThanOrEqual(
+                        proof.publicInput.publicKeys.length
+                    ),
+                    Field(0),
+                    PublicKeyArray.hash(
+                        proof.publicInput.publicKeys.get(Field(i))
+                    )
+                );
+                publicKeysMT.setLeaf(BigInt(i), value);
+            }
+            return publicKeysMT.getRoot();
+        });
+        round1Contract.verifyEncPubKeys(
+            committeeId,
+            keyId,
+            publicKeysLeaf,
+            publicKeysWitness
+        );
 
         // Create & dispatch action
         let action = new Action({

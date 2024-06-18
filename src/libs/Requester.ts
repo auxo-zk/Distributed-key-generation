@@ -8,12 +8,7 @@ import {
     UInt32,
     UInt8,
 } from 'o1js';
-import {
-    CustomScalar,
-    GroupDynamicArray,
-    StaticArray,
-    Utils,
-} from '@auxo-dev/auxo-libs';
+import { GroupDynamicArray, StaticArray, Utils } from '@auxo-dev/auxo-libs';
 import { ENCRYPTION_LIMITS, SECRET_MAX, SECRET_UNIT } from '../constants.js';
 
 export {
@@ -40,17 +35,11 @@ export {
 class RArray extends GroupDynamicArray(ENCRYPTION_LIMITS.FULL_DIMENSION) {}
 class MArray extends GroupDynamicArray(ENCRYPTION_LIMITS.FULL_DIMENSION) {}
 class DArray extends GroupDynamicArray(ENCRYPTION_LIMITS.FULL_DIMENSION) {}
-class SecretVector extends StaticArray(
-    CustomScalar,
-    ENCRYPTION_LIMITS.DIMENSION
-) {}
-class RandomVector extends StaticArray(
-    CustomScalar,
-    ENCRYPTION_LIMITS.DIMENSION
-) {}
+class SecretVector extends StaticArray(Scalar, ENCRYPTION_LIMITS.DIMENSION) {}
+class RandomVector extends StaticArray(Scalar, ENCRYPTION_LIMITS.DIMENSION) {}
 class RequestVector extends StaticArray(Group, ENCRYPTION_LIMITS.DIMENSION) {}
 class ResultVector extends StaticArray(
-    CustomScalar,
+    Scalar,
     ENCRYPTION_LIMITS.FULL_DIMENSION
 ) {}
 class NullifierArray extends StaticArray(Field, ENCRYPTION_LIMITS.DIMENSION) {}
@@ -74,7 +63,7 @@ function calculateCommitment(
     nullifier: Field,
     taskId: UInt32,
     index: UInt8,
-    secret: CustomScalar
+    secret: Scalar
 ) {
     return Poseidon.hash(
         [nullifier, taskId.value, index.value, secret.toFields()].flat()
@@ -117,15 +106,15 @@ function generateEncryption(
         let random = Scalar.random();
         let nullifier = Field.random();
         indices.push(Number(key));
-        secrets.set(Field(i), CustomScalar.fromScalar(secret));
-        randoms.set(Field(i), CustomScalar.fromScalar(random));
+        secrets.set(Field(i), secret);
+        randoms.set(Field(i), random);
         nullifiers.set(Field(i), nullifier);
         let index = UInt8.from(Number(key));
         let commitment = calculateCommitment(
             nullifier,
             UInt32.from(taskId),
             index,
-            CustomScalar.fromScalar(secret)
+            secret
         );
         if (value > 0n)
             notes.push({
@@ -157,8 +146,8 @@ function generateEncryption(
         let random = Scalar.random();
         let nullifier = Field.random();
         indices.push(Number(randomIndex));
-        secrets.set(Field(i), CustomScalar.fromScalar(secret));
-        randoms.set(Field(i), CustomScalar.fromScalar(random));
+        secrets.set(Field(i), secret);
+        randoms.set(Field(i), random);
         nullifiers.set(Field(i), nullifier);
         R[randomIndex] = Group.generator.scale(random);
         M[randomIndex] = Group.zero.add(publicKey.scale(random));

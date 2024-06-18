@@ -37,35 +37,35 @@ async function compile(
     logger?: Utils.Logger
 ) {
     try {
-        if (programs.length > 0) {
-            for (let i = 0; i < programs.length; i++) {
-                await Utils.compile(programs[i], cache, profiler, logger);
-            }
-        } else {
-            await Utils.compile(Rollup, cache, profiler, logger);
-            await Utils.compile(UpdateCommittee, cache, profiler, logger);
-            await Utils.compile(UpdateKey, cache, profiler, logger);
-            await Utils.compile(Elgamal, cache, profiler, logger);
-            await Utils.compile(BatchEncryption, cache, profiler, logger);
-            await Utils.compile(BatchDecryption, cache, profiler, logger);
-            await Utils.compile(FinalizeRound1, cache, profiler, logger);
-            await Utils.compile(FinalizeRound2, cache, profiler, logger);
-            await Utils.compile(UpdateRequest, cache, profiler, logger);
-            await Utils.compile(UpdateTask, cache, profiler, logger);
-            await Utils.compile(ComputeResponse, cache, profiler, logger);
-            await Utils.compile(FinalizeResponse, cache, profiler, logger);
-            await Utils.compile(ComputeResult, cache, profiler, logger);
-
-            await Utils.compile(RollupContract, cache, profiler, logger);
-            await Utils.compile(CommitteeContract, cache, profiler, logger);
-            await Utils.compile(DkgContract, cache, profiler, logger);
-            await Utils.compile(Round1Contract, cache, profiler, logger);
-            await Utils.compile(Round2Contract, cache, profiler, logger);
-            await Utils.compile(RequestContract, cache, profiler, logger);
-            await Utils.compile(TaskManagerContract, cache, profiler, logger);
-            await Utils.compile(SubmissionContract, cache, profiler, logger);
-            await Utils.compile(RequesterContract, cache, profiler, logger);
-            await Utils.compile(ResponseContract, cache, profiler, logger);
+        if (!programs || programs.length == 0) {
+            programs = [
+                Rollup,
+                UpdateCommittee,
+                UpdateKey,
+                Elgamal,
+                BatchEncryption,
+                BatchDecryption,
+                FinalizeRound1,
+                FinalizeRound2,
+                UpdateRequest,
+                UpdateTask,
+                ComputeResponse,
+                FinalizeResponse,
+                ComputeResult,
+                RollupContract,
+                CommitteeContract,
+                DkgContract,
+                Round1Contract,
+                Round2Contract,
+                RequestContract,
+                TaskManagerContract,
+                SubmissionContract,
+                RequesterContract,
+                ResponseContract,
+            ];
+        }
+        for (let i = 0; i < programs.length; i++) {
+            await Utils.compile(programs[i], { cache, profiler, logger });
         }
     } catch (error) {
         console.error(error);

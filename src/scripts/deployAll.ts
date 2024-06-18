@@ -1,4 +1,4 @@
-import { Field, Provable, TokenId } from 'o1js';
+import { Field, TokenId } from 'o1js';
 import { CommitteeContract } from '../contracts/Committee.js';
 import { DkgContract } from '../contracts/DKG.js';
 import { Round1Contract } from '../contracts/Round1.js';
@@ -98,32 +98,42 @@ async function main() {
     let rollupZkApp = Utils.getZkApp(
         _.accounts.rollup,
         new RollupContract(_.accounts.rollup.publicKey),
-        RollupContract.name,
-        { zkAppRoot: sharedAddressStorage.root }
+        {
+            name: RollupContract.name,
+            initArgs: { zkAppRoot: sharedAddressStorage.root },
+        }
     );
     let committeeZkApp = Utils.getZkApp(
         _.accounts.committee,
         new CommitteeContract(_.accounts.committee.publicKey),
-        CommitteeContract.name,
-        { zkAppRoot: sharedAddressStorage.root }
+        {
+            name: CommitteeContract.name,
+            initArgs: { zkAppRoot: sharedAddressStorage.root },
+        }
     );
     let dkgZkApp = Utils.getZkApp(
         _.accounts.dkg,
         new DkgContract(_.accounts.dkg.publicKey),
-        DkgContract.name,
-        { zkAppRoot: sharedAddressStorage.root }
+        {
+            name: DkgContract.name,
+            initArgs: { zkAppRoot: sharedAddressStorage.root },
+        }
     );
     let round1ZkApp = Utils.getZkApp(
         _.accounts.round1,
         new Round1Contract(_.accounts.round1.publicKey),
-        Round1Contract.name,
-        { zkAppRoot: sharedAddressStorage.root }
+        {
+            name: Round1Contract.name,
+            initArgs: { zkAppRoot: sharedAddressStorage.root },
+        }
     );
     let round2ZkApp = Utils.getZkApp(
         _.accounts.round2,
         new Round2Contract(_.accounts.round2.publicKey),
-        Round2Contract.name,
-        { zkAppRoot: sharedAddressStorage.root }
+        {
+            name: Round2Contract.name,
+            initArgs: { zkAppRoot: sharedAddressStorage.root },
+        }
     );
     let rollupZkAppWithDkgToken = {
         ...rollupZkApp,
@@ -163,32 +173,42 @@ async function main() {
     let requestZkApp = Utils.getZkApp(
         _.accounts.request,
         new RequestContract(_.accounts.request.publicKey),
-        RequestContract.name,
-        { zkAppRoot: sharedAddressStorage.root }
+        {
+            name: RequestContract.name,
+            initArgs: { zkAppRoot: sharedAddressStorage.root },
+        }
     );
     let responseZkApp = Utils.getZkApp(
         _.accounts.response,
         new ResponseContract(_.accounts.response.publicKey),
-        ResponseContract.name,
-        { zkAppRoot: sharedAddressStorage.root }
+        {
+            name: ResponseContract.name,
+            initArgs: { zkAppRoot: sharedAddressStorage.root },
+        }
     );
     let requesterZkApp = Utils.getZkApp(
         _.accounts.requester,
         new RequesterContract(_.accounts.requester.publicKey),
-        RequesterContract.name,
-        { zkAppRoot: requesterAddressStorage.root }
+        {
+            name: RequesterContract.name,
+            initArgs: { zkAppRoot: requesterAddressStorage.root },
+        }
     );
     let taskManagerZkApp = Utils.getZkApp(
         _.accounts.taskmanager,
         new TaskManagerContract(_.accounts.taskmanager.publicKey),
-        TaskManagerContract.name,
-        { requesterAddress: _.accounts.requester.publicKey }
+        {
+            name: TaskManagerContract.name,
+            initArgs: { requesterAddress: _.accounts.requester.publicKey },
+        }
     );
     let submissionZkApp = Utils.getZkApp(
         _.accounts.submission,
         new SubmissionContract(_.accounts.submission.publicKey),
-        SubmissionContract.name,
-        { requesterAddress: _.accounts.requester.publicKey }
+        {
+            name: SubmissionContract.name,
+            initArgs: { requesterAddress: _.accounts.requester.publicKey },
+        }
     );
     let rollupZkAppWithResponseToken = {
         ...rollupZkApp,
@@ -229,7 +249,7 @@ async function main() {
         ),
         _.feePayer,
         true,
-        logger
+        { logger }
     );
 
     await Utils.deployZkApps(
@@ -242,7 +262,7 @@ async function main() {
         ].map((e) => e as unknown as Utils.ZkApp),
         _.feePayer,
         true,
-        logger
+        { logger }
     );
 
     // Deploy contract accounts with tokens
@@ -271,7 +291,7 @@ async function main() {
         ],
         _.feePayer,
         true,
-        logger
+        { logger }
     );
     await Utils.deployZkAppsWithToken(
         [
@@ -294,7 +314,7 @@ async function main() {
         ],
         _.feePayer,
         true,
-        logger
+        { logger }
     );
 }
 

@@ -35,7 +35,7 @@ export async function prepare(
     let network;
     switch (networkOptions.type) {
         case Network.Local:
-            network = Mina.LocalBlockchain({
+            network = await Mina.LocalBlockchain({
                 proofsEnabled: networkOptions.doProofs,
             });
             break;
@@ -93,9 +93,6 @@ export async function prepare(
     }
 
     if (networkOptions.type == Network.Lightnet) {
-        // let acquiredAccounts = ((await Lightnet.listAcquiredKeyPairs({})) ||
-        //     []) as Key[];
-        // if (acquiredAccounts.length < DEFAULT_ACCOUNTS) {
         for (let i = 0; i < DEFAULT_ACCOUNTS; i++) {
             let accountData: JSONKey = JSON.parse(
                 fs.readFileSync(
@@ -110,25 +107,26 @@ export async function prepare(
                 },
             });
         }
-        // }
-        // acquiredAccounts = (await Lightnet.listAcquiredKeyPairs({})) as Key[];
-
-        // for (let i = 0; i < acquiredAccounts.length; i++) {
-        //     Object.assign(accounts, {
-        //         [i]: acquiredAccounts[i],
-        //     });
-        // }
     } else if (networkOptions.type == Network.Local) {
         accounts = {
             ...accounts,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ...(network as any).testAccounts
-                .slice(0, DEFAULT_ACCOUNTS)
-                .reduce(
-                    (prev: object, curr: Key, index: number) =>
-                        Object.assign(prev, { [index]: curr }),
-                    {}
-                ),
+            ...(network as any).testAccounts.slice(0, DEFAULT_ACCOUNTS).reduce(
+                (
+                    prev: object,
+                    curr: PublicKey & {
+                        key: PrivateKey;
+                    },
+                    index: number
+                ) =>
+                    Object.assign(prev, {
+                        [index]: {
+                            privateKey: curr.key,
+                            publicKey: curr,
+                        } as Key,
+                    }),
+                {}
+            ),
         };
     } else if (networkOptions.type == Network.Testnet) {
         for (let i = 0; i < DEFAULT_ACCOUNTS; i++) {

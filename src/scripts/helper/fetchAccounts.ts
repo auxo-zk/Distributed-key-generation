@@ -1,5 +1,5 @@
 import 'dotenv/config.js';
-import { Mina, Provable, PublicKey, fetchAccount } from 'o1js';
+import { Mina, Provable, PublicKey } from 'o1js';
 import { fetchAccounts } from './index.js';
 
 async function main() {

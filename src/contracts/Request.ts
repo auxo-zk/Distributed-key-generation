@@ -94,7 +94,7 @@ class Action
 class ResultArrayEvent extends Struct({
     requestId: Field,
     dimensionIndex: UInt8,
-    result: CustomScalar,
+    result: Scalar,
 }) {}
 
 class ComputeResultInput extends Struct({
@@ -218,24 +218,25 @@ const ComputeResult = ZkProgram({
                 );
 
                 let resultPoint = input.M.sub(input.D);
+
                 // Verify result value
-                // Provable.if(
-                //     resultPoint.equals(Group.zero),
-                //     CustomScalar.fromScalar(input.result).equals(
-                //         CustomScalar.fromScalar(Scalar.from(0))
-                //     ),
-                //     resultPoint.equals(Group.generator.scale(input.result))
-                // ).assertTrue(
-                //     Utils.buildAssertMessage(
-                //         RequestContract.name,
-                //         'compute',
-                //         ErrorEnum.REQUEST_RESULT
-                //     )
-                // );
+                Provable.if(
+                    resultPoint.equals(Group.zero),
+                    CustomScalar.fromScalar(input.result).equals(
+                        CustomScalar.fromScalar(Scalar.from(0))
+                    ),
+                    resultPoint.equals(Group.generator.scale(input.result))
+                ).assertTrue(
+                    Utils.buildAssertMessage(
+                        RequestContract.name,
+                        'compute',
+                        ErrorEnum.REQUEST_RESULT
+                    )
+                );
                 let resultVector = earlierProof.publicOutput.resultVector;
                 resultVector.set(
                     earlierProof.publicOutput.dimension.value,
-                    CustomScalar.fromScalar(input.result)
+                    input.result
                 );
 
                 return new ComputeResultOutput({

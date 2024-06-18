@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import fs from 'fs/promises';
-import { Field, Provable, Reducer } from 'o1js';
+import { Cache, Field, Reducer } from 'o1js';
 import { IpfsHash, Utils } from '@auxo-dev/auxo-libs';
 import {
     CommitteeContract,
@@ -23,6 +23,7 @@ describe('DKG Committee', () => {
         info: true,
         error: true,
     };
+    let cache: Cache;
     let _: any;
     let users: Utils.Key[] = [];
     let committeeZkApp: Utils.ZkApp;
@@ -37,22 +38,25 @@ describe('DKG Committee', () => {
     beforeAll(async () => {
         _ = await prepare(
             './caches',
-            { type: Network.Lightnet, doProofs },
+            { type: Network.Local, doProofs },
             {
                 aliases: ['committee'],
             }
         );
+        cache = _.cache;
         users = [_.accounts[0], _.accounts[1], _.accounts[2]];
-        await Utils.compile(UpdateCommittee, _.cache, profiler, logger);
+        await Utils.compile(UpdateCommittee, { cache, profiler, logger });
         if (doProofs) {
-            await Utils.compile(CommitteeContract, _.cache, profiler, logger);
+            await Utils.compile(CommitteeContract, { cache, profiler, logger });
         }
         committeeZkApp = Utils.getZkApp(
             _.accounts.committee,
             new CommitteeContract(_.accounts.committee.publicKey),
-            CommitteeContract.name
+            { name: CommitteeContract.name }
         );
-        await Utils.deployZkApps([committeeZkApp], _.feePayer, true, logger);
+        await Utils.deployZkApps([committeeZkApp], _.feePayer, true, {
+            logger,
+        });
         // await fetchAccounts([committeeZkApp.key.publicKey]);
     });
 
@@ -78,8 +82,7 @@ describe('DKG Committee', () => {
             async () => committeeContract.create(action),
             feePayer,
             true,
-            profiler,
-            logger
+            { profiler, logger }
         );
         await fetchAccounts([committeeZkApp.key.publicKey]);
 
@@ -114,8 +117,7 @@ describe('DKG Committee', () => {
             async () => committeeContract.create(action),
             feePayer,
             true,
-            profiler,
-            logger
+            { profiler, logger }
         );
         await fetchAccounts([committeeZkApp.key.publicKey]);
 
@@ -141,8 +143,7 @@ describe('DKG Committee', () => {
                     settingStorage.root,
                     committeeContract.nextCommitteeId.get()
                 ),
-            profiler,
-            logger
+            { profiler, logger }
         );
         for (let i = 0; i < committees.length; i++) {
             let committee = committees[i];
@@ -156,8 +157,7 @@ describe('DKG Committee', () => {
                         memberStorage.getLevel1Witness(Field(i)),
                         settingStorage.getLevel1Witness(Field(i))
                     ),
-                profiler,
-                logger
+                { profiler, logger }
             );
             for (let j = 0; j < Number(committee.members.length); j++)
                 memberStorage.updateRawLeaf(
@@ -183,8 +183,7 @@ describe('DKG Committee', () => {
             async () => committeeContract.update(proof),
             feePayer,
             true,
-            profiler,
-            logger
+            { profiler, logger }
         );
         await fetchAccounts([committeeZkApp.key.publicKey]);
 
@@ -218,14 +217,13 @@ describe('DKG Committee', () => {
                 async () => committeeContract.create(action),
                 feePayer,
                 true,
-                undefined,
-                logger
+                { logger }
             )
         ).rejects.toThrow();
     });
 
     it('Should not create committee with threshold T = 0', async () => {
-        let { accounts, feePayer } = _;
+        let { feePayer } = _;
         let memberArray = new MemberArray([
             users[0].publicKey,
             users[1].publicKey,
@@ -247,8 +245,7 @@ describe('DKG Committee', () => {
                 async () => committeeContract.create(action),
                 feePayer,
                 true,
-                undefined,
-                logger
+                { logger }
             )
         ).rejects.toThrow();
     });

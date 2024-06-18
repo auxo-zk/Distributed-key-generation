@@ -1,5 +1,5 @@
 import 'dotenv/config.js';
-import { Field, Mina, Provable, PublicKey, Reducer, fetchAccount } from 'o1js';
+import { Field, Provable } from 'o1js';
 import { Utils } from '@auxo-dev/auxo-libs';
 import {
     CommitteeAction,
@@ -7,14 +7,10 @@ import {
     UpdateCommittee,
 } from '../../../contracts/Committee.js';
 import axios from 'axios';
-import { MemberArray } from '../../../libs/Committee.js';
-import { IpfsHash } from '@auxo-dev/auxo-libs';
 import {
-    COMMITTEE_LEVEL_2_TREE,
     MemberStorage,
     SettingStorage,
 } from '../../../storages/CommitteeStorage.js';
-import { INSTANCE_LIMITS } from '../../../constants.js';
 import { prepare } from '../../helper/prepare.js';
 import { Network } from '../../helper/config.js';
 import { fetchAccounts } from '../../helper/index.js';
@@ -34,14 +30,14 @@ async function main() {
     );
 
     // Compile programs
-    await Utils.compile(UpdateCommittee, cache);
-    await Utils.compile(CommitteeContract, cache);
+    await Utils.compile(UpdateCommittee, { cache });
+    await Utils.compile(CommitteeContract, { cache });
 
     // Get zkApps
     let committeeZkApp = Utils.getZkApp(
         accounts.committee,
         new CommitteeContract(accounts.committee.publicKey),
-        CommitteeContract.name
+        { name: CommitteeContract.name }
     );
     let committeeContract = committeeZkApp.contract as CommitteeContract;
     await fetchAccounts([committeeZkApp.key.publicKey]);
@@ -118,8 +114,7 @@ async function main() {
                 committeeContract.settingRoot.get(),
                 committeeContract.nextCommitteeId.get()
             ),
-        undefined,
-        logger
+        { logger }
     );
 
     for (let i = 0; i < actions.length; i++) {
@@ -135,8 +130,7 @@ async function main() {
                     memberStorage.getLevel1Witness(committeeId),
                     settingStorage.getLevel1Witness(committeeId)
                 ),
-            undefined,
-            logger
+            { logger }
         );
 
         for (let j = 0; j < Number(action.addresses.length); j++) {
@@ -166,8 +160,7 @@ async function main() {
         async () => committeeContract.update(proof),
         feePayer,
         true,
-        undefined,
-        logger
+        { logger }
     );
     await fetchAccounts([committeeZkApp.key.publicKey]);
 }

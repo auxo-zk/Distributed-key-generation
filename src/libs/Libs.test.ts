@@ -1,5 +1,5 @@
-import { Field, Group, PrivateKey, Provable, Scalar } from 'o1js';
-import { Bit255, Utils } from '@auxo-dev/auxo-libs';
+import { Field, Group, PrivateKey, Scalar } from 'o1js';
+import { Bit255, CustomScalar } from '@auxo-dev/auxo-libs';
 import * as ElgamalECC from './Elgamal.js';
 import { ENCRYPTION_LIMITS, SECRET_UNIT } from '../constants.js';
 import {
@@ -48,7 +48,6 @@ describe('DKG', () => {
         {
             0: 10000n * BigInt(SECRET_UNIT),
             2: 10000n * BigInt(SECRET_UNIT),
-            4: 10000n * BigInt(SECRET_UNIT),
         },
         {
             3: 10000n * BigInt(SECRET_UNIT),
@@ -114,7 +113,6 @@ describe('DKG', () => {
                 if (!result[index]) result[index] = 0n;
                 result[index] += encryptedVector.secrets
                     .get(Field(j))
-                    .toScalar()
                     .toBigInt();
             }
         }
@@ -131,12 +129,14 @@ describe('DKG', () => {
                     index == committees[respondedMembers[i]].memberId
                         ? { c: Bit255.fromBigInt(0n), U: Group.zero }
                         : {
-                              c: contribution.c.values[member.memberId],
+                              c: new Bit255(
+                                  contribution.c.values[member.memberId]
+                              ),
                               U: contribution.U.values[member.memberId],
                           },
                 {}
             );
-            let [responseContribution, ski] = getResponseContribution(
+            let [responseContribution, _] = getResponseContribution(
                 committees[respondedMembers[i]].secretPolynomial,
                 committees[respondedMembers[i]].memberId,
                 round2Data,

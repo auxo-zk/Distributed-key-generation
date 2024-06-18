@@ -5,20 +5,13 @@ import { prepare } from '../../helper/prepare.js';
 import { Utils } from '@auxo-dev/auxo-libs';
 import { Rollup, RollupContract } from '../../../contracts/Rollup.js';
 import { DkgContract, UpdateKey } from '../../../contracts/DKG.js';
-import {
-    FinalizeRound1,
-    FinalizeRound1Input,
-    Round1Action,
-    Round1Contract,
-} from '../../../contracts/Round1.js';
+import { FinalizeRound1, Round1Contract } from '../../../contracts/Round1.js';
 import { fetchAccounts } from '../../helper/index.js';
 import { AddressStorage } from '../../../storages/AddressStorage.js';
 import {
     DKG_LEVEL_2_TREE,
     EncryptionStorage,
     KeyStatusStorage,
-    PublicKeyStorage,
-    Round1ContributionStorage,
     Round2ContributionStorage,
 } from '../../../storages/DkgStorage.js';
 import { ProcessStorage } from '../../../storages/ProcessStorage.js';
@@ -33,6 +26,7 @@ import {
     Round2Contract,
 } from '../../../contracts/Round2.js';
 import { EncryptionHashArray } from '../../../libs/Committee.js';
+import { compile } from '../../helper/compile.js';
 
 async function main() {
     const logger: Utils.Logger = {
@@ -49,36 +43,43 @@ async function main() {
     );
 
     // Compile programs
-    await Utils.compile(Rollup, cache);
-    await Utils.compile(RollupContract, cache);
-    await Utils.compile(UpdateKey, cache);
-    await Utils.compile(DkgContract, cache);
-    await Utils.compile(FinalizeRound1, cache);
-    await Utils.compile(Round1Contract, cache);
-    await Utils.compile(BatchEncryption, cache);
-    await Utils.compile(FinalizeRound2, cache);
-    await Utils.compile(Round2Contract, cache);
+    await compile(
+        cache,
+        [
+            Rollup,
+            RollupContract,
+            UpdateKey,
+            DkgContract,
+            FinalizeRound1,
+            Round1Contract,
+            BatchEncryption,
+            FinalizeRound2,
+            Round2Contract,
+        ],
+        undefined,
+        logger
+    );
 
     // Get zkApps
     let rollupZkApp = Utils.getZkApp(
         accounts.rollup,
         new RollupContract(accounts.rollup.publicKey),
-        RollupContract.name
+        { name: RollupContract.name }
     );
     let dkgZkApp = Utils.getZkApp(
         accounts.dkg,
         new DkgContract(accounts.dkg.publicKey),
-        DkgContract.name
+        { name: DkgContract.name }
     );
     let round1ZkApp = Utils.getZkApp(
         accounts.round1,
         new Round1Contract(accounts.round1.publicKey),
-        Round1Contract.name
+        { name: Round1Contract.name }
     );
     let round2ZkApp = Utils.getZkApp(
         accounts.round2,
         new Round2Contract(accounts.round2.publicKey),
-        Round2Contract.name
+        { name: Round2Contract.name }
     );
     let rollupContract = rollupZkApp.contract as RollupContract;
     let round2Contract = round2ZkApp.contract as Round2Contract;
@@ -271,8 +272,7 @@ async function main() {
                     })
                 )
             ),
-        undefined,
-        logger
+        { logger }
     );
 
     contributionStorage.updateInternal(
@@ -323,8 +323,7 @@ async function main() {
                         ProcessStorage.calculateIndex(actionId)
                     )
                 ),
-            undefined,
-            logger
+            { logger }
         );
 
         contributionStorage.updateLeaf(
@@ -400,8 +399,7 @@ async function main() {
             ),
         feePayer,
         true,
-        undefined,
-        logger
+        { logger }
     );
     await fetchAccounts([
         dkgZkApp.key.publicKey,

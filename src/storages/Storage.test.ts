@@ -52,7 +52,7 @@ describe('Storage', () => {
                 root.assertEquals(witness.calculateRoot(leaf));
             }
         }
-        let Local = Mina.LocalBlockchain({ proofsEnabled: true });
+        let Local = await Mina.LocalBlockchain({ proofsEnabled: true });
         Mina.setActiveInstance(Local);
         await TestContract.analyzeMethods();
     });

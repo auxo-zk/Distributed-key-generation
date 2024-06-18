@@ -1,4 +1,4 @@
-import { Field, UInt64 } from 'o1js';
+import { Field } from 'o1js';
 import { Utils } from '@auxo-dev/auxo-libs';
 import { prepare } from '../../helper/prepare.js';
 import { calculateKeyIndex } from '../../../storages/DkgStorage.js';
@@ -6,10 +6,8 @@ import { UpdateRequest } from '../../../contracts/Request.js';
 import { RequestContract } from '../../../contracts/Request.js';
 import {
     AddressStorage,
-    RequesterAddressBook,
     RequesterContract,
     SubmissionContract,
-    TaskManagerContract,
     UpdateTask,
 } from '../../../index.js';
 import axios from 'axios';
@@ -34,27 +32,27 @@ async function main() {
     const keyId = Field(0);
 
     // Compile programs
-    await Utils.compile(UpdateRequest, cache);
-    await Utils.compile(RequestContract, cache);
-    await Utils.compile(UpdateTask, cache);
-    await Utils.compile(RequesterContract, cache);
-    await Utils.compile(SubmissionContract, cache);
+    await Utils.compile(UpdateRequest, { cache });
+    await Utils.compile(RequestContract, { cache });
+    await Utils.compile(UpdateTask, { cache });
+    await Utils.compile(RequesterContract, { cache });
+    await Utils.compile(SubmissionContract, { cache });
 
     // Get zkApps
     let requestZkApp = Utils.getZkApp(
         accounts.request,
         new RequestContract(accounts.request.publicKey),
-        RequestContract.name
+        { name: RequestContract.name }
     );
     let requesterZkApp = Utils.getZkApp(
         accounts.requester,
         new RequesterContract(accounts.requester.publicKey),
-        RequesterContract.name
+        { name: RequesterContract.name }
     );
     let submissionZkApp = Utils.getZkApp(
         accounts.submission,
         new SubmissionContract(accounts.submission.publicKey),
-        SubmissionContract.name
+        { name: SubmissionContract.name }
     );
     let submissionContract = submissionZkApp.contract as SubmissionContract;
     await fetchAccounts([

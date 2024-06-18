@@ -34,21 +34,21 @@ async function main() {
     );
 
     // Compile programs
-    await Utils.compile(Rollup, cache);
-    await Utils.compile(RollupContract, cache);
-    await Utils.compile(UpdateKey, cache);
-    await Utils.compile(DkgContract, cache);
+    await Utils.compile(Rollup, { cache });
+    await Utils.compile(RollupContract, { cache });
+    await Utils.compile(UpdateKey, { cache });
+    await Utils.compile(DkgContract, { cache });
 
     // Get zkApps
     let rollupZkApp = Utils.getZkApp(
         accounts.rollup,
         new RollupContract(accounts.rollup.publicKey),
-        RollupContract.name
+        { name: RollupContract.name }
     );
     let dkgZkApp = Utils.getZkApp(
         accounts.dkg,
         new DkgContract(accounts.dkg.publicKey),
-        DkgContract.name
+        { name: DkgContract.name }
     );
     let dkgContract = dkgZkApp.contract as DkgContract;
     let rollupContract = rollupZkApp.contract as RollupContract;
@@ -215,8 +215,7 @@ async function main() {
                 dkgContract.keyRoot.get(),
                 dkgContract.processRoot.get()
             ),
-        undefined,
-        logger
+        { logger }
     );
 
     for (let i = 0; i < actions.length; i++) {
@@ -260,8 +259,7 @@ async function main() {
                             ProcessStorage.calculateIndex(actionId)
                         )
                     ),
-                undefined,
-                logger
+                { logger }
             );
 
             keyStatusStorage.updateRawLeaf(
@@ -318,8 +316,7 @@ async function main() {
                             ProcessStorage.calculateIndex(actionId)
                         )
                     ),
-                undefined,
-                logger
+                { logger }
             );
 
             keyStatusStorage.updateLeaf(
@@ -363,8 +360,7 @@ async function main() {
             ),
         feePayer,
         true,
-        undefined,
-        logger
+        { logger }
     );
     await fetchAccounts([dkgZkApp.key.publicKey]);
 }

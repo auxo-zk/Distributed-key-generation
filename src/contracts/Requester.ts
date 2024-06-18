@@ -574,7 +574,7 @@ class RequesterContract extends SmartContract {
             let index = Field.fromBits(
                 indices.toBits().slice(i * 8, (i + 1) * 8)
             );
-            let random = randoms.get(Field(i)).toScalar();
+            let random = randoms.get(Field(i));
             let secret = secrets.get(Field(i));
             let nullifier = nullifiers.get(Field(i));
             R.set(Field(i), Group.generator.scale(random));
@@ -582,9 +582,11 @@ class RequesterContract extends SmartContract {
                 Field(i),
                 Provable.witness(Group, () =>
                     Provable.if(
-                        secret.equals(CustomScalar.fromScalar(Scalar.from(0))),
+                        CustomScalar.fromScalar(secret).equals(
+                            CustomScalar.fromScalar(Scalar.from(0))
+                        ),
                         Group.zero,
-                        Group.generator.scale(secrets.get(Field(i)).toScalar())
+                        Group.generator.scale(secrets.get(Field(i)))
                     ).add(publicKey.scale(random))
                 )
             );

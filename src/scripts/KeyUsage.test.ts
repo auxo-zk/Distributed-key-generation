@@ -563,78 +563,98 @@ describe('Key usage', () => {
         rollupZkApp = Utils.getZkApp(
             accounts.rollup,
             new RollupContract(accounts.rollup.publicKey),
-            RollupContract.name,
-            { zkAppRoot: sharedAddressStorage.root }
+            {
+                name: RollupContract.name,
+                initArgs: { zkAppRoot: sharedAddressStorage.root },
+            }
         );
         committeeZkApp = Utils.getZkApp(
             accounts.committee,
             new CommitteeContract(accounts.committee.publicKey),
-            CommitteeContract.name,
             {
-                zkAppRoot: sharedAddressStorage.root,
-                memberRoot: memberStorage.root,
-                settingRoot: settingStorage.root,
+                name: CommitteeContract.name,
+                initArgs: {
+                    zkAppRoot: sharedAddressStorage.root,
+                    memberRoot: memberStorage.root,
+                    settingRoot: settingStorage.root,
+                },
             }
         );
         dkgZkApp = Utils.getZkApp(
             accounts.dkg,
             new DkgContract(accounts.dkg.publicKey),
-            DkgContract.name,
             {
-                zkAppRoot: sharedAddressStorage.root,
-                keyStatusRoot: keyStatusStorage.root,
-                keyRoot: keyStorage.root,
+                name: DkgContract.name,
+                initArgs: {
+                    zkAppRoot: sharedAddressStorage.root,
+                    keyStatusRoot: keyStatusStorage.root,
+                    keyRoot: keyStorage.root,
+                },
             }
         );
         round1ZkApp = Utils.getZkApp(
             accounts.round1,
             new Round1Contract(accounts.round1.publicKey),
-            Round1Contract.name,
             {
-                zkAppRoot: sharedAddressStorage.root,
-                contributionRoot: round1ContributionStorage.root,
-                publicKeyRoot: publicKeyStorage.root,
+                name: Round1Contract.name,
+                initArgs: {
+                    zkAppRoot: sharedAddressStorage.root,
+                    contributionRoot: round1ContributionStorage.root,
+                    publicKeyRoot: publicKeyStorage.root,
+                },
             }
         );
         round2ZkApp = Utils.getZkApp(
             accounts.round2,
             new Round2Contract(accounts.round2.publicKey),
-            Round2Contract.name,
             {
-                zkAppRoot: sharedAddressStorage.root,
-                contributionRoot: round2ContributionStorage.root,
-                encryptionRoot: encryptionStorage.root,
+                name: Round2Contract.name,
+                initArgs: {
+                    zkAppRoot: sharedAddressStorage.root,
+                    contributionRoot: round2ContributionStorage.root,
+                    encryptionRoot: encryptionStorage.root,
+                },
             }
         );
         requestZkApp = Utils.getZkApp(
             accounts.request,
             new RequestContract(accounts.request.publicKey),
-            RequestContract.name,
-            { zkAppRoot: sharedAddressStorage.root }
+            {
+                name: RequestContract.name,
+                initArgs: { zkAppRoot: sharedAddressStorage.root },
+            }
         );
         responseZkApp = Utils.getZkApp(
             accounts.response,
             new ResponseContract(accounts.response.publicKey),
-            ResponseContract.name,
-            { zkAppRoot: sharedAddressStorage.root }
+            {
+                name: ResponseContract.name,
+                initArgs: { zkAppRoot: sharedAddressStorage.root },
+            }
         );
         requesterZkApp = Utils.getZkApp(
             accounts.requester,
             new RequesterContract(accounts.requester.publicKey),
-            RequesterContract.name,
-            { zkAppRoot: requesterAddressStorage.root }
+            {
+                name: RequesterContract.name,
+                initArgs: { zkAppRoot: requesterAddressStorage.root },
+            }
         );
         taskManagerZkApp = Utils.getZkApp(
             accounts.taskmanager,
             new TaskManagerContract(accounts.taskmanager.publicKey),
-            TaskManagerContract.name,
-            { requesterAddress: accounts.requester.publicKey }
+            {
+                name: TaskManagerContract.name,
+                initArgs: { requesterAddress: accounts.requester.publicKey },
+            }
         );
         submissionZkApp = Utils.getZkApp(
             accounts.submission,
             new SubmissionContract(accounts.submission.publicKey),
-            SubmissionContract.name,
-            { requesterAddress: accounts.requester.publicKey }
+            {
+                name: SubmissionContract.name,
+                initArgs: { requesterAddress: accounts.requester.publicKey },
+            }
         );
         let rollupZkAppWithResponseToken = {
             ...rollupZkApp,
@@ -684,7 +704,7 @@ describe('Key usage', () => {
                 ],
                 feePayer,
                 true,
-                logger
+                { logger }
             );
         } else {
             await Utils.deployZkApps(
@@ -702,7 +722,7 @@ describe('Key usage', () => {
                 ],
                 feePayer,
                 true,
-                logger
+                { logger }
             );
         }
 
@@ -728,7 +748,7 @@ describe('Key usage', () => {
             ],
             feePayer,
             true,
-            logger
+            { logger }
         );
     });
 
@@ -760,8 +780,7 @@ describe('Key usage', () => {
                     ),
                 feePayer,
                 true,
-                undefined,
-                logger
+                { logger }
             );
             requests.push({
                 taskId: UInt32.from(i),
@@ -820,8 +839,7 @@ describe('Key usage', () => {
                     requesterCounters.commitmentCounter,
                     requesterContract.commitmentRoot.get()
                 ),
-            undefined,
-            logger
+            { logger }
         );
         for (let i = 0; i < NUM_TASKS; i++) {
             let action = RequesterAction.fromFields(requesterZkApp.actions[i]);
@@ -839,8 +857,7 @@ describe('Key usage', () => {
                         timestampStorage.getWitness(level1Index),
                         requesterAccumulationStorage.getWitness(level1Index)
                     ),
-                undefined,
-                logger
+                { logger }
             );
             requesterKeyIndexStorage.updateRawLeaf(
                 {
@@ -863,8 +880,7 @@ describe('Key usage', () => {
             async () => requesterContract.updateTasks(updateTaskProof),
             feePayer,
             true,
-            undefined,
-            logger
+            { logger }
         );
         await fetchAccounts([requesterZkApp.key.publicKey]);
     });
@@ -975,8 +991,7 @@ describe('Key usage', () => {
                     ),
                 feePayer,
                 true,
-                undefined,
-                logger
+                { logger }
             );
             await fetchAccounts([
                 requesterZkApp.key.publicKey,
@@ -1012,8 +1027,7 @@ describe('Key usage', () => {
                     requesterCounters.commitmentCounter,
                     requesterContract.commitmentRoot.get()
                 ),
-            undefined,
-            logger
+            { logger }
         );
         let actions = requesterZkApp.actions.slice(
             NUM_TASKS,
@@ -1095,8 +1109,7 @@ describe('Key usage', () => {
                         accumulationWitnessesM,
                         commitmentWitnesses
                     ),
-                undefined,
-                logger
+                { logger }
             );
         }
         requests[0].accumulationRootR = accumulationStorageR.root;
@@ -1107,8 +1120,7 @@ describe('Key usage', () => {
             async () => requesterContract.updateTasks(updateTaskProof),
             feePayer,
             true,
-            undefined,
-            logger
+            { logger }
         );
         await fetchAccounts([requesterZkApp.key.publicKey]);
     });
@@ -1145,8 +1157,7 @@ describe('Key usage', () => {
                 ),
             feePayer,
             true,
-            undefined,
-            logger
+            { logger }
         );
         await fetchAccounts([requestZkApp.key.publicKey]);
         let actions = await Utils.fetchActions(requestZkApp.key.publicKey);
@@ -1173,8 +1184,7 @@ describe('Key usage', () => {
                     requestContract.resultRoot.get(),
                     requestContract.actionState.get()
                 ),
-            undefined,
-            logger
+            { logger }
         );
         updateRequestProof = await Utils.prove(
             UpdateRequest.name,
@@ -1188,8 +1198,7 @@ describe('Key usage', () => {
                     requestAccumulationStorage.getWitness(Field(0)),
                     expirationStorage.getWitness(Field(0))
                 ),
-            undefined,
-            logger
+            { logger }
         );
         requestKeyIndexStorage.updateRawLeaf(
             {
@@ -1228,8 +1237,7 @@ describe('Key usage', () => {
             async () => requestContract.update(updateRequestProof),
             feePayer,
             true,
-            undefined,
-            logger
+            { logger }
         );
         await fetchAccounts([requestZkApp.key.publicKey]);
     });
@@ -1295,14 +1303,11 @@ describe('Key usage', () => {
                             memberId: Field(memberId),
                         }),
                         new PlainArray(
-                            committeeSecrets.map((e) =>
-                                CustomScalar.fromScalar(e.f[memberId])
-                            )
+                            committeeSecrets.map((e) => e.f[memberId])
                         ),
                         committeeSecrets[memberId].a[0]
                     ),
-                undefined,
-                logger
+                { logger }
             );
             Provable.log('Decrypted Ski:', decryptionProof.publicOutput);
 
@@ -1332,8 +1337,7 @@ describe('Key usage', () => {
                         accumulationStorageR.root,
                         CustomScalar.fromScalar(ski)
                     ),
-                undefined,
-                logger
+                { logger }
             );
             for (let j = 0; j < ENCRYPTION_LIMITS.FULL_DIMENSION; j++) {
                 computeResponseProof = await Utils.prove(
@@ -1347,8 +1351,7 @@ describe('Key usage', () => {
                             accumulationStorageR.getWitness(Field(j)),
                             responseStorageD.getWitness(Field(j))
                         ),
-                    undefined,
-                    logger
+                    { logger }
                 );
                 responseStorageD.updateRawLeaf(
                     {
@@ -1429,8 +1432,7 @@ describe('Key usage', () => {
                     ),
                 feePayer,
                 true,
-                undefined,
-                logger
+                { logger }
             );
             await fetchAccounts([
                 responseZkApp.key.publicKey,
@@ -1461,8 +1463,7 @@ describe('Key usage', () => {
                     rollupContract.rollupRoot.get(),
                     rollupContract.actionState.get()
                 ),
-            undefined,
-            logger
+            { logger }
         );
         for (let i = 0; i < T; i++) {
             let action = RollupAction.fromFields(rollupZkApp.actions[i]);
@@ -1486,8 +1487,7 @@ describe('Key usage', () => {
                             })
                         )
                     ),
-                undefined,
-                logger
+                { logger }
             );
             rollupCounterStorage.updateRawLeaf(
                 {
@@ -1513,8 +1513,7 @@ describe('Key usage', () => {
             async () => rollupContract.rollup(rollupProof),
             feePayer,
             true,
-            undefined,
-            logger
+            { logger }
         );
         await fetchAccounts([rollupZkApp.key.publicKey]);
 
@@ -1539,8 +1538,7 @@ describe('Key usage', () => {
                     rollupContract.rollupRoot.get(),
                     responseContributionStorage.getLevel1Witness(Field(0))
                 ),
-            undefined,
-            logger
+            { logger }
         );
         responseContributionStorage.updateInternal(
             Field(0),
@@ -1579,8 +1577,7 @@ describe('Key usage', () => {
                             ProcessStorage.calculateIndex(actionId)
                         )
                     ),
-                undefined,
-                logger
+                { logger }
             );
             responseContributionStorage.updateRawLeaf(
                 {
@@ -1628,8 +1625,7 @@ describe('Key usage', () => {
                                 ProcessStorage.calculateIndex(actionId)
                             )
                         ),
-                    undefined,
-                    logger
+                    { logger }
                 );
                 responseProcessStorage.updateRawLeaf(
                     {
@@ -1656,8 +1652,7 @@ describe('Key usage', () => {
                         finalizeResponseProof,
                         responseStorageD.getWitness(Field(i))
                     ),
-                undefined,
-                logger
+                { logger }
             );
             responseStorageD.updateRawLeaf(
                 { level1Index: Field(i) },
@@ -1688,8 +1683,7 @@ describe('Key usage', () => {
                 ),
             feePayer,
             true,
-            undefined,
-            logger
+            { logger }
         );
         await fetchAccounts([responseZkApp.key.publicKey]);
 
@@ -1718,8 +1712,7 @@ describe('Key usage', () => {
                     responseStorageD.root,
                     rawResultStorage.root
                 ),
-            undefined,
-            logger
+            { logger }
         );
         for (let i = 0; i < ENCRYPTION_LIMITS.FULL_DIMENSION; i++) {
             let sumMi = requests[0].sumM[i];
@@ -1740,8 +1733,7 @@ describe('Key usage', () => {
                         responseStorageD.getWitness(Field(i)),
                         rawResultStorage.getWitness(Field(i))
                     ),
-                undefined,
-                logger
+                { logger }
             );
         }
         await Utils.proveAndSendTx(
@@ -1763,8 +1755,7 @@ describe('Key usage', () => {
                 ),
             feePayer,
             true,
-            undefined,
-            logger
+            { logger }
         );
         await fetchAccounts([requestZkApp.key.publicKey]);
         let action = new RequestAction({
@@ -1791,8 +1782,7 @@ describe('Key usage', () => {
                     requestContract.resultRoot.get(),
                     requestContract.actionState.get()
                 ),
-            undefined,
-            logger
+            { logger }
         );
         updateRequestProof = await Utils.prove(
             UpdateRequest.name,
@@ -1803,8 +1793,7 @@ describe('Key usage', () => {
                     updateRequestProof,
                     resultStorage.getWitness(Field(0))
                 ),
-            undefined,
-            logger
+            { logger }
         );
         resultStorage.updateRawLeaf(
             { level1Index: Field(0) },
@@ -1816,8 +1805,7 @@ describe('Key usage', () => {
             async () => requestContract.update(updateRequestProof),
             feePayer,
             true,
-            undefined,
-            logger
+            { logger }
         );
         await fetchAccounts([requestZkApp.key.publicKey]);
     });

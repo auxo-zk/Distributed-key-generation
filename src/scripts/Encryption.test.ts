@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import { Cache, Field, Group, Mina, Scalar } from 'o1js';
-import { Bit255, CustomScalar, Utils } from '@auxo-dev/auxo-libs';
+import { Bit255, Utils } from '@auxo-dev/auxo-libs';
 import {
     BatchDecryption,
     BatchDecryptionInput,
@@ -17,8 +17,6 @@ import { CArray, UArray, cArray } from '../libs/Committee.js';
 describe('Encryption', () => {
     const profiling = true;
     const cache = Cache.FileSystem('./caches');
-    let Local = Mina.LocalBlockchain({ proofsEnabled: false });
-    Mina.setActiveInstance(Local);
     const DKGProfiler = Utils.getProfiler('Benchmark Encryption', fs);
 
     let prvKey: Scalar = Scalar.random();
@@ -31,46 +29,60 @@ describe('Encryption', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let decryptions: any[] = [];
 
-    it('Should compile all ZK programs', async () => {
-        // await Utils.compile(Elgamal, cache);
-        await Utils.compile(BatchEncryption, cache);
-        await Utils.compile(BatchDecryption, cache);
+    beforeAll(async () => {
+        let Local = await Mina.LocalBlockchain({ proofsEnabled: false });
+        Mina.setActiveInstance(Local);
     });
 
-    xit('Should encrypt successfully', async () => {
-        console.log('Single encryption');
+    it('Should compile all ZK programs', async () => {
+        await Utils.compile(Elgamal, { cache });
+        await Utils.compile(BatchEncryption, { cache });
+        await Utils.compile(BatchDecryption, { cache });
+    });
+
+    it('Should encrypt successfully', async () => {
         let encryption = ElgamalLib.encrypt(plains[0], pubKey, randoms[0]);
-        let encryptionProof = await Elgamal.encrypt(
-            new ElgamalInput({
-                pubKey: pubKey,
-                c: encryption.c,
-                U: encryption.U,
-            }),
-            plains[0],
-            randoms[0]
+        let encryptionProof = await Utils.prove(
+            Elgamal.name,
+            'encrypt',
+            async () =>
+                Elgamal.encrypt(
+                    new ElgamalInput({
+                        pubKey: pubKey,
+                        c: encryption.c,
+                        U: encryption.U,
+                    }),
+                    plains[0],
+                    randoms[0]
+                ),
+            { logger: { info: true, error: true } }
         );
         encryptionProof.verify();
         encryptions.push(encryption);
     });
 
-    xit('Should decrypt successfully', async () => {
-        console.log('Single decryption');
+    it('Should decrypt successfully', async () => {
         let encryption = encryptions[0];
         let decryption = ElgamalLib.decrypt(encryption.c, encryption.U, prvKey);
-        let decryptionProof = await Elgamal.decrypt(
-            new ElgamalInput({
-                pubKey: pubKey,
-                c: encryption.c,
-                U: encryption.U,
-            }),
-            decryption.m,
-            prvKey
+        let decryptionProof = await Utils.prove(
+            Elgamal.name,
+            'decrypt',
+            async () =>
+                Elgamal.decrypt(
+                    new ElgamalInput({
+                        pubKey: pubKey,
+                        c: encryption.c,
+                        U: encryption.U,
+                    }),
+                    decryption.m,
+                    prvKey
+                ),
+            { logger: { info: true, error: true } }
         );
         decryptionProof.verify();
     });
 
     it('Should batch encrypt successfully', async () => {
-        console.log('Batch encryption');
         encryptions = [
             {
                 c: Bit255.fromBigInt(0n),
@@ -80,38 +92,48 @@ describe('Encryption', () => {
         for (let i = 1; i < length; i++) {
             encryptions.push(ElgamalLib.encrypt(plains[i], pubKey, randoms[i]));
         }
-        let encryptionProof = await BatchEncryption.encrypt(
-            new BatchEncryptionInput({
-                publicKeys: new CArray([...Array(length)].map(() => pubKey)),
-                c: new cArray(encryptions.map((e) => e.c)),
-                U: new UArray(encryptions.map((e) => e.U)),
-                memberId: Field(0),
-            }),
-            new PlainArray(plains.map((e) => CustomScalar.fromScalar(e))),
-            new RandomArray(randoms.map((e) => CustomScalar.fromScalar(e)))
+        let encryptionProof = await Utils.prove(
+            BatchEncryption.name,
+            'encrypt',
+            async () =>
+                BatchEncryption.encrypt(
+                    new BatchEncryptionInput({
+                        publicKeys: new CArray(
+                            [...Array(length)].map(() => pubKey)
+                        ),
+                        c: new cArray(encryptions.map((e) => e.c)),
+                        U: new UArray(encryptions.map((e) => e.U)),
+                        memberId: Field(0),
+                    }),
+                    new PlainArray(plains),
+                    new RandomArray(randoms)
+                ),
+            { logger: { info: true, error: true } }
         );
         encryptionProof.verify();
     });
 
     it('Should batch decrypt successfully', async () => {
-        console.log('Batch decryption');
-        decryptions = [{ m: Scalar.from(2n) }];
+        decryptions = [{ m: Scalar.from(1n) }];
         for (let i = 1; i < length; i++) {
             decryptions.push(
                 ElgamalLib.decrypt(encryptions[i].c, encryptions[i].U, prvKey)
             );
         }
-        let decryptionProof = await BatchDecryption.decrypt(
-            new BatchDecryptionInput({
-                publicKey: pubKey,
-                c: new cArray(encryptions.map((e) => e.c)),
-                U: new UArray(encryptions.map((e) => e.U)),
-                memberId: Field(0),
-            }),
-            new PlainArray(
-                decryptions.map((e) => CustomScalar.fromScalar(e.m))
-            ),
-            prvKey
+        let decryptionProof = await Utils.prove(
+            BatchDecryption.name,
+            'decrypt',
+            async () =>
+                BatchDecryption.decrypt(
+                    new BatchDecryptionInput({
+                        publicKey: pubKey,
+                        c: new cArray(encryptions.map((e) => e.c)),
+                        U: new UArray(encryptions.map((e) => e.U)),
+                        memberId: Field(0),
+                    }),
+                    new PlainArray(decryptions.map((e) => e.m)),
+                    prvKey
+                )
         );
         decryptionProof.verify();
     });

@@ -8,12 +8,7 @@ import {
     Struct,
     ZkProgram,
 } from 'o1js';
-import {
-    Bit255,
-    CustomScalar,
-    ScalarDynamicArray,
-    Utils,
-} from '@auxo-dev/auxo-libs';
+import { Bit255, ScalarDynamicArray, Utils } from '@auxo-dev/auxo-libs';
 import { CArray, cArray, UArray } from '../libs/Committee.js';
 import { INSTANCE_LIMITS } from '../constants.js';
 import { ErrorEnum, ZkProgramEnum } from './constants.js';
@@ -53,11 +48,9 @@ const Elgamal = ZkProgram({
                     .scale(random)
                     .sub(Group.generator.scale(random));
                 let k = Poseidon.hash([U.toFields(), V.toFields()].flat());
-                let kBits = k.toBits();
-                kBits.push(Bool(false));
-                let kBitsPadded = Bit255.fromBits(kBits);
+                let kBits = Bit255.fromBits([...k.toBits(), Bool(false)]);
                 let plainBits = Bit255.fromScalar(plain);
-                let encrypted = Bit255.xor(kBitsPadded, plainBits);
+                let encrypted = Bit255.xor(kBits, plainBits);
                 encrypted.assertEquals(
                     input.c,
                     Utils.buildAssertMessage(
@@ -72,14 +65,14 @@ const Elgamal = ZkProgram({
         decrypt: {
             privateInputs: [Scalar, Scalar],
             async method(input: ElgamalInput, plain: Scalar, prvKey: Scalar) {
-                let V = input.U.scale(prvKey);
+                let V = input.U.add(Group.generator)
+                    .scale(prvKey)
+                    .sub(Group.generator.scale(prvKey));
                 let k = Poseidon.hash(input.U.toFields().concat(V.toFields()));
-                let kBits = k.toBits();
-                kBits.push(Bool(false));
-                let kBitsPadded = Bit255.fromBits(kBits);
-                let decrypted = Bit255.xor(kBitsPadded, input.c);
-                CustomScalar.fromScalar(decrypted.toScalar()).assertEquals(
-                    CustomScalar.fromScalar(plain),
+                let kBits = Bit255.fromBits([...k.toBits(), Bool(false)]);
+                let decrypted = Bit255.xor(kBits, input.c);
+                decrypted.assertEquals(
+                    Bit255.fromScalar(plain),
                     Utils.buildAssertMessage(
                         Elgamal.name,
                         'decrypt',
@@ -130,9 +123,9 @@ const BatchEncryption = ZkProgram({
 
                 for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
                     let iField = Field(i);
-                    let random = randomValues.get(iField).toScalar();
+                    let random = randomValues.get(iField);
                     let pubKey = input.publicKeys.get(iField);
-                    let cipher = input.c.get(iField);
+                    let cipher = input.c.get(iField) as Bit255;
                     let U = Group.generator.scale(random);
                     // Avoid scaling zero point
                     let V = pubKey
@@ -144,10 +137,7 @@ const BatchEncryption = ZkProgram({
                     let kBits = k.toBits();
                     kBits.push(Bool(false));
                     let kBitsPadded = Bit255.fromBits(kBits);
-                    let plainBits = new Bit255({
-                        head: plain.head,
-                        tail: plain.tail,
-                    });
+                    let plainBits = Bit255.fromScalar(plain);
                     let encrypted = Bit255.xor(kBitsPadded, plainBits);
                     Provable.if(
                         input.memberId
@@ -215,26 +205,21 @@ const BatchDecryption = ZkProgram({
                 for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
                     let iField = Field(i);
                     let plain = polynomialValues.get(iField);
-                    let cipher = input.c.get(iField);
+                    let cipher = input.c.get(iField) as Bit255;
                     let U = input.U.get(iField);
                     // Avoid scaling zero point
                     let V = U.add(Group.generator)
                         .scale(privateKey)
                         .sub(Group.generator.scale(privateKey));
                     let k = Poseidon.hash([U.toFields(), V.toFields()].flat());
-                    let kBits = k.toBits();
-                    kBits.push(Bool(false));
-                    let kBitsPadded = Bit255.fromBits(kBits);
-                    let decrypted = Bit255.xor(kBitsPadded, cipher);
+                    let kBits = Bit255.fromBits([...k.toBits(), Bool(false)]);
+                    let decrypted = Bit255.xor(kBits, cipher);
                     Provable.if(
                         input.memberId
                             .equals(iField)
                             .or(iField.greaterThanOrEqual(length)),
                         Bool(true),
-                        new CustomScalar({
-                            head: decrypted.head,
-                            tail: decrypted.tail,
-                        }).equals(plain)
+                        decrypted.equals(Bit255.fromScalar(plain))
                     ).assertTrue(
                         Utils.buildAssertMessage(
                             Elgamal.name,
@@ -242,8 +227,7 @@ const BatchDecryption = ZkProgram({
                             ErrorEnum.ELGAMAL_DECRYPTION
                         )
                     );
-                    // FIXME - Field.inv error, requires update to o1js@^1.0.1
-                    ski = ski.add(Group.generator.scale(plain.toScalar()));
+                    ski = ski.add(Group.generator.scale(plain));
                 }
                 return ski;
             },

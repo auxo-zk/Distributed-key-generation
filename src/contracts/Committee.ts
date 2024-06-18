@@ -12,7 +12,6 @@ import {
     ZkProgram,
     PublicKey,
     Void,
-    Group,
     Bool,
 } from 'o1js';
 import { IpfsHash, Utils } from '@auxo-dev/auxo-libs';
@@ -212,11 +211,6 @@ const UpdateCommittee = ZkProgram({
 });
 
 class UpdateCommitteeProof extends ZkProgram.Proof(UpdateCommittee) {}
-
-// interface ICommitteeContract {
-//     zkAppRoot: State<Field>;
-//     create: (...args: any) => Promise<void>;
-// }
 
 /**
  * @todo Prevent fake committee by spoofing IPFS hash

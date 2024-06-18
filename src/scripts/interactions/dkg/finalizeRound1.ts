@@ -23,6 +23,7 @@ import { ProcessStorage } from '../../../storages/ProcessStorage.js';
 import { RollupStorage } from '../../../storages/RollupStorage.js';
 import { SettingStorage } from '../../../storages/CommitteeStorage.js';
 import { ZkAppIndex } from '../../../contracts/constants.js';
+import { compile } from '../../helper/compile.js';
 
 async function main() {
     const logger: Utils.Logger = {
@@ -39,28 +40,35 @@ async function main() {
     );
 
     // Compile programs
-    await Utils.compile(Rollup, cache);
-    await Utils.compile(RollupContract, cache);
-    await Utils.compile(UpdateKey, cache);
-    await Utils.compile(DkgContract, cache);
-    await Utils.compile(FinalizeRound1, cache);
-    await Utils.compile(Round1Contract, cache);
+    await compile(
+        cache,
+        [
+            Rollup,
+            RollupContract,
+            UpdateKey,
+            DkgContract,
+            FinalizeRound1,
+            Round1Contract,
+        ],
+        undefined,
+        logger
+    );
 
     // Get zkApps
     let rollupZkApp = Utils.getZkApp(
         accounts.rollup,
         new RollupContract(accounts.rollup.publicKey),
-        RollupContract.name
+        { name: RollupContract.name }
     );
     let dkgZkApp = Utils.getZkApp(
         accounts.dkg,
         new DkgContract(accounts.dkg.publicKey),
-        DkgContract.name
+        { name: DkgContract.name }
     );
     let round1ZkApp = Utils.getZkApp(
         accounts.round1,
         new Round1Contract(accounts.round1.publicKey),
-        Round1Contract.name
+        { name: Round1Contract.name }
     );
     let rollupContract = rollupZkApp.contract as RollupContract;
     let round1Contract = round1ZkApp.contract as Round1Contract;
@@ -248,8 +256,7 @@ async function main() {
                     })
                 )
             ),
-        undefined,
-        logger
+        { logger }
     );
 
     contributionStorage.updateInternal(
@@ -308,8 +315,7 @@ async function main() {
                         ProcessStorage.calculateIndex(actionId)
                     )
                 ),
-            undefined,
-            logger
+            { logger }
         );
 
         contributionStorage.updateLeaf(
@@ -379,8 +385,7 @@ async function main() {
             ),
         feePayer,
         true,
-        undefined,
-        logger
+        { logger }
     );
     await fetchAccounts([
         dkgZkApp.key.publicKey,

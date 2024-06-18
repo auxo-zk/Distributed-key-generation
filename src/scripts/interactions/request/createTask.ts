@@ -33,27 +33,27 @@ async function main() {
     const keyId = Field(0);
 
     // Compile programs
-    await Utils.compile(UpdateRequest, cache);
-    await Utils.compile(RequestContract, cache);
-    await Utils.compile(UpdateTask, cache);
-    await Utils.compile(RequesterContract, cache);
-    await Utils.compile(TaskManagerContract, cache);
+    await Utils.compile(UpdateRequest, { cache });
+    await Utils.compile(RequestContract, { cache });
+    await Utils.compile(UpdateTask, { cache });
+    await Utils.compile(RequesterContract, { cache });
+    await Utils.compile(TaskManagerContract, { cache });
 
     // Get zkApps
     let requestZkApp = Utils.getZkApp(
         accounts.request,
         new RequestContract(accounts.request.publicKey),
-        RequestContract.name
+        { name: RequestContract.name }
     );
     let requesterZkApp = Utils.getZkApp(
         accounts.requester,
         new RequesterContract(accounts.requester.publicKey),
-        RequesterContract.name
+        { name: RequesterContract.name }
     );
     let taskManagerZkApp = Utils.getZkApp(
         accounts.taskmanager,
         new TaskManagerContract(accounts.taskmanager.publicKey),
-        TaskManagerContract.name
+        { name: TaskManagerContract.name }
     );
     let taskManagerContract = taskManagerZkApp.contract as TaskManagerContract;
     await fetchAccounts([
@@ -96,8 +96,7 @@ async function main() {
             ),
         feePayer,
         true,
-        undefined,
-        logger
+        { logger }
     );
 }
 
