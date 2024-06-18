@@ -28,7 +28,7 @@ async function main() {
 
     let _ = await prepare(
         './caches',
-        { type: Network.Lightnet, doProofs },
+        { type: Network.Local, doProofs },
         {
             aliases: [
                 'rollup',

@@ -2,7 +2,6 @@ import {
     Field,
     Group,
     Poseidon,
-    Provable,
     Reducer,
     SelfProof,
     SmartContract,
@@ -463,7 +462,6 @@ class Round1Contract extends SmartContract {
         const committeeContract = new CommitteeContract(committee.address);
         const rollupContract = new RollupContract(rollup.address);
 
-        // FIXME - "Option.value_exn None" error
         // Verify keyId
         keyId.assertLessThanOrEqual(
             INSTANCE_LIMITS.KEY,
@@ -625,9 +623,7 @@ class Round1Contract extends SmartContract {
             keyId,
             Field(DkgActionEnum.FINALIZE_ROUND_1),
             proof.publicOutput.publicKey,
-            selfRef,
-            rollup,
-            dkg
+            selfRef
         );
 
         // Emit events

@@ -427,14 +427,6 @@ describe('Key generation', () => {
                             sharedAddressStorage.getZkAppRef(
                                 ZkAppIndex.COMMITTEE,
                                 committeeZkApp.key.publicKey
-                            ),
-                            sharedAddressStorage.getZkAppRef(
-                                ZkAppIndex.ROLLUP,
-                                rollupZkApp.key.publicKey
-                            ),
-                            sharedAddressStorage.getZkAppRef(
-                                ZkAppIndex.DKG,
-                                dkgZkApp.key.publicKey
                             )
                         ),
                     {
@@ -477,70 +469,70 @@ describe('Key generation', () => {
             }
         }
 
-        // Rollup dkg actions
-        let rollupProof = await Utils.prove(
-            Rollup.name,
-            'init',
-            async () =>
-                Rollup.init(
-                    RollupAction.empty(),
-                    rollupContract.counterRoot.get(),
-                    rollupContract.rollupRoot.get(),
-                    rollupContract.actionState.get()
-                ),
-            { profiler, logger }
-        );
-        for (let i = 0; i < rollupZkApp.actions.length; i++) {
-            let action = RollupAction.fromFields(rollupZkApp.actions[i]);
-            rollupProof = await Utils.prove(
-                Rollup.name,
-                'rollup',
-                async () =>
-                    Rollup.rollup(
-                        action,
-                        rollupProof,
-                        Field(i),
-                        rollupCounterStorage.getWitness(
-                            RollupCounterStorage.calculateLevel1Index(
-                                Field(ZkAppIndex.DKG)
-                            )
-                        ),
-                        rollupStorage.getWitness(
-                            RollupStorage.calculateLevel1Index({
-                                zkAppIndex: Field(ZkAppIndex.DKG),
-                                actionId: Field(i),
-                            })
-                        )
-                    ),
-                { profiler, logger }
-            );
-            rollupCounterStorage.updateRawLeaf(
-                {
-                    level1Index: RollupCounterStorage.calculateLevel1Index(
-                        Field(ZkAppIndex.DKG)
-                    ),
-                },
-                Field(i + 1)
-            );
-            rollupStorage.updateRawLeaf(
-                {
-                    level1Index: RollupStorage.calculateLevel1Index({
-                        zkAppIndex: Field(ZkAppIndex.DKG),
-                        actionId: Field(i),
-                    }),
-                },
-                action.actionHash
-            );
-        }
-        await Utils.proveAndSendTx(
-            RollupContract.name,
-            'rollup',
-            async () => rollupContract.rollup(rollupProof),
-            feePayer,
-            true,
-            { profiler, logger }
-        );
-        await fetchAccounts([rollupZkApp.key.publicKey]);
+        // // Rollup dkg actions
+        // let rollupProof = await Utils.prove(
+        //     Rollup.name,
+        //     'init',
+        //     async () =>
+        //         Rollup.init(
+        //             RollupAction.empty(),
+        //             rollupContract.counterRoot.get(),
+        //             rollupContract.rollupRoot.get(),
+        //             rollupContract.actionState.get()
+        //         ),
+        //     { profiler, logger }
+        // );
+        // for (let i = 0; i < rollupZkApp.actions.length; i++) {
+        //     let action = RollupAction.fromFields(rollupZkApp.actions[i]);
+        //     rollupProof = await Utils.prove(
+        //         Rollup.name,
+        //         'rollup',
+        //         async () =>
+        //             Rollup.rollup(
+        //                 action,
+        //                 rollupProof,
+        //                 Field(i),
+        //                 rollupCounterStorage.getWitness(
+        //                     RollupCounterStorage.calculateLevel1Index(
+        //                         Field(ZkAppIndex.DKG)
+        //                     )
+        //                 ),
+        //                 rollupStorage.getWitness(
+        //                     RollupStorage.calculateLevel1Index({
+        //                         zkAppIndex: Field(ZkAppIndex.DKG),
+        //                         actionId: Field(i),
+        //                     })
+        //                 )
+        //             ),
+        //         { profiler, logger }
+        //     );
+        //     rollupCounterStorage.updateRawLeaf(
+        //         {
+        //             level1Index: RollupCounterStorage.calculateLevel1Index(
+        //                 Field(ZkAppIndex.DKG)
+        //             ),
+        //         },
+        //         Field(i + 1)
+        //     );
+        //     rollupStorage.updateRawLeaf(
+        //         {
+        //             level1Index: RollupStorage.calculateLevel1Index({
+        //                 zkAppIndex: Field(ZkAppIndex.DKG),
+        //                 actionId: Field(i),
+        //             }),
+        //         },
+        //         action.actionHash
+        //     );
+        // }
+        // await Utils.proveAndSendTx(
+        //     RollupContract.name,
+        //     'rollup',
+        //     async () => rollupContract.rollup(rollupProof),
+        //     feePayer,
+        //     true,
+        //     { profiler, logger }
+        // );
+        // await fetchAccounts([rollupZkApp.key.publicKey]);
 
         // Update dkg keys
         let updateKeyProof = await Utils.prove(
@@ -553,11 +545,10 @@ describe('Key generation', () => {
                         action: DkgAction.empty(),
                         actionId: Field(0),
                     }),
-                    rollupContract.rollupRoot.get(),
+                    dkgContract.actionState.get(),
                     dkgContract.keyCounterRoot.get(),
                     dkgContract.keyStatusRoot.get(),
-                    dkgContract.keyRoot.get(),
-                    dkgContract.processRoot.get()
+                    dkgContract.keyRoot.get()
                 ),
             { profiler, logger }
         );
@@ -588,15 +579,6 @@ describe('Key generation', () => {
                                 committeeId: action.committeeId,
                                 keyId,
                             })
-                        ),
-                        rollupStorage.getWitness(
-                            RollupStorage.calculateLevel1Index({
-                                zkAppIndex: Field(ZkAppIndex.DKG),
-                                actionId,
-                            })
-                        ),
-                        dkgProcessStorage.getWitness(
-                            ProcessStorage.calculateIndex(actionId)
                         )
                     ),
                 { profiler, logger }
@@ -636,14 +618,7 @@ describe('Key generation', () => {
         await Utils.proveAndSendTx(
             DkgContract.name,
             'update',
-            async () =>
-                dkgContract.update(
-                    updateKeyProof,
-                    sharedAddressStorage.getZkAppRef(
-                        ZkAppIndex.ROLLUP,
-                        rollupContract.address
-                    )
-                ),
+            async () => dkgContract.update(updateKeyProof),
             feePayer,
             true,
             { profiler, logger }
@@ -1010,63 +985,63 @@ describe('Key generation', () => {
         rollupZkApp.actionStates.push(rollupContract.account.actionState.get());
         rollupZkApp.actions.push(RollupAction.toFields(rollupAction));
 
-        // Rollup dkg action
-        rollupProof = await Utils.prove(Rollup.name, 'init', async () =>
-            Rollup.init(
-                RollupAction.empty(),
-                rollupContract.counterRoot.get(),
-                rollupContract.rollupRoot.get(),
-                rollupContract.actionState.get()
-            )
-        );
-        rollupProof = await Utils.prove(
-            Rollup.name,
-            'rollup',
-            async () =>
-                Rollup.rollup(
-                    rollupAction,
-                    rollupProof,
-                    Field(NUM_KEYS),
-                    rollupCounterStorage.getWitness(
-                        RollupCounterStorage.calculateLevel1Index(
-                            Field(ZkAppIndex.DKG)
-                        )
-                    ),
-                    rollupStorage.getWitness(
-                        RollupStorage.calculateLevel1Index({
-                            zkAppIndex: Field(ZkAppIndex.DKG),
-                            actionId,
-                        })
-                    )
-                ),
-            { profiler, logger }
-        );
-        rollupCounterStorage.updateRawLeaf(
-            {
-                level1Index: RollupCounterStorage.calculateLevel1Index(
-                    Field(ZkAppIndex.DKG)
-                ),
-            },
-            actionId.add(1)
-        );
-        rollupStorage.updateRawLeaf(
-            {
-                level1Index: RollupStorage.calculateLevel1Index({
-                    zkAppIndex: Field(ZkAppIndex.DKG),
-                    actionId,
-                }),
-            },
-            rollupAction.actionHash
-        );
-        await Utils.proveAndSendTx(
-            RollupContract.name,
-            'rollup',
-            async () => rollupContract.rollup(rollupProof),
-            feePayer,
-            true,
-            { profiler, logger }
-        );
-        await fetchAccounts([rollupZkApp.key.publicKey]);
+        // // Rollup dkg action
+        // rollupProof = await Utils.prove(Rollup.name, 'init', async () =>
+        //     Rollup.init(
+        //         RollupAction.empty(),
+        //         rollupContract.counterRoot.get(),
+        //         rollupContract.rollupRoot.get(),
+        //         rollupContract.actionState.get()
+        //     )
+        // );
+        // rollupProof = await Utils.prove(
+        //     Rollup.name,
+        //     'rollup',
+        //     async () =>
+        //         Rollup.rollup(
+        //             rollupAction,
+        //             rollupProof,
+        //             Field(NUM_KEYS),
+        //             rollupCounterStorage.getWitness(
+        //                 RollupCounterStorage.calculateLevel1Index(
+        //                     Field(ZkAppIndex.DKG)
+        //                 )
+        //             ),
+        //             rollupStorage.getWitness(
+        //                 RollupStorage.calculateLevel1Index({
+        //                     zkAppIndex: Field(ZkAppIndex.DKG),
+        //                     actionId,
+        //                 })
+        //             )
+        //         ),
+        //     { profiler, logger }
+        // );
+        // rollupCounterStorage.updateRawLeaf(
+        //     {
+        //         level1Index: RollupCounterStorage.calculateLevel1Index(
+        //             Field(ZkAppIndex.DKG)
+        //         ),
+        //     },
+        //     actionId.add(1)
+        // );
+        // rollupStorage.updateRawLeaf(
+        //     {
+        //         level1Index: RollupStorage.calculateLevel1Index({
+        //             zkAppIndex: Field(ZkAppIndex.DKG),
+        //             actionId,
+        //         }),
+        //     },
+        //     rollupAction.actionHash
+        // );
+        // await Utils.proveAndSendTx(
+        //     RollupContract.name,
+        //     'rollup',
+        //     async () => rollupContract.rollup(rollupProof),
+        //     feePayer,
+        //     true,
+        //     { profiler, logger }
+        // );
+        // await fetchAccounts([rollupZkApp.key.publicKey]);
 
         // Update dkg key
         let updateKeyProof = await Utils.prove(
@@ -1079,11 +1054,10 @@ describe('Key generation', () => {
                         action: DkgAction.empty(),
                         actionId: Field(0),
                     }),
-                    rollupContract.rollupRoot.get(),
+                    dkgContract.actionState.get(),
                     dkgContract.keyCounterRoot.get(),
                     dkgContract.keyStatusRoot.get(),
-                    dkgContract.keyRoot.get(),
-                    dkgContract.processRoot.get()
+                    dkgContract.keyRoot.get()
                 )
         );
 
@@ -1110,15 +1084,6 @@ describe('Key generation', () => {
                             committeeId: action.committeeId,
                             keyId: action.keyId,
                         })
-                    ),
-                    rollupStorage.getWitness(
-                        RollupStorage.calculateLevel1Index({
-                            zkAppIndex: Field(ZkAppIndex.DKG),
-                            actionId,
-                        })
-                    ),
-                    dkgProcessStorage.getWitness(
-                        ProcessStorage.calculateIndex(actionId)
                     )
                 ),
             { profiler, logger }
@@ -1160,14 +1125,7 @@ describe('Key generation', () => {
         await Utils.proveAndSendTx(
             DkgContract.name,
             'update',
-            async () =>
-                dkgContract.update(
-                    updateKeyProof,
-                    sharedAddressStorage.getZkAppRef(
-                        ZkAppIndex.ROLLUP,
-                        rollupContract.address
-                    )
-                ),
+            async () => dkgContract.update(updateKeyProof),
             feePayer,
             true,
             { profiler, logger }
@@ -1558,63 +1516,63 @@ describe('Key generation', () => {
         rollupZkApp.actionStates.push(rollupContract.account.actionState.get());
         rollupZkApp.actions.push(RollupAction.toFields(rollupAction));
 
-        // Rollup dkg action
-        rollupProof = await Utils.prove(Rollup.name, 'init', async () =>
-            Rollup.init(
-                RollupAction.empty(),
-                rollupContract.counterRoot.get(),
-                rollupContract.rollupRoot.get(),
-                rollupContract.actionState.get()
-            )
-        );
-        rollupProof = await Utils.prove(
-            Rollup.name,
-            'rollup',
-            async () =>
-                Rollup.rollup(
-                    rollupAction,
-                    rollupProof,
-                    actionId,
-                    rollupCounterStorage.getWitness(
-                        RollupCounterStorage.calculateLevel1Index(
-                            Field(ZkAppIndex.DKG)
-                        )
-                    ),
-                    rollupStorage.getWitness(
-                        RollupStorage.calculateLevel1Index({
-                            zkAppIndex: Field(ZkAppIndex.DKG),
-                            actionId,
-                        })
-                    )
-                ),
-            { profiler, logger }
-        );
-        rollupCounterStorage.updateRawLeaf(
-            {
-                level1Index: RollupCounterStorage.calculateLevel1Index(
-                    Field(ZkAppIndex.DKG)
-                ),
-            },
-            actionId.add(1)
-        );
-        rollupStorage.updateRawLeaf(
-            {
-                level1Index: RollupStorage.calculateLevel1Index({
-                    zkAppIndex: Field(ZkAppIndex.DKG),
-                    actionId,
-                }),
-            },
-            rollupAction.actionHash
-        );
-        await Utils.proveAndSendTx(
-            RollupContract.name,
-            'rollup',
-            async () => rollupContract.rollup(rollupProof),
-            feePayer,
-            true,
-            { profiler, logger }
-        );
-        await fetchAccounts([rollupZkApp.key.publicKey]);
+        // // Rollup dkg action
+        // rollupProof = await Utils.prove(Rollup.name, 'init', async () =>
+        //     Rollup.init(
+        //         RollupAction.empty(),
+        //         rollupContract.counterRoot.get(),
+        //         rollupContract.rollupRoot.get(),
+        //         rollupContract.actionState.get()
+        //     )
+        // );
+        // rollupProof = await Utils.prove(
+        //     Rollup.name,
+        //     'rollup',
+        //     async () =>
+        //         Rollup.rollup(
+        //             rollupAction,
+        //             rollupProof,
+        //             actionId,
+        //             rollupCounterStorage.getWitness(
+        //                 RollupCounterStorage.calculateLevel1Index(
+        //                     Field(ZkAppIndex.DKG)
+        //                 )
+        //             ),
+        //             rollupStorage.getWitness(
+        //                 RollupStorage.calculateLevel1Index({
+        //                     zkAppIndex: Field(ZkAppIndex.DKG),
+        //                     actionId,
+        //                 })
+        //             )
+        //         ),
+        //     { profiler, logger }
+        // );
+        // rollupCounterStorage.updateRawLeaf(
+        //     {
+        //         level1Index: RollupCounterStorage.calculateLevel1Index(
+        //             Field(ZkAppIndex.DKG)
+        //         ),
+        //     },
+        //     actionId.add(1)
+        // );
+        // rollupStorage.updateRawLeaf(
+        //     {
+        //         level1Index: RollupStorage.calculateLevel1Index({
+        //             zkAppIndex: Field(ZkAppIndex.DKG),
+        //             actionId,
+        //         }),
+        //     },
+        //     rollupAction.actionHash
+        // );
+        // await Utils.proveAndSendTx(
+        //     RollupContract.name,
+        //     'rollup',
+        //     async () => rollupContract.rollup(rollupProof),
+        //     feePayer,
+        //     true,
+        //     { profiler, logger }
+        // );
+        // await fetchAccounts([rollupZkApp.key.publicKey]);
 
         // Update dkg key
         let updateKeyProof = await Utils.prove(
@@ -1627,11 +1585,10 @@ describe('Key generation', () => {
                         action: DkgAction.empty(),
                         actionId: Field(0),
                     }),
-                    rollupContract.rollupRoot.get(),
+                    dkgContract.actionState.get(),
                     dkgContract.keyCounterRoot.get(),
                     dkgContract.keyStatusRoot.get(),
-                    dkgContract.keyRoot.get(),
-                    dkgContract.processRoot.get()
+                    dkgContract.keyRoot.get()
                 )
         );
 
@@ -1655,15 +1612,6 @@ describe('Key generation', () => {
                         committeeId: action.committeeId,
                         keyId: action.keyId,
                     })
-                ),
-                rollupStorage.getWitness(
-                    RollupStorage.calculateLevel1Index({
-                        zkAppIndex: Field(ZkAppIndex.DKG),
-                        actionId,
-                    })
-                ),
-                dkgProcessStorage.getWitness(
-                    ProcessStorage.calculateIndex(actionId)
                 )
             )
         );
@@ -1694,14 +1642,7 @@ describe('Key generation', () => {
         await Utils.proveAndSendTx(
             DkgContract.name,
             'update',
-            async () =>
-                dkgContract.update(
-                    updateKeyProof,
-                    sharedAddressStorage.getZkAppRef(
-                        ZkAppIndex.ROLLUP,
-                        rollupContract.address
-                    )
-                ),
+            async () => dkgContract.update(updateKeyProof),
             feePayer,
             true,
             { profiler, logger }

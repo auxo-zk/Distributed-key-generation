@@ -291,13 +291,13 @@ const UpdateRequest = ZkProgram({
                 initialActionState: Field
             ) {
                 return new UpdateRequestOutput({
-                    initialRequestCounter: initialRequestCounter,
-                    initialKeyIndexRoot: initialKeyIndexRoot,
-                    initialTaskIdRoot: initialTaskIdRoot,
-                    initialAccumulationRoot: initialAccumulationRoot,
-                    initialExpirationRoot: initialExpirationRoot,
-                    initialResultRoot: initialResultRoot,
-                    initialActionState: initialActionState,
+                    initialRequestCounter,
+                    initialKeyIndexRoot,
+                    initialTaskIdRoot,
+                    initialAccumulationRoot,
+                    initialExpirationRoot,
+                    initialResultRoot,
+                    initialActionState,
                     nextRequestCounter: initialRequestCounter,
                     nextKeyIndexRoot: initialKeyIndexRoot,
                     nextTaskIdRoot: initialTaskIdRoot,
@@ -441,7 +441,7 @@ const UpdateRequest = ZkProgram({
                     nextTaskIdRoot,
                     nextAccumulationRoot,
                     nextExpirationRoot,
-                    nextActionState: nextActionState,
+                    nextActionState,
                 });
             },
         },
@@ -458,6 +458,9 @@ const UpdateRequest = ZkProgram({
                 >,
                 resultWitness: RequestLevel1Witness
             ) {
+                // Fail check
+                let isFailed = Bool(false);
+
                 // Verify earlier proof
                 earlierProof.verify();
 
@@ -472,14 +475,18 @@ const UpdateRequest = ZkProgram({
                 );
 
                 // Verify empty result
-                earlierProof.publicOutput.nextResultRoot.assertEquals(
-                    resultWitness.calculateRoot(Field(0)),
+                isFailed = Utils.checkCondition(
+                    earlierProof.publicOutput.nextResultRoot.equals(
+                        resultWitness.calculateRoot(Field(0))
+                    ),
                     Utils.buildAssertMessage(
                         UpdateRequest.name,
                         'resolve',
                         ErrorEnum.REQUEST_RESULT_ROOT
                     )
-                );
+                )
+                    .not()
+                    .or(isFailed);
                 input.requestId.assertEquals(
                     resultWitness.calculateIndex(),
                     Utils.buildAssertMessage(
@@ -490,8 +497,10 @@ const UpdateRequest = ZkProgram({
                 );
 
                 // Calculate new state values
-                let nextResultRoot = resultWitness.calculateRoot(
-                    input.resultRoot
+                let nextResultRoot = Provable.if(
+                    isFailed,
+                    earlierProof.publicOutput.nextResultRoot,
+                    resultWitness.calculateRoot(input.resultRoot)
                 );
 
                 // Calculate corresponding action state
@@ -501,31 +510,9 @@ const UpdateRequest = ZkProgram({
                 );
 
                 return new UpdateRequestOutput({
-                    initialRequestCounter:
-                        earlierProof.publicOutput.initialRequestCounter,
-                    initialKeyIndexRoot:
-                        earlierProof.publicOutput.initialKeyIndexRoot,
-                    initialTaskIdRoot:
-                        earlierProof.publicOutput.initialTaskIdRoot,
-                    initialAccumulationRoot:
-                        earlierProof.publicOutput.initialAccumulationRoot,
-                    initialExpirationRoot:
-                        earlierProof.publicOutput.initialExpirationRoot,
-                    initialResultRoot:
-                        earlierProof.publicOutput.initialResultRoot,
-                    initialActionState:
-                        earlierProof.publicOutput.initialActionState,
-                    nextRequestCounter:
-                        earlierProof.publicOutput.nextRequestCounter,
-                    nextKeyIndexRoot:
-                        earlierProof.publicOutput.nextKeyIndexRoot,
-                    nextTaskIdRoot: earlierProof.publicOutput.nextTaskIdRoot,
-                    nextAccumulationRoot:
-                        earlierProof.publicOutput.nextAccumulationRoot,
-                    nextExpirationRoot:
-                        earlierProof.publicOutput.nextExpirationRoot,
-                    nextResultRoot: nextResultRoot,
-                    nextActionState: nextActionState,
+                    ...earlierProof.publicOutput,
+                    nextResultRoot,
+                    nextActionState,
                 });
             },
         },

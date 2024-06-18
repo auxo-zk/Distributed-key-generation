@@ -506,28 +506,28 @@ class Round2Contract extends SmartContract {
 
         // Verify round 1 public keys (C0[])
         // @todo Remove Provable.witness or adding assertion
-        let publicKeysLeaf = Provable.witness(Field, () => {
-            let publicKeysMT = DKG_LEVEL_2_TREE();
-            for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
-                let value = Provable.if(
-                    Field(i).greaterThanOrEqual(
-                        proof.publicInput.publicKeys.length
-                    ),
-                    Field(0),
-                    PublicKeyArray.hash(
-                        proof.publicInput.publicKeys.get(Field(i))
-                    )
-                );
-                publicKeysMT.setLeaf(BigInt(i), value);
-            }
-            return publicKeysMT.getRoot();
-        });
-        round1Contract.verifyEncPubKeys(
-            committeeId,
-            keyId,
-            publicKeysLeaf,
-            publicKeysWitness
-        );
+        // let publicKeysLeaf = Provable.witness(Field, () => {
+        //     let publicKeysMT = DKG_LEVEL_2_TREE();
+        //     for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
+        //         let value = Provable.if(
+        //             Field(i).greaterThanOrEqual(
+        //                 proof.publicInput.publicKeys.length
+        //             ),
+        //             Field(0),
+        //             PublicKeyArray.hash(
+        //                 proof.publicInput.publicKeys.get(Field(i))
+        //             )
+        //         );
+        //         publicKeysMT.setLeaf(BigInt(i), value);
+        //     }
+        //     return publicKeysMT.getRoot();
+        // });
+        // round1Contract.verifyEncPubKeys(
+        //     committeeId,
+        //     keyId,
+        //     publicKeysLeaf,
+        //     publicKeysWitness
+        // );
 
         // Create & dispatch action
         let action = new Action({
@@ -694,9 +694,7 @@ class Round2Contract extends SmartContract {
             keyId,
             Field(DkgActionEnum.FINALIZE_ROUND_2),
             Group.zero,
-            selfRef,
-            rollup,
-            dkg
+            selfRef
         );
 
         // Emit events

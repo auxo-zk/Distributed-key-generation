@@ -769,7 +769,6 @@ class ResponseContract extends SmartContract {
         // Verify decryption proof
         decryptionProof.verify();
 
-        // FIXME - "Option.value_exn None" error
         // Verify keyId
         keyId.assertLessThanOrEqual(
             INSTANCE_LIMITS.KEY,

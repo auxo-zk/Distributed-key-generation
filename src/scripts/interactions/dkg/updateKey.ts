@@ -209,11 +209,10 @@ async function main() {
                     action: DkgAction.empty(),
                     actionId: Field(0),
                 }),
-                rollupContract.rollupRoot.get(),
                 dkgContract.keyCounterRoot.get(),
                 dkgContract.keyStatusRoot.get(),
                 dkgContract.keyRoot.get(),
-                dkgContract.processRoot.get()
+                dkgContract.actionState.get()
             ),
         { logger }
     );
@@ -248,15 +247,6 @@ async function main() {
                                 committeeId,
                                 keyId,
                             })
-                        ),
-                        rollupStorage.getWitness(
-                            RollupStorage.calculateLevel1Index({
-                                zkAppIndex: Field(ZkAppIndex.DKG),
-                                actionId,
-                            })
-                        ),
-                        processStorage.getWitness(
-                            ProcessStorage.calculateIndex(actionId)
                         )
                     ),
                 { logger }
@@ -305,15 +295,6 @@ async function main() {
                                 committeeId: action.committeeId,
                                 keyId: action.keyId,
                             })
-                        ),
-                        rollupStorage.getWitness(
-                            RollupStorage.calculateLevel1Index({
-                                zkAppIndex: Field(ZkAppIndex.DKG),
-                                actionId,
-                            })
-                        ),
-                        processStorage.getWitness(
-                            ProcessStorage.calculateIndex(actionId)
                         )
                     ),
                 { logger }
@@ -350,14 +331,7 @@ async function main() {
     await Utils.proveAndSendTx(
         DkgContract.name,
         'update',
-        async () =>
-            dkgContract.update(
-                updateKeyProof,
-                sharedAddressStorage.getZkAppRef(
-                    ZkAppIndex.ROLLUP,
-                    rollupContract.address
-                )
-            ),
+        async () => dkgContract.update(updateKeyProof),
         feePayer,
         true,
         { logger }
