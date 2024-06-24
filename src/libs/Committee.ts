@@ -1,4 +1,12 @@
-import { Field, Group, MerkleTree, Poseidon, Scalar, Struct } from 'o1js';
+import {
+    Field,
+    Group,
+    MerkleTree,
+    Poseidon,
+    Provable,
+    Scalar,
+    Struct,
+} from 'o1js';
 import {
     Bit255,
     Bit255DynamicArray,
@@ -194,6 +202,8 @@ function getResponseContribution(
             ? secret.f[memberId]
             : Scalar.from(ElgamalECC.decrypt(data.c, data.U, secret.a[0]).m)
     );
+
+    Provable.log('Plain:', decryptions);
     let ski: Scalar = decryptions.reduce(
         (prev: Scalar, curr: Scalar) => prev.add(curr),
         Scalar.from(0n)

@@ -1,5 +1,5 @@
-import { Field, Group, PrivateKey, Scalar } from 'o1js';
-import { Bit255, CustomScalar } from '@auxo-dev/auxo-libs';
+import { Field, Group, PrivateKey, Provable, Scalar } from 'o1js';
+import { Bit255 } from '@auxo-dev/auxo-libs';
 import * as ElgamalECC from './Elgamal.js';
 import { ENCRYPTION_LIMITS, SECRET_UNIT } from '../constants.js';
 import {
@@ -136,12 +136,19 @@ describe('DKG', () => {
                           },
                 {}
             );
-            let [responseContribution, _] = getResponseContribution(
+            let [responseContribution, ski] = getResponseContribution(
                 committees[respondedMembers[i]].secretPolynomial,
                 committees[respondedMembers[i]].memberId,
                 round2Data,
                 sumR
             );
+            let skiCommitment = Group.zero;
+            for (let i = 0; i < N; i++) {
+                skiCommitment = skiCommitment.add(
+                    Group.generator.scale(committees[i].secretPolynomial.f[0])
+                );
+            }
+            skiCommitment.assertEquals(Group.generator.scale(ski));
             committees[respondedMembers[i]].responseContribution =
                 responseContribution;
             responseContributions.push(responseContribution);

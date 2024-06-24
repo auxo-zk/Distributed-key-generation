@@ -39,7 +39,11 @@ import {
 } from '../storages/RequestStorage.js';
 import { rollup } from './Rollup.js';
 import { ResponseContract } from './Response.js';
-import { ResultVector, calculateTaskReference } from '../libs/Requester.js';
+import {
+    ResultVector,
+    calculateAccumulationRoot,
+    calculateTaskReference,
+} from '../libs/Requester.js';
 
 export {
     RequestStatus,
@@ -66,9 +70,12 @@ class Action
     extends Struct({
         requestId: Field,
         keyIndex: Field,
-        task: Field,
+        taskId: UInt32,
+        requester: PublicKey,
         expirationTimestamp: UInt64,
-        accumulationRoot: Field,
+        dimension: UInt8,
+        accumulationRootR: Field,
+        accumulationRootM: Field,
         resultRoot: Field,
     })
     implements ZkAppAction
@@ -77,9 +84,12 @@ class Action
         return new Action({
             requestId: Field(0),
             keyIndex: Field(0),
-            task: Field(0),
+            taskId: UInt32.zero,
+            requester: PublicKey.empty(),
             expirationTimestamp: UInt64.zero,
-            accumulationRoot: Field(0),
+            dimension: UInt8.from(0),
+            accumulationRootR: Field(0),
+            accumulationRootM: Field(0),
             resultRoot: Field(0),
         });
     }
@@ -420,9 +430,15 @@ const UpdateRequest = ZkProgram({
                 let nextKeyIndexRoot = keyIndexWitness.calculateRoot(
                     input.keyIndex
                 );
-                let nextTaskIdRoot = taskWitness.calculateRoot(input.task);
+                let nextTaskIdRoot = taskWitness.calculateRoot(
+                    calculateTaskReference(input.requester, input.taskId)
+                );
                 let nextAccumulationRoot = accumulationWitness.calculateRoot(
-                    input.accumulationRoot
+                    calculateAccumulationRoot(
+                        input.accumulationRootR,
+                        input.accumulationRootM,
+                        input.dimension
+                    )
                 );
                 let nextExpirationRoot = expirationWitness.calculateRoot(
                     input.expirationTimestamp.value
@@ -598,7 +614,9 @@ class RequestContract extends SmartContract {
         keyIndex: Field,
         taskId: UInt32,
         expirationPeriod: UInt64,
-        accumulationRoot: Field,
+        dimension: UInt8,
+        accumulationRootR: Field,
+        accumulationRootM: Field,
         requester: PublicKey
     ) {
         // Verify caller
@@ -610,10 +628,13 @@ class RequestContract extends SmartContract {
         let timestamp = UInt64.from(0);
         let action = new Action({
             requestId: Field(-1),
-            keyIndex: keyIndex,
-            task: calculateTaskReference(requester, taskId),
+            keyIndex,
+            taskId,
+            requester,
             expirationTimestamp: timestamp.add(expirationPeriod),
-            accumulationRoot,
+            dimension,
+            accumulationRootR,
+            accumulationRootM,
             resultRoot: Field(0),
         });
         this.reducer.dispatch(action);

@@ -759,11 +759,9 @@ class RequesterContract extends SmartContract {
             keyIndex,
             taskId,
             UInt64.from(REQUEST_EXPIRATION),
-            Poseidon.hash([
-                accumulationRootR,
-                accumulationRootM,
-                dimension.value,
-            ]),
+            dimension,
+            accumulationRootR,
+            accumulationRootM,
             this.address
         );
     }

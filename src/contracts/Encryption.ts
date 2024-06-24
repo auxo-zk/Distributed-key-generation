@@ -200,7 +200,7 @@ const BatchDecryption = ZkProgram({
                             ErrorEnum.ELGAMAL_KEY
                         )
                     );
-                let ski = Group.generator.scale(Scalar.from(0n));
+                let skiCommitment = Group.zero;
 
                 for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
                     let iField = Field(i);
@@ -227,9 +227,12 @@ const BatchDecryption = ZkProgram({
                             ErrorEnum.ELGAMAL_DECRYPTION
                         )
                     );
-                    ski = ski.add(Group.generator.scale(plain));
+                    Provable.log(`Plain ${i}`, plain);
+                    skiCommitment = skiCommitment.add(
+                        Group.generator.scale(plain)
+                    );
                 }
-                return ski;
+                return skiCommitment;
             },
         },
     },

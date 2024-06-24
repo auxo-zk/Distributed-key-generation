@@ -44,11 +44,7 @@ import {
     RollupCounterStorage,
     RollupStorage,
 } from '../storages/RollupStorage.js';
-import {
-    KeyCounterStorage,
-    MemberStorage,
-    SettingStorage,
-} from '../storages/CommitteeStorage.js';
+import { MemberStorage, SettingStorage } from '../storages/CommitteeStorage.js';
 import {
     DKG_LEVEL_2_TREE,
     EncryptionStorage,
@@ -145,7 +141,7 @@ describe('Key usage', () => {
     let submissionZkApp: Utils.ZkApp;
     let requesterZkApp: Utils.ZkApp;
     let mockSecret: any;
-    let dkgDeployed = true;
+    let dkgDeployed = false;
     let committees: {
         members: MemberArray;
         threshold: Field;
@@ -889,8 +885,8 @@ describe('Key usage', () => {
         const { feePayer } = _;
         const submissions = [
             { 0: 10n * BigInt(SECRET_UNIT), 2: 20n * BigInt(SECRET_UNIT) },
-            { 1: 25n * BigInt(SECRET_UNIT), 2: 15n * BigInt(SECRET_UNIT) },
-            { 0: 5n * BigInt(SECRET_UNIT) },
+            { 5: 25n * BigInt(SECRET_UNIT), 2: 15n * BigInt(SECRET_UNIT) },
+            { 9: 5n * BigInt(SECRET_UNIT) },
         ];
         let request = requests[0];
         let publicKey = keys[0].key || Group.zero;
@@ -1291,6 +1287,10 @@ describe('Key usage', () => {
                     e.U.get(Field(memberId))
                 )
             );
+            Provable.log(
+                'Plain:',
+                new PlainArray(committeeSecrets.map((e) => e.f[memberId]))
+            );
             let decryptionProof = await Utils.prove(
                 BatchDecryption.name,
                 'decrypt',
@@ -1325,7 +1325,7 @@ describe('Key usage', () => {
                 round2Data,
                 requests[0].sumR
             );
-            Provable.log('Ski:', ski);
+            Provable.log('Ski:', Group.generator.scale(ski));
             requests[0].contributions.push(contribution);
 
             // Generate compute response proof

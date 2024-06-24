@@ -25,6 +25,7 @@ export {
     calculatePublicKey as calculatePublicKeyFromPoints,
     calculateCommitment,
     calculateTaskReference,
+    calculateAccumulationRoot,
     generateEncryption,
     // recoverEncryption,
     accumulateEncryption,
@@ -72,6 +73,18 @@ function calculateCommitment(
 
 function calculateTaskReference(requester: PublicKey, taskId: UInt32) {
     return Poseidon.hash([requester.toFields(), taskId.value].flat());
+}
+
+function calculateAccumulationRoot(
+    accumulationRootR: Field,
+    accumulationRootM: Field,
+    dimension: UInt8
+) {
+    return Poseidon.hash([
+        accumulationRootR,
+        accumulationRootM,
+        dimension.value,
+    ]);
 }
 
 function generateEncryption(
