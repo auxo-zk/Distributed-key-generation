@@ -24,7 +24,6 @@ import {
     DKGWitness,
     DKG_LEVEL_2_TREE,
     ProcessedContributions,
-    ResponseContributionWitness,
     calculateKeyIndex,
 } from '../storages/DkgStorage.js';
 import {
@@ -42,11 +41,7 @@ import { BatchDecryptionProof } from './Encryption.js';
 import { Round1Contract } from './Round1.js';
 import { Round2Contract } from './Round2.js';
 import { ENCRYPTION_LIMITS, INSTANCE_LIMITS } from '../constants.js';
-import {
-    ADDRESS_MT,
-    ZkAppRef,
-    verifyZkApp,
-} from '../storages/AddressStorage.js';
+import { AddressMap, ZkAppRef } from '../storages/AddressStorage.js';
 import {
     PROCESS_MT,
     ProcessWitness,
@@ -59,11 +54,11 @@ import {
     ZkAppIndex,
     ZkProgramEnum,
 } from './constants.js';
-import { RollupContract, verifyRollup } from './Rollup.js';
-import {
-    RollupWitness,
-    calculateActionIndex,
-} from '../storages/RollupStorage.js';
+import { RollupContract } from './Rollup.js';
+// import {
+//     RollupWitness,
+//     calculateActionIndex,
+// } from '../storages/RollupStorage.js';
 import { DArray } from '../libs/Requester.js';
 import { RequestContract } from './Request.js';
 
@@ -164,8 +159,8 @@ const ComputeResponse = ZkProgram({
                 earlierProof: SelfProof<Void, ComputeResponseOutput>,
                 ski: CustomScalar,
                 R: Group,
-                accumulationWitness: RequestLevel2Witness,
-                responseWitness: RequestLevel2Witness
+                accumulationWitness: typeof RequestLevel2Witness,
+                responseWitness: typeof RequestLevel2Witness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
@@ -296,7 +291,7 @@ const FinalizeResponse = ZkProgram({
                 initialContributionRoot: Field,
                 initialProcessRoot: Field,
                 rollupRoot: Field,
-                contributionWitness: RequestLevel1Witness
+                contributionWitness: typeof RequestLevel2Witness
             ) {
                 // Verify there is no recorded contribution for the request
                 initialContributionRoot.assertEquals(
@@ -342,122 +337,122 @@ const FinalizeResponse = ZkProgram({
                 });
             },
         },
-        contribute: {
-            privateInputs: [
-                SelfProof<FinalizeResponseInput, FinalizeResponseOutput>,
-                ResponseContributionWitness,
-                RollupWitness,
-                ProcessWitness,
-            ],
-            async method(
-                input: FinalizeResponseInput,
-                earlierProof: SelfProof<
-                    FinalizeResponseInput,
-                    FinalizeResponseOutput
-                >,
-                contributionWitness: ResponseContributionWitness,
-                rollupWitness: RollupWitness,
-                processWitness: ProcessWitness
-            ) {
-                // Verify earlier proof
-                earlierProof.verify();
+        // contribute: {
+        //     privateInputs: [
+        //         SelfProof<FinalizeResponseInput, FinalizeResponseOutput>,
+        //         ResponseContributionWitness,
+        //         RollupWitness,
+        //         ProcessWitness,
+        //     ],
+        //     async method(
+        //         input: FinalizeResponseInput,
+        //         earlierProof: SelfProof<
+        //             FinalizeResponseInput,
+        //             FinalizeResponseOutput
+        //         >,
+        //         contributionWitness: ResponseContributionWitness,
+        //         rollupWitness: RollupWitness,
+        //         processWitness: ProcessWitness
+        //     ) {
+        //         // Verify earlier proof
+        //         earlierProof.verify();
 
-                // Verify requestId
-                input.action.requestId.assertEquals(
-                    earlierProof.publicOutput.requestId,
-                    Utils.buildAssertMessage(
-                        FinalizeResponse.name,
-                        'contribute',
-                        ErrorEnum.REQUEST_ID
-                    )
-                );
+        //         // Verify requestId
+        //         input.action.requestId.assertEquals(
+        //             earlierProof.publicOutput.requestId,
+        //             Utils.buildAssertMessage(
+        //                 FinalizeResponse.name,
+        //                 'contribute',
+        //                 ErrorEnum.REQUEST_ID
+        //             )
+        //         );
 
-                // Verify dimension
-                input.action.dimension.assertEquals(
-                    earlierProof.publicOutput.dimension,
-                    Utils.buildAssertMessage(
-                        FinalizeResponse.name,
-                        'contribute',
-                        ErrorEnum.REQUEST_VECTOR_DIM
-                    )
-                );
+        //         // Verify dimension
+        //         input.action.dimension.assertEquals(
+        //             earlierProof.publicOutput.dimension,
+        //             Utils.buildAssertMessage(
+        //                 FinalizeResponse.name,
+        //                 'contribute',
+        //                 ErrorEnum.REQUEST_VECTOR_DIM
+        //             )
+        //         );
 
-                // Verify the member's contribution witness
-                earlierProof.publicOutput.nextContributionRoot.assertEquals(
-                    contributionWitness.level1.calculateRoot(
-                        contributionWitness.level2.calculateRoot(Field(0))
-                    ),
-                    Utils.buildAssertMessage(
-                        FinalizeResponse.name,
-                        'contribute',
-                        ErrorEnum.RES_CONTRIBUTION_ROOT
-                    )
-                );
-                input.action.requestId.assertEquals(
-                    contributionWitness.level1.calculateIndex(),
-                    Utils.buildAssertMessage(
-                        FinalizeResponse.name,
-                        'contribute',
-                        ErrorEnum.RES_CONTRIBUTION_INDEX_L1
-                    )
-                );
-                input.action.memberId.assertEquals(
-                    contributionWitness.level2.calculateIndex(),
-                    Utils.buildAssertMessage(
-                        FinalizeResponse.name,
-                        'contribute',
-                        ErrorEnum.RES_CONTRIBUTION_INDEX_L2
-                    )
-                );
+        //         // Verify the member's contribution witness
+        //         earlierProof.publicOutput.nextContributionRoot.assertEquals(
+        //             contributionWitness.level1.calculateRoot(
+        //                 contributionWitness.level2.calculateRoot(Field(0))
+        //             ),
+        //             Utils.buildAssertMessage(
+        //                 FinalizeResponse.name,
+        //                 'contribute',
+        //                 ErrorEnum.RES_CONTRIBUTION_ROOT
+        //             )
+        //         );
+        //         input.action.requestId.assertEquals(
+        //             contributionWitness.level1.calculateIndex(),
+        //             Utils.buildAssertMessage(
+        //                 FinalizeResponse.name,
+        //                 'contribute',
+        //                 ErrorEnum.RES_CONTRIBUTION_INDEX_L1
+        //             )
+        //         );
+        //         input.action.memberId.assertEquals(
+        //             contributionWitness.level2.calculateIndex(),
+        //             Utils.buildAssertMessage(
+        //                 FinalizeResponse.name,
+        //                 'contribute',
+        //                 ErrorEnum.RES_CONTRIBUTION_INDEX_L2
+        //             )
+        //         );
 
-                // Compute new contribution root
-                let nextContributionRoot =
-                    contributionWitness.level1.calculateRoot(
-                        contributionWitness.level2.calculateRoot(
-                            input.action.responseRootD
-                        )
-                    );
+        //         // Compute new contribution root
+        //         let nextContributionRoot =
+        //             contributionWitness.level1.calculateRoot(
+        //                 contributionWitness.level2.calculateRoot(
+        //                     input.action.responseRootD
+        //                 )
+        //             );
 
-                // Verify action is rolluped
-                let actionIndex = calculateActionIndex(
-                    Field(ZkAppIndex.RESPONSE),
-                    input.actionId
-                );
-                verifyRollup(
-                    FinalizeResponse.name,
-                    actionIndex,
-                    input.action.hash(),
-                    earlierProof.publicOutput.rollupRoot,
-                    rollupWitness
-                );
+        //         // Verify action is rolluped
+        //         let actionIndex = calculateActionIndex(
+        //             Field(ZkAppIndex.RESPONSE),
+        //             input.actionId
+        //         );
+        //         verifyRollup(
+        //             FinalizeResponse.name,
+        //             actionIndex,
+        //             input.action.hash(),
+        //             earlierProof.publicOutput.rollupRoot,
+        //             rollupWitness
+        //         );
 
-                // Calculate corresponding action state
-                let actionState = Utils.updateActionState(
-                    input.previousActionState,
-                    [Action.toFields(input.action)]
-                );
-                let processedActions =
-                    earlierProof.publicOutput.processedActions;
-                processedActions.push(actionState);
+        //         // Calculate corresponding action state
+        //         let actionState = Utils.updateActionState(
+        //             input.previousActionState,
+        //             [Action.toFields(input.action)]
+        //         );
+        //         let processedActions =
+        //             earlierProof.publicOutput.processedActions;
+        //         processedActions.push(actionState);
 
-                // Verify the action isn't already processed
-                let nextProcessRoot = processAction(
-                    FinalizeResponse.name,
-                    input.actionId,
-                    UInt8.from(0),
-                    actionState,
-                    earlierProof.publicOutput.nextProcessRoot,
-                    processWitness
-                );
+        //         // Verify the action isn't already processed
+        //         let nextProcessRoot = processAction(
+        //             FinalizeResponse.name,
+        //             input.actionId,
+        //             UInt8.from(0),
+        //             actionState,
+        //             earlierProof.publicOutput.nextProcessRoot,
+        //             processWitness
+        //         );
 
-                return new FinalizeResponseOutput({
-                    ...earlierProof.publicOutput,
-                    nextContributionRoot,
-                    nextProcessRoot,
-                    processedActions,
-                });
-            },
-        },
+        //         return new FinalizeResponseOutput({
+        //             ...earlierProof.publicOutput,
+        //             nextContributionRoot,
+        //             nextProcessRoot,
+        //             processedActions,
+        //         });
+        //     },
+        // },
         compute: {
             privateInputs: [
                 SelfProof<FinalizeResponseInput, FinalizeResponseOutput>,
@@ -472,8 +467,8 @@ const FinalizeResponse = ZkProgram({
                     FinalizeResponseOutput
                 >,
                 di: Group,
-                responseWitness: RequestLevel2Witness,
-                processWitness: ProcessWitness
+                responseWitness: typeof RequestLevel2Witness,
+                processWitness: typeof ProcessWitness
             ) {
                 // Verify proof
                 earlierProof.verify();
@@ -586,7 +581,7 @@ const FinalizeResponse = ZkProgram({
                     FinalizeResponseInput,
                     FinalizeResponseOutput
                 >,
-                responseWitness: RequestLevel2Witness
+                responseWitness: typeof RequestLevel2Witness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
@@ -675,7 +670,7 @@ class ResponseContract extends SmartContract {
 
     init() {
         super.init();
-        this.zkAppRoot.set(ADDRESS_MT().getRoot());
+        this.zkAppRoot.set(new AddressMap().addressMap.getRoot());
         this.contributionRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
         this.responseRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
         this.processRoot.set(PROCESS_MT().getRoot());
@@ -706,13 +701,13 @@ class ResponseContract extends SmartContract {
         memberWitness: CommitteeWitness,
         publicKeyWitness: DKGWitness,
         encryptionWitness: DKGWitness,
-        accumulationWitness: RequestLevel1Witness,
-        committee: ZkAppRef,
-        round1: ZkAppRef,
-        round2: ZkAppRef,
-        request: ZkAppRef,
-        rollup: ZkAppRef,
-        selfRef: ZkAppRef
+        accumulationWitness: typeof RequestLevel2Witness,
+        committee: InstanceType<typeof ZkAppRef>,
+        round1: InstanceType<typeof ZkAppRef>,
+        round2: InstanceType<typeof ZkAppRef>,
+        request: InstanceType<typeof ZkAppRef>,
+        rollup: InstanceType<typeof ZkAppRef>,
+        selfRef: InstanceType<typeof ZkAppRef>
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -721,7 +716,7 @@ class ResponseContract extends SmartContract {
         let memberId = memberWitness.level2.calculateIndex();
 
         // Verify CommitteeContract address
-        verifyZkApp(
+        AddressMap.verifyZkApp(
             ResponseContract.name,
             committee,
             zkAppRoot,
@@ -729,7 +724,7 @@ class ResponseContract extends SmartContract {
         );
 
         // Verify Round1Contract address
-        verifyZkApp(
+        AddressMap.verifyZkApp(
             ResponseContract.name,
             round1,
             zkAppRoot,
@@ -737,7 +732,7 @@ class ResponseContract extends SmartContract {
         );
 
         // Verify Round2Contract address
-        verifyZkApp(
+        AddressMap.verifyZkApp(
             ResponseContract.name,
             round2,
             zkAppRoot,
@@ -745,7 +740,7 @@ class ResponseContract extends SmartContract {
         );
 
         // Verify RequestContract address
-        verifyZkApp(
+        AddressMap.verifyZkApp(
             ResponseContract.name,
             request,
             zkAppRoot,
@@ -753,7 +748,7 @@ class ResponseContract extends SmartContract {
         );
 
         // Verify Rollup Contract address
-        verifyZkApp(
+        AddressMap.verifyZkApp(
             ResponseContract.name,
             rollup,
             zkAppRoot,
@@ -887,12 +882,12 @@ class ResponseContract extends SmartContract {
     @method
     async finalize(
         proof: FinalizeResponseProof,
-        settingWitness: CommitteeLevel1Witness,
-        keyIndexWitness: RequestLevel1Witness,
-        responseWitness: RequestLevel1Witness,
-        committee: ZkAppRef,
-        request: ZkAppRef,
-        rollup: ZkAppRef
+        settingWitness: typeof CommitteeLevel1Witness,
+        keyIndexWitness: typeof RequestLevel2Witness,
+        responseWitness: typeof RequestLevel2Witness,
+        committee: InstanceType<typeof ZkAppRef>,
+        request: InstanceType<typeof ZkAppRef>,
+        rollup: InstanceType<typeof ZkAppRef>
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -903,7 +898,7 @@ class ResponseContract extends SmartContract {
         let requestId = proof.publicOutput.requestId;
 
         // Verify CommitteeContract address
-        verifyZkApp(
+        AddressMap.verifyZkApp(
             ResponseContract.name,
             committee,
             zkAppRoot,
@@ -911,7 +906,7 @@ class ResponseContract extends SmartContract {
         );
 
         // Verify RequestContract address
-        verifyZkApp(
+        AddressMap.verifyZkApp(
             ResponseContract.name,
             request,
             zkAppRoot,
@@ -919,7 +914,7 @@ class ResponseContract extends SmartContract {
         );
 
         // Verify Rollup Contract address
-        verifyZkApp(
+        AddressMap.verifyZkApp(
             ResponseContract.name,
             rollup,
             zkAppRoot,
@@ -1035,7 +1030,7 @@ class ResponseContract extends SmartContract {
     verifyResponse(
         requestId: Field,
         responseRootD: Field,
-        witness: RequestLevel1Witness
+        witness: typeof RequestLevel2Witness
     ) {
         this.responseRoot
             .getAndRequireEquals()

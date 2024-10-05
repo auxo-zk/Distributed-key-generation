@@ -1,32 +1,24 @@
-import {
-    Field,
-    MerkleTree,
-    MerkleWitness,
-    Poseidon,
-    Provable,
-    UInt8,
-} from 'o1js';
+import { Field, Poseidon, Provable, UInt8 } from 'o1js';
 import { FieldDynamicArray, Utils } from '@auxo-dev/auxo-libs';
 import { ACTION_PROCESS_LIMITS, INSTANCE_LIMITS } from '../constants.js';
 import { ErrorEnum } from '../contracts/constants.js';
-import { GenericStorage, Witness } from './GenericStorage.js';
+import {
+    getBestHeight,
+    OneLevelStorage,
+} from '@auxo-dev/zkapp-offchain-storage';
 
 export {
-    PROCESS_MT,
-    PROCESS_WITNESS,
     processAction,
-    ProcessMT,
-    ProcessWitness,
+    EmptyMT as PROCESS_MT,
+    MTWitness as ProcessWitness,
     ProcessedActions,
     ProcessLeaf,
     ProcessStorage,
 };
 
-const PROCESS_TREE_HEIGHT = Math.ceil(Math.log2(INSTANCE_LIMITS.ACTION)) + 1;
-class ProcessMT extends MerkleTree {}
-class ProcessWitness extends MerkleWitness(PROCESS_TREE_HEIGHT) {}
-const PROCESS_MT = () => new ProcessMT(PROCESS_TREE_HEIGHT);
-const PROCESS_WITNESS = (witness: Witness) => new ProcessWitness(witness);
+const [MTWitness, NewMTWitness, EmptyMT] = getBestHeight(
+    BigInt(INSTANCE_LIMITS.ACTION)
+);
 
 class ProcessedActions extends FieldDynamicArray(ACTION_PROCESS_LIMITS) {}
 
@@ -38,7 +30,9 @@ type ProcessLeaf = {
     actionState: Field;
     processCounter: UInt8;
 };
-class ProcessStorage extends GenericStorage<ProcessLeaf> {
+class ProcessStorage extends OneLevelStorage<ProcessLeaf, typeof MTWitness> {
+    static readonly height = MTWitness.height;
+
     constructor(
         leafs?: {
             level1Index: Field;
@@ -46,7 +40,11 @@ class ProcessStorage extends GenericStorage<ProcessLeaf> {
             isRaw: boolean;
         }[]
     ) {
-        super(PROCESS_MT, PROCESS_WITNESS, undefined, undefined, leafs);
+        super(EmptyMT, NewMTWitness, leafs);
+    }
+
+    get height(): number {
+        return ProcessStorage.height;
     }
 
     get actionMap() {
@@ -85,25 +83,6 @@ class ProcessStorage extends GenericStorage<ProcessLeaf> {
     calculateIndex(actionIndex: Field): Field {
         return ProcessStorage.calculateIndex(actionIndex);
     }
-
-    getWitness(index: Field): ProcessWitness {
-        return super.getWitness(index) as ProcessWitness;
-    }
-
-    updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
-        super.updateLeaf({ level1Index }, leaf);
-    }
-
-    updateRawLeaf(
-        { level1Index }: { level1Index: Field },
-        rawLeaf: ProcessLeaf
-    ): void {
-        super.updateRawLeaf({ level1Index }, rawLeaf);
-    }
-
-    updateAction(index: Field, rawLeaf: ProcessLeaf): void {
-        super.updateRawLeaf({ level1Index: index }, rawLeaf);
-    }
 }
 
 function processAction(
@@ -112,7 +91,7 @@ function processAction(
     processCounter: UInt8,
     actionState: Field,
     previousRoot: Field,
-    witness: ProcessWitness
+    witness: typeof MTWitness
 ): Field {
     previousRoot.assertEquals(
         witness.calculateRoot(

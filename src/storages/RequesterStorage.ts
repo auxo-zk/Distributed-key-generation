@@ -1,25 +1,16 @@
-import {
-    Field,
-    MerkleTree,
-    MerkleWitness,
-    Poseidon,
-    Struct,
-    UInt32,
-    UInt64,
-} from 'o1js';
+import { Field, Poseidon, Struct, UInt32, UInt64 } from 'o1js';
 import { StaticArray } from '@auxo-dev/auxo-libs';
+import {
+    getBestHeight,
+    OneLevelStorage,
+} from '@auxo-dev/zkapp-offchain-storage';
 import { ENCRYPTION_LIMITS, INSTANCE_LIMITS } from '../constants.js';
-import { GenericStorage, Witness } from './GenericStorage.js';
 
 export {
-    REQUESTER_LEVEL_1_TREE,
-    REQUESTER_LEVEL_1_WITNESS,
-    COMMITMENT_TREE,
-    COMMITMENT_WITNESS,
-    Level1MT as RequesterLevel1MT,
-    Level1Witness as RequesterLevel1Witness,
-    CommitmentMT,
-    CommitmentWitness,
+    EmptyMTL1 as REQUESTER_LEVEL_1_TREE,
+    EmptyMTCom as COMMITMENT_TREE,
+    MTWitnessL1 as RequesterLevel1Witness,
+    MTWitnessCom as CommitmentWitness,
 };
 
 export {
@@ -35,20 +26,12 @@ export {
     CommitmentWitnesses,
 };
 
-const LEVEL1_TREE_HEIGHT = Math.ceil(Math.log2(INSTANCE_LIMITS.REQUEST)) + 1;
-const COMMITMENT_TREE_HEIGHT =
-    Math.ceil(
-        Math.log2(INSTANCE_LIMITS.REQUEST * ENCRYPTION_LIMITS.SUBMISSION)
-    ) + 1;
-class Level1MT extends MerkleTree {}
-class Level1Witness extends MerkleWitness(LEVEL1_TREE_HEIGHT) {}
-class CommitmentMT extends MerkleTree {}
-class CommitmentWitness extends MerkleWitness(COMMITMENT_TREE_HEIGHT) {}
-const REQUESTER_LEVEL_1_TREE = () => new Level1MT(LEVEL1_TREE_HEIGHT);
-const REQUESTER_LEVEL_1_WITNESS = (witness: Witness) =>
-    new Level1Witness(witness);
-const COMMITMENT_TREE = () => new CommitmentMT(COMMITMENT_TREE_HEIGHT);
-const COMMITMENT_WITNESS = (witness: Witness) => new CommitmentWitness(witness);
+const [MTWitnessL1, NewMTWitnessL1, EmptyMTL1] = getBestHeight(
+    BigInt(INSTANCE_LIMITS.REQUEST)
+);
+const [MTWitnessCom, NewMTWitnessCom, EmptyMTCom] = getBestHeight(
+    BigInt(INSTANCE_LIMITS.REQUEST * ENCRYPTION_LIMITS.SUBMISSION)
+);
 
 class RequesterCounters extends Struct({
     taskCounter: UInt32,
@@ -107,7 +90,12 @@ class RequesterCounters extends Struct({
 }
 
 type KeyIndexLeaf = Field;
-class KeyIndexStorage extends GenericStorage<KeyIndexLeaf> {
+class KeyIndexStorage extends OneLevelStorage<
+    KeyIndexLeaf,
+    typeof MTWitnessL1
+> {
+    static readonly height = MTWitnessL1.height;
+
     constructor(
         leafs?: {
             level1Index: Field;
@@ -115,14 +103,13 @@ class KeyIndexStorage extends GenericStorage<KeyIndexLeaf> {
             isRaw: boolean;
         }[]
     ) {
-        super(
-            REQUESTER_LEVEL_1_TREE,
-            REQUESTER_LEVEL_1_WITNESS,
-            undefined,
-            undefined,
-            leafs
-        );
+        super(EmptyMTL1, NewMTWitnessL1, leafs);
     }
+
+    get height(): number {
+        return KeyIndexStorage.height;
+    }
+
     static calculateLeaf(keyIndex: KeyIndexLeaf): Field {
         return keyIndex;
     }
@@ -138,29 +125,15 @@ class KeyIndexStorage extends GenericStorage<KeyIndexLeaf> {
     calculateLevel1Index(taskId: Field): Field {
         return KeyIndexStorage.calculateLevel1Index(taskId);
     }
-
-    getLevel1Witness(level1Index: Field): Level1Witness {
-        return super.getLevel1Witness(level1Index) as Level1Witness;
-    }
-
-    getWitness(level1Index: Field): Level1Witness {
-        return super.getWitness(level1Index) as Level1Witness;
-    }
-
-    updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
-        super.updateLeaf({ level1Index }, leaf);
-    }
-
-    updateRawLeaf(
-        { level1Index }: { level1Index: Field },
-        rawLeaf: KeyIndexLeaf
-    ): void {
-        super.updateRawLeaf({ level1Index }, rawLeaf);
-    }
 }
 
 type TimestampLeaf = UInt64;
-class TimestampStorage extends GenericStorage<TimestampLeaf> {
+class TimestampStorage extends OneLevelStorage<
+    TimestampLeaf,
+    typeof MTWitnessL1
+> {
+    static readonly height = MTWitnessL1.height;
+
     constructor(
         leafs?: {
             level1Index: Field;
@@ -168,14 +141,13 @@ class TimestampStorage extends GenericStorage<TimestampLeaf> {
             isRaw: boolean;
         }[]
     ) {
-        super(
-            REQUESTER_LEVEL_1_TREE,
-            REQUESTER_LEVEL_1_WITNESS,
-            undefined,
-            undefined,
-            leafs
-        );
+        super(EmptyMTL1, NewMTWitnessL1, leafs);
     }
+
+    get height(): number {
+        return TimestampStorage.height;
+    }
+
     static calculateLeaf(timestamp: TimestampLeaf): Field {
         return timestamp.value;
     }
@@ -188,27 +160,8 @@ class TimestampStorage extends GenericStorage<TimestampLeaf> {
         return taskId;
     }
 
-    getLevel1Witness(level1Index: Field): Level1Witness {
-        return super.getLevel1Witness(level1Index) as Level1Witness;
-    }
-
     calculateLevel1Index(taskId: Field): Field {
         return TimestampStorage.calculateLevel1Index(taskId);
-    }
-
-    getWitness(level1Index: Field): Level1Witness {
-        return super.getWitness(level1Index) as Level1Witness;
-    }
-
-    updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
-        super.updateLeaf({ level1Index }, leaf);
-    }
-
-    updateRawLeaf(
-        { level1Index }: { level1Index: Field },
-        rawLeaf: TimestampLeaf
-    ): void {
-        super.updateRawLeaf({ level1Index }, rawLeaf);
     }
 }
 
@@ -216,7 +169,12 @@ type AccumulationLeaf = {
     accumulationRootR: Field;
     accumulationRootM: Field;
 };
-class AccumulationStorage extends GenericStorage<AccumulationLeaf> {
+class AccumulationStorage extends OneLevelStorage<
+    AccumulationLeaf,
+    typeof MTWitnessL1
+> {
+    static readonly height = MTWitnessL1.height;
+
     constructor(
         leafs?: {
             level1Index: Field;
@@ -224,13 +182,11 @@ class AccumulationStorage extends GenericStorage<AccumulationLeaf> {
             isRaw: boolean;
         }[]
     ) {
-        super(
-            REQUESTER_LEVEL_1_TREE,
-            REQUESTER_LEVEL_1_WITNESS,
-            undefined,
-            undefined,
-            leafs
-        );
+        super(EmptyMTL1, NewMTWitnessL1, leafs);
+    }
+
+    get height(): number {
+        return AccumulationStorage.height;
     }
 
     static calculateLeaf(rawLeaf: AccumulationLeaf): Field {
@@ -251,36 +207,19 @@ class AccumulationStorage extends GenericStorage<AccumulationLeaf> {
     calculateLevel1Index(taskId: Field): Field {
         return AccumulationStorage.calculateLevel1Index(taskId);
     }
-
-    getLevel1Witness(level1Index: Field): Level1Witness {
-        return super.getLevel1Witness(level1Index) as Level1Witness;
-    }
-
-    getWitness(level1Index: Field): Level1Witness {
-        return super.getWitness(level1Index) as Level1Witness;
-    }
-
-    updateLeafWithR(
-        { level1Index }: { level1Index: Field },
-        leaf: Field
-    ): void {
-        super.updateLeaf({ level1Index }, leaf);
-    }
-
-    updateRawLeaf(
-        { level1Index }: { level1Index: Field },
-        rawLeaf: AccumulationLeaf
-    ): void {
-        super.updateRawLeaf({ level1Index }, rawLeaf);
-    }
 }
 
 type CommitmentLeaf = Field;
-class CommitmentWitnesses extends StaticArray(
-    CommitmentWitness,
+class CommitmentWitnesses extends StaticArray<typeof MTWitnessCom>(
+    MTWitnessCom,
     ENCRYPTION_LIMITS.DIMENSION
 ) {}
-class CommitmentStorage extends GenericStorage<CommitmentLeaf> {
+class CommitmentStorage extends OneLevelStorage<
+    CommitmentLeaf,
+    typeof MTWitnessCom
+> {
+    static readonly height = MTWitnessL1.height;
+
     constructor(
         leafs?: {
             level1Index: Field;
@@ -288,7 +227,11 @@ class CommitmentStorage extends GenericStorage<CommitmentLeaf> {
             isRaw: boolean;
         }[]
     ) {
-        super(COMMITMENT_TREE, COMMITMENT_WITNESS, undefined, undefined, leafs);
+        super(EmptyMTCom, NewMTWitnessCom, leafs);
+    }
+
+    get height(): number {
+        return CommitmentStorage.height;
     }
 
     static calculateLeaf(commitment: CommitmentLeaf): Field {
@@ -305,24 +248,5 @@ class CommitmentStorage extends GenericStorage<CommitmentLeaf> {
 
     calculateLevel1Index(index: Field): Field {
         return CommitmentStorage.calculateLevel1Index(index);
-    }
-
-    getLevel1Witness(level1Index: Field): Level1Witness {
-        return super.getLevel1Witness(level1Index) as Level1Witness;
-    }
-
-    getWitness(level1Index: Field): CommitmentWitness {
-        return super.getWitness(level1Index) as CommitmentWitness;
-    }
-
-    updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
-        super.updateLeaf({ level1Index }, leaf);
-    }
-
-    updateRawLeaf(
-        { level1Index }: { level1Index: Field },
-        rawLeaf: CommitmentLeaf
-    ): void {
-        super.updateRawLeaf({ level1Index }, rawLeaf);
     }
 }

@@ -28,11 +28,7 @@ import {
     calculateCommitment,
 } from '../libs/Requester.js';
 import { rollup } from './Rollup.js';
-import {
-    ADDRESS_MT,
-    ZkAppRef,
-    verifyZkApp,
-} from '../storages/AddressStorage.js';
+import { AddressMap, ZkAppRef } from '../storages/AddressStorage.js';
 import {
     RequesterLevel1Witness,
     REQUESTER_LEVEL_1_TREE,
@@ -159,9 +155,9 @@ const UpdateTask = ZkProgram({
             async method(
                 input: UpdateTaskInput,
                 earlierProof: SelfProof<UpdateTaskInput, UpdateTaskOutput>,
-                keyIndexWitness: RequesterLevel1Witness,
-                timestampWitness: RequesterLevel1Witness,
-                accumulationWitness: RequesterLevel1Witness
+                keyIndexWitness: typeof RequesterLevel1Witness,
+                timestampWitness: typeof RequesterLevel1Witness,
+                accumulationWitness: typeof RequesterLevel1Witness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
@@ -271,7 +267,7 @@ const UpdateTask = ZkProgram({
                 earlierProof: SelfProof<UpdateTaskInput, UpdateTaskOutput>,
                 sumR: GroupVector,
                 sumM: GroupVector,
-                accumulationWitness: RequesterLevel1Witness,
+                accumulationWitness: typeof RequesterLevel1Witness,
                 accumulationWitnessesR: GroupVectorWitnesses,
                 accumulationWitnessesM: GroupVectorWitnesses,
                 commitmentWitnesses: CommitmentWitnesses
@@ -471,7 +467,7 @@ class RequesterContract extends SmartContract {
 
     init() {
         super.init();
-        this.zkAppRoot.set(ADDRESS_MT().getRoot());
+        this.zkAppRoot.set(new AddressMap().addressMap.getRoot());
         this.counters.set(RequesterCounters.empty().toFields()[0]);
         this.keyIndexRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
         this.timestampRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
@@ -489,14 +485,14 @@ class RequesterContract extends SmartContract {
     async createTask(
         keyIndex: Field,
         timestamp: UInt64,
-        taskManagerRef: ZkAppRef
+        taskManagerRef: InstanceType<typeof ZkAppRef>
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
 
         // Verify call from Task Manager Contract
         Utils.requireCaller(taskManagerRef.address, this);
-        verifyZkApp(
+        AddressMap.verifyZkApp(
             RequesterContract.name,
             taskManagerRef,
             zkAppRoot,
@@ -532,10 +528,10 @@ class RequesterContract extends SmartContract {
         indices: Field,
         nullifiers: NullifierArray,
         publicKey: Group,
-        publicKeyWitness: DkgLevel1Witness,
-        keyIndexWitness: RequesterLevel1Witness,
-        submission: ZkAppRef,
-        dkg: ZkAppRef
+        publicKeyWitness: typeof DkgLevel1Witness,
+        keyIndexWitness: typeof RequesterLevel1Witness,
+        submission: InstanceType<typeof ZkAppRef>,
+        dkg: InstanceType<typeof ZkAppRef>
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -544,7 +540,7 @@ class RequesterContract extends SmartContract {
         let timestamp = UInt64.from(0);
 
         // Verify Dkg Contract address
-        verifyZkApp(
+        AddressMap.verifyZkApp(
             RequesterContract.name,
             dkg,
             zkAppRoot,
@@ -553,7 +549,7 @@ class RequesterContract extends SmartContract {
 
         // Verify call from Submission Proxy Contract
         Utils.requireCaller(submission.address, this);
-        verifyZkApp(
+        AddressMap.verifyZkApp(
             RequesterContract.name,
             submission,
             zkAppRoot,
@@ -727,15 +723,15 @@ class RequesterContract extends SmartContract {
         keyIndex: Field,
         accumulationRootR: Field,
         accumulationRootM: Field,
-        keyIndexWitness: RequesterLevel1Witness,
-        accumulationWitness: RequesterLevel1Witness,
-        request: ZkAppRef
+        keyIndexWitness: typeof RequesterLevel1Witness,
+        accumulationWitness: typeof RequesterLevel1Witness,
+        request: InstanceType<typeof ZkAppRef>
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
 
         // Verify Request Contract address
-        verifyZkApp(
+        AddressMap.verifyZkApp(
             RequesterContract.name,
             request,
             zkAppRoot,
@@ -777,7 +773,7 @@ class RequesterContract extends SmartContract {
     verifyKeyIndex(
         taskId: Field,
         keyIndex: Field,
-        witness: RequesterLevel1Witness
+        witness: typeof RequesterLevel1Witness
     ) {
         this.keyIndexRoot
             .getAndRequireEquals()
@@ -810,7 +806,7 @@ class RequesterContract extends SmartContract {
         requestId: Field,
         accumulationRootR: Field,
         accumulationRootM: Field,
-        witness: RequesterLevel1Witness
+        witness: typeof RequesterLevel1Witness
     ) {
         this.accumulationRoot
             .getAndRequireEquals()
@@ -837,7 +833,7 @@ class RequesterContract extends SmartContract {
     verifyCommitment(
         index: Field,
         commitment: Field,
-        witness: RequesterLevel1Witness
+        witness: typeof RequesterLevel1Witness
     ) {
         this.commitmentRoot
             .getAndRequireEquals()
@@ -869,7 +865,11 @@ class TaskManagerContract extends SmartContract {
     }
 
     @method
-    async createTask(keyIndex: Field, timestamp: UInt64, selfRef: ZkAppRef) {
+    async createTask(
+        keyIndex: Field,
+        timestamp: UInt64,
+        selfRef: InstanceType<typeof ZkAppRef>
+    ) {
         let requesterContract = new RequesterContract(
             this.requesterAddress.getAndRequireEquals()
         );
@@ -893,10 +893,10 @@ class SubmissionContract extends SmartContract {
         indices: Field,
         nullifiers: NullifierArray,
         publicKey: Group,
-        publicKeyWitness: DkgLevel1Witness,
-        keyIndexWitness: RequesterLevel1Witness,
-        submission: ZkAppRef,
-        dkg: ZkAppRef
+        publicKeyWitness: typeof DkgLevel1Witness,
+        keyIndexWitness: typeof RequesterLevel1Witness,
+        submission: InstanceType<typeof ZkAppRef>,
+        dkg: InstanceType<typeof ZkAppRef>
     ) {
         let requesterContract = new RequesterContract(
             this.requesterAddress.getAndRequireEquals()

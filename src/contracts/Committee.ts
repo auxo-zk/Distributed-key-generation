@@ -123,8 +123,8 @@ const UpdateCommittee = ZkProgram({
             async method(
                 earlierProof: SelfProof<Void, UpdateCommitteeOutput>,
                 input: Action,
-                memberWitness: CommitteeLevel1Witness,
-                settingWitness: CommitteeLevel1Witness
+                memberWitness: typeof CommitteeLevel1Witness,
+                settingWitness: typeof CommitteeLevel1Witness
             ): Promise<UpdateCommitteeOutput> {
                 // Verify earlier proof
                 earlierProof.verify();

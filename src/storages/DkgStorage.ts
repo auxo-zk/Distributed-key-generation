@@ -1,15 +1,12 @@
+import { Field, Group, Poseidon, Struct } from 'o1js';
+import { Bit255, FieldDynamicArray } from '@auxo-dev/auxo-libs';
 import {
-    Field,
-    Group,
-    MerkleTree,
-    MerkleWitness,
-    Poseidon,
-    Struct,
-} from 'o1js';
+    getBestHeight,
+    OneLevelStorage,
+    TwoLevelStorage,
+} from '@auxo-dev/zkapp-offchain-storage';
 import { Round1Contribution, Round2Contribution } from '../libs/Committee.js';
 import { INSTANCE_LIMITS } from '../constants.js';
-import { GenericStorage, Witness } from './GenericStorage.js';
-import { Bit255, FieldDynamicArray } from '@auxo-dev/auxo-libs';
 import {
     REQUEST_LEVEL_1_TREE,
     REQUEST_LEVEL_1_WITNESS,
@@ -17,15 +14,11 @@ import {
 } from './RequestStorage.js';
 
 export {
-    DKG_LEVEL_1_TREE,
-    DKG_LEVEL_1_WITNESS,
-    DKG_LEVEL_2_TREE,
-    DKG_LEVEL_2_WITNESS,
     calculateKeyIndex,
-    Level1MT as DkgLevel1MT,
-    Level1Witness as DkgLevel1Witness,
-    Level2MT as DkgLevel2MT,
-    Level2Witness as DkgLevel2Witness,
+    EmptyMTL1 as DKG_LEVEL_1_TREE,
+    EmptyMTL2 as DKG_LEVEL_2_TREE,
+    MTWitnessL1 as DkgLevel1Witness,
+    MTWitnessL2 as DkgLevel2Witness,
     FullMTWitness as DKGWitness,
     ResponseContributionWitness,
     ProcessedContributions,
@@ -50,22 +43,16 @@ export {
     ResponseStorage,
 };
 
-const LEVEL1_TREE_HEIGHT =
-    Math.ceil(Math.log2(INSTANCE_LIMITS.COMMITTEE * INSTANCE_LIMITS.KEY)) + 1;
-const LEVEL2_TREE_HEIGHT = Math.ceil(Math.log2(INSTANCE_LIMITS.MEMBER)) + 1;
-class Level1MT extends MerkleTree {}
-class Level1Witness extends MerkleWitness(LEVEL1_TREE_HEIGHT) {}
-class Level2MT extends MerkleTree {}
-class Level2Witness extends MerkleWitness(LEVEL2_TREE_HEIGHT) {}
+const [MTWitnessL1, NewMTWitnessL1, EmptyMTL1] = getBestHeight(
+    BigInt(INSTANCE_LIMITS.COMMITTEE)
+);
+const [MTWitnessL2, NewMTWitnessL2, EmptyMTL2] = getBestHeight(
+    BigInt(INSTANCE_LIMITS.MEMBER)
+);
 class FullMTWitness extends Struct({
-    level1: Level1Witness,
-    level2: Level2Witness,
+    level1: MTWitnessL1,
+    level2: MTWitnessL2,
 }) {}
-
-const DKG_LEVEL_1_TREE = () => new Level1MT(LEVEL1_TREE_HEIGHT);
-const DKG_LEVEL_1_WITNESS = (witness: Witness) => new Level1Witness(witness);
-const DKG_LEVEL_2_TREE = () => new Level2MT(LEVEL2_TREE_HEIGHT);
-const DKG_LEVEL_2_WITNESS = (witness: Witness) => new Level2Witness(witness);
 
 function calculateKeyIndex(committeeId: Field, keyId: Field): Field {
     return Field.from(INSTANCE_LIMITS.KEY).mul(committeeId).add(keyId);
@@ -76,7 +63,12 @@ class ProcessedContributions extends FieldDynamicArray(
 ) {}
 
 type KeyStatusLeaf = Field;
-class KeyStatusStorage extends GenericStorage<KeyStatusLeaf> {
+class KeyStatusStorage extends OneLevelStorage<
+    KeyStatusLeaf,
+    typeof MTWitnessL1
+> {
+    static readonly height = MTWitnessL1.height;
+
     constructor(
         leafs?: {
             level1Index: Field;
@@ -84,13 +76,11 @@ class KeyStatusStorage extends GenericStorage<KeyStatusLeaf> {
             isRaw: boolean;
         }[]
     ) {
-        super(
-            DKG_LEVEL_1_TREE,
-            DKG_LEVEL_1_WITNESS,
-            undefined,
-            undefined,
-            leafs
-        );
+        super(EmptyMTL1, NewMTWitnessL1, leafs);
+    }
+
+    get height(): number {
+        return KeyStatusStorage.height;
     }
 
     static calculateLeaf(status: KeyStatusLeaf): Field {
@@ -108,10 +98,7 @@ class KeyStatusStorage extends GenericStorage<KeyStatusLeaf> {
         committeeId: Field;
         keyId: Field;
     }): Field {
-        return Field.from(
-            committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) +
-                keyId.toBigInt()
-        );
+        return calculateKeyIndex(committeeId, keyId);
     }
 
     calculateLevel1Index({
@@ -126,29 +113,11 @@ class KeyStatusStorage extends GenericStorage<KeyStatusLeaf> {
             keyId,
         });
     }
-
-    getLevel1Witness(level1Index: Field): Level1Witness {
-        return super.getLevel1Witness(level1Index) as Level1Witness;
-    }
-
-    getWitness(level1Index: Field): Level1Witness {
-        return super.getWitness(level1Index) as Level1Witness;
-    }
-
-    updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
-        super.updateLeaf({ level1Index }, leaf);
-    }
-
-    updateRawLeaf(
-        { level1Index }: { level1Index: Field },
-        rawLeaf: KeyStatusLeaf
-    ): void {
-        super.updateRawLeaf({ level1Index }, rawLeaf);
-    }
 }
 
 type KeyLeaf = Group;
-class KeyStorage extends GenericStorage<KeyLeaf> {
+class KeyStorage extends OneLevelStorage<KeyLeaf, typeof MTWitnessL1> {
+    static readonly height = MTWitnessL1.height;
     constructor(
         leafs?: {
             level1Index: Field;
@@ -156,13 +125,11 @@ class KeyStorage extends GenericStorage<KeyLeaf> {
             isRaw: boolean;
         }[]
     ) {
-        super(
-            DKG_LEVEL_1_TREE,
-            DKG_LEVEL_1_WITNESS,
-            undefined,
-            undefined,
-            leafs
-        );
+        super(EmptyMTL1, NewMTWitnessL1, leafs);
+    }
+
+    get height(): number {
+        return KeyStorage.height;
     }
 
     static calculateLeaf(key: KeyLeaf): Field {
@@ -180,10 +147,7 @@ class KeyStorage extends GenericStorage<KeyLeaf> {
         committeeId: Field;
         keyId: Field;
     }): Field {
-        return Field.from(
-            committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) +
-                keyId.toBigInt()
-        );
+        return calculateKeyIndex(committeeId, keyId);
     }
 
     calculateLevel1Index({
@@ -198,43 +162,34 @@ class KeyStorage extends GenericStorage<KeyLeaf> {
             keyId,
         });
     }
-
-    getLevel1Witness(level1Index: Field): Level1Witness {
-        return super.getLevel1Witness(level1Index) as Level1Witness;
-    }
-
-    getWitness(level1Index: Field): Level1Witness {
-        return super.getWitness(level1Index) as Level1Witness;
-    }
-
-    updateLeaf({ level1Index }: { level1Index: Field }, leaf: Field): void {
-        super.updateLeaf({ level1Index }, leaf);
-    }
-
-    updateRawLeaf(
-        { level1Index }: { level1Index: Field },
-        rawLeaf: KeyLeaf
-    ): void {
-        super.updateRawLeaf({ level1Index }, rawLeaf);
-    }
 }
 
 type Round1ContributionLeaf = Round1Contribution;
-class Round1ContributionStorage extends GenericStorage<Round1ContributionLeaf> {
+class Round1ContributionStorage extends TwoLevelStorage<
+    Round1ContributionLeaf,
+    typeof MTWitnessL1,
+    typeof MTWitnessL2
+> {
+    static readonly height1 = MTWitnessL1.height;
+    static readonly height2 = MTWitnessL2.height;
+
     constructor(
         leafs?: {
             level1Index: Field;
+            level2Index: Field;
             leaf: Round1ContributionLeaf | Field;
             isRaw: boolean;
         }[]
     ) {
-        super(
-            DKG_LEVEL_1_TREE,
-            DKG_LEVEL_1_WITNESS,
-            DKG_LEVEL_2_TREE,
-            DKG_LEVEL_2_WITNESS,
-            leafs
-        );
+        super(EmptyMTL1, NewMTWitnessL1, EmptyMTL2, NewMTWitnessL2, leafs);
+    }
+
+    get height1(): number {
+        return Round1ContributionStorage.height1;
+    }
+
+    get height2(): number {
+        return Round1ContributionStorage.height2;
     }
 
     static calculateLeaf(contribution: Round1ContributionLeaf): Field {
@@ -252,10 +207,7 @@ class Round1ContributionStorage extends GenericStorage<Round1ContributionLeaf> {
         committeeId: Field;
         keyId: Field;
     }): Field {
-        return Field.from(
-            committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) +
-                keyId.toBigInt()
-        );
+        return calculateKeyIndex(committeeId, keyId);
     }
 
     calculateLevel1Index({
@@ -278,59 +230,34 @@ class Round1ContributionStorage extends GenericStorage<Round1ContributionLeaf> {
     calculateLevel2Index(memberId: Field): Field {
         return Round1ContributionStorage.calculateLevel2Index(memberId);
     }
-
-    getLevel1Witness(level1Index: Field): Level1Witness {
-        return super.getLevel1Witness(level1Index) as Level1Witness;
-    }
-
-    getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
-        return super.getLevel2Witness?.(
-            level1Index,
-            level2Index
-        ) as Level2Witness;
-    }
-
-    getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
-        return super.getWitness(level1Index, level2Index) as FullMTWitness;
-    }
-
-    updateLeaf(
-        {
-            level1Index,
-            level2Index,
-        }: { level1Index: Field; level2Index: Field },
-        leaf: Field
-    ): void {
-        super.updateLeaf({ level1Index, level2Index }, leaf);
-    }
-
-    updateRawLeaf(
-        {
-            level1Index,
-            level2Index,
-        }: { level1Index: Field; level2Index: Field },
-        rawLeaf: Round1ContributionLeaf
-    ): void {
-        super.updateRawLeaf({ level1Index, level2Index }, rawLeaf);
-    }
 }
 
 type PublicKeyLeaf = Group;
-class PublicKeyStorage extends GenericStorage<PublicKeyLeaf> {
+class PublicKeyStorage extends TwoLevelStorage<
+    PublicKeyLeaf,
+    typeof MTWitnessL1,
+    typeof MTWitnessL2
+> {
+    static readonly height1 = MTWitnessL1.height;
+    static readonly height2 = MTWitnessL2.height;
+
     constructor(
         leafs?: {
             level1Index: Field;
+            level2Index: Field;
             leaf: PublicKeyLeaf | Field;
             isRaw: boolean;
         }[]
     ) {
-        super(
-            DKG_LEVEL_1_TREE,
-            DKG_LEVEL_1_WITNESS,
-            DKG_LEVEL_2_TREE,
-            DKG_LEVEL_2_WITNESS,
-            leafs
-        );
+        super(EmptyMTL1, NewMTWitnessL1, EmptyMTL2, NewMTWitnessL2, leafs);
+    }
+
+    get height1(): number {
+        return PublicKeyStorage.height1;
+    }
+
+    get height2(): number {
+        return PublicKeyStorage.height2;
     }
 
     static calculateLeaf(C0: PublicKeyLeaf): Field {
@@ -348,10 +275,7 @@ class PublicKeyStorage extends GenericStorage<PublicKeyLeaf> {
         committeeId: Field;
         keyId: Field;
     }): Field {
-        return Field.from(
-            committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) +
-                keyId.toBigInt()
-        );
+        return calculateKeyIndex(committeeId, keyId);
     }
 
     calculateLevel1Index({
@@ -374,59 +298,34 @@ class PublicKeyStorage extends GenericStorage<PublicKeyLeaf> {
     calculateLevel2Index(memberId: Field): Field {
         return PublicKeyStorage.calculateLevel2Index(memberId);
     }
-
-    getLevel1Witness(level1Index: Field): Level1Witness {
-        return super.getLevel1Witness(level1Index) as Level1Witness;
-    }
-
-    getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
-        return super.getLevel2Witness?.(
-            level1Index,
-            level2Index
-        ) as Level2Witness;
-    }
-
-    getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
-        return super.getWitness(level1Index, level2Index) as FullMTWitness;
-    }
-
-    updateLeaf(
-        {
-            level1Index,
-            level2Index,
-        }: { level1Index: Field; level2Index: Field },
-        leaf: Field
-    ): void {
-        super.updateLeaf({ level1Index, level2Index }, leaf);
-    }
-
-    updateRawLeaf(
-        {
-            level1Index,
-            level2Index,
-        }: { level1Index: Field; level2Index: Field },
-        rawLeaf: PublicKeyLeaf
-    ): void {
-        super.updateRawLeaf({ level1Index, level2Index }, rawLeaf);
-    }
 }
 
 type Round2ContributionLeaf = Round2Contribution;
-class Round2ContributionStorage extends GenericStorage<Round2ContributionLeaf> {
+class Round2ContributionStorage extends TwoLevelStorage<
+    Round2ContributionLeaf,
+    typeof MTWitnessL1,
+    typeof MTWitnessL2
+> {
+    static readonly height1 = MTWitnessL1.height;
+    static readonly height2 = MTWitnessL2.height;
+
     constructor(
         leafs?: {
             level1Index: Field;
+            level2Index: Field;
             leaf: Round2ContributionLeaf | Field;
             isRaw: boolean;
         }[]
     ) {
-        super(
-            DKG_LEVEL_1_TREE,
-            DKG_LEVEL_1_WITNESS,
-            DKG_LEVEL_2_TREE,
-            DKG_LEVEL_2_WITNESS,
-            leafs
-        );
+        super(EmptyMTL1, NewMTWitnessL1, EmptyMTL2, NewMTWitnessL2, leafs);
+    }
+
+    get height1(): number {
+        return Round2ContributionStorage.height1;
+    }
+
+    get height2(): number {
+        return Round2ContributionStorage.height2;
     }
 
     static calculateLeaf(contribution: Round2ContributionLeaf): Field {
@@ -444,10 +343,7 @@ class Round2ContributionStorage extends GenericStorage<Round2ContributionLeaf> {
         committeeId: Field;
         keyId: Field;
     }): Field {
-        return Field.from(
-            committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) +
-                keyId.toBigInt()
-        );
+        return calculateKeyIndex(committeeId, keyId);
     }
 
     calculateLevel1Index({
@@ -470,62 +366,37 @@ class Round2ContributionStorage extends GenericStorage<Round2ContributionLeaf> {
     calculateLevel2Index(memberId: Field): Field {
         return Round2ContributionStorage.calculateLevel2Index(memberId);
     }
-
-    getLevel1Witness(level1Index: Field): Level1Witness {
-        return super.getLevel1Witness(level1Index) as Level1Witness;
-    }
-
-    getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
-        return super.getLevel2Witness?.(
-            level1Index,
-            level2Index
-        ) as Level2Witness;
-    }
-
-    getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
-        return super.getWitness(level1Index, level2Index) as FullMTWitness;
-    }
-
-    updateLeaf(
-        {
-            level1Index,
-            level2Index,
-        }: { level1Index: Field; level2Index: Field },
-        leaf: Field
-    ): void {
-        super.updateLeaf({ level1Index, level2Index }, leaf);
-    }
-
-    updateRawLeaf(
-        {
-            level1Index,
-            level2Index,
-        }: { level1Index: Field; level2Index: Field },
-        rawLeaf: Round2ContributionLeaf
-    ): void {
-        super.updateRawLeaf({ level1Index, level2Index }, rawLeaf);
-    }
 }
 
 type EncryptionLeaf = {
     contributions: Round2Contribution[];
     memberId: Field;
 };
-class EncryptionStorage extends GenericStorage<EncryptionLeaf> {
+class EncryptionStorage extends TwoLevelStorage<
+    EncryptionLeaf,
+    typeof MTWitnessL1,
+    typeof MTWitnessL2
+> {
+    static readonly height1 = MTWitnessL1.height;
+    static readonly height2 = MTWitnessL2.height;
+
     constructor(
         leafs?: {
             level1Index: Field;
+            level2Index: Field;
             leaf: EncryptionLeaf | Field;
             isRaw: boolean;
         }[]
     ) {
-        super(
-            DKG_LEVEL_1_TREE,
-            DKG_LEVEL_1_WITNESS,
-            DKG_LEVEL_2_TREE,
-            DKG_LEVEL_2_WITNESS,
-            leafs
-        );
+        super(EmptyMTL1, NewMTWitnessL1, EmptyMTL2, NewMTWitnessL2, leafs);
+    }
+
+    get height1(): number {
+        return EncryptionStorage.height1;
+    }
+
+    get height2(): number {
+        return EncryptionStorage.height2;
     }
 
     static calculateLeaf(rawLeaf: EncryptionLeaf): Field {
@@ -557,10 +428,7 @@ class EncryptionStorage extends GenericStorage<EncryptionLeaf> {
         committeeId: Field;
         keyId: Field;
     }): Field {
-        return Field.from(
-            committeeId.toBigInt() * BigInt(INSTANCE_LIMITS.KEY) +
-                keyId.toBigInt()
-        );
+        return calculateKeyIndex(committeeId, keyId);
     }
 
     calculateLevel1Index({
@@ -583,50 +451,22 @@ class EncryptionStorage extends GenericStorage<EncryptionLeaf> {
     calculateLevel2Index(memberId: Field): Field {
         return EncryptionStorage.calculateLevel2Index(memberId);
     }
-
-    getLevel1Witness(level1Index: Field): Level1Witness {
-        return super.getLevel1Witness(level1Index) as Level1Witness;
-    }
-
-    getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
-        return super.getLevel2Witness?.(
-            level1Index,
-            level2Index
-        ) as Level2Witness;
-    }
-
-    getWitness(level1Index: Field, level2Index: Field): FullMTWitness {
-        return super.getWitness(level1Index, level2Index) as FullMTWitness;
-    }
-
-    updateLeaf(
-        {
-            level1Index,
-            level2Index,
-        }: { level1Index: Field; level2Index: Field },
-        leaf: Field
-    ): void {
-        super.updateLeaf({ level1Index, level2Index }, leaf);
-    }
-
-    updateRawLeaf(
-        {
-            level1Index,
-            level2Index,
-        }: { level1Index: Field; level2Index: Field },
-        rawLeaf: EncryptionLeaf
-    ): void {
-        super.updateRawLeaf({ level1Index, level2Index }, rawLeaf);
-    }
 }
 
 type ResponseContributionLeaf = Field;
 class ResponseContributionWitness extends Struct({
     level1: RequestLevel1Witness,
-    level2: Level2Witness,
+    level2: MTWitnessL2,
 }) {}
 
-class ResponseContributionStorage extends GenericStorage<ResponseContributionLeaf> {
+class ResponseContributionStorage extends TwoLevelStorage<
+    ResponseContributionLeaf,
+    RequestLevel1Witness,
+    typeof MTWitnessL2
+> {
+    static readonly height1 = MTWitnessL1.height; // FIXME
+    static readonly height2 = MTWitnessL2.height;
+
     constructor(
         leafs?: {
             level1Index: Field;
@@ -638,10 +478,18 @@ class ResponseContributionStorage extends GenericStorage<ResponseContributionLea
         super(
             REQUEST_LEVEL_1_TREE,
             REQUEST_LEVEL_1_WITNESS,
-            DKG_LEVEL_2_TREE,
-            DKG_LEVEL_2_WITNESS,
+            EmptyMTL2,
+            NewMTWitnessL2,
             leafs
         );
+    }
+
+    get height1(): number {
+        return ResponseContributionStorage.height1;
+    }
+
+    get height2(): number {
+        return ResponseContributionStorage.height2;
     }
 
     static calculateLeaf(contribution: ResponseContributionLeaf): Field {
@@ -667,51 +515,15 @@ class ResponseContributionStorage extends GenericStorage<ResponseContributionLea
     calculateLevel2Index(memberId: Field): Field {
         return ResponseContributionStorage.calculateLevel2Index(memberId);
     }
-
-    getLevel1Witness(level1Index: Field): RequestLevel1Witness {
-        return super.getLevel1Witness(level1Index) as RequestLevel1Witness;
-    }
-
-    getLevel2Witness(level1Index: Field, level2Index: Field): Level2Witness {
-        return super.getLevel2Witness?.(
-            level1Index,
-            level2Index
-        ) as Level2Witness;
-    }
-
-    getWitness(
-        level1Index: Field,
-        level2Index: Field
-    ): ResponseContributionWitness {
-        return super.getWitness(
-            level1Index,
-            level2Index
-        ) as ResponseContributionWitness;
-    }
-
-    updateLeaf(
-        {
-            level1Index,
-            level2Index,
-        }: { level1Index: Field; level2Index: Field },
-        leaf: Field
-    ): void {
-        super.updateLeaf({ level1Index, level2Index }, leaf);
-    }
-
-    updateRawLeaf(
-        {
-            level1Index,
-            level2Index,
-        }: { level1Index: Field; level2Index: Field },
-        rawLeaf: ResponseContributionLeaf
-    ): void {
-        super.updateRawLeaf({ level1Index, level2Index }, rawLeaf);
-    }
 }
 
 type ResponseLeaf = Field;
-class ResponseStorage extends GenericStorage<ResponseLeaf> {
+class ResponseStorage extends OneLevelStorage<
+    ResponseLeaf,
+    RequestLevel1Witness
+> {
+    static readonly height = MTWitnessL1.height;
+
     constructor(
         leafs?: {
             level1Index: Field;
@@ -719,13 +531,11 @@ class ResponseStorage extends GenericStorage<ResponseLeaf> {
             isRaw: boolean;
         }[]
     ) {
-        super(
-            REQUEST_LEVEL_1_TREE,
-            REQUEST_LEVEL_1_WITNESS,
-            undefined,
-            undefined,
-            leafs
-        );
+        super(REQUEST_LEVEL_1_TREE, REQUEST_LEVEL_1_WITNESS, leafs);
+    }
+
+    get height(): number {
+        return ResponseStorage.height;
     }
 
     static calculateLeaf(responseRootD: ResponseLeaf): Field {
@@ -742,24 +552,5 @@ class ResponseStorage extends GenericStorage<ResponseLeaf> {
 
     calculateLevel1Index(requestId: Field): Field {
         return ResponseStorage.calculateLevel1Index(requestId);
-    }
-
-    getLevel1Witness(level1Index: Field): Level1Witness {
-        return super.getLevel1Witness(level1Index) as Level1Witness;
-    }
-
-    getWitness(level1Index: Field): Level1Witness {
-        return super.getWitness(level1Index) as Level1Witness;
-    }
-
-    updateLeaf1({ level1Index }: { level1Index: Field }, leaf: Field): void {
-        super.updateLeaf({ level1Index }, leaf);
-    }
-
-    updateRawLeaf(
-        { level1Index }: { level1Index: Field },
-        rawLeaf: ResponseLeaf
-    ): void {
-        super.updateRawLeaf({ level1Index }, rawLeaf);
     }
 }

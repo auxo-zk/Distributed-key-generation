@@ -27,11 +27,7 @@ import {
     ZkAppIndex,
     ZkProgramEnum,
 } from './constants.js';
-import {
-    ADDRESS_MT,
-    ZkAppRef,
-    verifyZkApp,
-} from '../storages/AddressStorage.js';
+import { AddressMap, ZkAppRef } from '../storages/AddressStorage.js';
 import {
     REQUEST_LEVEL_1_TREE,
     RequestLevel1Witness,
@@ -146,9 +142,9 @@ const ComputeResult = ZkProgram({
                     ComputeResultInput,
                     ComputeResultOutput
                 >,
-                accumulationWitness: RequestLevel2Witness,
-                responseWitness: RequestLevel2Witness,
-                resultWitness: RequestLevel2Witness
+                accumulationWitness: typeof RequestLevel2Witness,
+                responseWitness: typeof RequestLevel2Witness,
+                resultWitness: typeof RequestLevel2Witness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
@@ -322,10 +318,10 @@ const UpdateRequest = ZkProgram({
                     UpdateRequestInput,
                     UpdateRequestOutput
                 >,
-                keyIndexWitness: RequestLevel1Witness,
-                taskWitness: RequestLevel1Witness,
-                accumulationWitness: RequestLevel1Witness,
-                expirationWitness: RequestLevel1Witness
+                keyIndexWitness: typeof RequestLevel1Witness,
+                taskWitness: typeof RequestLevel1Witness,
+                accumulationWitness: typeof RequestLevel1Witness,
+                expirationWitness: typeof RequestLevel1Witness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
@@ -456,7 +452,7 @@ const UpdateRequest = ZkProgram({
                     UpdateRequestInput,
                     UpdateRequestOutput
                 >,
-                resultWitness: RequestLevel1Witness
+                resultWitness: typeof RequestLevel1Witness
             ) {
                 // Verify earlier proof
                 earlierProof.verify();
@@ -588,7 +584,7 @@ class RequestContract extends SmartContract {
 
     init() {
         super.init();
-        this.zkAppRoot.set(ADDRESS_MT().getRoot());
+        this.zkAppRoot.set(new AddressMap().addressMap.getRoot());
         this.requestCounter.set(Field(0));
         this.keyIndexRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
         this.taskRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
@@ -650,11 +646,11 @@ class RequestContract extends SmartContract {
         proof: ComputeResultProof,
         expirationTimestamp: UInt64,
         accumulationRootR: Field,
-        expirationWitness: RequestLevel1Witness,
-        accumulationWitness: RequestLevel1Witness,
-        responseWitness: RequestLevel1Witness,
-        resultWitness: RequestLevel1Witness,
-        response: ZkAppRef
+        expirationWitness: typeof RequestLevel1Witness,
+        accumulationWitness: typeof RequestLevel1Witness,
+        responseWitness: typeof RequestLevel1Witness,
+        resultWitness: typeof RequestLevel1Witness,
+        response: InstanceType<typeof ZkAppRef>
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -662,7 +658,7 @@ class RequestContract extends SmartContract {
         let requestId = accumulationWitness.calculateIndex();
 
         // Verify Response Contract address
-        verifyZkApp(
+        AddressMap.verifyZkApp(
             RequestContract.name,
             response,
             zkAppRoot,
@@ -825,7 +821,7 @@ class RequestContract extends SmartContract {
     verifyKeyIndex(
         requestId: Field,
         keyIndex: Field,
-        witness: RequestLevel1Witness
+        witness: typeof RequestLevel1Witness
     ) {
         this.keyIndexRoot
             .getAndRequireEquals()
@@ -858,7 +854,7 @@ class RequestContract extends SmartContract {
         requestId: Field,
         address: PublicKey,
         taskId: UInt32,
-        witness: RequestLevel1Witness
+        witness: typeof RequestLevel1Witness
     ) {
         this.taskRoot
             .getAndRequireEquals()
@@ -891,8 +887,8 @@ class RequestContract extends SmartContract {
     getRequestStatus(
         requestId: Field,
         expirationTimestamp: UInt64,
-        expirationWitness: RequestLevel1Witness,
-        resultWitness: RequestLevel1Witness
+        expirationWitness: typeof RequestLevel1Witness,
+        resultWitness: typeof RequestLevel1Witness
     ): Field {
         let isResolved = this.resultRoot
             .getAndRequireEquals()
@@ -952,8 +948,8 @@ class RequestContract extends SmartContract {
         requestId: Field,
         status: Field,
         expirationTimestamp: UInt64,
-        expirationWitness: RequestLevel1Witness,
-        resultWitness: RequestLevel1Witness
+        expirationWitness: typeof RequestLevel1Witness,
+        resultWitness: typeof RequestLevel1Witness
     ) {
         status.assertEquals(
             this.getRequestStatus(
@@ -983,7 +979,7 @@ class RequestContract extends SmartContract {
         accumulationRootR: Field,
         accumulationRootM: Field,
         dimension: UInt8,
-        witness: RequestLevel1Witness
+        witness: typeof RequestLevel1Witness
     ) {
         this.accumulationRoot
             .getAndRequireEquals()
@@ -1023,8 +1019,8 @@ class RequestContract extends SmartContract {
         requestId: Field,
         dimensionIndex: UInt8,
         result: Scalar,
-        witness: RequestLevel1Witness,
-        scalarWitness: RequestLevel2Witness
+        witness: typeof RequestLevel1Witness,
+        scalarWitness: typeof RequestLevel2Witness
     ) {
         this.resultRoot
             .getAndRequireEquals()
