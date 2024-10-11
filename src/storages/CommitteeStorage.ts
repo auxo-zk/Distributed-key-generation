@@ -63,8 +63,8 @@ class MemberStorage extends TwoLevelStorage<
         );
     }
 
-    calculateLeaf(publicKey: MemberLeaf): Field {
-        return MemberStorage.calculateLeaf(publicKey);
+    calculateLeaf(rawLeaf: MemberLeaf): Field {
+        return MemberStorage.calculateLeaf(rawLeaf);
     }
 
     static calculateLevel1Index(committeeId: Field): Field {

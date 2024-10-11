@@ -20,8 +20,7 @@ enum ZkAppIndex {
     ROLLUP,
     COMMITTEE,
     DKG,
-    ROUND1,
-    ROUND2,
+    CONTRIBUTION,
     RESPONSE,
     REQUEST,
     __LENGTH,
@@ -34,8 +33,8 @@ enum ZkProgramEnum {
 
     Rollup = 'Rollup',
 
-    UpdateCommittee = 'UpdateCommittee',
-    UpdateKey = 'UpdateKey',
+    RollupCommittee = 'RollupCommittee',
+    RollupKey = 'RollupKey',
     FinalizeRound1 = 'FinalizeRound1',
     FinalizeRound2 = 'FinalizeRound2',
     ComputeResponse = 'ComputeResponse',
@@ -63,6 +62,9 @@ enum EventEnum {
     ROLLUPED = 'actions-rolluped',
     PROCESSED = 'actions-processed',
 
+    COMMITTEE_DATA = 'committee-data',
+    COMMITTEE_MEMBER_DATA = 'committee-member-data',
+
     RespondedDArray = 'responded-d-array',
     FinalizedDArray = 'finalized-d-array',
 
@@ -75,12 +77,17 @@ enum ErrorEnum {
     ZKAPP_INDEX = 'Incorrect zkApp MT index',
     ZKAPP_ADDRESS = 'Incorrect zkApp address',
 
+    // Authorization errors
+    REQUIRE_MEMBER = 'Only committee member',
+
     // Action errors
     ACTION_TYPE = 'Incorrect action type',
     ACTION_STATE = 'Incorrect action state',
     CURRENT_ACTION_STATE = 'Incorrect current action state',
     LAST_ACTION_STATE = 'Incorrect last action state',
 
+    ROLLUP_INITIAL_STATE = 'Incorrect initial rollup state',
+    ROLLUP_NEXT_STATE = 'Incorrect next rollup state',
     ROLLUP_ROOT = 'Incorrect rollup MT root',
     ROLLUP_INDEX = 'Incorrect rollup MT index',
     PROCESS_ROOT = 'Incorrect process MT root',
@@ -102,7 +109,7 @@ enum ErrorEnum {
     SETTING_ROOT = 'Incorrect setting MT root',
     SETTING_INDEX = 'Incorrect setting MT index',
 
-    // DkgContract errors
+    // KeyContract errors
     KEY_COUNTER_ROOT = 'Incorrect key counter MT root',
     KEY_COUNTER_INDEX = 'Incorrect key counter MT index',
     KEY_COUNTER_LIMIT = 'Exceeding key counter limit',
@@ -111,6 +118,9 @@ enum ErrorEnum {
     KEY_STATUS_VALUE = 'Incorrect key status value',
     KEY_ROOT = 'Incorrect key MT root',
     KEY_INDEX = 'Incorrect key MT index',
+    KEY_FEE_ROOT = 'Incorrect key usage fee MT root',
+    KEY_FEE_INDEX = 'Incorrect key usage fee MT index',
+    KEY_FEE_VALUE = 'Incorrect key usage fee value',
 
     // Round1Contract errors
     R1_CONTRIBUTION_THRESHOLD = 'Incorrect number of round 1 contributions',

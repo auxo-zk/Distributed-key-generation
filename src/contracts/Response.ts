@@ -1,4 +1,5 @@
 import {
+    Bool,
     Field,
     Group,
     Poseidon,
@@ -25,7 +26,7 @@ import {
     DKG_LEVEL_2_TREE,
     ProcessedContributions,
     calculateKeyIndex,
-} from '../storages/DkgStorage.js';
+} from '../storages/KeyStorage.js';
 import {
     RequestLevel1Witness,
     RequestLevel2Witness,
@@ -38,9 +39,9 @@ import {
     CommitteeContract,
 } from './Committee.js';
 import { BatchDecryptionProof } from './Encryption.js';
-import { Round1Contract } from './Round1.js';
-import { Round2Contract } from './Round2.js';
-import { ENCRYPTION_LIMITS, INSTANCE_LIMITS } from '../constants.js';
+// import { Round1Contract } from './Round1.js';
+// import { Round2Contract } from './Round2.js';
+import { ENC_LIMITS, INSTANCE_LIMITS } from '../constants.js';
 import { AddressMap, ZkAppRef } from '../storages/AddressStorage.js';
 import {
     PROCESS_MT,
@@ -54,7 +55,6 @@ import {
     ZkAppIndex,
     ZkProgramEnum,
 } from './constants.js';
-import { RollupContract } from './Rollup.js';
 // import {
 //     RollupWitness,
 //     calculateActionIndex,
@@ -756,10 +756,10 @@ class ResponseContract extends SmartContract {
         );
 
         const committeeContract = new CommitteeContract(committee.address);
-        const round1Contract = new Round1Contract(round1.address);
-        const round2Contract = new Round2Contract(round2.address);
+        // const round1Contract = new Round1Contract(round1.address);
+        // const round2Contract = new Round2Contract(round2.address);
         const requestContract = new RequestContract(request.address);
-        const rollupContract = new RollupContract(rollup.address);
+        // const rollupContract = new RollupContract(rollup.address);
 
         // Verify decryption proof
         decryptionProof.verify();
@@ -779,20 +779,21 @@ class ResponseContract extends SmartContract {
         committeeContract.verifyMember(
             new CommitteeMemberInput({
                 address: this.sender.getAndRequireSignature(),
-                committeeId: committeeId,
-                memberId: memberId,
-                memberWitness: memberWitness,
+                committeeId,
+                memberId,
+                isActive: Bool(true),
+                memberWitness,
             })
         );
 
         // Verify round 1 public key (C0)
-        round1Contract.verifyEncPubKey(
-            committeeId,
-            keyId,
-            memberId,
-            decryptionProof.publicInput.publicKey,
-            publicKeyWitness
-        );
+        // round1Contract.verifyEncPubKey(
+        //     committeeId,
+        //     keyId,
+        //     memberId,
+        //     decryptionProof.publicInput.publicKey,
+        //     publicKeyWitness
+        // );
 
         // Verify round 2 encryptions (hashes)
         let encryptionHashChain = Field(0);
@@ -815,13 +816,13 @@ class ResponseContract extends SmartContract {
                 )
             );
         }
-        round2Contract.verifyEncHashChain(
-            committeeId,
-            keyId,
-            memberId,
-            encryptionHashChain,
-            encryptionWitness
-        );
+        // round2Contract.verifyEncHashChain(
+        //     committeeId,
+        //     keyId,
+        //     memberId,
+        //     encryptionHashChain,
+        //     encryptionWitness
+        // );
 
         // Verify accumulation root
         requestContract.verifyAccumulationData(
@@ -843,7 +844,7 @@ class ResponseContract extends SmartContract {
             )
         );
 
-        // Create & dispatch action to DkgContract
+        // Create & dispatch action to KeyContract
         let action = new Action({
             committeeId,
             keyId,
@@ -856,9 +857,9 @@ class ResponseContract extends SmartContract {
 
         // Record action for rollup
         selfRef.address.assertEquals(this.address);
-        await rollupContract.recordAction(action.hash(), selfRef);
+        // await rollupContract.recordAction(action.hash(), selfRef);
 
-        for (let i = 0; i < ENCRYPTION_LIMITS.FULL_DIMENSION; i++) {
+        for (let i = 0; i < ENC_LIMITS.DIMENSION; i++) {
             this.emitEvent(
                 EventEnum.RespondedDArray,
                 new RespondedDArrayEvent({
@@ -923,18 +924,18 @@ class ResponseContract extends SmartContract {
 
         const committeeContract = new CommitteeContract(committee.address);
         const requestContract = new RequestContract(request.address);
-        const rollupContract = new RollupContract(rollup.address);
+        // const rollupContract = new RollupContract(rollup.address);
 
         // Verify response proof
         proof.verify();
-        proof.publicOutput.rollupRoot.assertEquals(
-            rollupContract.rollupRoot.getAndRequireEquals(),
-            Utils.buildAssertMessage(
-                ResponseContract.name,
-                'finalize',
-                ErrorEnum.ROLLUP_ROOT
-            )
-        );
+        // proof.publicOutput.rollupRoot.assertEquals(
+        //     rollupContract.rollupRoot.getAndRequireEquals(),
+        //     Utils.buildAssertMessage(
+        //         ResponseContract.name,
+        //         'finalize',
+        //         ErrorEnum.ROLLUP_ROOT
+        //     )
+        // );
         proof.publicOutput.initialContributionRoot.assertEquals(
             contributionRoot,
             Utils.buildAssertMessage(
@@ -982,7 +983,7 @@ class ResponseContract extends SmartContract {
         );
 
         // Verify committee config
-        committeeContract.verifyConfig(
+        committeeContract.verifySetting(
             new CommitteeConfigInput({
                 N: proof.publicOutput.N,
                 T: proof.publicOutput.T,
@@ -1006,7 +1007,7 @@ class ResponseContract extends SmartContract {
         this.responseRoot.set(nextResponseRoot);
         this.processRoot.set(proof.publicOutput.nextProcessRoot);
 
-        for (let i = 0; i < ENCRYPTION_LIMITS.FULL_DIMENSION; i++) {
+        for (let i = 0; i < ENC_LIMITS.DIMENSION; i++) {
             this.emitEvent(
                 EventEnum.FinalizedDArray,
                 new FinalizedDArrayEvent({

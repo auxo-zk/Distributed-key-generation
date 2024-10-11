@@ -4,7 +4,7 @@ import {
     getBestHeight,
     OneLevelStorage,
 } from '@auxo-dev/zkapp-offchain-storage';
-import { ENCRYPTION_LIMITS, INSTANCE_LIMITS } from '../constants.js';
+import { ENC_LIMITS, INSTANCE_LIMITS } from '../constants.js';
 
 export {
     EmptyMTL1 as REQUESTER_LEVEL_1_TREE,
@@ -30,7 +30,7 @@ const [MTWitnessL1, NewMTWitnessL1, EmptyMTL1] = getBestHeight(
     BigInt(INSTANCE_LIMITS.REQUEST)
 );
 const [MTWitnessCom, NewMTWitnessCom, EmptyMTCom] = getBestHeight(
-    BigInt(INSTANCE_LIMITS.REQUEST * ENCRYPTION_LIMITS.SUBMISSION)
+    BigInt(INSTANCE_LIMITS.REQUEST * ENC_LIMITS.DIMENSION)
 );
 
 class RequesterCounters extends Struct({
@@ -212,7 +212,7 @@ class AccumulationStorage extends OneLevelStorage<
 type CommitmentLeaf = Field;
 class CommitmentWitnesses extends StaticArray<typeof MTWitnessCom>(
     MTWitnessCom,
-    ENCRYPTION_LIMITS.DIMENSION
+    ENC_LIMITS.DIMENSION
 ) {}
 class CommitmentStorage extends OneLevelStorage<
     CommitmentLeaf,

@@ -18,7 +18,7 @@ import {
     PublicKey,
 } from 'o1js';
 import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
-import { ENCRYPTION_LIMITS, REQUEST_EXPIRATION } from '../constants.js';
+import { ENC_LIMITS, REQUEST_EXPIRATION } from '../constants.js';
 import {
     CommitmentArray,
     NullifierArray,
@@ -36,8 +36,8 @@ import {
     COMMITMENT_TREE,
 } from '../storages/RequesterStorage.js';
 import { ErrorEnum, ZkAppAction, ZkProgramEnum } from './constants.js';
-import { DkgLevel1Witness } from '../storages/DkgStorage.js';
-import { DkgContract } from './DKG.js';
+import { DkgLevel1Witness } from '../storages/KeyStorage.js';
+import { KeyContract } from './Key.js';
 import { RequestContract } from './Request.js';
 import { CommitmentWitnesses } from '../storages/RequesterStorage.js';
 import {
@@ -280,7 +280,7 @@ const UpdateTask = ZkProgram({
                     nextCommitmentCounter,
                     nextCommitmentRoot,
                 } = earlierProof.publicOutput;
-                for (let i = 0; i < ENCRYPTION_LIMITS.DIMENSION; i++) {
+                for (let i = 0; i < ENC_LIMITS.DIMENSION; i++) {
                     let sumRi = sumR.get(Field(i));
                     let sumMi = sumM.get(Field(i));
                     let Ri = input.R.get(Field(i));
@@ -556,7 +556,7 @@ class RequesterContract extends SmartContract {
             Field(RequesterContract.AddressBook.SUBMISSION)
         );
 
-        const dkgContract = new DkgContract(dkg.address);
+        const dkgContract = new KeyContract(dkg.address);
 
         // Verify public key
         dkgContract.verifyKey(keyIndex, publicKey, publicKeyWitness);
@@ -566,7 +566,7 @@ class RequesterContract extends SmartContract {
         let R = new RequestVector();
         let M = new RequestVector();
         let commitments = new CommitmentArray();
-        for (let i = 0; i < ENCRYPTION_LIMITS.DIMENSION; i++) {
+        for (let i = 0; i < ENC_LIMITS.DIMENSION; i++) {
             let index = Field.fromBits(
                 indices.toBits().slice(i * 8, (i + 1) * 8)
             );

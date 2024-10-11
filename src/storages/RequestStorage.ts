@@ -9,7 +9,7 @@ import {
     UInt64,
 } from 'o1js';
 import { CustomScalar, StaticArray } from '@auxo-dev/auxo-libs';
-import { ENCRYPTION_LIMITS, INSTANCE_LIMITS } from '../constants.js';
+import { ENC_LIMITS, INSTANCE_LIMITS } from '../constants.js';
 import {
     getBestHeight,
     OneLevelStorage,
@@ -47,7 +47,7 @@ const [MTWitnessL1, NewMTWitnessL1, EmptyMTL1] = getBestHeight(
     BigInt(INSTANCE_LIMITS.REQUEST * INSTANCE_LIMITS.REQUESTER)
 );
 const [MTWitnessL2, NewMTWitnessL2, EmptyMTL2] = getBestHeight(
-    BigInt(ENCRYPTION_LIMITS.FULL_DIMENSION)
+    BigInt(ENC_LIMITS.DIMENSION)
 );
 class FullMTWitness extends Struct({
     level1: MTWitnessL1,
@@ -252,10 +252,10 @@ class AccumulationStorage extends OneLevelStorage<
 }
 
 type GroupVectorLeaf = Group;
-class GroupVector extends StaticArray(Group, ENCRYPTION_LIMITS.DIMENSION) {}
+class GroupVector extends StaticArray(Group, ENC_LIMITS.DIMENSION) {}
 class GroupVectorWitnesses extends StaticArray<typeof MTWitnessL2>(
     MTWitnessL2,
-    ENCRYPTION_LIMITS.DIMENSION
+    ENC_LIMITS.DIMENSION
 ) {}
 class GroupVectorStorage extends OneLevelStorage<
     GroupVectorLeaf,
@@ -297,7 +297,7 @@ class GroupVectorStorage extends OneLevelStorage<
 type ScalarVectorLeaf = Scalar;
 class ScalarVectorWitnesses extends StaticArray<typeof MTWitnessL2>(
     MTWitnessL2,
-    ENCRYPTION_LIMITS.DIMENSION
+    ENC_LIMITS.DIMENSION
 ) {}
 class ScalarVectorStorage extends OneLevelStorage<
     ScalarVectorLeaf,

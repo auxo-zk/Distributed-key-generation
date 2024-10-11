@@ -1,16 +1,16 @@
-import { Rollup, RollupContract } from '../../contracts/Rollup.js';
+// import { Rollup, RollupContract } from '../../contracts/Rollup.js';
 import {
     CommitteeContract,
-    UpdateCommittee,
+    RollupCommittee,
 } from '../../contracts/Committee.js';
-import { DkgContract, UpdateKey } from '../../contracts/DKG.js';
+import { KeyContract, RollupKey } from '../../contracts/Key.js';
 import {
     BatchDecryption,
     BatchEncryption,
     Elgamal,
 } from '../../contracts/Encryption.js';
-import { FinalizeRound1, Round1Contract } from '../../contracts/Round1.js';
-import { FinalizeRound2, Round2Contract } from '../../contracts/Round2.js';
+// import { FinalizeRound1, Round1Contract } from '../../contracts/Round1.js';
+// import { FinalizeRound2, Round2Contract } from '../../contracts/Round2.js';
 import { ComputeResult, UpdateRequest } from '../../contracts/Request.js';
 import { RequestContract } from '../../contracts/Request.js';
 import { UpdateTask, RequesterContract } from '../../contracts/Requester.js';
@@ -22,14 +22,14 @@ import {
 
 async function main() {
     const programs = [
-        Rollup,
-        UpdateCommittee,
-        UpdateKey,
+        // Rollup,
+        RollupCommittee,
+        RollupKey,
         Elgamal,
         BatchEncryption,
         BatchDecryption,
-        FinalizeRound1,
-        FinalizeRound2,
+        // FinalizeRound1,
+        // FinalizeRound2,
         UpdateRequest,
         UpdateTask,
         ComputeResponse,
@@ -37,11 +37,11 @@ async function main() {
         ComputeResult,
     ];
     const contracts = [
-        RollupContract,
+        // RollupContract,
         CommitteeContract,
-        DkgContract,
-        Round1Contract,
-        Round2Contract,
+        KeyContract,
+        // Round1Contract,
+        // Round2Contract,
         RequestContract,
         RequesterContract,
         ResponseContract,

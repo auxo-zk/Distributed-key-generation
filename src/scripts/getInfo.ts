@@ -1,5 +1,5 @@
-// import { CommitteeContract, UpdateCommittee } from '../contracts/Committee.js';
-// import { DkgContract, RollupDkg } from '../contracts/DKG.js';
+// import { CommitteeContract, RollupCommittee } from '../contracts/Committee.js';
+// import { KeyContract, RollupDkg } from '../contracts/DKG.js';
 // import { BatchDecryption, BatchEncryption } from '../contracts/Encryption.js';
 // import {
 //     FinalizeResponse,
@@ -20,7 +20,7 @@
 // const PROGRAMS = {
 //     BatchEncryption,
 //     BatchDecryption,
-//     UpdateCommittee,
+//     RollupCommittee,
 //     RollupDkg,
 //     RollupRound1,
 //     FinalizeRound1,
@@ -35,7 +35,7 @@
 
 // const CONTRACTS = {
 //     CommitteeContract,
-//     DkgContract,
+//     KeyContract,
 //     Round1Contract,
 //     Round2Contract,
 //     ResponseContract,
@@ -44,8 +44,8 @@
 // };
 
 // const DEPENDENCIES = {
-//     CommitteeContract: [UpdateCommittee],
-//     DkgContract: [RollupDkg],
+//     CommitteeContract: [RollupCommittee],
+//     KeyContract: [RollupDkg],
 //     Round1Contract: [RollupRound1, FinalizeRound1],
 //     Round2Contract: [RollupRound2, BatchEncryption, FinalizeRound2],
 //     ResponseContract: [RollupResponse, BatchDecryption, FinalizeResponse],

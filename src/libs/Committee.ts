@@ -1,4 +1,12 @@
-import { Field, Group, MerkleTree, Poseidon, Scalar, Struct } from 'o1js';
+import {
+    Field,
+    Group,
+    Poseidon,
+    PrivateKey,
+    PublicKey,
+    Scalar,
+    Struct,
+} from 'o1js';
 import {
     Bit255,
     Bit255DynamicArray,
@@ -6,9 +14,8 @@ import {
     GroupDynamicArray,
     PublicKeyDynamicArray,
 } from '@auxo-dev/auxo-libs';
-import * as ElgamalECC from './Elgamal.js';
-import { ENCRYPTION_LIMITS, INSTANCE_LIMITS } from '../constants.js';
-import { DArray } from './Requester.js';
+import { ECElGamal } from '@auxo-dev/o1js-encrypt';
+import { ENC_LIMITS, INSTANCE_LIMITS } from '../constants.js';
 
 export {
     MemberArray,
@@ -18,17 +25,17 @@ export {
     PublicKeyArray,
     EncryptionHashArray,
     SecretPolynomial,
-    Round2Data,
-    Round1Contribution,
-    Round2Contribution,
+    Cipher,
+    KeyGenContribution,
     ResponseContribution,
     calculatePublicKey,
     calculatePublicKey as calculatePublicKeyFromContribution,
     calculatePolynomialValue,
+    calculateShareCommitment,
     generateRandomPolynomial,
     recoverSecretPolynomial,
-    getRound1Contribution,
-    getRound2Contribution,
+    getKeyGenContribution,
+    getSecretShare,
     getResponseContribution,
     getLagrangeCoefficient,
     accumulateResponses,
@@ -38,7 +45,7 @@ type SecretPolynomial = {
     C: Group[];
     f: Scalar[];
 };
-type Round2Data = {
+type Cipher = {
     c: Bit255;
     U: Group;
 };
@@ -48,55 +55,22 @@ class cArray extends Bit255DynamicArray(INSTANCE_LIMITS.MEMBER) {}
 class UArray extends GroupDynamicArray(INSTANCE_LIMITS.MEMBER) {}
 class PublicKeyArray extends GroupDynamicArray(INSTANCE_LIMITS.MEMBER) {}
 class EncryptionHashArray extends FieldDynamicArray(INSTANCE_LIMITS.MEMBER) {}
-class Round1Contribution extends Struct({
+
+class KeyGenContribution extends Struct({
     C: CArray,
-}) {
-    static empty(): Round1Contribution {
-        return new Round1Contribution({
-            C: new CArray(),
-        });
-    }
-
-    toFields(): Field[] {
-        return this.C.toFields();
-    }
-
-    hash(): Field {
-        return Poseidon.hash(this.toFields());
-    }
-}
-class Round2Contribution extends Struct({
     c: cArray,
     U: UArray,
 }) {
-    static empty(): Round2Contribution {
-        return new Round2Contribution({
+    static empty(): KeyGenContribution {
+        return new KeyGenContribution({
+            C: new CArray(),
             c: new cArray(),
             U: new UArray(),
         });
     }
 
     toFields(): Field[] {
-        return this.c.toFields().concat(this.U.toFields());
-    }
-
-    hash(): Field {
-        return Poseidon.hash(this.toFields());
-    }
-}
-class ResponseContribution extends Struct({
-    responseRootD: Field,
-    D: DArray,
-}) {
-    static empty(): ResponseContribution {
-        return new ResponseContribution({
-            responseRootD: Field(0),
-            D: new DArray(),
-        });
-    }
-
-    toFields(): Field[] {
-        return [this.responseRootD, this.D.toFields()].flat();
+        return KeyGenContribution.toFields(this);
     }
 
     hash(): Field {
@@ -104,12 +78,18 @@ class ResponseContribution extends Struct({
     }
 }
 
-function calculatePublicKey(round1Contributions: Round1Contribution[]): Group {
+class ResponseContribution extends GroupDynamicArray(ENC_LIMITS.SPLIT) {}
+
+function calculatePublicKey(arr: CArray[]): Group {
     let result = Group.zero;
-    for (let i = 0; i < round1Contributions.length; i++) {
-        result = result.add(round1Contributions[i].C.values[0]);
+    for (let i = 0; i < Number(arr.length); i++) {
+        result = result.add(arr[i].get(Field(0)));
     }
     return result;
+}
+
+function calculateShareCommitment(secret: Scalar, memberId: Field) {
+    return Poseidon.hash([secret.toFields(), memberId].flat());
 }
 
 function calculatePolynomialValue(a: Scalar[], x: number): Scalar {
@@ -150,72 +130,62 @@ function recoverSecretPolynomial(
     return { a, C, f };
 }
 
-function getRound1Contribution(secret: SecretPolynomial): Round1Contribution {
-    let provableC = CArray.from(secret.C);
-    return new Round1Contribution({ C: provableC });
-}
-
-function getRound2Contribution(
+function getKeyGenContribution(
     secret: SecretPolynomial,
     memberId: number,
-    round1Contributions: Round1Contribution[],
+    pubKeys: PublicKey[],
     randoms: Scalar[]
-): Round2Contribution {
-    let data = new Array<Round2Data>(secret.f.length);
-    let c = new Array<Bit255>(secret.f.length);
-    let U = new Array<Group>(secret.f.length);
-    for (let i = 0; i < data.length; i++) {
+) {
+    let C = CArray.from(secret.C);
+    let cArr = new Array<Bit255>(secret.f.length);
+    let UArr = new Array<Group>(secret.f.length);
+    for (let i = 0; i < secret.f.length; i++) {
         if (i == memberId) {
-            c[i] = Bit255.fromBigInt(0n);
-            U[i] = Group.zero;
+            cArr[i] = Bit255.fromBigInt(0n);
+            UArr[i] = Group.zero;
         } else {
-            let encryption = ElgamalECC.encrypt(
+            let encryption = ECElGamal.Lib.encrypt(
                 secret.f[i],
-                round1Contributions[i].C.values[0],
+                pubKeys[i].toGroup(),
                 randoms[i]
             );
-            c[i] = encryption.c;
-            U[i] = encryption.U;
+            cArr[i] = encryption.c;
+            UArr[i] = encryption.U;
         }
     }
-    let provablec = cArray.from(c);
-    let provableU = UArray.from(U);
-    return new Round2Contribution({ c: provablec, U: provableU });
+    let c = cArray.from(cArr);
+    let U = UArray.from(UArr);
+    return new KeyGenContribution({ C, c, U });
 }
 
-function getResponseContribution(
+function getSecretShare(
     secret: SecretPolynomial,
     memberId: number,
-    round2Data: Round2Data[],
-    R: Group[]
-): [ResponseContribution, Scalar] {
-    let decryptions: Scalar[] = round2Data.map((data, id) =>
+    ciphers: Cipher[],
+    prvKey: PrivateKey
+): { share: Scalar; commitment: Field } {
+    let decryptions: Scalar[] = ciphers.map((data, id) =>
         id == memberId
             ? secret.f[memberId]
-            : Scalar.from(ElgamalECC.decrypt(data.c, data.U, secret.a[0]).m)
+            : Scalar.from(ECElGamal.Lib.decrypt(data.c, data.U, prvKey.s).m)
     );
-    let ski: Scalar = decryptions.reduce(
+    let share: Scalar = decryptions.reduce(
         (prev: Scalar, curr: Scalar) => prev.add(curr),
         Scalar.from(0n)
     );
+    let commitment = calculateShareCommitment(share, Field(memberId));
+    return { share, commitment };
+}
 
-    let merkleTree = new MerkleTree(
-        Math.ceil(Math.log2(ENCRYPTION_LIMITS.FULL_DIMENSION)) + 1
-    );
-    let D = new Array<Group>(R.length);
+function getResponseContribution(
+    share: Scalar,
+    R: Group[]
+): ResponseContribution {
+    let D = new Array<Group>(R.length).fill(Group.zero);
     for (let i = 0; i < R.length; i++) {
-        if (R[i].equals(Group.zero).toBoolean()) D[i] = Group.zero;
-        else D[i] = R[i].scale(ski);
-        merkleTree.setLeaf(BigInt(i), Poseidon.hash(D[i].toFields()));
+        if (!R[i].equals(Group.zero).toBoolean()) D[i] = R[i].scale(share);
     }
-
-    return [
-        new ResponseContribution({
-            responseRootD: merkleTree.getRoot(),
-            D: new DArray(D),
-        }),
-        ski,
-    ];
+    return new ResponseContribution(D);
 }
 
 function getLagrangeCoefficient(memberIds: number[]): Scalar[] {

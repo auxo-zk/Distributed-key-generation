@@ -1,13 +1,6 @@
 import 'dotenv/config.js';
 import fs from 'fs';
-import {
-    Cache,
-    Lightnet,
-    Mina,
-    PrivateKey,
-    PublicKey,
-    fetchAccount,
-} from 'o1js';
+import { Cache, Mina, PrivateKey, PublicKey, fetchAccount } from 'o1js';
 import { Utils } from '@auxo-dev/auxo-libs';
 import { Config, JSONKey, Key, Network } from './config.js';
 

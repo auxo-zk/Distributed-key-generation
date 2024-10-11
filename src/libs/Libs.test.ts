@@ -1,23 +1,20 @@
 import { Field, Group, PrivateKey, Scalar } from 'o1js';
-import { Bit255, CustomScalar } from '@auxo-dev/auxo-libs';
-import * as ElgamalECC from './Elgamal.js';
-import { ENCRYPTION_LIMITS, SECRET_UNIT } from '../constants.js';
 import {
-    ResponseContribution,
-    Round1Contribution,
-    Round2Contribution,
-    Round2Data,
+    Cipher,
+    KeyGenContribution,
     SecretPolynomial,
     accumulateResponses,
     calculatePublicKey,
     generateRandomPolynomial,
     getResponseContribution,
-    getRound1Contribution,
-    getRound2Contribution,
+    getKeyGenContribution,
+    getSecretShare,
+    ResponseContribution,
 } from './Committee.js';
 import {
     accumulateEncryption,
-    bruteForceResultVector,
+    bruteForceResult,
+    EncryptionConfig,
     generateEncryption,
     getResultVector,
 } from './Requester.js';
@@ -25,16 +22,16 @@ import {
 describe('DKG', () => {
     let T = 1;
     let N = 3;
-    let committees: {
+    let members: {
         privateKey: PrivateKey;
         memberId: number;
         secretPolynomial: SecretPolynomial;
-        round1Contribution?: Round1Contribution;
-        round2Contribution?: Round2Contribution;
+        contribution?: KeyGenContribution;
+        share?: Scalar;
+        commitment?: Field;
         responseContribution?: ResponseContribution;
     }[] = [];
-    let round1Contributions: Round1Contribution[] = [];
-    let round2Contributions: Round2Contribution[] = [];
+    let contributions: KeyGenContribution[] = [];
     let responseContributions: ResponseContribution[] = [];
     let publicKey: Group;
     let R: Group[][] = [];
@@ -44,18 +41,17 @@ describe('DKG', () => {
     let sumM: Group[] = [];
     let sumD: Group[] = [];
     let respondedMembers = [1];
+    const encryptionConfig = new EncryptionConfig({
+        n: Field(10 ** 2),
+        l: Field(10 ** 2),
+        d: Field(32),
+    });
     const submissionVectors = [
-        {
-            0: 10000n * BigInt(SECRET_UNIT),
-            2: 10000n * BigInt(SECRET_UNIT),
-        },
-        {
-            3: 10000n * BigInt(SECRET_UNIT),
-        },
-        {
-            2: 10000n * BigInt(SECRET_UNIT),
-            5: 10000n * BigInt(SECRET_UNIT),
-        },
+        { 0: 100n, 12: 100n },
+        { 3: 100n },
+        { 8: 100n, 6: 100n },
+        { 5: 100n, 3: 100n },
+        { 7: 100n, 1: 100n },
     ];
     let result: { [key: number]: bigint } = {};
     let resultVector: Group[];
@@ -64,56 +60,74 @@ describe('DKG', () => {
         for (let i = 0; i < N; i++) {
             let privateKey = PrivateKey.random();
             let secretPolynomial = generateRandomPolynomial(T, N);
-            committees.push({
+            members.push({
                 privateKey: privateKey,
                 memberId: i,
                 secretPolynomial: secretPolynomial,
-                round1Contribution: undefined,
-                round2Contribution: undefined,
+                contribution: undefined,
             });
         }
     });
 
-    it('Should generate round 1 contribution', async () => {
+    it('Should generate contribution', async () => {
+        const pubKeys = members.map((member) =>
+            member.privateKey.toPublicKey()
+        );
         for (let i = 0; i < N; i++) {
-            let round1Contribution = getRound1Contribution(
-                committees[i].secretPolynomial
+            let contribution = getKeyGenContribution(
+                members[i].secretPolynomial,
+                i,
+                pubKeys,
+                [...Array(N).keys()].map(() => Scalar.random())
             );
-            committees[i].round1Contribution = round1Contribution;
-            round1Contributions.push(round1Contribution);
+            members[i].contribution = contribution;
+            contributions.push(contribution);
         }
-        publicKey = calculatePublicKey(round1Contributions);
+        publicKey = calculatePublicKey(contributions.map((e) => e.C));
         expect(publicKey.isZero().toBoolean()).toEqual(false);
     });
 
-    it('Should generate round 2 contribution', async () => {
+    it('Should compute and commit secret share', async () => {
         for (let i = 0; i < N; i++) {
-            let round2Contribution = getRound2Contribution(
-                committees[i].secretPolynomial,
-                committees[i].memberId,
-                round1Contributions,
-                [...Array(N).keys()].map(() => Scalar.random())
+            let { share, commitment } = getSecretShare(
+                members[i].secretPolynomial,
+                members[i].memberId,
+                contributions.map(
+                    (e) =>
+                        ({
+                            c: e.c.get(Field(i)),
+                            U: e.U.get(Field(i)),
+                        } as Cipher)
+                ),
+                members[i].privateKey
             );
-            committees[i].round2Contribution = round2Contribution;
-            round2Contributions.push(round2Contribution);
+            members[i].share = share;
+            members[i].commitment = commitment;
         }
+        let secretKey = members.slice(0, T).reduce(
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any
+            (prev: Scalar, curr: any) => prev.add(curr.share!),
+            Scalar.from(0n)
+        );
+        expect(
+            Group.generator.scale(secretKey).equals(publicKey).toBoolean()
+        ).toEqual(true);
     });
 
     it('Should accumulate encryption', async () => {
         for (let i = 0; i < submissionVectors.length; i++) {
             let encryptedVector = generateEncryption(
                 0,
-                calculatePublicKey(round1Contributions),
-                submissionVectors[i]
+                calculatePublicKey(contributions.map((e) => e.C)),
+                submissionVectors[i],
+                encryptionConfig
             );
             R.push(encryptedVector.R);
             M.push(encryptedVector.M);
-            for (let j = 0; j < ENCRYPTION_LIMITS.DIMENSION; j++) {
-                let index = encryptedVector.indices[j];
+            for (let j = 0; j < encryptedVector.notes.length; j++) {
+                let index = Number(encryptedVector.notes[j].index);
                 if (!result[index]) result[index] = 0n;
-                result[index] += encryptedVector.secrets
-                    .get(Field(j))
-                    .toBigInt();
+                result[index] += encryptedVector.notes[j].value.toBigInt();
             }
         }
         let accumulatedEncryption = accumulateEncryption(R, M);
@@ -123,45 +137,39 @@ describe('DKG', () => {
 
     it('Should generate response contribution', async () => {
         for (let i = 0; i < T; i++) {
-            let member = committees[respondedMembers[i]];
-            let round2Data: Round2Data[] = round2Contributions.map(
-                (contribution, index) =>
-                    index == committees[respondedMembers[i]].memberId
-                        ? { c: Bit255.fromBigInt(0n), U: Group.zero }
-                        : {
-                              c: new Bit255(
-                                  contribution.c.values[member.memberId]
-                              ),
-                              U: contribution.U.values[member.memberId],
-                          },
-                {}
-            );
-            let [responseContribution, _] = getResponseContribution(
-                committees[respondedMembers[i]].secretPolynomial,
-                committees[respondedMembers[i]].memberId,
-                round2Data,
-                sumR
-            );
-            committees[respondedMembers[i]].responseContribution =
-                responseContribution;
-            responseContributions.push(responseContribution);
-            D.push(responseContribution.D.values);
+            let member = members[respondedMembers[i]];
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            let contribution = getResponseContribution(member.share!, sumR);
+            members[respondedMembers[i]].responseContribution = contribution;
+            responseContributions.push(contribution);
+            D.push(contribution.values.slice(0, Number(encryptionConfig.c)));
         }
     });
 
-    it('Should calculate result vector', async () => {
+    it('Should calculate result point', async () => {
         sumD = accumulateResponses(respondedMembers, D);
         resultVector = getResultVector(sumD, sumM);
-        Object.entries(result).map(([key, value]) => {
-            let point = Group.generator.scale(Scalar.from(value));
-            expect(resultVector[Number(key)].x).toEqual(point.x);
-            expect(resultVector[Number(key)].y).toEqual(point.y);
-        });
     });
 
     it('Should brute force raw result correctly', async () => {
-        let rawResult = bruteForceResultVector(resultVector);
-        for (let i = 0; i < ENCRYPTION_LIMITS.FULL_DIMENSION; i++) {
+        let { base, c, d } = encryptionConfig;
+        let splitSize = Number(d) / Number(c);
+        for (let k = 0; k < Number(c); k++) {
+            let correctResult = Scalar.from(0n);
+            for (let i = 0; i < splitSize; i++) {
+                correctResult = correctResult.add(
+                    Scalar.from(
+                        result[i + k * splitSize]
+                            ? result[i + k * splitSize] *
+                                  base.toBigInt() ** BigInt(i)
+                            : 0n
+                    )
+                );
+            }
+        }
+        let rawResult = bruteForceResult(resultVector, encryptionConfig);
+
+        for (let i = 0; i < rawResult.length; i++) {
             if (
                 Object.keys(result)
                     .map((e) => Number(e))
@@ -172,20 +180,5 @@ describe('DKG', () => {
                 expect(rawResult[i].toBigInt()).toEqual(0n);
             }
         }
-    });
-});
-
-describe('ElgamalECC', () => {
-    it('Should decrypt successfully', async () => {
-        let msg = Scalar.random();
-        let privateKey = Scalar.random();
-        let publicKey = Group.generator.scale(privateKey);
-        let encrypted = ElgamalECC.encrypt(msg, publicKey, Scalar.random());
-        let decrypted = ElgamalECC.decrypt(
-            encrypted.c,
-            encrypted.U,
-            privateKey
-        );
-        expect(msg.toBigInt()).toEqual(decrypted.m.toBigInt());
     });
 });

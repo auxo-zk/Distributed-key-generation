@@ -19,7 +19,7 @@ import {
     Bool,
 } from 'o1js';
 import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
-import { ENCRYPTION_LIMITS, REQUEST_FEE } from '../constants.js';
+import { ENC_LIMITS, REQUEST_FEE } from '../constants.js';
 import {
     ErrorEnum,
     EventEnum,
@@ -704,7 +704,7 @@ class RequestContract extends SmartContract {
         });
         this.reducer.dispatch(action);
 
-        for (let i = 0; i < ENCRYPTION_LIMITS.FULL_DIMENSION; i++) {
+        for (let i = 0; i < ENC_LIMITS.DIMENSION; i++) {
             this.emitEvent(
                 EventEnum.ResultArray,
                 new ResultArrayEvent({

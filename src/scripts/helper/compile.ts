@@ -1,19 +1,19 @@
 import fs from 'fs/promises';
 import { Cache } from 'o1js';
 import { Utils } from '@auxo-dev/auxo-libs';
-import { Rollup, RollupContract } from '../../contracts/Rollup.js';
+// import { Rollup, RollupContract } from '../../contracts/Rollup.js';
 import {
     CommitteeContract,
-    UpdateCommittee,
+    RollupCommittee,
 } from '../../contracts/Committee.js';
-import { DkgContract, UpdateKey } from '../../contracts/DKG.js';
+import { KeyContract, RollupKey } from '../../contracts/Key.js';
 import {
     BatchDecryption,
     BatchEncryption,
     Elgamal,
 } from '../../contracts/Encryption.js';
-import { FinalizeRound1, Round1Contract } from '../../contracts/Round1.js';
-import { FinalizeRound2, Round2Contract } from '../../contracts/Round2.js';
+// import { FinalizeRound1, Round1Contract } from '../../contracts/Round1.js';
+// import { FinalizeRound2, Round2Contract } from '../../contracts/Round2.js';
 import { ComputeResult, UpdateRequest } from '../../contracts/Request.js';
 import { RequestContract } from '../../contracts/Request.js';
 import {
@@ -39,24 +39,24 @@ async function compile(
     try {
         if (!programs || programs.length == 0) {
             programs = [
-                Rollup,
-                UpdateCommittee,
-                UpdateKey,
+                // Rollup,
+                RollupCommittee,
+                RollupKey,
                 Elgamal,
                 BatchEncryption,
                 BatchDecryption,
-                FinalizeRound1,
-                FinalizeRound2,
+                // FinalizeRound1,
+                // FinalizeRound2,
                 UpdateRequest,
                 UpdateTask,
                 ComputeResponse,
                 FinalizeResponse,
                 ComputeResult,
-                RollupContract,
+                // RollupContract,
                 CommitteeContract,
-                DkgContract,
-                Round1Contract,
-                Round2Contract,
+                KeyContract,
+                // Round1Contract,
+                // Round2Contract,
                 RequestContract,
                 TaskManagerContract,
                 SubmissionContract,

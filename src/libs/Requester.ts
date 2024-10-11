@@ -1,15 +1,18 @@
 import {
+    Bool,
     Field,
     Group,
     Poseidon,
+    Provable,
     PublicKey,
     Scalar,
     Struct,
     UInt32,
     UInt8,
 } from 'o1js';
-import { GroupDynamicArray, StaticArray, Utils } from '@auxo-dev/auxo-libs';
-import { ENCRYPTION_LIMITS, SECRET_MAX, SECRET_UNIT } from '../constants.js';
+import { GroupDynamicArray, StaticArray } from '@auxo-dev/auxo-libs';
+import { ECElGamal } from '@auxo-dev/o1js-encrypt';
+import { ENC_LIMITS } from '../constants.js';
 
 export {
     RArray,
@@ -22,34 +25,71 @@ export {
     NullifierArray,
     CommitmentArray,
     SecretNote,
+    EncryptionConfig,
     calculatePublicKey as calculatePublicKeyFromPoints,
     calculateCommitment,
     calculateTaskReference,
     generateEncryption,
-    // recoverEncryption,
     accumulateEncryption,
     getResultVector,
-    bruteForceResultVector,
+    bruteForceResult,
 };
 
-class RArray extends GroupDynamicArray(ENCRYPTION_LIMITS.FULL_DIMENSION) {}
-class MArray extends GroupDynamicArray(ENCRYPTION_LIMITS.FULL_DIMENSION) {}
-class DArray extends GroupDynamicArray(ENCRYPTION_LIMITS.FULL_DIMENSION) {}
-class SecretVector extends StaticArray(Scalar, ENCRYPTION_LIMITS.DIMENSION) {}
-class RandomVector extends StaticArray(Scalar, ENCRYPTION_LIMITS.DIMENSION) {}
-class RequestVector extends StaticArray(Group, ENCRYPTION_LIMITS.DIMENSION) {}
-class ResultVector extends StaticArray(
-    Scalar,
-    ENCRYPTION_LIMITS.FULL_DIMENSION
-) {}
-class NullifierArray extends StaticArray(Field, ENCRYPTION_LIMITS.DIMENSION) {}
-class CommitmentArray extends StaticArray(Field, ENCRYPTION_LIMITS.DIMENSION) {}
+class RArray extends GroupDynamicArray(ENC_LIMITS.SPLIT) {}
+class MArray extends GroupDynamicArray(ENC_LIMITS.SPLIT) {}
+class DArray extends GroupDynamicArray(ENC_LIMITS.SPLIT) {}
+class SecretVector extends StaticArray(Scalar, ENC_LIMITS.DIMENSION) {}
+class RandomVector extends StaticArray(Scalar, ENC_LIMITS.DIMENSION) {}
+class RequestVector extends StaticArray(Group, ENC_LIMITS.DIMENSION) {}
+class ResultVector extends StaticArray(Scalar, ENC_LIMITS.DIMENSION) {}
+class NullifierArray extends StaticArray(Field, ENC_LIMITS.DIMENSION) {}
+class CommitmentArray extends StaticArray(Field, ENC_LIMITS.DIMENSION) {}
+
+class EncryptionConfig extends Struct({
+    n: Field,
+    l: Field,
+    d: Field,
+}) {
+    static assertCorrect(config: EncryptionConfig) {
+        let { base, c, d } = config;
+        d.isEven().or(d.lessThanOrEqual(3)).assertTrue();
+        c.assertLessThanOrEqual(Field(ENC_LIMITS.SPLIT));
+        base.assertLessThanOrEqual(
+            Provable.if(
+                d.equals(3),
+                Field(Math.cbrt(ENC_LIMITS.RESULT)),
+                Field(Math.sqrt(ENC_LIMITS.RESULT))
+            )
+        );
+        return Bool(true);
+    }
+
+    get c(): Field {
+        return Provable.if(this.d.lessThanOrEqual(3), Field(1), this.d.div(2));
+    }
+
+    get base(): Field {
+        return this.n.mul(this.l);
+    }
+
+    get splitSize(): Field {
+        return this.d.div(this.c);
+    }
+}
+
 class SecretNote extends Struct({
     taskId: UInt32,
     index: UInt8,
+    value: Scalar,
     nullifier: Field,
     commitment: Field,
-}) {}
+}) {
+    static new(taskId: UInt32, index: UInt8, value: Scalar): SecretNote {
+        let nullifier = Field.random();
+        let commitment = calculateCommitment(nullifier, taskId, index, value);
+        return new SecretNote({ taskId, index, value, nullifier, commitment });
+    }
+}
 
 function calculatePublicKey(contributedPublicKeys: Group[]): Group {
     let result = Group.zero;
@@ -77,149 +117,82 @@ function calculateTaskReference(requester: PublicKey, taskId: UInt32) {
 function generateEncryption(
     taskId: number,
     publicKey: Group,
-    vector: { [key: number | string]: bigint | undefined }
+    vector: { [key: number | string]: bigint | undefined },
+    config: EncryptionConfig
 ): {
-    indices: number[];
-    packedIndices: Field;
-    secrets: SecretVector;
-    randoms: RandomVector;
-    nullifiers: NullifierArray;
     R: Group[];
     M: Group[];
     notes: SecretNote[];
+    fakeNotes: SecretNote[];
 } {
-    if (Object.keys(vector).length > ENCRYPTION_LIMITS.DIMENSION)
-        throw new Error('Exceeds limit for submission dimension!');
-    let secrets = new SecretVector();
-    let randoms = new RandomVector();
-    let indices: number[] = [];
-    let nullifiers = new NullifierArray();
+    if (Object.keys(vector).length > ENC_LIMITS.DIMENSION)
+        throw new Error('Exceeds limit for number of encrypting index!');
+    let { base, d, splitSize } = config;
     let notes: SecretNote[] = [];
-    let R = new Array<Group>(ENCRYPTION_LIMITS.FULL_DIMENSION).fill(Group.zero);
-    let M = new Array<Group>(ENCRYPTION_LIMITS.FULL_DIMENSION).fill(Group.zero);
+    let fakeNotes: SecretNote[] = [];
+    let R = new Array<Group>(ENC_LIMITS.SPLIT).fill(Group.zero);
+    let M = new Array<Group>(ENC_LIMITS.SPLIT).fill(Group.zero);
+    let indices: number[] = [];
 
-    Object.entries(vector).map(([key, value], i) => {
-        if (value === undefined || value < 0n)
-            throw new Error('Negative value is not allowed!');
-
+    for (let i = 0; i < Number(d); i++) {
+        let value = vector[i] || 0;
+        if (value < 0n) throw new Error('Negative value is not allowed!');
+        let splitIdx = Math.floor(i / Number(splitSize));
+        let localIdx = i % Number(splitSize);
         let secret = Scalar.from(value);
         let random = Scalar.random();
-        let nullifier = Field.random();
-        indices.push(Number(key));
-        secrets.set(Field(i), secret);
-        randoms.set(Field(i), random);
-        nullifiers.set(Field(i), nullifier);
-        let index = UInt8.from(Number(key));
-        let commitment = calculateCommitment(
-            nullifier,
-            UInt32.from(taskId),
-            index,
-            secret
+        let note = SecretNote.new(UInt32.from(taskId), UInt8.from(i), secret);
+        if (value > 0n) {
+            notes.push(note);
+            indices.push(i);
+        }
+        R[splitIdx] = R[splitIdx].add(Group.generator.scale(random));
+        M[splitIdx] = M[splitIdx].add(
+            Group.generator
+                .scale(
+                    secret.mul(Scalar.from(base.toBigInt() ** BigInt(localIdx)))
+                )
+                .add(publicKey.scale(random))
         );
-        if (value > 0n)
-            notes.push({
-                taskId: UInt32.from(taskId),
-                index,
-                nullifier,
-                commitment,
-            });
-
-        R[Number(key)] = Group.generator.scale(random);
-        M[Number(key)] =
-            value > 0n
-                ? Group.generator.scale(secret).add(publicKey.scale(random))
-                : Group.zero.add(publicKey.scale(random));
-    });
+    }
 
     for (
         let i = Object.keys(vector).length;
-        i < ENCRYPTION_LIMITS.DIMENSION;
+        i < Math.ceil(Math.sqrt(ENC_LIMITS.DIMENSION));
         i++
     ) {
-        let freeIndices = [
-            ...Array(ENCRYPTION_LIMITS.FULL_DIMENSION).keys(),
-        ].filter((e) => !indices.includes(e));
+        let freeIndices = [...Array(ENC_LIMITS.DIMENSION).keys()].filter(
+            (e) => !indices.includes(e)
+        );
         let randomIndex =
             freeIndices[Math.floor(Math.random() * freeIndices.length)];
 
-        let secret = Scalar.from(0);
-        let random = Scalar.random();
-        let nullifier = Field.random();
-        indices.push(Number(randomIndex));
-        secrets.set(Field(i), secret);
-        randoms.set(Field(i), random);
-        nullifiers.set(Field(i), nullifier);
-        R[randomIndex] = Group.generator.scale(random);
-        M[randomIndex] = Group.zero.add(publicKey.scale(random));
+        let note = SecretNote.new(
+            UInt32.from(taskId),
+            UInt8.from(randomIndex),
+            Scalar.from(0)
+        );
+        indices.push(randomIndex);
+        fakeNotes.push(note);
     }
 
-    let packedIndices = Utils.packNumberArray(indices, 8);
-    return {
-        indices,
-        packedIndices,
-        secrets,
-        randoms,
-        nullifiers,
-        R,
-        M,
-        notes,
-    };
+    return { R, M, notes, fakeNotes };
 }
-
-// function recoverEncryption(
-//     taskIndex: number,
-//     publicKey: Group,
-//     r: Scalar[],
-//     vector: { [key: number | string]: bigint | undefined }
-// ): {
-//     packedIndices: Field;
-//     R: Group[];
-//     M: Group[];
-//     notes: SecretNote[];
-// } {
-//     let dimension = vector.length;
-//     let R = new Array<Group>(dimension);
-//     let M = new Array<Group>(dimension);
-//     let notes = new Array<SecretNote>(dimension);
-//     let packedIndices = Utils.packNumberArray(indices, 8);
-//     for (let i = 0; i < dimension; i++) {
-//         let random = r[i];
-//         R[i] = Group.generator.scale(random);
-//         M[i] =
-//             vector[i] > 0n
-//                 ? Group.generator
-//                       .scale(Scalar.from(vector[i]))
-//                       .add(publicKey.scale(random))
-//                 : Group.zero.add(publicKey.scale(random));
-//         let nullifier = Field.random();
-//         let taskId = Field(taskIndex);
-//         let index = Field(indices[i]);
-//         // let commitment = calculateCommitment(
-//         //     nullifier,
-//         //     taskId,
-//         //     index,
-//         //     CustomScalar.fromScalar(Scalar.from(vector[i]))
-//         // );
-//         // notes[i] = { taskId, index, nullifier, commitment };
-//     }
-//     return { packedIndices, R, M, notes };
-// }
 
 function accumulateEncryption(
     R: Group[][],
     M: Group[][]
 ): { sumR: Group[]; sumM: Group[] } {
-    let quantity = R.length;
-    let dimension = R[0].length ?? 0;
-    let sumR = new Array<Group>(dimension);
-    let sumM = new Array<Group>(dimension);
-    sumR.fill(Group.zero);
-    sumM.fill(Group.zero);
+    if (R.length !== M.length || R[0].length !== M[0].length)
+        throw new Error('Mismatch in length of ciphertext!');
 
-    for (let i = 0; i < quantity; i++) {
-        for (let j = 0; j < dimension; j++) {
-            sumR[j] = sumR[j].add(R[i][j]);
-            sumM[j] = sumM[j].add(M[i][j]);
+    let sumR = new Array<Group>(Number(R[0].length)).fill(Group.zero);
+    let sumM = new Array<Group>(Number(M[0].length)).fill(Group.zero);
+
+    for (let j = 0; j < M.length; j++) {
+        for (let k = 0; k < M[0].length; k++) {
+            sumR[k] = sumR[k].add(R[j][k]);
+            sumM[k] = sumM[k].add(M[j][k]);
         }
     }
     return { sumR, sumM };
@@ -233,33 +206,55 @@ function getResultVector(D: Group[], M: Group[]): Group[] {
     return result;
 }
 
-function bruteForceResultVector(
+function convertToBase(number: number, base: number): number[] {
+    if (number < 0) {
+        throw new Error('The number must be non-negative!');
+    }
+    const digits: number[] = [];
+    while (number > 0) {
+        digits.push(number % base);
+        number = Math.floor(number / base);
+    }
+    return digits;
+}
+
+function bruteForceResult(
     resultVector: Group[],
-    unitValue = SECRET_UNIT,
-    maxValue = SECRET_MAX
+    config: EncryptionConfig
 ): Scalar[] {
-    let dimension = resultVector.length;
-    let rawResult = [...Array(dimension).keys()].map(() => Scalar.from(0));
-    let coefficient = [...Array(dimension).keys()].map(() => BigInt(0));
-
-    [...Array(dimension).keys()].map((i) => {
-        let found = false;
-        let targetPoint = resultVector[i];
-        while (!found) {
-            let testingValue = Scalar.from(coefficient[i] * BigInt(unitValue));
-            found = targetPoint
-                .sub(Group.generator.scale(testingValue))
-                .equals(Group.zero)
-                .toBoolean();
-
-            if (found) rawResult[i] = testingValue;
-            else {
-                coefficient[i] += BigInt(1);
-                if (testingValue.toBigInt() == BigInt(maxValue))
-                    throw new Error('No valid value found!');
-            }
-        }
+    let { base, c, d } = config;
+    let babySteps = new Map<string, bigint>();
+    ECElGamal.Lib.loadBabySteps(
+        `src/libs/helpers/babySteps-1e${Math.ceil(
+            Math.log10(Math.sqrt(ENC_LIMITS.RESULT))
+        )}.txt`
+    ).map((babyStep) => {
+        babySteps.set(babyStep[0].toString(), babyStep[1]);
     });
-
-    return rawResult;
+    let result: Scalar[] = [];
+    for (let i = 0; i < Number(c); i++) {
+        let combinedResult = ECElGamal.Lib.babyStepGiantStep(
+            resultVector[i],
+            babySteps,
+            1n,
+            BigInt(ENC_LIMITS.RESULT)
+        );
+        let rawResult = convertToBase(
+            Number(combinedResult.toBigInt()),
+            Number(base)
+        );
+        let splitSize = Number(d) / Number(c);
+        if (rawResult.length > splitSize)
+            throw new Error('Brute force result exceeds specified dimension!');
+        result.push(
+            ...rawResult
+                .map((e) => Scalar.from(e))
+                .concat(
+                    [...Array(splitSize - rawResult.length)].map(() =>
+                        Scalar.from(0)
+                    )
+                )
+        );
+    }
+    return result;
 }
