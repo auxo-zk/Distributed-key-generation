@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import fs from 'fs/promises';
-import { Bool, Cache, Field, PublicKey, Reducer } from 'o1js';
+import { Bool, Cache, Field, Provable, PublicKey, Reducer } from 'o1js';
 import { IpfsHash, Utils } from '@auxo-dev/auxo-libs';
 import {
     CommitteeContract,
@@ -12,15 +12,17 @@ import {
     CommitteeActionEnum,
     CreateActions,
 } from '../contracts/Committee.js';
-import { MemberArray } from '../libs/Committee.js';
 import { MemberStorage, SettingStorage } from '../storages/CommitteeStorage.js';
 import { prepare } from './helper/prepare.js';
 import { Network } from './helper/config.js';
 import { fetchAccounts } from './helper/index.js';
-import { INSTANCE_LIMITS } from '../constants.js';
+import { INST_LIMITS } from '../constants.js';
+import { ECElGamal } from '@auxo-dev/o1js-encrypt';
+import { MemberPublicKeyArray } from '../libs/types.js';
 
 describe('DKG Committee', () => {
-    const doProofs = false;
+    const doProofs = true;
+    const analyzing = false;
     const profiler = Utils.getProfiler('committee', fs);
     const logger = {
         info: true,
@@ -33,7 +35,7 @@ describe('DKG Committee', () => {
     let memberStorage = new MemberStorage();
     let settingStorage = new SettingStorage();
     let committees: {
-        members: MemberArray;
+        members: MemberPublicKeyArray;
         threshold: Field;
         ipfsHash: IpfsHash;
         createActions: CreateActions;
@@ -53,6 +55,10 @@ describe('DKG Committee', () => {
         if (doProofs) {
             await Utils.compile(CommitteeContract, { cache, profiler, logger });
         }
+        if (analyzing) {
+            Provable.log(await RollupCommittee.analyzeMethods());
+            Provable.log(await CommitteeContract.analyzeMethods());
+        }
         committeeZkApp = Utils.getZkApp(
             _.accounts.committee,
             new CommitteeContract(_.accounts.committee.publicKey),
@@ -66,7 +72,7 @@ describe('DKG Committee', () => {
 
     // it('Should create committee with config T = 1, N = 2', async () => {
     //     let { feePayer } = _;
-    //     let memberArray = new MemberArray([
+    //     let memberArray = new MemberPublicKeyArray([
     //         users[0].publicKey,
     //         users[1].publicKey,
     //     ]);
@@ -118,7 +124,7 @@ describe('DKG Committee', () => {
 
     it('Should create committee with config T = 2, N = 3', async () => {
         let { feePayer } = _;
-        let memberArray = new MemberArray([
+        let memberArray = new MemberPublicKeyArray([
             users[0].publicKey,
             users[1].publicKey,
             users[2].publicKey,
@@ -147,7 +153,7 @@ describe('DKG Committee', () => {
         let actions = memberArray.values.map((address: PublicKey) => {
             let action = new CommitteeAction({
                 packedData: CommitteeAction.pack(
-                    Field(INSTANCE_LIMITS.COMMITTEE),
+                    Field(INST_LIMITS.COMMITTEE),
                     memberArray.length,
                     threshold,
                     Field(CommitteeActionEnum.CREATE)
@@ -308,6 +314,21 @@ describe('DKG Committee', () => {
                     address: users[j].publicKey,
                 });
                 let witness = memberStorage.getWitness(Field(i), Field(j));
+                // let r = Field.random();
+                // let { c, U } = await ECElGamal.Lib.encrypt(
+                //     Field(0),
+                //     users[j].publicKey.toGroup(),
+                //     r
+                // );
+                // let dummyProof = await ECElGamal.HashEncoding.Enc.encrypt(
+                //     new ECElGamal.HashEncoding.Input({
+                //         pubKey: users[j].publicKey.toGroup(),
+                //         c,
+                //         U,
+                //     }),
+                //     Field(0),
+                //     r
+                // );
                 proof = await Utils.prove(
                     RollupCommittee.name,
                     'join',
@@ -348,7 +369,7 @@ describe('DKG Committee', () => {
 
     it('Should not create committee with duplicated members', async () => {
         let { feePayer } = _;
-        let memberArray = new MemberArray([
+        let memberArray = new MemberPublicKeyArray([
             users[0].publicKey,
             users[1].publicKey,
             users[0].publicKey,
@@ -379,7 +400,7 @@ describe('DKG Committee', () => {
 
     it('Should not create committee with threshold T = 0', async () => {
         let { feePayer } = _;
-        let memberArray = new MemberArray([
+        let memberArray = new MemberPublicKeyArray([
             users[0].publicKey,
             users[1].publicKey,
         ]);
@@ -409,7 +430,7 @@ describe('DKG Committee', () => {
 
     it('Should not create committee with T > N', async () => {
         let { feePayer } = _;
-        let memberArray = new MemberArray([
+        let memberArray = new MemberPublicKeyArray([
             users[0].publicKey,
             users[1].publicKey,
         ]);

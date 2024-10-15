@@ -59,14 +59,14 @@ async function main() {
         Field(ZkAppIndex.DKG),
         _.accounts.dkg.publicKey
     );
-    sharedAddressMap.updateAddress(
-        Field(ZkAppIndex.ROUND1),
-        _.accounts.round1.publicKey
-    );
-    sharedAddressMap.updateAddress(
-        Field(ZkAppIndex.ROUND2),
-        _.accounts.round2.publicKey
-    );
+    // sharedAddressMap.updateAddress(
+    //     Field(ZkAppIndex.ROUND1),
+    //     _.accounts.round1.publicKey
+    // );
+    // sharedAddressMap.updateAddress(
+    //     Field(ZkAppIndex.ROUND2),
+    //     _.accounts.round2.publicKey
+    // );
     sharedAddressMap.updateAddress(
         Field(ZkAppIndex.REQUEST),
         _.accounts.request.publicKey

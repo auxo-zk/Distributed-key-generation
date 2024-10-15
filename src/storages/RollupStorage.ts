@@ -1,5 +1,5 @@
 // import { Field, MerkleTree, MerkleWitness } from 'o1js';
-// import { INSTANCE_LIMITS } from '../constants.js';
+// import { INST_LIMITS } from '../constants.js';
 // import { getBestHeight } from '@auxo-dev/zkapp-offchain-storage';
 // import {
 //     AddressMT,
@@ -28,11 +28,11 @@
 // };
 
 // const [MTWitnessRollup, NewMTWitnessRollup, EmptyMTRollup] = getBestHeight(
-//     BigInt(INSTANCE_LIMITS.ADDRESS * INSTANCE_LIMITS.ACTION)
+//     BigInt(INST_LIMITS.ADDRESS * INST_LIMITS.ACTION)
 // );
 
 // const ROLLUP_TREE_HEIGHT =
-//     Math.ceil(Math.log2(INSTANCE_LIMITS.ADDRESS * INSTANCE_LIMITS.ACTION)) + 1;
+//     Math.ceil(Math.log2(INST_LIMITS.ADDRESS * INST_LIMITS.ACTION)) + 1;
 // class RollupMT extends MerkleTree {}
 // class RollupWitness extends MerkleWitness(ROLLUP_TREE_HEIGHT) {}
 // const ROLLUP_MT = () => new RollupMT(ROLLUP_TREE_HEIGHT);
@@ -43,7 +43,7 @@
 // const ROLLUP_COUNTER_WITNESS = ADDRESS_WITNESS;
 
 // function calculateActionIndex(zkAppIndex: Field, actionId: Field): Field {
-//     return Field.from(BigInt(INSTANCE_LIMITS.ACTION))
+//     return Field.from(BigInt(INST_LIMITS.ACTION))
 //         .mul(zkAppIndex)
 //         .add(actionId);
 // }

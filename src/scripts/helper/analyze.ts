@@ -8,45 +8,20 @@ import {
     BatchDecryption,
     BatchEncryption,
     Elgamal,
-} from '../../contracts/Encryption.js';
-// import { FinalizeRound1, Round1Contract } from '../../contracts/Round1.js';
+} from '../../contracts/ContributionProgram.js';
+// import { RollupContribution, Round1Contract } from '../../contracts/Round1.js';
 // import { FinalizeRound2, Round2Contract } from '../../contracts/Round2.js';
-import { ComputeResult, UpdateRequest } from '../../contracts/Request.js';
+import { ComputeResult, RollupRequest } from '../../contracts/Request.js';
 import { RequestContract } from '../../contracts/Request.js';
-import { UpdateTask, RequesterContract } from '../../contracts/Requester.js';
+import { RollupTask, RequesterContract } from '../../contracts/Requester.js';
 import {
     ComputeResponse,
     FinalizeResponse,
     ResponseContract,
 } from '../../contracts/Response.js';
+import { Utils } from '@auxo-dev/auxo-libs';
 
-async function main() {
-    const programs = [
-        // Rollup,
-        RollupCommittee,
-        RollupKey,
-        Elgamal,
-        BatchEncryption,
-        BatchDecryption,
-        // FinalizeRound1,
-        // FinalizeRound2,
-        UpdateRequest,
-        UpdateTask,
-        ComputeResponse,
-        FinalizeResponse,
-        ComputeResult,
-    ];
-    const contracts = [
-        // RollupContract,
-        CommitteeContract,
-        KeyContract,
-        // Round1Contract,
-        // Round2Contract,
-        RequestContract,
-        RequesterContract,
-        ResponseContract,
-    ];
-
+export async function analyze(programs: Utils.Program[] = []) {
     let info: {
         program: string;
         method: string;
@@ -76,36 +51,45 @@ async function main() {
         });
     }
 
-    for (let i = 0; i < contracts.length; i++) {
-        let ct = contracts[i];
-        let analysis;
-        try {
-            analysis = await ct.analyzeMethods();
-        } catch (err) {
-            error.push(ct.name);
-            console.error(err);
-            continue;
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Object.entries(analysis).map(([key, value]: [string, any]) => {
-            info.push({
-                program: ct.name,
-                method: key,
-                constraints: value.rows,
-                digest: value.digest,
-            });
-        });
-    }
-
     console.log('Successfully compile:');
     console.table(info, ['program', 'method', 'constraints', 'digest']);
-
     console.log('Errors:', error);
 }
 
-main()
-    .then()
-    .catch((err) => {
-        console.error(err);
-        process.exit(1);
-    });
+async function main() {
+    const programs = [
+        // Rollup,
+        RollupCommittee,
+        RollupKey,
+        Elgamal,
+        BatchEncryption,
+        BatchDecryption,
+        // RollupContribution,
+        // FinalizeRound2,
+        RollupRequest,
+        RollupTask,
+        ComputeResponse,
+        FinalizeResponse,
+        ComputeResult,
+    ];
+    const contracts = [
+        // RollupContract,
+        CommitteeContract,
+        KeyContract,
+        // Round1Contract,
+        // Round2Contract,
+        RequestContract,
+        RequesterContract,
+        ResponseContract,
+    ];
+
+    await analyze(programs);
+    await analyze(contracts);
+}
+
+// main()
+//     .then()
+//     .catch((err) => {
+//         console.error(err);
+//         process.exit(1);
+//     });

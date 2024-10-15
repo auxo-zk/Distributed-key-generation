@@ -9,7 +9,6 @@ import {
     Struct,
     SelfProof,
     Poseidon,
-    UInt64,
     ZkProgram,
     Provable,
     Group,
@@ -17,9 +16,10 @@ import {
     UInt8,
     UInt32,
     Bool,
+    UInt64,
 } from 'o1js';
 import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
-import { ENC_LIMITS, REQUEST_FEE } from '../constants.js';
+import { ENC_LIMITS, INST_BIT_LIMITS, REQUEST_FEE } from '../constants.js';
 import {
     ErrorEnum,
     EventEnum,
@@ -33,22 +33,23 @@ import {
     RequestLevel1Witness,
     RequestLevel2Witness,
 } from '../storages/RequestStorage.js';
-import { rollup } from './Rollup.js';
 import { ResponseContract } from './Response.js';
-import { ResultVector, calculateTaskReference } from '../libs/Requester.js';
+import { calculateTaskReference } from '../libs/Requester.js';
+import { DimensionFieldArray } from '../libs/types.js';
 
 export {
     RequestStatus,
+    ActionEnum as RequestActionEnum,
     Action as RequestAction,
     ResultArrayEvent,
     ComputeResultInput,
     ComputeResultOutput,
     ComputeResult,
     ComputeResultProof,
-    UpdateRequestInput,
-    UpdateRequestOutput,
-    UpdateRequest,
-    UpdateRequestProof,
+    RollupRequestInput,
+    RollupRequestOutput,
+    RollupRequest,
+    RollupRequestProof,
     RequestContract,
 };
 
@@ -58,39 +59,98 @@ const enum RequestStatus {
     EXPIRED,
 }
 
+const enum ActionEnum {
+    INITIALIZE,
+    RESOLVE,
+    __LENGTH,
+}
+
+const { COMMITTEE, KEY, REQUEST, REQUESTER } = INST_BIT_LIMITS;
+
 class Action
     extends Struct({
-        requestId: Field,
-        keyIndex: Field,
-        task: Field,
-        expirationTimestamp: UInt64,
-        accumulationRoot: Field,
-        resultRoot: Field,
+        packedData: Field,
+        hashedData: Field,
     })
     implements ZkAppAction
 {
     static empty(): Action {
         return new Action({
-            requestId: Field(0),
-            keyIndex: Field(0),
-            task: Field(0),
-            expirationTimestamp: UInt64.zero,
-            accumulationRoot: Field(0),
-            resultRoot: Field(0),
+            packedData: Field(0),
+            hashedData: Field(0),
         });
     }
     static fromFields(input: Field[]): Action {
         return super.fromFields(input) as Action;
     }
+    static pack(
+        requestId: Field,
+        committeeId: Field,
+        keyId: Field,
+        task: Field,
+        timestamp: UInt32
+    ): Field {
+        return Field.fromBits([
+            ...requestId.toBits(REQUEST * REQUESTER),
+            ...committeeId.toBits(COMMITTEE),
+            ...keyId.toBits(KEY),
+            ...task.toBits(REQUEST),
+            ...timestamp.value.toBits(64),
+        ]);
+    }
     hash(): Field {
         return Poseidon.hash(Action.toFields(this));
+    }
+    get requestId(): Field {
+        return Field.fromBits(
+            this.packedData.toBits().slice(0, REQUEST * REQUESTER)
+        );
+    }
+    get committeeId(): Field {
+        return Field.fromBits(
+            this.packedData
+                .toBits()
+                .slice(REQUEST * REQUESTER, REQUEST * REQUESTER + COMMITTEE)
+        );
+    }
+    get keyId(): Field {
+        return Field.fromBits(
+            this.packedData
+                .toBits()
+                .slice(
+                    REQUEST * REQUESTER + COMMITTEE,
+                    REQUEST * REQUESTER + COMMITTEE + KEY
+                )
+        );
+    }
+    get task(): Field {
+        return Field.fromBits(
+            this.packedData
+                .toBits()
+                .slice(
+                    REQUEST * REQUESTER + COMMITTEE + KEY,
+                    REQUEST * REQUESTER + COMMITTEE + KEY + REQUEST
+                )
+        );
+    }
+    get expirationBlock(): UInt32 {
+        return UInt32.fromFields([
+            Field.fromBits(
+                this.packedData
+                    .toBits()
+                    .slice(
+                        REQUEST * REQUESTER + COMMITTEE + KEY + REQUEST,
+                        REQUEST * REQUESTER + COMMITTEE + KEY + REQUEST + 32
+                    )
+            ),
+        ]);
     }
 }
 
 class ResultArrayEvent extends Struct({
     requestId: Field,
     dimensionIndex: UInt8,
-    result: Scalar,
+    result: Field,
 }) {}
 
 class ComputeResultInput extends Struct({
@@ -104,7 +164,7 @@ class ComputeResultOutput extends Struct({
     responseRootD: Field,
     resultRoot: Field,
     dimension: UInt8,
-    resultVector: ResultVector,
+    resultVector: DimensionFieldArray,
 }) {}
 
 const ComputeResult = ZkProgram({
@@ -247,9 +307,9 @@ const ComputeResult = ZkProgram({
 
 class ComputeResultProof extends ZkProgram.Proof(ComputeResult) {}
 
-class UpdateRequestInput extends Action {}
+class RollupRequestInput extends Action {}
 
-class UpdateRequestOutput extends Struct({
+class RollupRequestOutput extends Struct({
     initialRequestCounter: Field,
     initialKeyIndexRoot: Field,
     initialTaskIdRoot: Field,
@@ -269,15 +329,15 @@ class UpdateRequestOutput extends Struct({
 /**
  * @todo Prevent failure for duplicated resolve actions
  */
-const UpdateRequest = ZkProgram({
-    name: ZkProgramEnum.UpdateRequest,
-    publicInput: UpdateRequestInput,
-    publicOutput: UpdateRequestOutput,
+const RollupRequest = ZkProgram({
+    name: ZkProgramEnum.RollupRequest,
+    publicInput: RollupRequestInput,
+    publicOutput: RollupRequestOutput,
     methods: {
         init: {
             privateInputs: [Field, Field, Field, Field, Field, Field, Field],
             async method(
-                input: UpdateRequestInput,
+                input: RollupRequestInput,
                 initialRequestCounter: Field,
                 initialKeyIndexRoot: Field,
                 initialTaskIdRoot: Field,
@@ -286,7 +346,7 @@ const UpdateRequest = ZkProgram({
                 initialResultRoot: Field,
                 initialActionState: Field
             ) {
-                return new UpdateRequestOutput({
+                return new RollupRequestOutput({
                     initialRequestCounter: initialRequestCounter,
                     initialKeyIndexRoot: initialKeyIndexRoot,
                     initialTaskIdRoot: initialTaskIdRoot,
@@ -306,17 +366,17 @@ const UpdateRequest = ZkProgram({
         },
         initialize: {
             privateInputs: [
-                SelfProof<UpdateRequestInput, UpdateRequestOutput>,
+                SelfProof<RollupRequestInput, RollupRequestOutput>,
                 RequestLevel1Witness,
                 RequestLevel1Witness,
                 RequestLevel1Witness,
                 RequestLevel1Witness,
             ],
             async method(
-                input: UpdateRequestInput,
+                input: RollupRequestInput,
                 earlierProof: SelfProof<
-                    UpdateRequestInput,
-                    UpdateRequestOutput
+                    RollupRequestInput,
+                    RollupRequestOutput
                 >,
                 keyIndexWitness: typeof RequestLevel1Witness,
                 taskWitness: typeof RequestLevel1Witness,
@@ -330,7 +390,7 @@ const UpdateRequest = ZkProgram({
                 input.requestId.assertEquals(
                     Field(-1),
                     Utils.buildAssertMessage(
-                        UpdateRequest.name,
+                        RollupRequest.name,
                         'initialize',
                         ErrorEnum.ACTION_TYPE
                     )
@@ -343,7 +403,7 @@ const UpdateRequest = ZkProgram({
                 earlierProof.publicOutput.nextKeyIndexRoot.assertEquals(
                     keyIndexWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
-                        UpdateRequest.name,
+                        RollupRequest.name,
                         'initialize',
                         ErrorEnum.KEY_INDEX_ROOT
                     )
@@ -351,7 +411,7 @@ const UpdateRequest = ZkProgram({
                 requestId.assertEquals(
                     keyIndexWitness.calculateIndex(),
                     Utils.buildAssertMessage(
-                        UpdateRequest.name,
+                        RollupRequest.name,
                         'initialize',
                         ErrorEnum.KEY_INDEX_INDEX
                     )
@@ -361,7 +421,7 @@ const UpdateRequest = ZkProgram({
                 earlierProof.publicOutput.nextTaskIdRoot.assertEquals(
                     taskWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
-                        UpdateRequest.name,
+                        RollupRequest.name,
                         'initialize',
                         ErrorEnum.TASK_ID_ROOT
                     )
@@ -369,7 +429,7 @@ const UpdateRequest = ZkProgram({
                 requestId.assertEquals(
                     taskWitness.calculateIndex(),
                     Utils.buildAssertMessage(
-                        UpdateRequest.name,
+                        RollupRequest.name,
                         'initialize',
                         ErrorEnum.TASK_ID_INDEX
                     )
@@ -379,7 +439,7 @@ const UpdateRequest = ZkProgram({
                 earlierProof.publicOutput.nextAccumulationRoot.assertEquals(
                     accumulationWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
-                        UpdateRequest.name,
+                        RollupRequest.name,
                         'initialize',
                         ErrorEnum.ACCUMULATION_ROOT
                     )
@@ -387,7 +447,7 @@ const UpdateRequest = ZkProgram({
                 requestId.assertEquals(
                     accumulationWitness.calculateIndex(),
                     Utils.buildAssertMessage(
-                        UpdateRequest.name,
+                        RollupRequest.name,
                         'initialize',
                         ErrorEnum.ACCUMULATION_INDEX_L1
                     )
@@ -397,7 +457,7 @@ const UpdateRequest = ZkProgram({
                 earlierProof.publicOutput.nextExpirationRoot.assertEquals(
                     expirationWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
-                        UpdateRequest.name,
+                        RollupRequest.name,
                         'initialize',
                         ErrorEnum.REQUEST_EXP_ROOT
                     )
@@ -405,7 +465,7 @@ const UpdateRequest = ZkProgram({
                 requestId.assertEquals(
                     expirationWitness.calculateIndex(),
                     Utils.buildAssertMessage(
-                        UpdateRequest.name,
+                        RollupRequest.name,
                         'initialize',
                         ErrorEnum.REQUEST_EXP_INDEX
                     )
@@ -430,7 +490,7 @@ const UpdateRequest = ZkProgram({
                     [Action.toFields(input)]
                 );
 
-                return new UpdateRequestOutput({
+                return new RollupRequestOutput({
                     ...earlierProof.publicOutput,
                     nextRequestCounter,
                     nextKeyIndexRoot,
@@ -443,14 +503,14 @@ const UpdateRequest = ZkProgram({
         },
         resolve: {
             privateInputs: [
-                SelfProof<UpdateRequestInput, UpdateRequestOutput>,
+                SelfProof<RollupRequestInput, RollupRequestOutput>,
                 RequestLevel1Witness,
             ],
             async method(
-                input: UpdateRequestInput,
+                input: RollupRequestInput,
                 earlierProof: SelfProof<
-                    UpdateRequestInput,
-                    UpdateRequestOutput
+                    RollupRequestInput,
+                    RollupRequestOutput
                 >,
                 resultWitness: typeof RequestLevel1Witness
             ) {
@@ -461,7 +521,7 @@ const UpdateRequest = ZkProgram({
                 input.requestId.assertNotEquals(
                     Field(-1),
                     Utils.buildAssertMessage(
-                        UpdateRequest.name,
+                        RollupRequest.name,
                         'resolve',
                         ErrorEnum.ACTION_TYPE
                     )
@@ -471,7 +531,7 @@ const UpdateRequest = ZkProgram({
                 earlierProof.publicOutput.nextResultRoot.assertEquals(
                     resultWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
-                        UpdateRequest.name,
+                        RollupRequest.name,
                         'resolve',
                         ErrorEnum.REQUEST_RESULT_ROOT
                     )
@@ -479,7 +539,7 @@ const UpdateRequest = ZkProgram({
                 input.requestId.assertEquals(
                     resultWitness.calculateIndex(),
                     Utils.buildAssertMessage(
-                        UpdateRequest.name,
+                        RollupRequest.name,
                         'resolve',
                         ErrorEnum.REQUEST_RESULT_INDEX_L1
                     )
@@ -496,7 +556,7 @@ const UpdateRequest = ZkProgram({
                     [Action.toFields(input)]
                 );
 
-                return new UpdateRequestOutput({
+                return new RollupRequestOutput({
                     initialRequestCounter:
                         earlierProof.publicOutput.initialRequestCounter,
                     initialKeyIndexRoot:
@@ -528,33 +588,44 @@ const UpdateRequest = ZkProgram({
     },
 });
 
-class UpdateRequestProof extends ZkProgram.Proof(UpdateRequest) {}
+class RollupRequestProof extends ZkProgram.Proof(RollupRequest) {}
 
 class RequestContract extends SmartContract {
     /**
+     * Slot 0
      * @description MT storing addresses of other zkApps
      * @see AddressStorage for off-chain storage implementation
      */
     @state(Field) zkAppRoot = State<Field>();
 
     /**
-     * @description Number of initialized requests
+     * Slot 1
+     * @description Latest rolluped action's state
      */
-    @state(Field) requestCounter = State<Field>();
+    @state(Field) actionState = State<Field>();
 
     /**
+     * Slot 2
+     * @description Number of initialized requests
+     */
+    @state(Field) requestCounter = State<Field>(Field(0));
+
+    /**
+     * Slot 3
      * @description MT storing corresponding keys
      * @see RequestKeyIndexStorage for off-chain storage implementation
      */
     @state(Field) keyIndexRoot = State<Field>();
 
     /**
+     * Slot 4
      * @description MT storing global task = Hash(requester | taskId)
      * @see TaskStorage for off-chain storage implementation
      */
     @state(Field) taskRoot = State<Field>();
 
     /**
+     * Slot 5
      * @description MT storing accumulation data
      * Hash(R accumulation MT root | M accumulation MT root | dimension)
      * @see RequestAccumulationStorage for off-chain storage implementation
@@ -562,21 +633,18 @@ class RequestContract extends SmartContract {
     @state(Field) accumulationRoot = State<Field>();
 
     /**
+     * Slot 6
      * @description MT storing requests' expiration timestamp
      * @see ExpirationStorage for off-chain storage implementation
      */
     @state(Field) expirationRoot = State<Field>();
 
     /**
+     * Slot 7
      * @description MT storing result values
      * @see ResultStorage for off-chain storage implementation
      */
     @state(Field) resultRoot = State<Field>();
-
-    /**
-     * @description Latest rolluped action's state
-     */
-    @state(Field) actionState = State<Field>();
 
     reducer = Reducer({ actionType: Action });
 
@@ -584,8 +652,6 @@ class RequestContract extends SmartContract {
 
     init() {
         super.init();
-        this.zkAppRoot.set(new AddressMap().addressMap.getRoot());
-        this.requestCounter.set(Field(0));
         this.keyIndexRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
         this.taskRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
         this.accumulationRoot.set(REQUEST_LEVEL_1_TREE().getRoot());
@@ -606,7 +672,7 @@ class RequestContract extends SmartContract {
     async initialize(
         keyIndex: Field,
         taskId: UInt32,
-        expirationPeriod: UInt64,
+        expirationPeriod: UInt32,
         accumulationRoot: Field,
         requester: PublicKey
     ) {
@@ -616,7 +682,8 @@ class RequestContract extends SmartContract {
         // Create and dispatch action
         // FIXME - "the permutation was not constructed correctly: final value" error
         // let timestamp = this.network.timestamp.getAndRequireEquals();
-        let timestamp = UInt64.from(0);
+        // let timestamp = UInt32.from(0);
+        let timestamp = this.network.blockchainLength.getAndRequireEquals();
         let action = new Action({
             requestId: Field(-1),
             keyIndex: keyIndex,
@@ -625,6 +692,7 @@ class RequestContract extends SmartContract {
             accumulationRoot,
             resultRoot: Field(0),
         });
+        this.network.blockchainLength;
         this.reducer.dispatch(action);
     }
 
@@ -650,7 +718,7 @@ class RequestContract extends SmartContract {
         accumulationWitness: typeof RequestLevel1Witness,
         responseWitness: typeof RequestLevel1Witness,
         resultWitness: typeof RequestLevel1Witness,
-        response: InstanceType<typeof ZkAppRef>
+        response: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -721,7 +789,7 @@ class RequestContract extends SmartContract {
      * @param proof Verification proof
      */
     @method
-    async update(proof: UpdateRequestProof) {
+    async update(proof: RollupRequestProof) {
         // Get current state values
         let curActionState = this.actionState.getAndRequireEquals();
         let requestCounter = this.requestCounter.getAndRequireEquals();
@@ -799,14 +867,26 @@ class RequestContract extends SmartContract {
         this.actionState.set(proof.publicOutput.nextActionState);
     }
 
+    /**
+     * Refund fee for a expired request
+     * @param requestId
+     * @param taskId
+     * @param receiver
+     */
     @method
-    async refund(requestId: Field, receiver: PublicKey) {
+    async refund(requestId: Field, taskId: UInt32, receiver: PublicKey) {
         // Refund fee
         this.send({ to: receiver, amount: UInt64.from(REQUEST_FEE) });
     }
 
+    /**
+     * Claim fee for a resolved request
+     * @param requestId
+     * @param committeeId
+     * @param receiver
+     */
     @method
-    async claimFee(requestId: Field, receiver: PublicKey) {
+    async claimFee(requestId: Field, committeeId: Field, receiver: PublicKey) {
         // Send shared fee
         // @todo Consider between this.sender or requester
         this.send({ to: receiver, amount: UInt64.from(REQUEST_FEE) });

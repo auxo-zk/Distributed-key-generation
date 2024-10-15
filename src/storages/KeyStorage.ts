@@ -1,23 +1,24 @@
-import { Field, Group, Poseidon, Struct } from 'o1js';
-import { FieldDynamicArray } from '@auxo-dev/auxo-libs';
+import { Field, Group, Poseidon } from 'o1js';
 import {
-    getBestHeight,
     OneLevelStorage,
+    ThreeLevelStorage,
     TwoLevelStorage,
 } from '@auxo-dev/zkapp-offchain-storage';
-import { INSTANCE_LIMITS } from '../constants.js';
-import { CommitteeLevel1Witness } from './CommitteeStorage.js';
-import { KeyGenContribution } from '../libs/Committee.js';
+import { INST_LIMITS } from '../constants.js';
+import { Cipher, ThresholdGroupArray } from '../libs/types.js';
+import {
+    CommitteeWitness,
+    EmptyCommitteeMT,
+    EmptyKeyMT,
+    EmptyMemberMT,
+    KeyWitness,
+    MemberWitness,
+    NewCommitteeWitness,
+    NewKeyWitness,
+    NewMemberWitness,
+} from './Merklized.js';
 
-export {
-    calculateKeyIndex,
-    EmptyMTL1 as KEY_LEVEL_1_TREE,
-    EmptyMTL2 as KEY_LEVEL_2_TREE,
-    MTWitnessL1 as KeyLevel1Witness,
-    MTWitnessL2 as KeyLevel2Witness,
-    FullMTWitness as DKGWitness,
-    ProcessedContributions,
-};
+export { calculateKeyIndex };
 
 export {
     KeyCounterLeaf,
@@ -28,35 +29,26 @@ export {
     KeyStorage,
     KeyFeeLeaf,
     KeeFeeStorage,
-    KeyGenContributionLeaf,
-    KeyGenContributionStorage,
+    PolynomialCommitmentLeaf,
+    PolynomialCommitmentStorage,
+    EncryptionLeaf,
+    EncryptionStorage,
+    ShareCommitmentLeaf,
+    ShareCommitmentStorage,
+    PublicKeyLeaf,
+    PublicKeyStorage,
 };
 
-const [MTWitnessL1, NewMTWitnessL1, EmptyMTL1] = getBestHeight(
-    BigInt(INSTANCE_LIMITS.COMMITTEE)
-);
-const [MTWitnessL2, NewMTWitnessL2, EmptyMTL2] = getBestHeight(
-    BigInt(INSTANCE_LIMITS.MEMBER)
-);
-class FullMTWitness extends Struct({
-    level1: MTWitnessL1,
-    level2: MTWitnessL2,
-}) {}
-
 function calculateKeyIndex(committeeId: Field, keyId: Field): Field {
-    return Field.from(INSTANCE_LIMITS.KEY).mul(committeeId).add(keyId);
+    return Field.from(INST_LIMITS.KEY).mul(committeeId).add(keyId);
 }
-
-class ProcessedContributions extends FieldDynamicArray(
-    INSTANCE_LIMITS.MEMBER
-) {}
 
 type KeyCounterLeaf = Field;
 class KeyCounterStorage extends OneLevelStorage<
     KeyCounterLeaf,
-    typeof CommitteeLevel1Witness
+    typeof CommitteeWitness
 > {
-    static readonly height = CommitteeLevel1Witness.height;
+    static readonly height = CommitteeWitness.height;
 
     constructor(
         leafs?: {
@@ -65,7 +57,7 @@ class KeyCounterStorage extends OneLevelStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EmptyMTL1, NewMTWitnessL1, leafs);
+        super(EmptyCommitteeMT, NewCommitteeWitness, leafs);
     }
 
     get height(): number {
@@ -92,9 +84,9 @@ class KeyCounterStorage extends OneLevelStorage<
 type KeyStatusLeaf = Field;
 class KeyStatusStorage extends OneLevelStorage<
     KeyStatusLeaf,
-    typeof MTWitnessL1
+    typeof KeyWitness
 > {
-    static readonly height = MTWitnessL1.height;
+    static readonly height = KeyWitness.height;
 
     constructor(
         leafs?: {
@@ -103,7 +95,7 @@ class KeyStatusStorage extends OneLevelStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EmptyMTL1, NewMTWitnessL1, leafs);
+        super(EmptyKeyMT, NewKeyWitness, leafs);
     }
 
     get height(): number {
@@ -143,8 +135,8 @@ class KeyStatusStorage extends OneLevelStorage<
 }
 
 type KeyLeaf = Group;
-class KeyStorage extends OneLevelStorage<KeyLeaf, typeof MTWitnessL1> {
-    static readonly height = MTWitnessL1.height;
+class KeyStorage extends OneLevelStorage<KeyLeaf, typeof KeyWitness> {
+    static readonly height = KeyWitness.height;
     constructor(
         leafs?: {
             level1Index: Field;
@@ -152,7 +144,7 @@ class KeyStorage extends OneLevelStorage<KeyLeaf, typeof MTWitnessL1> {
             isRaw: boolean;
         }[]
     ) {
-        super(EmptyMTL1, NewMTWitnessL1, leafs);
+        super(EmptyKeyMT, NewKeyWitness, leafs);
     }
 
     get height(): number {
@@ -192,8 +184,8 @@ class KeyStorage extends OneLevelStorage<KeyLeaf, typeof MTWitnessL1> {
 }
 
 type KeyFeeLeaf = Field;
-class KeeFeeStorage extends OneLevelStorage<KeyFeeLeaf, typeof MTWitnessL1> {
-    static readonly height = MTWitnessL1.height;
+class KeeFeeStorage extends OneLevelStorage<KeyFeeLeaf, typeof KeyWitness> {
+    static readonly height = KeyWitness.height;
 
     constructor(
         leafs?: {
@@ -202,7 +194,7 @@ class KeeFeeStorage extends OneLevelStorage<KeyFeeLeaf, typeof MTWitnessL1> {
             isRaw: boolean;
         }[]
     ) {
-        super(EmptyMTL1, NewMTWitnessL1, leafs);
+        super(EmptyKeyMT, NewKeyWitness, leafs);
     }
 
     get height(): number {
@@ -241,40 +233,46 @@ class KeeFeeStorage extends OneLevelStorage<KeyFeeLeaf, typeof MTWitnessL1> {
     }
 }
 
-type KeyGenContributionLeaf = KeyGenContribution;
-class KeyGenContributionStorage extends TwoLevelStorage<
-    KeyGenContributionLeaf,
-    typeof MTWitnessL1,
-    typeof MTWitnessL2
+type PolynomialCommitmentLeaf = ThresholdGroupArray;
+class PolynomialCommitmentStorage extends TwoLevelStorage<
+    PolynomialCommitmentLeaf,
+    typeof KeyWitness,
+    typeof MemberWitness
 > {
-    static readonly height1 = MTWitnessL1.height;
-    static readonly height2 = MTWitnessL2.height;
+    static readonly height1 = KeyWitness.height;
+    static readonly height2 = MemberWitness.height;
 
     constructor(
         leafs?: {
             level1Index: Field;
             level2Index: Field;
-            leaf: KeyGenContributionLeaf | Field;
+            leaf: PolynomialCommitmentLeaf | Field;
             isRaw: boolean;
         }[]
     ) {
-        super(EmptyMTL1, NewMTWitnessL1, EmptyMTL2, NewMTWitnessL2, leafs);
+        super(
+            EmptyKeyMT,
+            NewKeyWitness,
+            EmptyMemberMT,
+            NewMemberWitness,
+            leafs
+        );
     }
 
     get height1(): number {
-        return KeyGenContributionStorage.height1;
+        return PolynomialCommitmentStorage.height1;
     }
 
     get height2(): number {
-        return KeyGenContributionStorage.height2;
+        return PolynomialCommitmentStorage.height2;
     }
 
-    static calculateLeaf(contribution: KeyGenContributionLeaf): Field {
-        return contribution.hash();
+    static calculateLeaf(commitment: PolynomialCommitmentLeaf): Field {
+        return commitment.hash();
     }
 
-    calculateLeaf(contribution: KeyGenContributionLeaf): Field {
-        return KeyGenContributionStorage.calculateLeaf(contribution);
+    calculateLeaf(commitment: PolynomialCommitmentLeaf): Field {
+        return PolynomialCommitmentStorage.calculateLeaf(commitment);
     }
 
     static calculateLevel1Index({
@@ -294,7 +292,7 @@ class KeyGenContributionStorage extends TwoLevelStorage<
         committeeId: Field;
         keyId: Field;
     }): Field {
-        return KeyGenContributionStorage.calculateLevel1Index({
+        return PolynomialCommitmentStorage.calculateLevel1Index({
             committeeId,
             keyId,
         });
@@ -305,23 +303,264 @@ class KeyGenContributionStorage extends TwoLevelStorage<
     }
 
     calculateLevel2Index(memberId: Field): Field {
-        return KeyGenContributionStorage.calculateLevel2Index(memberId);
+        return PolynomialCommitmentStorage.calculateLevel2Index(memberId);
+    }
+}
+
+type EncryptionLeaf = Cipher;
+class EncryptionStorage extends ThreeLevelStorage<
+    EncryptionLeaf,
+    typeof KeyWitness,
+    typeof MemberWitness,
+    typeof MemberWitness
+> {
+    static readonly height1 = KeyWitness.height;
+    static readonly height2 = MemberWitness.height;
+    static readonly height3 = MemberWitness.height;
+
+    constructor(
+        leafs?: {
+            level1Index: Field;
+            level2Index: Field;
+            level3Index: Field;
+            leaf: EncryptionLeaf | Field;
+            isRaw: boolean;
+        }[]
+    ) {
+        super(
+            EmptyKeyMT,
+            NewKeyWitness,
+            EmptyMemberMT,
+            NewMemberWitness,
+            EmptyMemberMT,
+            NewMemberWitness,
+            leafs
+        );
+    }
+
+    get height1(): number {
+        return EncryptionStorage.height1;
+    }
+
+    get height2(): number {
+        return EncryptionStorage.height2;
+    }
+
+    get height3(): number {
+        return EncryptionStorage.height3;
+    }
+
+    static calculateLeaf(encryption: EncryptionLeaf): Field {
+        return Poseidon.hash(
+            [encryption.c.toFields(), encryption.U.toFields()].flat()
+        );
+    }
+
+    calculateLeaf(encryption: EncryptionLeaf): Field {
+        return EncryptionStorage.calculateLeaf(encryption);
+    }
+
+    static calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return calculateKeyIndex(committeeId, keyId);
+    }
+
+    calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return EncryptionStorage.calculateLevel1Index({
+            committeeId,
+            keyId,
+        });
+    }
+
+    static calculateLevel2Index(memberId: Field): Field {
+        return memberId;
+    }
+
+    calculateLevel2Index(memberId: Field): Field {
+        return EncryptionStorage.calculateLevel2Index(memberId);
+    }
+
+    static calculateLevel3Index(memberId: Field): Field {
+        return memberId;
+    }
+
+    calculateLevel3Index(memberId: Field): Field {
+        return EncryptionStorage.calculateLevel3Index(memberId);
+    }
+}
+
+type ShareCommitmentLeaf = Field;
+class ShareCommitmentStorage extends TwoLevelStorage<
+    ShareCommitmentLeaf,
+    typeof KeyWitness,
+    typeof MemberWitness
+> {
+    static readonly height1 = KeyWitness.height;
+    static readonly height2 = MemberWitness.height;
+
+    constructor(
+        leafs?: {
+            level1Index: Field;
+            level2Index: Field;
+            leaf: ShareCommitmentLeaf | Field;
+            isRaw: boolean;
+        }[]
+    ) {
+        super(
+            EmptyKeyMT,
+            NewKeyWitness,
+            EmptyMemberMT,
+            NewMemberWitness,
+            leafs
+        );
+    }
+
+    get height1(): number {
+        return ShareCommitmentStorage.height1;
+    }
+
+    get height2(): number {
+        return ShareCommitmentStorage.height2;
+    }
+
+    static calculateLeaf(commitment: ShareCommitmentLeaf): Field {
+        return commitment;
+    }
+
+    calculateLeaf(commitment: ShareCommitmentLeaf): Field {
+        return ShareCommitmentStorage.calculateLeaf(commitment);
+    }
+
+    static calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return calculateKeyIndex(committeeId, keyId);
+    }
+
+    calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return ShareCommitmentStorage.calculateLevel1Index({
+            committeeId,
+            keyId,
+        });
+    }
+
+    static calculateLevel2Index(memberId: Field): Field {
+        return memberId;
+    }
+
+    calculateLevel2Index(memberId: Field): Field {
+        return ShareCommitmentStorage.calculateLevel2Index(memberId);
+    }
+}
+
+type PublicKeyLeaf = Group;
+class PublicKeyStorage extends TwoLevelStorage<
+    PublicKeyLeaf,
+    typeof KeyWitness,
+    typeof MemberWitness
+> {
+    static readonly height1 = KeyWitness.height;
+    static readonly height2 = MemberWitness.height;
+
+    constructor(
+        leafs?: {
+            level1Index: Field;
+            level2Index: Field;
+            leaf: PublicKeyLeaf | Field;
+            isRaw: boolean;
+        }[]
+    ) {
+        super(
+            EmptyKeyMT,
+            NewKeyWitness,
+            EmptyMemberMT,
+            NewMemberWitness,
+            leafs
+        );
+    }
+
+    get height1(): number {
+        return PublicKeyStorage.height1;
+    }
+
+    get height2(): number {
+        return PublicKeyStorage.height2;
+    }
+
+    static calculateLeaf(publicKey: PublicKeyLeaf): Field {
+        return Poseidon.hash(publicKey.toFields());
+    }
+
+    calculateLeaf(publicKey: PublicKeyLeaf): Field {
+        return PublicKeyStorage.calculateLeaf(publicKey);
+    }
+
+    static calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return calculateKeyIndex(committeeId, keyId);
+    }
+
+    calculateLevel1Index({
+        committeeId,
+        keyId,
+    }: {
+        committeeId: Field;
+        keyId: Field;
+    }): Field {
+        return PublicKeyStorage.calculateLevel1Index({
+            committeeId,
+            keyId,
+        });
+    }
+
+    static calculateLevel2Index(memberId: Field): Field {
+        return memberId;
+    }
+
+    calculateLevel2Index(memberId: Field): Field {
+        return PublicKeyStorage.calculateLevel2Index(memberId);
     }
 }
 
 // type ResponseContributionLeaf = Field;
 // class ResponseContributionWitness extends Struct({
 //     level1: RequestLevel1Witness,
-//     level2: MTWitnessL2,
+//     level2: MemberWitness,
 // }) {}
 
 // class ResponseContributionStorage extends TwoLevelStorage<
 //     ResponseContributionLeaf,
 //     typeof RequestLevel1Witness,
-//     typeof MTWitnessL2
+//     typeof MemberWitness
 // > {
 //     static readonly height1 = RequestLevel1Witness.height;
-//     static readonly height2 = MTWitnessL2.height;
+//     static readonly height2 = MemberWitness.height;
 
 //     constructor(
 //         leafs?: {
@@ -334,8 +573,8 @@ class KeyGenContributionStorage extends TwoLevelStorage<
 //         super(
 //             REQUEST_LEVEL_1_TREE,
 //             REQUEST_LEVEL_1_WITNESS,
-//             EmptyMTL2,
-//             NewMTWitnessL2,
+//             EmptyMemberMT,
+//             NewMemberWitness,
 //             leafs
 //         );
 //     }
@@ -378,7 +617,7 @@ class KeyGenContributionStorage extends TwoLevelStorage<
 //     ResponseLeaf,
 //     typeof RequestLevel1Witness
 // > {
-//     static readonly height = MTWitnessL1.height;
+//     static readonly height = KeyWitness.height;
 
 //     constructor(
 //         leafs?: {

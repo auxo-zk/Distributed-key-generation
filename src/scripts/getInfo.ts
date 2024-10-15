@@ -7,7 +7,7 @@
 //     ResponseContract,
 // } from '../contracts/Response.js';
 // import {
-//     FinalizeRound1,
+//     RollupContribution,
 //     RollupRound1,
 //     Round1Contract,
 // } from '../contracts/Round1.js';
@@ -23,12 +23,12 @@
 //     RollupCommittee,
 //     RollupDkg,
 //     RollupRound1,
-//     FinalizeRound1,
+//     RollupContribution,
 //     RollupRound2,
 //     FinalizeRound2,
 //     RollupResponse,
 //     FinalizeResponse,
-//     // UpdateRequest,
+//     // RollupRequest,
 //     // CreateRollupStatus,
 //     // RollupActions,
 // };
@@ -46,7 +46,7 @@
 // const DEPENDENCIES = {
 //     CommitteeContract: [RollupCommittee],
 //     KeyContract: [RollupDkg],
-//     Round1Contract: [RollupRound1, FinalizeRound1],
+//     Round1Contract: [RollupRound1, RollupContribution],
 //     Round2Contract: [RollupRound2, BatchEncryption, FinalizeRound2],
 //     ResponseContract: [RollupResponse, BatchDecryption, FinalizeResponse],
 //     RequestContract: [],

@@ -1,57 +1,41 @@
 import {
+    Bool,
     Field,
-    method,
+    Group,
     Poseidon,
     Reducer,
     SmartContract,
-    state,
     State,
     Struct,
-    ZkProgram,
-    Group,
-    Bool,
-    SelfProof,
-    Void,
-    Provable,
+    method,
+    state,
 } from 'o1js';
 import { Utils } from '@auxo-dev/auxo-libs';
 import { CommitteeMemberInput, CommitteeContract } from './Committee.js';
 import { AddressMap, ZkAppRef } from '../storages/AddressStorage.js';
-import { ProcessedActions } from '../storages/ProcessStorage.js';
 import {
-    COMMITTEE_LEVEL_1_TREE,
-    CommitteeLevel1Witness,
-    CommitteeWitness,
-} from '../storages/CommitteeStorage.js';
-import {
-    KEY_LEVEL_1_TREE,
     KeeFeeStorage,
-    KeyLevel1Witness,
     KeyStatusStorage,
     KeyStorage,
     calculateKeyIndex,
 } from '../storages/KeyStorage.js';
-import { INSTANCE_LIMITS } from '../constants.js';
+import { INST_BIT_LIMITS, INST_LIMITS, NETWORK_LIMITS } from '../constants.js';
+import { ErrorEnum, EventEnum, ZkAppAction, ZkAppIndex } from './constants.js';
 import {
-    ErrorEnum,
-    EventEnum,
-    ZkAppAction,
-    ZkAppIndex,
-    ZkProgramEnum,
-} from './constants.js';
-import { getBitLength } from '../libs/index.js';
-import { rollup, rollupField } from './Rollup.js';
+    CommitteeMemberWitness,
+    EmptyCommitteeMT,
+    EmptyKeyMT,
+    KeyWitness,
+} from '../storages/Merklized.js';
+import { RollupKeyProof } from './KeyProgram.js';
 
 export {
     KeyStatus,
-    ActionEnum as DkgActionEnum,
-    Action as DkgAction,
+    ActionEnum as KeyActionEnum,
+    Action as KeyAction,
     KeyStatusInput,
     KeyInput,
     KeyFeeInput,
-    RollupKeyOutput,
-    RollupKey,
-    RollupKeyProof,
     KeyContract,
 };
 
@@ -69,6 +53,8 @@ const enum ActionEnum {
     __LENGTH,
 }
 
+const { COMMITTEE, KEY } = INST_BIT_LIMITS;
+
 /**
  * Class of action dispatched by users
  * @param committeeId Incremental committee index
@@ -79,7 +65,7 @@ const enum ActionEnum {
  */
 class Action
     extends Struct({
-        packedData: Field,
+        packedData: Field, // Pack = [committeeId, keyId, actionType]
         fee: Field,
         key: Group,
     })
@@ -97,30 +83,20 @@ class Action
     }
     static pack(committeeId: Field, keyId: Field, actionType: Field): Field {
         return Field.fromBits([
-            ...committeeId.toBits(getBitLength(INSTANCE_LIMITS.COMMITTEE)),
-            ...keyId.toBits(getBitLength(INSTANCE_LIMITS.KEY)),
-            ...actionType.toBits(getBitLength(ActionEnum.__LENGTH)),
+            ...committeeId.toBits(COMMITTEE),
+            ...keyId.toBits(KEY),
+            ...actionType.toBits(Utils.getBitLength(ActionEnum.__LENGTH)),
         ]);
     }
     hash(): Field {
         return Poseidon.hash(Action.toFields(this));
     }
     get committeeId(): Field {
-        return Field.fromBits(
-            this.packedData
-                .toBits()
-                .slice(0, getBitLength(INSTANCE_LIMITS.COMMITTEE))
-        );
+        return Field.fromBits(this.packedData.toBits().slice(0, COMMITTEE));
     }
     get keyId(): Field {
         return Field.fromBits(
-            this.packedData
-                .toBits()
-                .slice(
-                    getBitLength(INSTANCE_LIMITS.COMMITTEE),
-                    getBitLength(INSTANCE_LIMITS.COMMITTEE) +
-                        getBitLength(INSTANCE_LIMITS.KEY)
-                )
+            this.packedData.toBits().slice(COMMITTEE, COMMITTEE + KEY)
         );
     }
     get actionType(): Field {
@@ -128,11 +104,8 @@ class Action
             this.packedData
                 .toBits()
                 .slice(
-                    getBitLength(INSTANCE_LIMITS.COMMITTEE) +
-                        getBitLength(INSTANCE_LIMITS.KEY),
-                    getBitLength(INSTANCE_LIMITS.COMMITTEE) +
-                        getBitLength(INSTANCE_LIMITS.KEY) +
-                        getBitLength(ActionEnum.__LENGTH)
+                    COMMITTEE + KEY,
+                    COMMITTEE + KEY + Utils.getBitLength(ActionEnum.__LENGTH)
                 )
         );
     }
@@ -142,321 +115,22 @@ class KeyStatusInput extends Struct({
     committeeId: Field,
     keyId: Field,
     status: Field,
-    witness: KeyLevel1Witness,
+    witness: KeyWitness,
 }) {}
 
 class KeyInput extends Struct({
     committeeId: Field,
     keyId: Field,
     key: Group,
-    witness: KeyLevel1Witness,
+    witness: KeyWitness,
 }) {}
 
 class KeyFeeInput extends Struct({
     committeeId: Field,
     keyId: Field,
     fee: Field,
-    witness: KeyLevel1Witness,
+    witness: KeyWitness,
 }) {}
-
-class RollupKeyOutput extends Struct({
-    initialActionState: Field,
-    initialKeyCounterRoot: Field,
-    initialKeyStatusRoot: Field,
-    initialKeyRoot: Field,
-    initialKeyFeeRoot: Field,
-    nextActionState: Field,
-    nextKeyCounterRoot: Field,
-    nextKeyStatusRoot: Field,
-    nextKeyRoot: Field,
-    nextKeyFeeRoot: Field,
-}) {}
-
-const RollupKey = ZkProgram({
-    name: ZkProgramEnum.RollupKey,
-    publicOutput: RollupKeyOutput,
-    methods: {
-        init: {
-            privateInputs: [Field, Field, Field, Field, Field],
-            async method(
-                initialActionState: Field,
-                initialKeyCounterRoot: Field,
-                initialKeyStatusRoot: Field,
-                initialKeyRoot: Field,
-                initialKeyFeeRoot: Field
-            ) {
-                return new RollupKeyOutput({
-                    initialActionState,
-                    initialKeyCounterRoot,
-                    initialKeyStatusRoot,
-                    initialKeyRoot,
-                    initialKeyFeeRoot,
-                    nextActionState: initialActionState,
-                    nextKeyCounterRoot: initialKeyCounterRoot,
-                    nextKeyStatusRoot: initialKeyStatusRoot,
-                    nextKeyRoot: initialKeyRoot,
-                    nextKeyFeeRoot: initialKeyFeeRoot,
-                });
-            },
-        },
-
-        /**
-         * Process GENERATE action
-         * @param earlierProof Previous recursive proof
-         * @param action Action to be processed
-         * @param currKeyId Current key index
-         * @param keyCounterWitness Witness for key counter MT
-         * @param keyStatusWitness Witness for key status MT
-         * @param keyFeeWitness Witness for key fee MT
-         */
-        generate: {
-            privateInputs: [
-                SelfProof<Void, RollupKeyOutput>,
-                Action,
-                Field,
-                CommitteeLevel1Witness,
-                KeyLevel1Witness,
-                KeyLevel1Witness,
-            ],
-            async method(
-                earlierProof: SelfProof<Void, RollupKeyOutput>,
-                action: Action,
-                currKeyId: Field,
-                keyCounterWitness: typeof CommitteeLevel1Witness,
-                keyStatusWitness: typeof KeyLevel1Witness,
-                keyFeeWitness: typeof KeyLevel1Witness
-            ) {
-                // Verify earlier proof
-                earlierProof.verify();
-
-                // Verify action type
-                action.actionType.assertNotEquals(
-                    Field(ActionEnum.GENERATE),
-                    Utils.buildAssertMessage(
-                        RollupKey.name,
-                        'generate',
-                        ErrorEnum.ACTION_TYPE
-                    )
-                );
-
-                // Verify the key's previous index
-                earlierProof.publicOutput.nextKeyCounterRoot.assertEquals(
-                    keyCounterWitness.calculateRoot(currKeyId),
-                    Utils.buildAssertMessage(
-                        RollupKey.name,
-                        'generate',
-                        ErrorEnum.KEY_COUNTER_ROOT
-                    )
-                );
-                action.committeeId.assertEquals(
-                    keyCounterWitness.calculateIndex(),
-                    Utils.buildAssertMessage(
-                        RollupKey.name,
-                        'generate',
-                        ErrorEnum.KEY_COUNTER_INDEX
-                    )
-                );
-
-                let keyIndex = calculateKeyIndex(action.committeeId, currKeyId);
-                // Verify the key's previous status
-                earlierProof.publicOutput.nextKeyStatusRoot.assertEquals(
-                    keyStatusWitness.calculateRoot(Field(KeyStatus.EMPTY)),
-                    Utils.buildAssertMessage(
-                        RollupKey.name,
-                        'generate',
-                        ErrorEnum.KEY_STATUS_ROOT
-                    )
-                );
-                keyIndex.assertEquals(
-                    keyStatusWitness.calculateIndex(),
-                    Utils.buildAssertMessage(
-                        RollupKey.name,
-                        'generate',
-                        ErrorEnum.KEY_STATUS_INDEX
-                    )
-                );
-
-                // Verify empty key usage fee
-                earlierProof.publicOutput.nextKeyFeeRoot.assertEquals(
-                    keyFeeWitness.calculateRoot(Field(0)),
-                    Utils.buildAssertMessage(
-                        RollupKey.name,
-                        'generate',
-                        ErrorEnum.KEY_FEE_ROOT
-                    )
-                );
-                keyIndex.assertEquals(
-                    keyFeeWitness.calculateIndex(),
-                    Utils.buildAssertMessage(
-                        RollupKey.name,
-                        'generate',
-                        ErrorEnum.KEY_FEE_INDEX
-                    )
-                );
-
-                // Update keyCounterRoot
-                let nextKeyCounterRoot = keyCounterWitness.calculateRoot(
-                    currKeyId.add(Field(1))
-                );
-
-                // Update keyStatusRoot
-                let nextKeyStatusRoot = keyStatusWitness.calculateRoot(
-                    Field(KeyStatus.CONTRIBUTION)
-                );
-
-                // Update keyFeeRoot
-                let nextKeyFeeRoot = keyFeeWitness.calculateRoot(action.fee);
-
-                // Update action state
-                let nextActionState = Utils.updateActionState(
-                    earlierProof.publicOutput.nextActionState,
-                    [Action.toFields(action)]
-                );
-
-                return new RollupKeyOutput({
-                    ...earlierProof.publicOutput,
-                    nextKeyCounterRoot,
-                    nextKeyStatusRoot,
-                    nextKeyFeeRoot,
-                    nextActionState,
-                });
-            },
-        },
-
-        /**
-         * Process FINALIZE & DEPRECATE action
-         * @param earlierProof Previous recursive proof
-         * @param action Action to be processed
-         * @param keyStatusWitness Witness for key status MT
-         * @param keyWitness Witness for key MT
-         */
-        update: {
-            privateInputs: [
-                SelfProof<Void, RollupKeyOutput>,
-                Action,
-                KeyLevel1Witness,
-                KeyLevel1Witness,
-            ],
-            async method(
-                earlierProof: SelfProof<Void, RollupKeyOutput>,
-                action: Action,
-                keyStatusWitness: typeof KeyLevel1Witness,
-                keyWitness: typeof KeyLevel1Witness
-            ) {
-                // Verify earlier proof
-                earlierProof.verify();
-
-                // Verify action type
-                action.actionType.assertNotEquals(
-                    Field(ActionEnum.GENERATE),
-                    Utils.buildAssertMessage(
-                        RollupKey.name,
-                        'update',
-                        ErrorEnum.ACTION_TYPE
-                    )
-                );
-
-                // Skip invalid action
-                let invalidAction = Bool(false);
-
-                // Verify key status
-                let keyStatus = Provable.switch(
-                    [
-                        action.actionType.equals(Field(ActionEnum.FINALIZE)),
-                        action.actionType.equals(Field(ActionEnum.DEPRECATE)),
-                    ],
-                    Field,
-                    [Field(KeyStatus.CONTRIBUTION), Field(KeyStatus.ACTIVE)]
-                );
-
-                // Verify the key's previous status
-                // Invalid cause: key status is already finalized / deprecated
-                let keyIndex = calculateKeyIndex(
-                    action.committeeId,
-                    action.keyId
-                );
-                invalidAction = Utils.checkInvalidAction(
-                    invalidAction,
-                    earlierProof.publicOutput.nextKeyStatusRoot.equals(
-                        keyStatusWitness.calculateRoot(keyStatus)
-                    ),
-                    'Skip invalid action: ' +
-                        Utils.buildAssertMessage(
-                            RollupKey.name,
-                            'update',
-                            ErrorEnum.KEY_STATUS_ROOT
-                        )
-                );
-                keyIndex.assertEquals(
-                    keyStatusWitness.calculateIndex(),
-                    Utils.buildAssertMessage(
-                        RollupKey.name,
-                        'update',
-                        ErrorEnum.KEY_STATUS_INDEX
-                    )
-                );
-
-                // Verify empty key if CONTRIBUTION -> ACTIVE
-                // Invalid cause: key is already finalized
-                invalidAction = Utils.checkInvalidAction(
-                    invalidAction,
-                    earlierProof.publicOutput.nextKeyRoot
-                        .equals(keyWitness.calculateRoot(Field(0)))
-                        .or(keyStatus.equals(Field(KeyStatus.ACTIVE))),
-                    'Skip invalid action: ' +
-                        Utils.buildAssertMessage(
-                            RollupKey.name,
-                            'update',
-                            ErrorEnum.KEY_ROOT
-                        )
-                );
-                keyIndex.assertEquals(
-                    keyWitness.calculateIndex(),
-                    Utils.buildAssertMessage(
-                        RollupKey.name,
-                        'update',
-                        ErrorEnum.KEY_INDEX
-                    )
-                );
-
-                // Update keyStatusRoot if action is valid
-                let nextKeyStatusRoot = Provable.if(
-                    invalidAction,
-                    earlierProof.publicOutput.nextKeyStatusRoot,
-                    keyStatusWitness.calculateRoot(keyStatus.add(1))
-                );
-
-                // Update keyRoot if action is valid and key is empty
-                let nextKeyRoot = Provable.if(
-                    keyStatus.equals(Field(KeyStatus.ACTIVE)).or(invalidAction),
-                    earlierProof.publicOutput.nextKeyRoot,
-                    keyWitness.calculateRoot(
-                        KeyStorage.calculateLeaf(action.key)
-                    )
-                );
-
-                // Update action state if action is valid
-                let nextActionState = Provable.if(
-                    invalidAction,
-                    earlierProof.publicOutput.nextActionState,
-                    Utils.updateActionState(
-                        earlierProof.publicOutput.nextActionState,
-                        [Action.toFields(action)]
-                    )
-                );
-
-                return new RollupKeyOutput({
-                    ...earlierProof.publicOutput,
-                    nextActionState,
-                    nextKeyStatusRoot,
-                    nextKeyRoot,
-                });
-            },
-        },
-    },
-});
-
-class RollupKeyProof extends ZkProgram.Proof(RollupKey) {}
 
 class KeyContract extends SmartContract {
     /**
@@ -470,49 +144,40 @@ class KeyContract extends SmartContract {
      * Slot 1
      * @description Latest rolluped action's state
      */
-    @state(Field) actionState = State<Field>();
+    @state(Field) actionState = State<Field>(Reducer.initialActionState);
 
     /**
      * Slot 2
      * @description MT storing incremental counter of committees' keys
      * @see KeyCounterStorage for off-chain storage implementation
      */
-    @state(Field) keyCounterRoot = State<Field>();
+    @state(Field) keyCounterRoot = State<Field>(EmptyCommitteeMT().getRoot());
 
     /**
      * Slot 3
      * @description MT storing keys' status
      * @see KeyStatusStorage for off-chain storage implementation
      */
-    @state(Field) keyStatusRoot = State<Field>();
+    @state(Field) keyStatusRoot = State<Field>(EmptyKeyMT().getRoot());
 
     /**
      * Slot 4
      * @description MT storing keys
      * @see KeyStorage for off-chain storage implementation
      */
-    @state(Field) keyRoot = State<Field>();
+    @state(Field) keyRoot = State<Field>(EmptyKeyMT().getRoot());
 
     /**
      * Slot 5
      * @description MT storing key usage fee
      * @see KeeFeeStorage for off-chain storage implementation
      */
-    @state(Field) keyUsageFeeRoot = State<Field>();
+    @state(Field) keyUsageFeeRoot = State<Field>(EmptyKeyMT().getRoot());
 
     reducer = Reducer({ actionType: Action });
     events = {
-        [EventEnum.ROLLUPED]: ProcessedActions,
+        [EventEnum.ROLLUPED]: Field,
     };
-
-    init() {
-        super.init();
-        this.keyCounterRoot.set(COMMITTEE_LEVEL_1_TREE().getRoot());
-        this.keyStatusRoot.set(KEY_LEVEL_1_TREE().getRoot());
-        this.keyRoot.set(KEY_LEVEL_1_TREE().getRoot());
-        this.keyUsageFeeRoot.set(KEY_LEVEL_1_TREE().getRoot());
-        this.actionState.set(Reducer.initialActionState);
-    }
 
     /**
      * Generate a new key
@@ -524,8 +189,8 @@ class KeyContract extends SmartContract {
     @method
     async generateKey(
         usageFee: Field,
-        memberWitness: CommitteeWitness,
-        committee: InstanceType<typeof ZkAppRef>
+        memberWitness: CommitteeMemberWitness,
+        committee: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -557,7 +222,7 @@ class KeyContract extends SmartContract {
         let action = new Action({
             packedData: Action.pack(
                 committeeId,
-                Field(INSTANCE_LIMITS.KEY),
+                Field(INST_LIMITS.KEY),
                 Field(ActionEnum.GENERATE)
             ),
             fee: usageFee,
@@ -569,8 +234,8 @@ class KeyContract extends SmartContract {
     @method
     async deprecate(
         keyId: Field,
-        memberWitness: CommitteeWitness,
-        committee: InstanceType<typeof ZkAppRef>
+        memberWitness: CommitteeMemberWitness,
+        committee: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -625,17 +290,17 @@ class KeyContract extends SmartContract {
         committeeId: Field,
         keyId: Field,
         key: Group,
-        contribution: InstanceType<typeof ZkAppRef>
+        contribution: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
 
         // Verify keyId
         keyId.assertLessThanOrEqual(
-            INSTANCE_LIMITS.KEY,
+            INST_LIMITS.KEY,
             Utils.buildAssertMessage(
                 KeyContract.name,
-                'finalizeContributionRound',
+                'finalize',
                 ErrorEnum.KEY_COUNTER_LIMIT
             )
         );
@@ -663,7 +328,7 @@ class KeyContract extends SmartContract {
     }
 
     /**
-     * Update keys' status and counter values
+     * Update keys by rollup actions
      * @param proof RollupKeyProof
      */
     @method
@@ -673,53 +338,39 @@ class KeyContract extends SmartContract {
 
         // Get on-chain states
         let curActionState = this.actionState.getAndRequireEquals();
-        let lastActionState = this.account.actionState.getAndRequireEquals();
+        let latestActionState = this.account.actionState.getAndRequireEquals();
         let keyCounterRoot = this.keyCounterRoot.getAndRequireEquals();
         let keyStatusRoot = this.keyStatusRoot.getAndRequireEquals();
         let keyRoot = this.keyRoot.getAndRequireEquals();
         let keyUsageFeeRoot = this.keyUsageFeeRoot.getAndRequireEquals();
 
         // Update action state
-        rollup(
-            CommitteeContract.name,
+        Utils.assertRollupActions(
             proof.publicOutput,
             curActionState,
-            lastActionState
+            latestActionState,
+            this.reducer.getActions({
+                fromActionState: curActionState,
+            }),
+            NETWORK_LIMITS.ROLLUP_ACTIONS
         );
         this.actionState.set(proof.publicOutput.nextActionState);
 
-        // Update key counter root
-        rollupField(
-            KeyContract.name,
-            proof.publicOutput.initialKeyCounterRoot,
-            keyCounterRoot
+        // Update on-chain states
+        Utils.assertRollupFields(
+            [
+                proof.publicOutput.initialKeyCounterRoot,
+                proof.publicOutput.initialKeyStatusRoot,
+                proof.publicOutput.initialKeyRoot,
+                proof.publicOutput.initialKeyFeeRoot,
+            ],
+            [keyCounterRoot, keyStatusRoot, keyRoot, keyUsageFeeRoot],
+            4
         );
         this.keyCounterRoot.set(proof.publicOutput.nextKeyCounterRoot);
-
-        // Update key status root
-        rollupField(
-            KeyContract.name,
-            proof.publicOutput.initialKeyStatusRoot,
-            keyStatusRoot
-        );
         this.keyStatusRoot.set(proof.publicOutput.nextKeyStatusRoot);
-
-        // Update key root
-        rollupField(
-            KeyContract.name,
-            proof.publicOutput.initialKeyRoot,
-            keyRoot
-        );
         this.keyRoot.set(proof.publicOutput.nextKeyRoot);
-
-        // Update key usage fee root
-        rollupField(
-            KeyContract.name,
-            proof.publicOutput.initialKeyFeeRoot,
-            keyUsageFeeRoot
-        );
         this.keyUsageFeeRoot.set(proof.publicOutput.nextKeyFeeRoot);
-
         this.emitEvent(EventEnum.ROLLUPED, proof.publicOutput.nextActionState);
     }
 
@@ -730,7 +381,7 @@ class KeyContract extends SmartContract {
     verifyKeyStatus(input: KeyStatusInput) {
         // Verify keyId
         input.keyId.assertLessThanOrEqual(
-            INSTANCE_LIMITS.KEY,
+            INST_LIMITS.KEY,
             Utils.buildAssertMessage(
                 KeyContract.name,
                 'verifyKeyStatus',
@@ -769,7 +420,7 @@ class KeyContract extends SmartContract {
     verifyKey(input: KeyInput) {
         // Verify keyId
         input.keyId.assertLessThanOrEqual(
-            INSTANCE_LIMITS.KEY,
+            INST_LIMITS.KEY,
             Utils.buildAssertMessage(
                 KeyContract.name,
                 'verifyKeyStatus',
@@ -806,7 +457,7 @@ class KeyContract extends SmartContract {
     verifyKeyFee(input: KeyFeeInput) {
         // Verify keyId
         input.keyId.assertLessThanOrEqual(
-            INSTANCE_LIMITS.KEY,
+            INST_LIMITS.KEY,
             Utils.buildAssertMessage(
                 KeyContract.name,
                 'verifyKeyFee',

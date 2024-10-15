@@ -9,7 +9,7 @@ import {
     UInt64,
 } from 'o1js';
 import { CustomScalar, StaticArray } from '@auxo-dev/auxo-libs';
-import { ENC_LIMITS, INSTANCE_LIMITS } from '../constants.js';
+import { ENC_LIMITS, INST_LIMITS } from '../constants.js';
 import {
     getBestHeight,
     OneLevelStorage,
@@ -44,7 +44,7 @@ export {
 };
 
 const [MTWitnessL1, NewMTWitnessL1, EmptyMTL1] = getBestHeight(
-    BigInt(INSTANCE_LIMITS.REQUEST * INSTANCE_LIMITS.REQUESTER)
+    BigInt(INST_LIMITS.REQUEST * INST_LIMITS.REQUESTER)
 );
 const [MTWitnessL2, NewMTWitnessL2, EmptyMTL2] = getBestHeight(
     BigInt(ENC_LIMITS.DIMENSION)

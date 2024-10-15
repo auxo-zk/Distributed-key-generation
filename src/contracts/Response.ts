@@ -22,7 +22,7 @@ import {
     CommitteeLevel1Witness,
 } from '../storages/CommitteeStorage.js';
 import {
-    DKGWitness,
+    KeyWitness,
     DKG_LEVEL_2_TREE,
     ProcessedContributions,
     calculateKeyIndex,
@@ -38,10 +38,10 @@ import {
     CommitteeMemberInput,
     CommitteeContract,
 } from './Committee.js';
-import { BatchDecryptionProof } from './Encryption.js';
+import { BatchDecryptionProof } from './ContributionProgram.js';
 // import { Round1Contract } from './Round1.js';
 // import { Round2Contract } from './Round2.js';
-import { ENC_LIMITS, INSTANCE_LIMITS } from '../constants.js';
+import { ENC_LIMITS, INST_LIMITS } from '../constants.js';
 import { AddressMap, ZkAppRef } from '../storages/AddressStorage.js';
 import {
     PROCESS_MT,
@@ -699,15 +699,15 @@ class ResponseContract extends SmartContract {
         requestId: Field,
         accumulationRootM: Field,
         memberWitness: CommitteeWitness,
-        publicKeyWitness: DKGWitness,
-        encryptionWitness: DKGWitness,
+        publicKeyWitness: KeyWitness,
+        encryptionWitness: KeyWitness,
         accumulationWitness: typeof RequestLevel2Witness,
-        committee: InstanceType<typeof ZkAppRef>,
-        round1: InstanceType<typeof ZkAppRef>,
-        round2: InstanceType<typeof ZkAppRef>,
-        request: InstanceType<typeof ZkAppRef>,
-        rollup: InstanceType<typeof ZkAppRef>,
-        selfRef: InstanceType<typeof ZkAppRef>
+        committee: ZkAppRef,
+        round1: ZkAppRef,
+        round2: ZkAppRef,
+        request: ZkAppRef,
+        rollup: ZkAppRef,
+        selfRef: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -767,7 +767,7 @@ class ResponseContract extends SmartContract {
         // FIXME - "Option.value_exn None" error
         // Verify keyId
         keyId.assertLessThanOrEqual(
-            INSTANCE_LIMITS.KEY,
+            INST_LIMITS.KEY,
             Utils.buildAssertMessage(
                 ResponseContract.name,
                 'contribute',
@@ -797,7 +797,7 @@ class ResponseContract extends SmartContract {
 
         // Verify round 2 encryptions (hashes)
         let encryptionHashChain = Field(0);
-        for (let i = 0; i < INSTANCE_LIMITS.MEMBER; i++) {
+        for (let i = 0; i < INST_LIMITS.MEMBER; i++) {
             encryptionHashChain = Provable.if(
                 Field(i).greaterThanOrEqual(
                     decryptionProof.publicInput.c.length
@@ -886,9 +886,9 @@ class ResponseContract extends SmartContract {
         settingWitness: typeof CommitteeLevel1Witness,
         keyIndexWitness: typeof RequestLevel2Witness,
         responseWitness: typeof RequestLevel2Witness,
-        committee: InstanceType<typeof ZkAppRef>,
-        request: InstanceType<typeof ZkAppRef>,
-        rollup: InstanceType<typeof ZkAppRef>
+        committee: ZkAppRef,
+        request: ZkAppRef,
+        rollup: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();

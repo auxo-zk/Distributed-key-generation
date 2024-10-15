@@ -3,9 +3,9 @@
 // import { IpfsHash, Utils } from '@auxo-dev/auxo-libs';
 // import { CommitteeContract, RollupCommittee } from '../contracts/Committee.js';
 // import {
-//     DkgAction,
-//     DkgActionMask,
-//     DkgActionEnum,
+//     KeyAction,
+//     KeyActionMask,
+//     KeyActionEnum,
 //     KeyContract,
 //     KeyStatus,
 //     RollupKey,
@@ -13,9 +13,9 @@
 // } from '../contracts/DKG.js';
 // import {
 //     Round1Action,
-//     FinalizeRound1,
+//     RollupContribution,
 //     Round1Contract,
-//     FinalizeRound1Input,
+//     RollupContributionInput,
 // } from '../contracts/Round1.js';
 // import {
 //     Round2Action,
@@ -44,7 +44,7 @@
 //     Round2ContributionStorage,
 // } from '../storages/KeyStorage.js';
 // import {
-//     CArray,
+//     ThresholdGroupArray,
 //     EncryptionHashArray,
 //     MemberArray,
 //     Round1Contribution,
@@ -184,7 +184,7 @@
 //             [
 //                 Rollup,
 //                 RollupKey,
-//                 FinalizeRound1,
+//                 RollupContribution,
 //                 FinalizeRound2,
 //                 BatchEncryption,
 //             ],
@@ -422,7 +422,7 @@
 //                     async () =>
 //                         dkgContract.committeeAction(
 //                             Field.random(),
-//                             Field(DkgActionEnum.GENERATE),
+//                             Field(KeyActionEnum.GENERATE),
 //                             memberWitness,
 //                             sharedAddressStorage.getZkAppRef(
 //                                 ZkAppIndex.COMMITTEE,
@@ -447,15 +447,15 @@
 //                     dkgZkApp.key.publicKey,
 //                     rollupZkApp.key.publicKey,
 //                 ]);
-//                 let action = new DkgAction({
+//                 let action = new KeyAction({
 //                     committeeId,
 //                     keyId: Field(-1),
 //                     key: Group.zero,
-//                     mask: DkgActionMask.createMask(
-//                         Field(DkgActionEnum.GENERATE)
+//                     mask: KeyActionMask.createMask(
+//                         Field(KeyActionEnum.GENERATE)
 //                     ),
 //                 });
-//                 dkgZkApp.actions.push(DkgAction.toFields(action));
+//                 dkgZkApp.actions.push(KeyAction.toFields(action));
 //                 dkgZkApp.actionStates.push(
 //                     dkgContract.account.actionState.get()
 //                 );
@@ -550,7 +550,7 @@
 //                 RollupKey.init(
 //                     new RollupKeyInput({
 //                         previousActionState: Field(0),
-//                         action: DkgAction.empty(),
+//                         action: KeyAction.empty(),
 //                         actionId: Field(0),
 //                     }),
 //                     rollupContract.rollupRoot.get(),
@@ -562,7 +562,7 @@
 //             { profiler, logger }
 //         );
 //         for (let i = 0; i < NUM_KEYS; i++) {
-//             let action = DkgAction.fromFields(dkgZkApp.actions[i]);
+//             let action = KeyAction.fromFields(dkgZkApp.actions[i]);
 //             let actionId = Field(i);
 //             let keyId = Field(i);
 //             let input = new RollupKeyInput({
@@ -822,11 +822,11 @@
 
 //         // Finalize round 1 contributions
 //         let finalizeProof = await Utils.prove(
-//             FinalizeRound1.name,
+//             RollupContribution.name,
 //             'init',
 //             async () =>
-//                 FinalizeRound1.init(
-//                     new FinalizeRound1Input({
+//                 RollupContribution.init(
+//                     new RollupContributionInput({
 //                         previousActionState: Field(0),
 //                         action: Round1Action.empty(),
 //                         actionId: Field(0),
@@ -874,11 +874,11 @@
 //             let action = Round1Action.fromFields(round1ZkApp.actions[i]);
 //             let actionId = Field(i);
 //             finalizeProof = await Utils.prove(
-//                 FinalizeRound1.name,
+//                 RollupContribution.name,
 //                 'contribute',
 //                 async () =>
-//                     FinalizeRound1.contribute(
-//                         new FinalizeRound1Input({
+//                     RollupContribution.contribute(
+//                         new RollupContributionInput({
 //                             previousActionState: round1ZkApp.actionStates[i],
 //                             action,
 //                             actionId,
@@ -991,13 +991,13 @@
 //             round1ZkApp.key.publicKey,
 //             rollupZkApp.key.publicKey,
 //         ]);
-//         let action = new DkgAction({
+//         let action = new KeyAction({
 //             committeeId,
 //             keyId,
 //             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 //             key: keys[Number(keyId)].key!,
-//             mask: DkgActionMask.createMask(
-//                 Field(DkgActionEnum.FINALIZE_ROUND_1)
+//             mask: KeyActionMask.createMask(
+//                 Field(KeyActionEnum.FINALIZE_ROUND_1)
 //             ),
 //         });
 //         let actionId = Field(NUM_KEYS);
@@ -1006,7 +1006,7 @@
 //             actionHash: action.hash(),
 //         });
 //         dkgZkApp.actionStates.push(dkgContract.account.actionState.get());
-//         dkgZkApp.actions.push(DkgAction.toFields(action));
+//         dkgZkApp.actions.push(KeyAction.toFields(action));
 //         rollupZkApp.actionStates.push(rollupContract.account.actionState.get());
 //         rollupZkApp.actions.push(RollupAction.toFields(rollupAction));
 
@@ -1076,7 +1076,7 @@
 //                 RollupKey.init(
 //                     new RollupKeyInput({
 //                         previousActionState: Field(0),
-//                         action: DkgAction.empty(),
+//                         action: KeyAction.empty(),
 //                         actionId: Field(0),
 //                     }),
 //                     rollupContract.rollupRoot.get(),
@@ -1224,7 +1224,7 @@
 //                 async () =>
 //                     BatchEncryption.encrypt(
 //                         new BatchEncryptionInput({
-//                             publicKeys: new CArray(
+//                             publicKeys: new ThresholdGroupArray(
 //                                 round1Contributions.map((e) =>
 //                                     e.C.get(Field(0))
 //                                 )
@@ -1540,12 +1540,12 @@
 //             round2ZkApp.key.publicKey,
 //             rollupZkApp.key.publicKey,
 //         ]);
-//         let action = new DkgAction({
+//         let action = new KeyAction({
 //             committeeId,
 //             keyId,
 //             key: Group.zero,
-//             mask: DkgActionMask.createMask(
-//                 Field(DkgActionEnum.FINALIZE_ROUND_2)
+//             mask: KeyActionMask.createMask(
+//                 Field(KeyActionEnum.FINALIZE_ROUND_2)
 //             ),
 //         });
 //         let actionId = Field(NUM_KEYS + 1);
@@ -1554,7 +1554,7 @@
 //             actionHash: action.hash(),
 //         });
 //         dkgZkApp.actionStates.push(dkgContract.account.actionState.get());
-//         dkgZkApp.actions.push(DkgAction.toFields(action));
+//         dkgZkApp.actions.push(KeyAction.toFields(action));
 //         rollupZkApp.actionStates.push(rollupContract.account.actionState.get());
 //         rollupZkApp.actions.push(RollupAction.toFields(rollupAction));
 
@@ -1624,7 +1624,7 @@
 //                 RollupKey.init(
 //                     new RollupKeyInput({
 //                         previousActionState: Field(0),
-//                         action: DkgAction.empty(),
+//                         action: KeyAction.empty(),
 //                         actionId: Field(0),
 //                     }),
 //                     rollupContract.rollupRoot.get(),

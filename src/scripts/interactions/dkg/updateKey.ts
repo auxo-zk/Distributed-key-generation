@@ -4,7 +4,7 @@
 // import { prepare } from '../../helper/prepare.js';
 // import { Rollup, RollupContract } from '../../../contracts/Rollup.js';
 // import {
-//     DkgAction,
+//     KeyAction,
 //     KeyContract,
 //     KeyStatus,
 //     RollupKey,
@@ -193,9 +193,9 @@
 //         // endActionState,
 //     );
 
-//     const actions: DkgAction[] = rawActions.map((e) => {
+//     const actions: KeyAction[] = rawActions.map((e) => {
 //         let action: Field[] = e.actions[0].map((e) => Field(e));
-//         return DkgAction.fromFields(action);
+//         return KeyAction.fromFields(action);
 //     });
 //     actions.map((e) => Provable.log(e));
 
@@ -206,7 +206,7 @@
 //             RollupKey.init(
 //                 new RollupKeyInput({
 //                     previousActionState: Field(0),
-//                     action: DkgAction.empty(),
+//                     action: KeyAction.empty(),
 //                     actionId: Field(0),
 //                 }),
 //                 rollupContract.rollupRoot.get(),

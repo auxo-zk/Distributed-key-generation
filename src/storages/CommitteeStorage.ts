@@ -1,42 +1,27 @@
-import { Bool, Field, Poseidon, PublicKey, Struct } from 'o1js';
+import { Bool, Field, Poseidon, PublicKey } from 'o1js';
 import {
-    getBestHeight,
     OneLevelStorage,
     TwoLevelStorage,
 } from '@auxo-dev/zkapp-offchain-storage';
-import { INSTANCE_LIMITS } from '../constants.js';
+import {
+    CommitteeWitness,
+    EmptyCommitteeMT,
+    EmptyMemberMT,
+    MemberWitness,
+    NewCommitteeWitness,
+    NewMemberWitness,
+} from './Merklized.js';
 
-export {
-    EmptyMTL1 as COMMITTEE_LEVEL_1_TREE,
-    EmptyMTL2 as COMMITTEE_LEVEL_2_TREE,
-    MTWitnessL1 as CommitteeLevel1Witness,
-    MTWitnessL2 as CommitteeLevel2Witness,
-    FullMTWitness as CommitteeWitness,
-    MemberLeaf,
-    MemberStorage,
-    SettingLeaf,
-    SettingStorage,
-};
-
-const [MTWitnessL1, NewMTWitnessL1, EmptyMTL1] = getBestHeight(
-    BigInt(INSTANCE_LIMITS.COMMITTEE)
-);
-const [MTWitnessL2, NewMTWitnessL2, EmptyMTL2] = getBestHeight(
-    BigInt(INSTANCE_LIMITS.MEMBER)
-);
-class FullMTWitness extends Struct({
-    level1: MTWitnessL1,
-    level2: MTWitnessL2,
-}) {}
+export { MemberLeaf, MemberStorage, SettingLeaf, SettingStorage };
 
 type MemberLeaf = { pubKey: PublicKey; active: Bool };
 class MemberStorage extends TwoLevelStorage<
     MemberLeaf,
-    typeof MTWitnessL1,
-    typeof MTWitnessL2
+    typeof CommitteeWitness,
+    typeof MemberWitness
 > {
-    static readonly height1 = MTWitnessL1.height;
-    static readonly height2 = MTWitnessL2.height;
+    static readonly height1 = CommitteeWitness.height;
+    static readonly height2 = MemberWitness.height;
 
     constructor(
         leafs?: {
@@ -46,7 +31,13 @@ class MemberStorage extends TwoLevelStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EmptyMTL1, NewMTWitnessL1, EmptyMTL2, NewMTWitnessL2, leafs);
+        super(
+            EmptyCommitteeMT,
+            NewCommitteeWitness,
+            EmptyMemberMT,
+            NewMemberWitness,
+            leafs
+        );
     }
 
     get height1(): number {
@@ -85,8 +76,11 @@ class MemberStorage extends TwoLevelStorage<
 }
 
 type SettingLeaf = { T: Field; N: Field };
-class SettingStorage extends OneLevelStorage<SettingLeaf, typeof MTWitnessL1> {
-    static readonly height = MTWitnessL1.height;
+class SettingStorage extends OneLevelStorage<
+    SettingLeaf,
+    typeof CommitteeWitness
+> {
+    static readonly height = CommitteeWitness.height;
 
     constructor(
         leafs?: {
@@ -95,7 +89,7 @@ class SettingStorage extends OneLevelStorage<SettingLeaf, typeof MTWitnessL1> {
             isRaw: boolean;
         }[]
     ) {
-        super(EmptyMTL1, NewMTWitnessL1, leafs);
+        super(EmptyCommitteeMT, NewCommitteeWitness, leafs);
     }
 
     get height(): number {

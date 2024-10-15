@@ -10,14 +10,14 @@ import { KeyContract, RollupKey } from '../../contracts/Key.js';
 import {
     BatchDecryption,
     BatchEncryption,
-    Elgamal,
-} from '../../contracts/Encryption.js';
-// import { FinalizeRound1, Round1Contract } from '../../contracts/Round1.js';
+    BatchPolyCommitment,
+} from '../../contracts/ContributionProgram.js';
+// import { RollupContribution, Round1Contract } from '../../contracts/Round1.js';
 // import { FinalizeRound2, Round2Contract } from '../../contracts/Round2.js';
-import { ComputeResult, UpdateRequest } from '../../contracts/Request.js';
+import { ComputeResult, RollupRequest } from '../../contracts/Request.js';
 import { RequestContract } from '../../contracts/Request.js';
 import {
-    UpdateTask,
+    RollupTask,
     RequesterContract,
     TaskManagerContract,
     SubmissionContract,
@@ -27,6 +27,10 @@ import {
     FinalizeResponse,
     ResponseContract,
 } from '../../contracts/Response.js';
+import {
+    ContributionContract,
+    RollupContribution,
+} from '../../contracts/Contribution.js';
 
 export { compile };
 
@@ -39,24 +43,20 @@ async function compile(
     try {
         if (!programs || programs.length == 0) {
             programs = [
-                // Rollup,
                 RollupCommittee,
                 RollupKey,
-                Elgamal,
+                BatchPolyCommitment,
                 BatchEncryption,
                 BatchDecryption,
-                // FinalizeRound1,
-                // FinalizeRound2,
-                UpdateRequest,
-                UpdateTask,
+                RollupContribution,
+                RollupRequest,
+                RollupTask,
                 ComputeResponse,
                 FinalizeResponse,
                 ComputeResult,
-                // RollupContract,
                 CommitteeContract,
                 KeyContract,
-                // Round1Contract,
-                // Round2Contract,
+                ContributionContract,
                 RequestContract,
                 TaskManagerContract,
                 SubmissionContract,

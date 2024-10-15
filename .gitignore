@@ -2,6 +2,7 @@ build
 mock
 pkg
 profiler
+babySteps*
 
 # Logs
 logs

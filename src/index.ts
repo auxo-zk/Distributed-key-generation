@@ -21,9 +21,9 @@
 // export {
 //     KeyStatus,
 //     KeyStatusInput,
-//     DkgActionEnum,
-//     DkgActionMask,
-//     DkgAction,
+//     KeyActionEnum,
+//     KeyActionMask,
+//     KeyAction,
 //     RollupKeyInput,
 //     RollupKeyOutput,
 //     RollupKey,
@@ -46,10 +46,10 @@
 
 // export {
 //     Round1Action,
-//     FinalizeRound1Input,
-//     FinalizeRound1Output,
-//     FinalizeRound1,
-//     FinalizeRound1Proof,
+//     RollupContributionInput,
+//     RollupContributionOutput,
+//     RollupContribution,
+//     RollupContributionProof,
 //     Round1Contract,
 // } from './contracts/Round1.js';
 
@@ -69,19 +69,19 @@
 //     ComputeResultOutput,
 //     ComputeResult,
 //     ComputeResultProof,
-//     UpdateRequestInput,
-//     UpdateRequestOutput,
-//     UpdateRequest,
-//     UpdateRequestProof,
+//     RollupRequestInput,
+//     RollupRequestOutput,
+//     RollupRequest,
+//     RollupRequestProof,
 //     RequestContract,
 // } from './contracts/Request.js';
 
 // export {
 //     RequesterAction,
-//     UpdateTaskInput,
-//     UpdateTaskOutput,
-//     UpdateTask,
-//     UpdateTaskProof,
+//     RollupTaskInput,
+//     RollupTaskOutput,
+//     RollupTask,
+//     RollupTaskProof,
 //     RequesterAddressBook,
 //     RequesterContract,
 //     TaskManagerContract,
@@ -117,9 +117,9 @@
 
 // export {
 //     MemberArray,
-//     CArray,
-//     cArray,
-//     UArray,
+//     ThresholdGroupArray,
+//     MemberFieldArray,
+//     MemberGroupArray,
 //     PublicKeyArray,
 //     EncryptionHashArray,
 //     SecretPolynomial,
@@ -230,7 +230,7 @@
 //     DkgLevel1Witness,
 //     DkgLevel2MT,
 //     DkgLevel2Witness,
-//     DKGWitness,
+//     KeyWitness,
 //     ResponseContributionWitness,
 //     ProcessedContributions,
 //     KeyStatusLeaf,

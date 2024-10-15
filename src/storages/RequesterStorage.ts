@@ -1,37 +1,34 @@
-import { Field, Poseidon, Struct, UInt32, UInt64 } from 'o1js';
+import { Field, Group, Poseidon, Struct, UInt32, UInt64 } from 'o1js';
 import { StaticArray } from '@auxo-dev/auxo-libs';
 import {
-    getBestHeight,
     OneLevelStorage,
+    TwoLevelStorage,
 } from '@auxo-dev/zkapp-offchain-storage';
-import { ENC_LIMITS, INSTANCE_LIMITS } from '../constants.js';
-
-export {
-    EmptyMTL1 as REQUESTER_LEVEL_1_TREE,
-    EmptyMTCom as COMMITMENT_TREE,
-    MTWitnessL1 as RequesterLevel1Witness,
-    MTWitnessCom as CommitmentWitness,
-};
+import { ENC_LIMITS } from '../constants.js';
+import {
+    CommitmentWitness,
+    EmptyCommitmentMT,
+    EmptySplitMT,
+    EmptyTaskMT,
+    NewCommitmentWitness,
+    NewSplitWitness,
+    NewTaskWitness,
+    SplitWitness,
+    TaskWitness,
+} from './Merklized.js';
 
 export {
     RequesterCounters,
     KeyIndexLeaf as RequesterKeyIndexLeaf,
     KeyIndexStorage as RequesterKeyIndexStorage,
-    TimestampLeaf,
-    TimestampStorage,
+    BlocknumberLeaf,
+    BlocknumberStorage,
     AccumulationLeaf as RequesterAccumulationLeaf,
     AccumulationStorage as RequesterAccumulationStorage,
     CommitmentLeaf,
     CommitmentStorage,
     CommitmentWitnesses,
 };
-
-const [MTWitnessL1, NewMTWitnessL1, EmptyMTL1] = getBestHeight(
-    BigInt(INSTANCE_LIMITS.REQUEST)
-);
-const [MTWitnessCom, NewMTWitnessCom, EmptyMTCom] = getBestHeight(
-    BigInt(INSTANCE_LIMITS.REQUEST * ENC_LIMITS.DIMENSION)
-);
 
 class RequesterCounters extends Struct({
     taskCounter: UInt32,
@@ -92,9 +89,9 @@ class RequesterCounters extends Struct({
 type KeyIndexLeaf = Field;
 class KeyIndexStorage extends OneLevelStorage<
     KeyIndexLeaf,
-    typeof MTWitnessL1
+    typeof TaskWitness
 > {
-    static readonly height = MTWitnessL1.height;
+    static readonly height = TaskWitness.height;
 
     constructor(
         leafs?: {
@@ -103,7 +100,7 @@ class KeyIndexStorage extends OneLevelStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EmptyMTL1, NewMTWitnessL1, leafs);
+        super(EmptyTaskMT, NewTaskWitness, leafs);
     }
 
     get height(): number {
@@ -127,33 +124,33 @@ class KeyIndexStorage extends OneLevelStorage<
     }
 }
 
-type TimestampLeaf = UInt64;
-class TimestampStorage extends OneLevelStorage<
-    TimestampLeaf,
-    typeof MTWitnessL1
+type BlocknumberLeaf = UInt32;
+class BlocknumberStorage extends OneLevelStorage<
+    BlocknumberLeaf,
+    typeof TaskWitness
 > {
-    static readonly height = MTWitnessL1.height;
+    static readonly height = TaskWitness.height;
 
     constructor(
         leafs?: {
             level1Index: Field;
-            leaf: TimestampLeaf | Field;
+            leaf: BlocknumberLeaf | Field;
             isRaw: boolean;
         }[]
     ) {
-        super(EmptyMTL1, NewMTWitnessL1, leafs);
+        super(EmptyTaskMT, NewTaskWitness, leafs);
     }
 
     get height(): number {
-        return TimestampStorage.height;
+        return BlocknumberStorage.height;
     }
 
-    static calculateLeaf(timestamp: TimestampLeaf): Field {
+    static calculateLeaf(timestamp: BlocknumberLeaf): Field {
         return timestamp.value;
     }
 
-    calculateLeaf(timestamp: TimestampLeaf): Field {
-        return TimestampStorage.calculateLeaf(timestamp);
+    calculateLeaf(timestamp: BlocknumberLeaf): Field {
+        return BlocknumberStorage.calculateLeaf(timestamp);
     }
 
     static calculateLevel1Index(taskId: Field): Field {
@@ -161,39 +158,51 @@ class TimestampStorage extends OneLevelStorage<
     }
 
     calculateLevel1Index(taskId: Field): Field {
-        return TimestampStorage.calculateLevel1Index(taskId);
+        return BlocknumberStorage.calculateLevel1Index(taskId);
     }
 }
 
 type AccumulationLeaf = {
-    accumulationRootR: Field;
-    accumulationRootM: Field;
+    R: Group;
+    M: Group;
 };
-class AccumulationStorage extends OneLevelStorage<
+class AccumulationStorage extends TwoLevelStorage<
     AccumulationLeaf,
-    typeof MTWitnessL1
+    typeof TaskWitness,
+    typeof SplitWitness
 > {
-    static readonly height = MTWitnessL1.height;
+    static readonly height1 = TaskWitness.height;
+    static readonly height2 = SplitWitness.height;
 
     constructor(
         leafs?: {
             level1Index: Field;
+            level2Index: Field;
             leaf: AccumulationLeaf | Field;
             isRaw: boolean;
         }[]
     ) {
-        super(EmptyMTL1, NewMTWitnessL1, leafs);
+        super(
+            EmptyTaskMT,
+            NewTaskWitness,
+            EmptySplitMT,
+            NewSplitWitness,
+            leafs
+        );
     }
 
-    get height(): number {
-        return AccumulationStorage.height;
+    get height1(): number {
+        return AccumulationStorage.height1;
+    }
+
+    get height2(): number {
+        return AccumulationStorage.height2;
     }
 
     static calculateLeaf(rawLeaf: AccumulationLeaf): Field {
-        return Poseidon.hash([
-            rawLeaf.accumulationRootR,
-            rawLeaf.accumulationRootM,
-        ]);
+        return Poseidon.hash(
+            [rawLeaf.R.toFields(), rawLeaf.M.toFields()].flat()
+        );
     }
 
     calculateLeaf(rawLeaf: AccumulationLeaf): Field {
@@ -207,18 +216,26 @@ class AccumulationStorage extends OneLevelStorage<
     calculateLevel1Index(taskId: Field): Field {
         return AccumulationStorage.calculateLevel1Index(taskId);
     }
+
+    static calculateLevel2Index(splitId: Field): Field {
+        return splitId;
+    }
+
+    calculateLevel2Index(splitId: Field): Field {
+        return AccumulationStorage.calculateLevel2Index(splitId);
+    }
 }
 
 type CommitmentLeaf = Field;
-class CommitmentWitnesses extends StaticArray<typeof MTWitnessCom>(
-    MTWitnessCom,
+class CommitmentWitnesses extends StaticArray(
+    CommitmentWitness,
     ENC_LIMITS.DIMENSION
 ) {}
 class CommitmentStorage extends OneLevelStorage<
     CommitmentLeaf,
-    typeof MTWitnessCom
+    typeof CommitmentWitness
 > {
-    static readonly height = MTWitnessL1.height;
+    static readonly height = CommitmentWitness.height;
 
     constructor(
         leafs?: {
@@ -227,7 +244,7 @@ class CommitmentStorage extends OneLevelStorage<
             isRaw: boolean;
         }[]
     ) {
-        super(EmptyMTCom, NewMTWitnessCom, leafs);
+        super(EmptyCommitmentMT, NewCommitmentWitness, leafs);
     }
 
     get height(): number {

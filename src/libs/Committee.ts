@@ -1,33 +1,16 @@
-import {
-    Field,
-    Group,
-    Poseidon,
-    PrivateKey,
-    PublicKey,
-    Scalar,
-    Struct,
-} from 'o1js';
-import {
-    Bit255,
-    Bit255DynamicArray,
-    FieldDynamicArray,
-    GroupDynamicArray,
-    PublicKeyDynamicArray,
-} from '@auxo-dev/auxo-libs';
+import { Field, Group, Poseidon, PrivateKey, PublicKey, Scalar } from 'o1js';
 import { ECElGamal } from '@auxo-dev/o1js-encrypt';
-import { ENC_LIMITS, INSTANCE_LIMITS } from '../constants.js';
-
-export {
-    MemberArray,
-    CArray,
-    cArray,
-    UArray,
-    PublicKeyArray,
-    EncryptionHashArray,
-    SecretPolynomial,
+import {
     Cipher,
     KeyGenContribution,
+    MemberFieldArray,
+    MemberGroupArray,
     ResponseContribution,
+    SecretPolynomial,
+    ThresholdGroupArray,
+} from './types.js';
+
+export {
     calculatePublicKey,
     calculatePublicKey as calculatePublicKeyFromContribution,
     calculatePolynomialValue,
@@ -40,47 +23,8 @@ export {
     getLagrangeCoefficient,
     accumulateResponses,
 };
-type SecretPolynomial = {
-    a: Scalar[];
-    C: Group[];
-    f: Scalar[];
-};
-type Cipher = {
-    c: Bit255;
-    U: Group;
-};
-class MemberArray extends PublicKeyDynamicArray(INSTANCE_LIMITS.MEMBER) {}
-class CArray extends GroupDynamicArray(INSTANCE_LIMITS.MEMBER) {}
-class cArray extends Bit255DynamicArray(INSTANCE_LIMITS.MEMBER) {}
-class UArray extends GroupDynamicArray(INSTANCE_LIMITS.MEMBER) {}
-class PublicKeyArray extends GroupDynamicArray(INSTANCE_LIMITS.MEMBER) {}
-class EncryptionHashArray extends FieldDynamicArray(INSTANCE_LIMITS.MEMBER) {}
 
-class KeyGenContribution extends Struct({
-    C: CArray,
-    c: cArray,
-    U: UArray,
-}) {
-    static empty(): KeyGenContribution {
-        return new KeyGenContribution({
-            C: new CArray(),
-            c: new cArray(),
-            U: new UArray(),
-        });
-    }
-
-    toFields(): Field[] {
-        return KeyGenContribution.toFields(this);
-    }
-
-    hash(): Field {
-        return Poseidon.hash(this.toFields());
-    }
-}
-
-class ResponseContribution extends GroupDynamicArray(ENC_LIMITS.SPLIT) {}
-
-function calculatePublicKey(arr: CArray[]): Group {
+function calculatePublicKey(arr: ThresholdGroupArray[]): Group {
     let result = Group.zero;
     for (let i = 0; i < Number(arr.length); i++) {
         result = result.add(arr[i].get(Field(0)));
@@ -88,26 +32,26 @@ function calculatePublicKey(arr: CArray[]): Group {
     return result;
 }
 
-function calculateShareCommitment(secret: Scalar, memberId: Field) {
-    return Poseidon.hash([secret.toFields(), memberId].flat());
+function calculateShareCommitment(secret: Field, memberId: Field) {
+    return Poseidon.hash([secret, memberId]);
 }
 
-function calculatePolynomialValue(a: Scalar[], x: number): Scalar {
-    let result = Scalar.from(a[0]);
+function calculatePolynomialValue(a: Field[], x: number): Field {
+    let result = a[0];
     for (let i = 1; i < a.length; i++) {
-        result = result.add(a[i].mul(Scalar.from(Math.pow(x, i))));
+        result = result.add(a[i].mul(Field(Math.pow(x, i))));
     }
     return result;
 }
 
 function generateRandomPolynomial(T: number, N: number): SecretPolynomial {
-    let a = new Array<Scalar>(T);
+    let a = new Array<Field>(T);
     let C = new Array<Group>(T);
     for (let i = 0; i < T; i++) {
-        a[i] = Scalar.random();
+        a[i] = Field.random();
         C[i] = Group.generator.scale(a[i]);
     }
-    let f = new Array<Scalar>(N);
+    let f = new Array<Field>(N);
     for (let i = 0; i < N; i++) {
         f[i] = calculatePolynomialValue(a, i + 1);
     }
@@ -115,7 +59,7 @@ function generateRandomPolynomial(T: number, N: number): SecretPolynomial {
 }
 
 function recoverSecretPolynomial(
-    a: Scalar[],
+    a: Field[],
     T: number,
     N: number
 ): SecretPolynomial {
@@ -123,7 +67,7 @@ function recoverSecretPolynomial(
     for (let i = 0; i < T; i++) {
         C[i] = Group.generator.scale(a[i]);
     }
-    let f = new Array<Scalar>(N);
+    let f = new Array<Field>(N);
     for (let i = 0; i < N; i++) {
         f[i] = calculatePolynomialValue(a, i + 1);
     }
@@ -134,14 +78,14 @@ function getKeyGenContribution(
     secret: SecretPolynomial,
     memberId: number,
     pubKeys: PublicKey[],
-    randoms: Scalar[]
+    randoms: Field[]
 ) {
-    let C = CArray.from(secret.C);
-    let cArr = new Array<Bit255>(secret.f.length);
+    let C = ThresholdGroupArray.from(secret.C);
+    let cArr = new Array<Field>(secret.f.length);
     let UArr = new Array<Group>(secret.f.length);
     for (let i = 0; i < secret.f.length; i++) {
         if (i == memberId) {
-            cArr[i] = Bit255.fromBigInt(0n);
+            cArr[i] = Field(0n);
             UArr[i] = Group.zero;
         } else {
             let encryption = ECElGamal.Lib.encrypt(
@@ -153,8 +97,8 @@ function getKeyGenContribution(
             UArr[i] = encryption.U;
         }
     }
-    let c = cArray.from(cArr);
-    let U = UArray.from(UArr);
+    let c = MemberFieldArray.from(cArr);
+    let U = MemberGroupArray.from(UArr);
     return new KeyGenContribution({ C, c, U });
 }
 
@@ -163,22 +107,22 @@ function getSecretShare(
     memberId: number,
     ciphers: Cipher[],
     prvKey: PrivateKey
-): { share: Scalar; commitment: Field } {
-    let decryptions: Scalar[] = ciphers.map((data, id) =>
+): { share: Field; commitment: Field } {
+    let decryptions: Field[] = ciphers.map((data, id) =>
         id == memberId
             ? secret.f[memberId]
-            : Scalar.from(ECElGamal.Lib.decrypt(data.c, data.U, prvKey.s).m)
+            : ECElGamal.Lib.decrypt(data.c, data.U, prvKey.s).m
     );
-    let share: Scalar = decryptions.reduce(
-        (prev: Scalar, curr: Scalar) => prev.add(curr),
-        Scalar.from(0n)
+    let share: Field = decryptions.reduce(
+        (prev: Field, curr: Field) => prev.add(curr),
+        Field(0n)
     );
     let commitment = calculateShareCommitment(share, Field(memberId));
     return { share, commitment };
 }
 
 function getResponseContribution(
-    share: Scalar,
+    share: Field,
     R: Group[]
 ): ResponseContribution {
     let D = new Array<Group>(R.length).fill(Group.zero);

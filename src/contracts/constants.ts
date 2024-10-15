@@ -35,13 +35,13 @@ enum ZkProgramEnum {
 
     RollupCommittee = 'RollupCommittee',
     RollupKey = 'RollupKey',
-    FinalizeRound1 = 'FinalizeRound1',
+    RollupContribution = 'RollupContribution',
     FinalizeRound2 = 'FinalizeRound2',
     ComputeResponse = 'ComputeResponse',
     FinalizeResponse = 'FinalizeResponse',
     ComputeResult = 'ComputeResult',
-    UpdateRequest = 'UpdateRequest',
-    UpdateTask = 'UpdateTask',
+    RollupRequest = 'RollupRequest',
+    RollupTask = 'RollupTask',
 }
 
 /**

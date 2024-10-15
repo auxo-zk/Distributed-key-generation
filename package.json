@@ -67,8 +67,8 @@
     },
     "dependencies": {
         "o1js": "1.8.0",
-        "@auxo-dev/auxo-libs": "1.0.4",
-        "@auxo-dev/o1js-encrypt": "1.0.3",
-        "@auxo-dev/zkapp-offchain-storage": "1.0.4"
+        "@auxo-dev/auxo-libs": "1.0.6",
+        "@auxo-dev/o1js-encrypt": "1.1.0",
+        "@auxo-dev/zkapp-offchain-storage": "1.0.6"
     }
 }

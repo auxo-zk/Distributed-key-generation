@@ -5,7 +5,7 @@
 // import { Utils } from '@auxo-dev/auxo-libs';
 // import { Rollup, RollupContract } from '../../../contracts/Rollup.js';
 // import { KeyContract, RollupKey } from '../../../contracts/DKG.js';
-// import { FinalizeRound1, Round1Contract } from '../../../contracts/Round1.js';
+// import { RollupContribution, Round1Contract } from '../../../contracts/Round1.js';
 // import { fetchAccounts } from '../../helper/index.js';
 // import { AddressStorage } from '../../../storages/AddressStorage.js';
 // import {
@@ -50,7 +50,7 @@
 //             RollupContract,
 //             RollupKey,
 //             KeyContract,
-//             FinalizeRound1,
+//             RollupContribution,
 //             Round1Contract,
 //             BatchEncryption,
 //             FinalizeRound2,

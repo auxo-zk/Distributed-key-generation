@@ -18,16 +18,12 @@ import {
     PublicKey,
 } from 'o1js';
 import { CustomScalar, Utils } from '@auxo-dev/auxo-libs';
-import { ENC_LIMITS, REQUEST_EXPIRATION } from '../constants.js';
 import {
-    CommitmentArray,
-    NullifierArray,
-    RandomVector,
-    RequestVector,
-    SecretVector,
-    calculateCommitment,
-} from '../libs/Requester.js';
-import { rollup } from './Rollup.js';
+    ENC_LIMITS,
+    INST_BIT_LIMITS,
+    INST_LIMITS,
+    REQUEST_EXPIRATION,
+} from '../constants.js';
 import { AddressMap, ZkAppRef } from '../storages/AddressStorage.js';
 import {
     RequesterLevel1Witness,
@@ -36,8 +32,7 @@ import {
     COMMITMENT_TREE,
 } from '../storages/RequesterStorage.js';
 import { ErrorEnum, ZkAppAction, ZkProgramEnum } from './constants.js';
-import { DkgLevel1Witness } from '../storages/KeyStorage.js';
-import { KeyContract } from './Key.js';
+import { KeyContract, KeyInput } from './Key.js';
 import { RequestContract } from './Request.js';
 import { CommitmentWitnesses } from '../storages/RequesterStorage.js';
 import {
@@ -45,53 +40,129 @@ import {
     GroupVectorWitnesses,
     REQUEST_LEVEL_2_TREE,
 } from '../storages/RequestStorage.js';
+import {
+    DimensionFieldArray,
+    DimensionGroupArray,
+    EncryptionConfig,
+    SplitFieldArray,
+    SplitGroupArray,
+} from '../libs/types.js';
+import {
+    EmptyCommitmentMT,
+    EmptyTaskMT,
+    KeyWitness,
+} from '../storages/Merklized.js';
 
 export {
     Action as RequesterAction,
-    UpdateTaskInput,
-    UpdateTaskOutput,
-    UpdateTask,
-    UpdateTaskProof,
+    RollupTaskInput,
+    RollupTaskOutput,
+    RollupTask,
+    RollupTaskProof,
     AddressBook as RequesterAddressBook,
     RequesterContract,
     TaskManagerContract,
     SubmissionContract,
 };
 
+const { COMMITTEE, KEY, TASK } = INST_BIT_LIMITS;
+
 class Action
     extends Struct({
-        taskId: UInt32,
-        timestamp: UInt64,
-        keyIndex: Field,
-        indices: Field,
-        R: RequestVector,
-        M: RequestVector,
-        commitments: CommitmentArray,
+        packedData: Field,
+        commitmentHash: Field,
+        R: Group,
+        M: Group,
     })
     implements ZkAppAction
 {
     static empty(): Action {
         return new Action({
-            taskId: UInt32.zero,
-            timestamp: UInt64.zero,
-            keyIndex: Field(0),
-            indices: Field(0),
-            R: new RequestVector(),
-            M: new RequestVector(),
-            commitments: new CommitmentArray(),
+            packedData: Field(0),
+            commitmentHash: Field(0),
+            R: Group.zero,
+            M: Group.zero,
         });
     }
     static fromFields(fields: Field[]): Action {
         return super.fromFields(fields) as Action;
     }
+    static packData(
+        blocknumber: UInt32,
+        startIndex: UInt8,
+        numIndices: UInt8,
+        curIndex: UInt8,
+        taskId: Field,
+        committeeId: Field,
+        keyId: Field,
+        config: EncryptionConfig
+    ): Field {
+        return Field.fromBits([
+            ...blocknumber.value.toBits(32),
+            ...startIndex.value.toBits(8),
+            ...numIndices.value.toBits(8),
+            ...curIndex.value.toBits(8),
+            ...config.toBits(),
+            ...taskId.toBits(TASK),
+            ...committeeId.toBits(COMMITTEE),
+            ...keyId.toBits(KEY),
+        ]);
+    }
     hash(): Field {
         return Poseidon.hash(Action.toFields(this));
     }
+    get blocknumber(): UInt32 {
+        return UInt32.Unsafe.fromField(
+            Field.fromBits(this.packedData.toBits().slice(0, 32))
+        );
+    }
+    get startIndex(): UInt8 {
+        return UInt8.Unsafe.fromField(
+            Field.fromBits(this.packedData.toBits().slice(32, 40))
+        );
+    }
+    get numIndices(): UInt8 {
+        return UInt8.Unsafe.fromField(
+            Field.fromBits(this.packedData.toBits().slice(40, 48))
+        );
+    }
+    get curIndex(): UInt8 {
+        return UInt8.Unsafe.fromField(
+            Field.fromBits(this.packedData.toBits().slice(48, 56))
+        );
+    }
+    get taskId(): UInt32 {
+        return UInt32.Unsafe.fromField(
+            Field.fromBits(this.packedData.toBits().slice(56, 56 + TASK))
+        );
+    }
+    get committeeId(): Field {
+        return Field.fromBits(
+            this.packedData.toBits().slice(56 + TASK, 56 + TASK + COMMITTEE)
+        );
+    }
+    get keyId(): Field {
+        return Field.fromBits(
+            this.packedData
+                .toBits()
+                .slice(56 + TASK + COMMITTEE, 56 + TASK + COMMITTEE + KEY)
+        );
+    }
+    get config(): EncryptionConfig {
+        return EncryptionConfig.fromBits(
+            this.packedData
+                .toBits()
+                .slice(
+                    48 + TASK + COMMITTEE + KEY,
+                    48 + TASK + COMMITTEE + KEY + EncryptionConfig.sizeInBits()
+                )
+        );
+    }
 }
 
-class UpdateTaskInput extends Action {}
+class RollupTaskInput extends Action {}
 
-class UpdateTaskOutput extends Struct({
+class RollupTaskOutput extends Struct({
     initialActionState: Field,
     initialTaskCounter: UInt32,
     initialKeyIndexRoot: Field,
@@ -109,15 +180,15 @@ class UpdateTaskOutput extends Struct({
     nextTimestamp: UInt64,
 }) {}
 
-const UpdateTask = ZkProgram({
-    name: ZkProgramEnum.UpdateTask,
-    publicInput: UpdateTaskInput,
-    publicOutput: UpdateTaskOutput,
+const RollupTask = ZkProgram({
+    name: ZkProgramEnum.RollupTask,
+    publicInput: RollupTaskInput,
+    publicOutput: RollupTaskOutput,
     methods: {
         init: {
             privateInputs: [Field, UInt32, Field, Field, Field, UInt64, Field],
             async method(
-                input: UpdateTaskInput,
+                input: RollupTaskInput,
                 initialActionState: Field,
                 initialTaskCounter: UInt32,
                 initialKeyIndexRoot: Field,
@@ -126,7 +197,7 @@ const UpdateTask = ZkProgram({
                 initialCommitmentCounter: UInt64,
                 initialCommitmentRoot: Field
             ) {
-                return new UpdateTaskOutput({
+                return new RollupTaskOutput({
                     initialActionState,
                     initialTaskCounter,
                     initialKeyIndexRoot,
@@ -147,14 +218,14 @@ const UpdateTask = ZkProgram({
         },
         create: {
             privateInputs: [
-                SelfProof<UpdateTaskInput, UpdateTaskOutput>,
+                SelfProof<RollupTaskInput, RollupTaskOutput>,
                 RequesterLevel1Witness,
                 RequesterLevel1Witness,
                 RequesterLevel1Witness,
             ],
             async method(
-                input: UpdateTaskInput,
-                earlierProof: SelfProof<UpdateTaskInput, UpdateTaskOutput>,
+                input: RollupTaskInput,
+                earlierProof: SelfProof<RollupTaskInput, RollupTaskOutput>,
                 keyIndexWitness: typeof RequesterLevel1Witness,
                 timestampWitness: typeof RequesterLevel1Witness,
                 accumulationWitness: typeof RequesterLevel1Witness
@@ -168,7 +239,7 @@ const UpdateTask = ZkProgram({
                 earlierProof.publicOutput.nextKeyIndexRoot.assertEquals(
                     keyIndexWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
-                        UpdateTask.name,
+                        RollupTask.name,
                         'create',
                         ErrorEnum.KEY_INDEX_ROOT
                     )
@@ -176,7 +247,7 @@ const UpdateTask = ZkProgram({
                 taskId.value.assertEquals(
                     keyIndexWitness.calculateIndex(),
                     Utils.buildAssertMessage(
-                        UpdateTask.name,
+                        RollupTask.name,
                         'create',
                         ErrorEnum.KEY_INDEX_INDEX
                     )
@@ -186,7 +257,7 @@ const UpdateTask = ZkProgram({
                 earlierProof.publicOutput.nextTimestampRoot.assertEquals(
                     timestampWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
-                        UpdateTask.name,
+                        RollupTask.name,
                         'create',
                         ErrorEnum.REQUEST_TIMESTAMP_ROOT
                     )
@@ -194,7 +265,7 @@ const UpdateTask = ZkProgram({
                 taskId.value.assertEquals(
                     timestampWitness.calculateIndex(),
                     Utils.buildAssertMessage(
-                        UpdateTask.name,
+                        RollupTask.name,
                         'create',
                         ErrorEnum.REQUEST_TIMESTAMP_INDEX
                     )
@@ -204,7 +275,7 @@ const UpdateTask = ZkProgram({
                 earlierProof.publicOutput.nextAccumulationRoot.assertEquals(
                     accumulationWitness.calculateRoot(Field(0)),
                     Utils.buildAssertMessage(
-                        UpdateTask.name,
+                        RollupTask.name,
                         'create',
                         ErrorEnum.ACCUMULATION_ROOT
                     )
@@ -212,7 +283,7 @@ const UpdateTask = ZkProgram({
                 taskId.value.assertEquals(
                     accumulationWitness.calculateIndex(),
                     Utils.buildAssertMessage(
-                        UpdateTask.name,
+                        RollupTask.name,
                         'create',
                         ErrorEnum.ACCUMULATION_INDEX_L1
                     )
@@ -239,7 +310,7 @@ const UpdateTask = ZkProgram({
                     [Action.toFields(input)]
                 );
 
-                return new UpdateTaskOutput({
+                return new RollupTaskOutput({
                     ...earlierProof.publicOutput,
                     ...{
                         nextActionState,
@@ -253,7 +324,7 @@ const UpdateTask = ZkProgram({
         },
         accumulate: {
             privateInputs: [
-                SelfProof<UpdateTaskInput, UpdateTaskOutput>,
+                SelfProof<RollupTaskInput, RollupTaskOutput>,
                 GroupVector,
                 GroupVector,
                 RequesterLevel1Witness,
@@ -263,8 +334,8 @@ const UpdateTask = ZkProgram({
             ],
 
             async method(
-                input: UpdateTaskInput,
-                earlierProof: SelfProof<UpdateTaskInput, UpdateTaskOutput>,
+                input: RollupTaskInput,
+                earlierProof: SelfProof<RollupTaskInput, RollupTaskOutput>,
                 sumR: GroupVector,
                 sumM: GroupVector,
                 accumulationWitness: typeof RequesterLevel1Witness,
@@ -318,7 +389,7 @@ const UpdateTask = ZkProgram({
                             ])
                         ),
                         Utils.buildAssertMessage(
-                            UpdateTask.name,
+                            RollupTask.name,
                             'accumulate',
                             ErrorEnum.ACCUMULATION_ROOT
                         )
@@ -326,7 +397,7 @@ const UpdateTask = ZkProgram({
                     input.taskId.value.assertEquals(
                         accumulationWitness.calculateIndex(),
                         Utils.buildAssertMessage(
-                            UpdateTask.name,
+                            RollupTask.name,
                             'accumulate',
                             ErrorEnum.ACCUMULATION_INDEX_L1
                         )
@@ -334,7 +405,7 @@ const UpdateTask = ZkProgram({
                     index.assertEquals(
                         accumulationWitnessR.calculateIndex(),
                         Utils.buildAssertMessage(
-                            UpdateTask.name,
+                            RollupTask.name,
                             'accumulate',
                             ErrorEnum.ACCUMULATION_INDEX_L2
                         )
@@ -342,7 +413,7 @@ const UpdateTask = ZkProgram({
                     index.assertEquals(
                         accumulationWitnessM.calculateIndex(),
                         Utils.buildAssertMessage(
-                            UpdateTask.name,
+                            RollupTask.name,
                             'accumulate',
                             ErrorEnum.ACCUMULATION_INDEX_L2
                         )
@@ -352,7 +423,7 @@ const UpdateTask = ZkProgram({
                     nextCommitmentRoot.assertEquals(
                         commitmentWitness.calculateRoot(Field(0)),
                         Utils.buildAssertMessage(
-                            UpdateTask.name,
+                            RollupTask.name,
                             'accumulate',
                             ErrorEnum.COMMITMENT_ROOT
                         )
@@ -360,7 +431,7 @@ const UpdateTask = ZkProgram({
                     nextCommitmentCounter.value.assertEquals(
                         commitmentWitness.calculateIndex(),
                         Utils.buildAssertMessage(
-                            UpdateTask.name,
+                            RollupTask.name,
                             'accumulate',
                             ErrorEnum.COMMITMENT_INDEX
                         )
@@ -392,7 +463,7 @@ const UpdateTask = ZkProgram({
                     [Action.toFields(input)]
                 );
 
-                return new UpdateTaskOutput({
+                return new RollupTaskOutput({
                     ...earlierProof.publicOutput,
                     ...{
                         nextActionState,
@@ -407,12 +478,12 @@ const UpdateTask = ZkProgram({
     },
 });
 
-class UpdateTaskProof extends ZkProgram.Proof(UpdateTask) {}
+class RollupTaskProof extends ZkProgram.Proof(RollupTask) {}
 
 enum AddressBook {
     TASK_MANAGER,
     SUBMISSION,
-    DKG,
+    KEY,
     REQUEST,
 }
 
@@ -420,62 +491,58 @@ class RequesterContract extends SmartContract {
     static readonly AddressBook = AddressBook;
 
     /**
+     * Slot 0
      * @description MT storing addresses of other zkApps
      */
     @state(Field) zkAppRoot = State<Field>();
 
     /**
-     * @description
+     * Slot 1
+     * @description Latest rolluped action's state
      */
-    @state(Field) counters = State<Field>();
+    @state(Field) actionState = State<Field>(Reducer.initialActionState);
 
     /**
+     * Slot 2
+     * @description Packed counters
+     */
+    @state(Field) counters = State<Field>(Field(0));
+
+    /**
+     * Slot 3
      * @description MT storing corresponding keys
      * @see RequesterKeyIndexStorage for off-chain storage implementation
      */
-    @state(Field) keyIndexRoot = State<Field>();
+    @state(Field) keyIndexRoot = State<Field>(EmptyTaskMT().getRoot());
 
     /**
-     * @description MT storing finalize timestamps for tasks
-     * @see TimestampStorage for off-chain storage implementation
+     * Slot 4
+     * @description MT storing finalize blocknumber for tasks
+     * @see BlocknumberStorage for off-chain storage implementation
      */
-    @state(Field) timestampRoot = State<Field>();
+    @state(Field) blocknumberRoot = State<Field>(EmptyTaskMT().getRoot());
 
     /**
+     * Slot 5
      * @description MT storing latest accumulation data Hash(R | M)
      * @see RequesterAccumulationStorage for off-chain storage implementation
      */
-    @state(Field) accumulationRoot = State<Field>();
+    @state(Field) accumulationRoot = State<Field>(EmptyTaskMT().getRoot());
 
     /**
+     * Slot 6
      * @description MT storing anonymous commitments
      * @see CommitmentStorage for off-chain storage implementation
      */
-    @state(Field) commitmentRoot = State<Field>();
+    @state(Field) commitmentRoot = State<Field>(EmptyCommitmentMT().getRoot());
 
     /**
+     * Slot 7
      * @description Timestamp of the latest processed action
      */
-    @state(UInt64) lastTimestamp = State<UInt64>();
-
-    /**
-     * @description Latest rolluped action's state
-     */
-    @state(Field) actionState = State<Field>();
+    @state(UInt64) lastTimestamp = State<UInt32>(UInt32.zero);
 
     reducer = Reducer({ actionType: Action });
-
-    init() {
-        super.init();
-        this.zkAppRoot.set(new AddressMap().addressMap.getRoot());
-        this.counters.set(RequesterCounters.empty().toFields()[0]);
-        this.keyIndexRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
-        this.timestampRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
-        this.accumulationRoot.set(REQUESTER_LEVEL_1_TREE().getRoot());
-        this.commitmentRoot.set(COMMITMENT_TREE().getRoot());
-        this.lastTimestamp.set(UInt64.zero);
-        this.actionState.set(Reducer.initialActionState);
-    }
 
     /**
      * Initialize new threshold homomorphic encryption request
@@ -483,9 +550,11 @@ class RequesterContract extends SmartContract {
      */
     @method
     async createTask(
-        keyIndex: Field,
-        timestamp: UInt64,
-        taskManagerRef: InstanceType<typeof ZkAppRef>
+        config: EncryptionConfig,
+        committeeId: Field,
+        keyId: Field,
+        deadline: UInt32,
+        taskManagerRef: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -499,10 +568,26 @@ class RequesterContract extends SmartContract {
             Field(RequesterContract.AddressBook.TASK_MANAGER)
         );
 
+        // Verify config
+        config.assertCorrect();
+
+        // Verify deadline
+        this.network.blockchainLength.getAndRequireEquals().lessThan(deadline);
+
         // Create and dispatch action
         let action = new Action({
-            ...Action.empty(),
-            ...{ taskId: UInt32.MAXINT(), keyIndex, timestamp },
+            packedData: Action.packData(
+                deadline,
+                UInt8.from(0),
+                UInt8.from(0),
+                Field(INST_LIMITS.TASK),
+                committeeId,
+                keyId,
+                config
+            ),
+            commitmentHash: Field(0),
+            R: Group.zero,
+            M: Group.zero,
         });
         this.reducer.dispatch(action);
     }
@@ -521,30 +606,32 @@ class RequesterContract extends SmartContract {
      */
     @method
     async submitEncryption(
-        taskId: UInt32,
-        keyIndex: Field,
-        secrets: SecretVector,
-        randoms: RandomVector,
-        indices: Field,
-        nullifiers: NullifierArray,
-        publicKey: Group,
-        publicKeyWitness: typeof DkgLevel1Witness,
-        keyIndexWitness: typeof RequesterLevel1Witness,
-        submission: InstanceType<typeof ZkAppRef>,
-        dkg: InstanceType<typeof ZkAppRef>
+        config: EncryptionConfig,
+        taskId: Field,
+        committeeId: Field,
+        keyId: Field,
+        startIndex: UInt8,
+        numIndices: UInt8,
+        secrets: DimensionFieldArray,
+        randoms: DimensionFieldArray,
+        nullifiers: DimensionFieldArray,
+        encKey: Group,
+        encKeyWitness: KeyWitness,
+        submission: ZkAppRef,
+        key: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
         // FIXME - "the permutation was not constructed correctly: final value" error
         // let timestamp = this.network.timestamp.getAndRequireEquals();
-        let timestamp = UInt64.from(0);
+        let blocknumber = this.network.blockchainLength.getAndRequireEquals();
 
         // Verify Dkg Contract address
         AddressMap.verifyZkApp(
             RequesterContract.name,
-            dkg,
+            key,
             zkAppRoot,
-            Field(RequesterContract.AddressBook.DKG)
+            Field(RequesterContract.AddressBook.KEY)
         );
 
         // Verify call from Submission Proxy Contract
@@ -556,35 +643,58 @@ class RequesterContract extends SmartContract {
             Field(RequesterContract.AddressBook.SUBMISSION)
         );
 
-        const dkgContract = new KeyContract(dkg.address);
+        const keyContract = new KeyContract(key.address);
 
         // Verify public key
-        dkgContract.verifyKey(keyIndex, publicKey, publicKeyWitness);
-        this.verifyKeyIndex(taskId.value, keyIndex, keyIndexWitness);
+        keyContract.verifyKey(
+            new KeyInput({
+                committeeId,
+                keyId,
+                key: encKey,
+                witness: encKeyWitness,
+            })
+        );
+        // this.verifyKeyIndex(taskId.value, keyIndex, keyIndexWitness);
 
         // Calculate encryption and commitments
-        let R = new RequestVector();
-        let M = new RequestVector();
-        let commitments = new CommitmentArray();
-        for (let i = 0; i < ENC_LIMITS.DIMENSION; i++) {
-            let index = Field.fromBits(
-                indices.toBits().slice(i * 8, (i + 1) * 8)
-            );
-            let random = randoms.get(Field(i));
-            let secret = secrets.get(Field(i));
-            let nullifier = nullifiers.get(Field(i));
-            R.set(Field(i), Group.generator.scale(random));
-            M.set(
+        let RArr = new SplitGroupArray();
+        let MArr = new SplitGroupArray();
+        let commitments = new SplitFieldArray();
+        let index = startIndex;
+        let splitSize = UInt8.from(config.splitSize);
+        Utils.divExact(startIndex.value, config.c.value).assertTrue();
+        Utils.divExact(numIndices.value, config.splitSize).assertTrue();
+        for (let i = 0; i < ENC_LIMITS.SPLIT; i++) {
+            let inRangeI = index.lessThan(numIndices);
+            let { quotient, remainder } = index.divMod(splitSize);
+            let R = Group.zero;
+            let M = Group.zero;
+            for (let j = 0; j < ENC_LIMITS.SPLIT_SIZE; j++) {
+                let random = randoms.get(Field(i));
+                let secret = secrets.get(Field(i));
+                let nullifier = nullifiers.get(Field(i));
+                let inRangeJ = Field(j).lessThan(config.splitSize).toField();
+                R = R.add(Group.generator.scale(random));
+                M = M.add(
+                    Group.generator
+                        .scale(secret.mul(Field(config.base.toBigInt() ** j)))
+                        .add(encKey.scale(random))
+                );
+                index = startIndex.add(UInt8.Unsafe.fromField(inRangeJ));
+            }
+            RArr.set(Field(i), Group.generator.scale(random));
+            MArr.set(
                 Field(i),
-                Provable.witness(Group, () =>
-                    Provable.if(
-                        CustomScalar.fromScalar(secret).equals(
-                            CustomScalar.fromScalar(Scalar.from(0))
-                        ),
-                        Group.zero,
-                        Group.generator.scale(secrets.get(Field(i)))
-                    ).add(publicKey.scale(random))
-                )
+                Group.generator.scale(secret.mul()).add(publicKey.scale(random))
+                // Provable.witness(Group, () =>
+                //     Provable.if(
+                //         CustomScalar.fromScalar(secret).equals(
+                //             CustomScalar.fromScalar(Scalar.from(0))
+                //         ),
+                //         Group.zero,
+                //         Group.generator.scale(secrets.get(Field(i)))
+                //     ).add(publicKey.scale(random))
+                // )
             );
             commitments.set(
                 Field(i),
@@ -615,7 +725,7 @@ class RequesterContract extends SmartContract {
      * @param proof Verification proof
      */
     @method
-    async updateTasks(proof: UpdateTaskProof) {
+    async updateTasks(proof: RollupTaskProof) {
         // Get current state values
         let curActionState = this.actionState.getAndRequireEquals();
         let counters = RequesterCounters.fromFields([
@@ -725,7 +835,7 @@ class RequesterContract extends SmartContract {
         accumulationRootM: Field,
         keyIndexWitness: typeof RequesterLevel1Witness,
         accumulationWitness: typeof RequesterLevel1Witness,
-        request: InstanceType<typeof ZkAppRef>
+        request: ZkAppRef
     ) {
         // Get current state values
         let zkAppRoot = this.zkAppRoot.getAndRequireEquals();
@@ -865,11 +975,7 @@ class TaskManagerContract extends SmartContract {
     }
 
     @method
-    async createTask(
-        keyIndex: Field,
-        timestamp: UInt64,
-        selfRef: InstanceType<typeof ZkAppRef>
-    ) {
+    async createTask(keyIndex: Field, timestamp: UInt64, selfRef: ZkAppRef) {
         let requesterContract = new RequesterContract(
             this.requesterAddress.getAndRequireEquals()
         );
@@ -895,8 +1001,8 @@ class SubmissionContract extends SmartContract {
         publicKey: Group,
         publicKeyWitness: typeof DkgLevel1Witness,
         keyIndexWitness: typeof RequesterLevel1Witness,
-        submission: InstanceType<typeof ZkAppRef>,
-        dkg: InstanceType<typeof ZkAppRef>
+        submission: ZkAppRef,
+        dkg: ZkAppRef
     ) {
         let requesterContract = new RequesterContract(
             this.requesterAddress.getAndRequireEquals()

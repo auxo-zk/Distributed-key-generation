@@ -6,8 +6,8 @@
 // import { Rollup, RollupContract } from '../../../contracts/Rollup.js';
 // import { KeyContract, RollupKey } from '../../../contracts/DKG.js';
 // import {
-//     FinalizeRound1,
-//     FinalizeRound1Input,
+//     RollupContribution,
+//     RollupContributionInput,
 //     Round1Action,
 //     Round1Contract,
 // } from '../../../contracts/Round1.js';
@@ -47,7 +47,7 @@
 //             RollupContract,
 //             RollupKey,
 //             KeyContract,
-//             FinalizeRound1,
+//             RollupContribution,
 //             Round1Contract,
 //         ],
 //         undefined,
@@ -224,11 +224,11 @@
 //     actions.map((e) => Provable.log(e));
 
 //     let finalizeProof = await Utils.prove(
-//         FinalizeRound1.name,
+//         RollupContribution.name,
 //         'init',
 //         async () =>
-//             FinalizeRound1.init(
-//                 new FinalizeRound1Input({
+//             RollupContribution.init(
+//                 new RollupContributionInput({
 //                     previousActionState: Field(0),
 //                     action: Round1Action.empty(),
 //                     actionId: Field(0),
@@ -279,11 +279,11 @@
 //         let action = actions[i];
 //         let actionId = Field(actionIds[i]);
 //         finalizeProof = await Utils.prove(
-//             FinalizeRound1.name,
+//             RollupContribution.name,
 //             'contribute',
 //             async () =>
-//                 FinalizeRound1.contribute(
-//                     new FinalizeRound1Input({
+//                 RollupContribution.contribute(
+//                     new RollupContributionInput({
 //                         previousActionState: Field(previousHashes[i]),
 //                         action,
 //                         actionId,

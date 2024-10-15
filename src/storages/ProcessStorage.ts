@@ -1,6 +1,6 @@
 import { Field, Poseidon, Provable, UInt8 } from 'o1js';
 import { FieldDynamicArray, Utils } from '@auxo-dev/auxo-libs';
-import { ACTION_PROCESS_LIMITS, INSTANCE_LIMITS } from '../constants.js';
+import { ACTION_PROCESS_LIMITS, INST_LIMITS } from '../constants.js';
 import { ErrorEnum } from '../contracts/constants.js';
 import {
     getBestHeight,
@@ -17,7 +17,7 @@ export {
 };
 
 const [MTWitness, NewMTWitness, EmptyMT] = getBestHeight(
-    BigInt(INSTANCE_LIMITS.ACTION)
+    BigInt(INST_LIMITS.ACTION)
 );
 
 class ProcessedActions extends FieldDynamicArray(ACTION_PROCESS_LIMITS) {}

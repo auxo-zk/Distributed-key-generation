@@ -1,23 +1,26 @@
-import { Field, Group, PrivateKey, Scalar } from 'o1js';
+import { Field, Group, PrivateKey, UInt32, UInt8 } from 'o1js';
 import {
-    Cipher,
-    KeyGenContribution,
-    SecretPolynomial,
     accumulateResponses,
     calculatePublicKey,
     generateRandomPolynomial,
     getResponseContribution,
     getKeyGenContribution,
     getSecretShare,
-    ResponseContribution,
 } from './Committee.js';
 import {
     accumulateEncryption,
     bruteForceResult,
-    EncryptionConfig,
     generateEncryption,
     getResultVector,
 } from './Requester.js';
+import {
+    Cipher,
+    EncryptionConfig,
+    KeyGenContribution,
+    ResponseContribution,
+    SecretPolynomial,
+} from './types.js';
+import { ENC_LIMITS } from '../constants.js';
 
 describe('DKG', () => {
     let T = 1;
@@ -27,7 +30,7 @@ describe('DKG', () => {
         memberId: number;
         secretPolynomial: SecretPolynomial;
         contribution?: KeyGenContribution;
-        share?: Scalar;
+        share?: Field;
         commitment?: Field;
         responseContribution?: ResponseContribution;
     }[] = [];
@@ -42,16 +45,24 @@ describe('DKG', () => {
     let sumD: Group[] = [];
     let respondedMembers = [1];
     const encryptionConfig = new EncryptionConfig({
-        n: Field(10 ** 2),
-        l: Field(10 ** 2),
-        d: Field(32),
+        n: UInt32.from(10 ** 4),
+        l: UInt32.from(10 ** 4),
+        d: UInt8.from(ENC_LIMITS.SPLIT),
+        c: UInt8.from(ENC_LIMITS.SPLIT),
     });
     const submissionVectors = [
-        { 0: 100n, 12: 100n },
-        { 3: 100n },
-        { 8: 100n, 6: 100n },
-        { 5: 100n, 3: 100n },
-        { 7: 100n, 1: 100n },
+        { 0: encryptionConfig.n.toBigint(), 12: encryptionConfig.n.toBigint() },
+        { 3: encryptionConfig.n.toBigint() },
+        { 8: encryptionConfig.n.toBigint(), 6: encryptionConfig.n.toBigint() },
+        { 5: encryptionConfig.n.toBigint(), 3: encryptionConfig.n.toBigint() },
+        { 7: encryptionConfig.n.toBigint(), 1: encryptionConfig.n.toBigint() },
+        { 15: encryptionConfig.n.toBigint() },
+        { 2: encryptionConfig.n.toBigint(), 17: encryptionConfig.n.toBigint() },
+        { 0: encryptionConfig.n.toBigint() },
+        { 8: encryptionConfig.n.toBigint(), 1: encryptionConfig.n.toBigint() },
+        { 6: encryptionConfig.n.toBigint(), 13: encryptionConfig.n.toBigint() },
+        { 2: encryptionConfig.n.toBigint(), 9: encryptionConfig.n.toBigint() },
+        { 5: encryptionConfig.n.toBigint() },
     ];
     let result: { [key: number]: bigint } = {};
     let resultVector: Group[];
@@ -78,7 +89,7 @@ describe('DKG', () => {
                 members[i].secretPolynomial,
                 i,
                 pubKeys,
-                [...Array(N).keys()].map(() => Scalar.random())
+                [...Array(N).keys()].map(() => Field.random())
             );
             members[i].contribution = contribution;
             contributions.push(contribution);
@@ -106,8 +117,8 @@ describe('DKG', () => {
         }
         let secretKey = members.slice(0, T).reduce(
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any
-            (prev: Scalar, curr: any) => prev.add(curr.share!),
-            Scalar.from(0n)
+            (prev: Field, curr: any) => prev.add(curr.share!),
+            Field.from(0n)
         );
         expect(
             Group.generator.scale(secretKey).equals(publicKey).toBoolean()
@@ -115,6 +126,7 @@ describe('DKG', () => {
     });
 
     it('Should accumulate encryption', async () => {
+        encryptionConfig.assertCorrect();
         for (let i = 0; i < submissionVectors.length; i++) {
             let encryptedVector = generateEncryption(
                 0,
@@ -155,10 +167,10 @@ describe('DKG', () => {
         let { base, c, d } = encryptionConfig;
         let splitSize = Number(d) / Number(c);
         for (let k = 0; k < Number(c); k++) {
-            let correctResult = Scalar.from(0n);
+            let correctResult = Field(0n);
             for (let i = 0; i < splitSize; i++) {
                 correctResult = correctResult.add(
-                    Scalar.from(
+                    Field(
                         result[i + k * splitSize]
                             ? result[i + k * splitSize] *
                                   base.toBigInt() ** BigInt(i)

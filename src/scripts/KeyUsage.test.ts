@@ -15,7 +15,7 @@
 // } from 'o1js';
 // import { CustomScalar, IpfsHash, Utils } from '@auxo-dev/auxo-libs';
 // import {
-//     UpdateRequest,
+//     RollupRequest,
 //     ComputeResult,
 //     RequestAction,
 //     ComputeResultInput,
@@ -28,9 +28,9 @@
 //     Round2Contribution,
 //     Round2Data,
 //     SecretPolynomial,
-//     UArray,
+//     MemberGroupArray,
 //     accumulateResponses,
-//     cArray,
+//     MemberFieldArray,
 //     calculatePublicKeyFromContribution,
 //     generateRandomPolynomial,
 //     getResponseContribution,
@@ -77,11 +77,11 @@
 //     RequesterContract,
 //     SubmissionContract,
 //     TaskManagerContract,
-//     UpdateTask,
+//     RollupTask,
 // } from '../contracts/Requester.js';
 // import { CommitteeContract, RollupCommittee } from '../contracts/Committee.js';
 // import { KeyContract, KeyStatus, RollupKey } from '../contracts/DKG.js';
-// import { FinalizeRound1, Round1Contract } from '../contracts/Round1.js';
+// import { RollupContribution, Round1Contract } from '../contracts/Round1.js';
 // import { FinalizeRound2, Round2Contract } from '../contracts/Round2.js';
 // import { ZkAppIndex } from '../contracts/constants.js';
 // import {
@@ -295,9 +295,9 @@
 //             cache,
 //             [
 //                 Rollup,
-//                 UpdateRequest,
+//                 RollupRequest,
 //                 ComputeResult,
-//                 UpdateTask,
+//                 RollupTask,
 //                 ComputeResponse,
 //                 BatchDecryption,
 //                 FinalizeResponse,
@@ -312,7 +312,7 @@
 //                 [
 //                     RollupCommittee,
 //                     RollupKey,
-//                     FinalizeRound1,
+//                     RollupContribution,
 //                     BatchEncryption,
 //                     FinalizeRound2,
 //                     RollupContract,
@@ -826,10 +826,10 @@
 //             requesterContract.counters.get(),
 //         ]);
 //         let updateTaskProof = await Utils.prove(
-//             UpdateTask.name,
+//             RollupTask.name,
 //             'init',
 //             async () =>
-//                 UpdateTask.init(
+//                 RollupTask.init(
 //                     RequesterAction.empty(),
 //                     requesterContract.actionState.get(),
 //                     requesterCounters.taskCounter,
@@ -847,10 +847,10 @@
 //                 UInt32.from(i).value
 //             );
 //             updateTaskProof = await Utils.prove(
-//                 UpdateTask.name,
+//                 RollupTask.name,
 //                 'create',
 //                 async () =>
-//                     UpdateTask.create(
+//                     RollupTask.create(
 //                         action,
 //                         updateTaskProof,
 //                         requesterKeyIndexStorage.getWitness(level1Index),
@@ -1014,10 +1014,10 @@
 //             requesterContract.counters.get(),
 //         ]);
 //         let updateTaskProof = await Utils.prove(
-//             UpdateTask.name,
+//             RollupTask.name,
 //             'init',
 //             async () =>
-//                 UpdateTask.init(
+//                 RollupTask.init(
 //                     RequesterAction.empty(),
 //                     requesterContract.actionState.get(),
 //                     requesterCounters.taskCounter,
@@ -1096,10 +1096,10 @@
 //                 commitmentCounter = commitmentCounter.add(1);
 //             }
 //             updateTaskProof = await Utils.prove(
-//                 UpdateTask.name,
+//                 RollupTask.name,
 //                 'accumulate',
 //                 async () =>
-//                     UpdateTask.accumulate(
+//                     RollupTask.accumulate(
 //                         action,
 //                         updateTaskProof,
 //                         initialSumR,
@@ -1171,10 +1171,10 @@
 
 //         // Initialize request
 //         let updateRequestProof = await Utils.prove(
-//             UpdateRequest.name,
+//             RollupRequest.name,
 //             'init',
 //             async () =>
-//                 UpdateRequest.init(
+//                 RollupRequest.init(
 //                     RequestAction.empty(),
 //                     requestContract.requestCounter.get(),
 //                     requestContract.keyIndexRoot.get(),
@@ -1187,10 +1187,10 @@
 //             { logger }
 //         );
 //         updateRequestProof = await Utils.prove(
-//             UpdateRequest.name,
+//             RollupRequest.name,
 //             'initialize',
 //             async () =>
-//                 UpdateRequest.initialize(
+//                 RollupRequest.initialize(
 //                     action,
 //                     updateRequestProof,
 //                     requestKeyIndexStorage.getWitness(Field(0)),
@@ -1280,13 +1280,13 @@
 //             let memberId = i;
 //             let responseStorageD = new GroupVectorStorage();
 //             // Generate decryption proof for secret shares
-//             let c = new cArray(
+//             let c = new MemberFieldArray(
 //                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 //                 keys[0].round2Contributions!.map((e) =>
 //                     e.c.get(Field(memberId))
 //                 )
 //             );
-//             let U = new UArray(
+//             let U = new MemberGroupArray(
 //                 keys[0].round2Contributions!.map((e) =>
 //                     e.U.get(Field(memberId))
 //                 )
@@ -1769,10 +1769,10 @@
 //         requestZkApp.actions.push(RequestAction.toFields(action));
 
 //         let updateRequestProof = await Utils.prove(
-//             UpdateRequest.name,
+//             RollupRequest.name,
 //             'init',
 //             async () =>
-//                 UpdateRequest.init(
+//                 RollupRequest.init(
 //                     RequestAction.empty(),
 //                     requestContract.requestCounter.get(),
 //                     requestContract.keyIndexRoot.get(),
@@ -1785,10 +1785,10 @@
 //             { logger }
 //         );
 //         updateRequestProof = await Utils.prove(
-//             UpdateRequest.name,
+//             RollupRequest.name,
 //             'resolve',
 //             async () =>
-//                 UpdateRequest.resolve(
+//                 RollupRequest.resolve(
 //                     action,
 //                     updateRequestProof,
 //                     resultStorage.getWitness(Field(0))

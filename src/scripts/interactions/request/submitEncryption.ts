@@ -2,13 +2,13 @@
 // import { Utils } from '@auxo-dev/auxo-libs';
 // import { prepare } from '../../helper/prepare.js';
 // import { calculateKeyIndex } from '../../../storages/KeyStorage.js';
-// import { UpdateRequest } from '../../../contracts/Request.js';
+// import { RollupRequest } from '../../../contracts/Request.js';
 // import { RequestContract } from '../../../contracts/Request.js';
 // import {
 //     AddressStorage,
 //     RequesterContract,
 //     SubmissionContract,
-//     UpdateTask,
+//     RollupTask,
 // } from '../../../index.js';
 // import axios from 'axios';
 // import { Network } from '../../helper/config.js';
@@ -32,9 +32,9 @@
 //     const keyId = Field(0);
 
 //     // Compile programs
-//     await Utils.compile(UpdateRequest, { cache });
+//     await Utils.compile(RollupRequest, { cache });
 //     await Utils.compile(RequestContract, { cache });
-//     await Utils.compile(UpdateTask, { cache });
+//     await Utils.compile(RollupTask, { cache });
 //     await Utils.compile(RequesterContract, { cache });
 //     await Utils.compile(SubmissionContract, { cache });
 
