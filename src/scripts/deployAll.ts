@@ -1,21 +1,21 @@
 import { Field, TokenId } from 'o1js';
-import { CommitteeContract } from '../contracts/Committee.js';
-import { KeyContract } from '../contracts/Key.js';
+import { CommitteeContract } from '../zkapps/Committee.js';
+import { KeyContract } from '../zkapps/Key.js';
 // import { Round1Contract } from '../contracts/Round1.js';
 // import { Round2Contract } from '../contracts/Round2.js';
-import { RequestContract } from '../contracts/Request.js';
+import { RequestContract } from '../zkapps/Request.js';
 import {
     RequesterContract,
     RequesterAddressBook,
     TaskManagerContract,
     SubmissionContract,
-} from '../contracts/Requester.js';
-import { ResponseContract } from '../contracts/Response.js';
+} from '../zkapps/Requester.js';
+import { ResponseContract } from '../zkapps/Response.js';
 import { AddressMap } from '../storages/AddressStorage.js';
 import { prepare } from './helper/prepare.js';
 import { Network } from './helper/config.js';
 import { Utils } from '@auxo-dev/auxo-libs';
-import { ZkAppIndex } from '../contracts/constants.js';
+import { ZkAppIndex } from '../zkapps/constants.js';
 // import { RollupContract } from '../contracts/Rollup.js';
 import { compile } from './helper/compile.js';
 
@@ -56,7 +56,7 @@ async function main() {
         _.accounts.committee.publicKey
     );
     sharedAddressMap.updateAddress(
-        Field(ZkAppIndex.DKG),
+        Field(ZkAppIndex.KEY),
         _.accounts.dkg.publicKey
     );
     // sharedAddressMap.updateAddress(

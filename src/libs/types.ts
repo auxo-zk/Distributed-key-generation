@@ -1,20 +1,17 @@
-import {
-    Bool,
-    Field,
-    Group,
-    Poseidon,
-    Provable,
-    Struct,
-    UInt32,
-    UInt8,
-} from 'o1js';
+import { Bool, Field, Group, Poseidon, PublicKey, Struct } from 'o1js';
 import {
     FieldDynamicArray,
     GroupDynamicArray,
     PublicKeyDynamicArray,
+    StaticArray,
     Utils,
 } from '@auxo-dev/auxo-libs';
-import { ENC_LIMITS, INST_BIT_LIMITS, INST_LIMITS } from '../constants';
+import {
+    ENC_BIT_LIMITS,
+    ENC_LIMITS,
+    INST_BIT_LIMITS,
+    INST_LIMITS,
+} from '../constants';
 
 export {
     SecretPolynomial,
@@ -29,16 +26,15 @@ export {
     ThresholdGroupArray,
 };
 export {
+    EncryptionIndices,
+    EncryptionMode,
+    EncryptionNote,
     SecretNote,
+    SubVectorFieldArray,
+    SubVectorGroupArray,
+    ResolutionFieldArray,
     EncryptionConfig,
-    DimensionFieldArray,
-    DimensionGroupArray,
-    SplitFieldArray,
-    SplitGroupArray,
 };
-
-const { MEMBER, THRESHOLD } = INST_LIMITS;
-const { DIMENSION, RESULT, SPLIT, SPLIT_SIZE } = ENC_LIMITS;
 
 // Committee Types
 type SecretPolynomial = {
@@ -51,11 +47,11 @@ type Cipher = {
     U: Group;
 };
 
-class MemberFieldArray extends FieldDynamicArray(MEMBER) {}
-class MemberGroupArray extends GroupDynamicArray(MEMBER) {}
-class MemberPublicKeyArray extends PublicKeyDynamicArray(MEMBER) {}
-class ThresholdFieldArray extends FieldDynamicArray(THRESHOLD) {}
-class ThresholdGroupArray extends GroupDynamicArray(THRESHOLD) {}
+class MemberFieldArray extends FieldDynamicArray(INST_LIMITS.MEMBER) {}
+class MemberGroupArray extends GroupDynamicArray(INST_LIMITS.MEMBER) {}
+class MemberPublicKeyArray extends PublicKeyDynamicArray(INST_LIMITS.MEMBER) {}
+class ThresholdFieldArray extends FieldDynamicArray(INST_LIMITS.THRESHOLD) {}
+class ThresholdGroupArray extends GroupDynamicArray(INST_LIMITS.THRESHOLD) {}
 class KeyGenContribution extends Struct({
     C: ThresholdGroupArray,
     c: MemberFieldArray,
@@ -77,7 +73,7 @@ class KeyGenContribution extends Struct({
         return Poseidon.hash(this.toFields());
     }
 }
-class ResponseContribution extends GroupDynamicArray(ENC_LIMITS.SPLIT) {}
+class ResponseContribution extends GroupDynamicArray(INST_LIMITS.MEMBER) {}
 class PackedMemberId extends Struct({
     packedId: Field,
 }) {
@@ -99,97 +95,156 @@ class PackedMemberId extends Struct({
 }
 
 // Requester Types
-class DimensionFieldArray extends FieldDynamicArray(DIMENSION) {}
-class DimensionGroupArray extends GroupDynamicArray(DIMENSION) {}
-class SplitFieldArray extends FieldDynamicArray(SPLIT) {}
-class SplitGroupArray extends GroupDynamicArray(SPLIT) {}
+enum EncryptionMode {
+    OPTIMIZED_PRIVACY,
+    OPTIMIZED_TXS,
+}
+
+class SubVectorFieldArray extends FieldDynamicArray(ENC_LIMITS.SUB_DIMENSION) {}
+class SubVectorGroupArray extends GroupDynamicArray(ENC_LIMITS.SUB_DIMENSION) {}
+class ResolutionFieldArray extends FieldDynamicArray(ENC_LIMITS.RESOLUTION) {}
 class EncryptionConfig extends Struct({
-    n: UInt32,
-    l: UInt32,
-    d: UInt8,
-    c: UInt8,
+    packedConfig: Field,
 }) {
     static assertCorrect(config: EncryptionConfig) {
-        let { base, c, d } = config;
-        Utils.divExact(d.value, c.value).assertTrue();
-        d.assertLessThanOrEqual(DIMENSION);
-        c.assertLessThanOrEqual(SPLIT);
-        let splitSize = d.div(c);
-        splitSize.assertLessThanOrEqual(SPLIT_SIZE);
-        base.assertLessThanOrEqual(
-            Provable.switch(
-                [
-                    splitSize.value.equals(1),
-                    splitSize.value.equals(2),
-                    splitSize.value.equals(3),
-                    splitSize.value.equals(4),
-                ],
-                Field,
-                [
-                    Field(RESULT),
-                    Field(Math.floor(Math.sqrt(RESULT))),
-                    Field(Math.floor(Math.cbrt(RESULT))),
-                    Field(Math.floor(Math.sqrt(Math.sqrt(RESULT)))),
-                ]
-            )
-        );
+        let { base, d } = config;
+        Utils.divExact(d, Field(ENC_LIMITS.SUB_DIMENSION)).assertTrue();
+        d.assertLessThanOrEqual(ENC_LIMITS.DIMENSION);
+        base.assertLessThanOrEqual(Field(ENC_LIMITS.RESULT));
     }
 
     assertCorrect() {
         EncryptionConfig.assertCorrect(this);
     }
 
+    static packConfig(n: Field, l: Field, d: Field): EncryptionConfig {
+        return new EncryptionConfig({
+            packedConfig: Field.fromBits([
+                ...n.toBits(ENC_BIT_LIMITS.RESULT),
+                ...l.toBits(ENC_BIT_LIMITS.RESULT),
+                ...d.toBits(ENC_BIT_LIMITS.DIMENSION),
+            ]),
+        });
+    }
+
     static fromBits(bits: Bool[]): EncryptionConfig {
         return new EncryptionConfig({
-            n: UInt32.Unsafe.fromField(Field.fromBits(bits.slice(0, 32))),
-            l: UInt32.Unsafe.fromField(Field.fromBits(bits.slice(32, 64))),
-            d: UInt8.Unsafe.fromField(Field.fromBits(bits.slice(64, 72))),
-            c: UInt8.Unsafe.fromField(Field.fromBits(bits.slice(72, 80))),
+            packedConfig: Field.fromBits([
+                ...bits.slice(0, ENC_BIT_LIMITS.RESULT),
+                ...bits.slice(ENC_BIT_LIMITS.RESULT, 2 * ENC_BIT_LIMITS.RESULT),
+                ...bits.slice(
+                    2 * ENC_BIT_LIMITS.RESULT,
+                    2 * ENC_BIT_LIMITS.RESULT + ENC_BIT_LIMITS.DIMENSION
+                ),
+            ]),
         });
     }
 
     static sizeInBits(): number {
-        return 80;
+        return 2 * ENC_BIT_LIMITS.RESULT + ENC_BIT_LIMITS.DIMENSION;
     }
 
     toBits(): Bool[] {
         return [
-            ...this.n.value.toBits(32),
-            ...this.l.value.toBits(32),
-            ...this.d.value.toBits(8),
-            ...this.c.value.toBits(8),
+            ...this.n.toBits(ENC_BIT_LIMITS.RESULT),
+            ...this.l.toBits(ENC_BIT_LIMITS.RESULT),
+            ...this.d.toBits(ENC_BIT_LIMITS.DIMENSION),
         ].flat();
     }
 
-    get base(): Field {
-        return this.n.value.mul(this.l.value);
+    hash(): Field {
+        return Poseidon.hash([this.packedConfig]);
     }
 
-    get splitSize(): Field {
-        return this.d.div(this.c).value;
+    get n(): Field {
+        return Field.fromBits(
+            this.packedConfig.toBits().slice(0, ENC_BIT_LIMITS.RESULT)
+        );
+    }
+
+    get l(): Field {
+        return Field.fromBits(
+            this.packedConfig
+                .toBits()
+                .slice(ENC_BIT_LIMITS.RESULT, 2 * ENC_BIT_LIMITS.RESULT)
+        );
+    }
+
+    get d(): Field {
+        return Field.fromBits(
+            this.packedConfig
+                .toBits()
+                .slice(
+                    2 * ENC_BIT_LIMITS.RESULT,
+                    2 * ENC_BIT_LIMITS.RESULT + ENC_BIT_LIMITS.DIMENSION
+                )
+        );
+    }
+
+    get base(): Field {
+        return this.n.mul(this.l);
+    }
+}
+
+class EncryptionIndices extends StaticArray(Field, ENC_LIMITS.SUB_DIMENSION) {}
+class EncryptionIndicesMap extends StaticArray(
+    Bool,
+    ENC_LIMITS.SUB_DIMENSION
+) {}
+class EncryptionNote extends Struct({
+    indices: Field,
+    R: SubVectorGroupArray,
+    M: SubVectorGroupArray,
+    commitments: SubVectorFieldArray,
+}) {
+    static packIndices(indices: EncryptionIndices): Field {
+        let map = new EncryptionIndicesMap();
+        let indicesBits = [];
+        for (let i = 0; i < ENC_LIMITS.SUB_DIMENSION; i++) {
+            let index = indices.get(Field(i));
+            let isExisted = map.get(index);
+            isExisted.assertFalse();
+            map.set(index, Bool(true));
+            indicesBits.push(...index.toBits(ENC_BIT_LIMITS.DIMENSION));
+        }
+        return Field.fromBits(indicesBits);
+    }
+    getIndex(i: number): Field {
+        return Field.fromBits(
+            this.indices
+                .toBits()
+                .slice(
+                    i * ENC_BIT_LIMITS.DIMENSION,
+                    (i + 1) * ENC_BIT_LIMITS.DIMENSION
+                )
+        );
     }
 }
 
 class SecretNote extends Struct({
-    taskId: UInt32,
-    index: UInt8,
+    taskId: Field,
+    index: Field,
     value: Field,
     nullifier: Field,
 }) {
-    static new(taskId: UInt32, index: UInt8, value: Field): SecretNote {
+    static new(taskId: Field, index: Field, value: Field): SecretNote {
         let nullifier = Field.random();
         return new SecretNote({ taskId, index, value, nullifier });
     }
     static calculateCommitment(
+        requester: PublicKey,
         nullifier: Field,
-        taskId: UInt32,
-        index: UInt8,
+        taskId: Field,
+        index: Field,
         secret: Field
     ) {
-        return Poseidon.hash([nullifier, taskId.value, index.value, secret]);
+        return Poseidon.hash(
+            [requester.toFields(), nullifier, taskId, index, secret].flat()
+        );
     }
-    get commitment(): Field {
+    commitment(requester: PublicKey): Field {
         return SecretNote.calculateCommitment(
+            requester,
             this.nullifier,
             this.taskId,
             this.index,

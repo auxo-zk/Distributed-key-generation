@@ -6,8 +6,8 @@ export {
     INST_LIMITS,
     INST_BIT_LIMITS,
     ENC_LIMITS,
+    ENC_BIT_LIMITS,
     NETWORK_LIMITS,
-    REQUEST_FEE,
     REQUEST_MIN_PERIOD,
     REQUEST_EXPIRATION,
     ROLLUP_BATCH_MAX_SIZE,
@@ -26,19 +26,16 @@ const ACTION_PROCESS_LIMITS = 10;
 const INDEX_SIZE = 6;
 
 /**
- * Fee charged for each request
- */
-const REQUEST_FEE = 1e9;
-
-/**
  * Minimum value for a request's period ~ 10 blocks
  */
-const REQUEST_MIN_PERIOD = 30 * 60 * 1000;
+// const REQUEST_MIN_PERIOD = 30 * 60 * 1000;
+const REQUEST_MIN_PERIOD = 10;
 
 /**
  * Waiting period before the expiration of a request ~ 100 blocks
  */
-const REQUEST_EXPIRATION = 300 * 60 * 1000;
+// const REQUEST_EXPIRATION = 300 * 60 * 1000;
+const REQUEST_EXPIRATION = 100;
 
 /**
  * Maximum value for number of contracts sharing rollup
@@ -71,22 +68,26 @@ const INST_LIMITS = {
 };
 
 const INST_BIT_LIMITS = {
-    ACTION: Utils.getBitLength(INST_LIMITS.ACTION),
-    ADDRESS: Utils.getBitLength(INST_LIMITS.ADDRESS),
-    MEMBER: Utils.getBitLength(INST_LIMITS.MEMBER),
-    THRESHOLD: Utils.getBitLength(INST_LIMITS.THRESHOLD),
-    COMMITTEE: Utils.getBitLength(INST_LIMITS.COMMITTEE),
-    KEY: Utils.getBitLength(INST_LIMITS.KEY),
-    REQUEST: Utils.getBitLength(INST_LIMITS.REQUEST),
-    REQUESTER: Utils.getBitLength(INST_LIMITS.REQUESTER),
-    TASK: Utils.getBitLength(INST_LIMITS.TASK),
+    ADDRESS: Utils.getBitLength(INST_LIMITS.ADDRESS - 1),
+    MEMBER: Utils.getBitLength(INST_LIMITS.MEMBER - 1),
+    THRESHOLD: Utils.getBitLength(INST_LIMITS.THRESHOLD - 1),
+    COMMITTEE: Utils.getBitLength(INST_LIMITS.COMMITTEE - 1),
+    KEY: Utils.getBitLength(INST_LIMITS.KEY - 1),
+    REQUEST: Utils.getBitLength(INST_LIMITS.REQUEST - 1),
+    REQUESTER: Utils.getBitLength(INST_LIMITS.REQUESTER - 1),
+    TASK: Utils.getBitLength(INST_LIMITS.TASK - 1),
 };
 
 const ENC_LIMITS = {
-    DIMENSION: 400, // Devnet: 100 - Mainnet: 400
-    SPLIT: 20, // Devnet: 10 - Mainnet: 20
-    SPLIT_SIZE: 4, // Devnet: 2 - Mainnet: 4
+    DIMENSION: 1023, // Devnet: 128 - Mainnet: 1024
+    SUB_DIMENSION: 16, // Devnet: 8  - Mainnet: 16
+    RESOLUTION: 32, // Devnet: 16 - Mainnet: 32 // Must be a multiple of SUB_DIMENSION
     RESULT: 10 ** 10, // Devnet: 10**10 - Mainnet: 10**14
+};
+
+const ENC_BIT_LIMITS = {
+    DIMENSION: Utils.getBitLength(ENC_LIMITS.DIMENSION - 1),
+    RESULT: Utils.getBitLength(ENC_LIMITS.RESULT - 1),
 };
 
 const NETWORK_LIMITS = {

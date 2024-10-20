@@ -251,7 +251,7 @@
 //                         ),
 //                         rollupStorage.getWitness(
 //                             RollupStorage.calculateLevel1Index({
-//                                 zkAppIndex: Field(ZkAppIndex.DKG),
+//                                 zkAppIndex: Field(ZkAppIndex.KEY),
 //                                 actionId,
 //                             })
 //                         ),
@@ -308,7 +308,7 @@
 //                         ),
 //                         rollupStorage.getWitness(
 //                             RollupStorage.calculateLevel1Index({
-//                                 zkAppIndex: Field(ZkAppIndex.DKG),
+//                                 zkAppIndex: Field(ZkAppIndex.KEY),
 //                                 actionId,
 //                             })
 //                         ),

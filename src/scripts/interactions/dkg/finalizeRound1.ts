@@ -371,7 +371,7 @@
 //                     accounts.committee.publicKey
 //                 ),
 //                 sharedAddressStorage.getZkAppRef(
-//                     ZkAppIndex.DKG,
+//                     ZkAppIndex.KEY,
 //                     dkgZkApp.key.publicKey
 //                 ),
 //                 sharedAddressStorage.getZkAppRef(

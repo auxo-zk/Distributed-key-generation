@@ -2,35 +2,32 @@ import fs from 'fs/promises';
 import { Cache } from 'o1js';
 import { Utils } from '@auxo-dev/auxo-libs';
 // import { Rollup, RollupContract } from '../../contracts/Rollup.js';
-import {
-    CommitteeContract,
-    RollupCommittee,
-} from '../../contracts/Committee.js';
-import { KeyContract, RollupKey } from '../../contracts/Key.js';
+import { CommitteeContract, RollupCommittee } from '../../zkapps/Committee.js';
+import { KeyContract, RollupKey } from '../../zkapps/Key.js';
 import {
     BatchDecryption,
     BatchEncryption,
     BatchPolyCommitment,
-} from '../../contracts/ContributionProgram.js';
+} from '../../zkapps/ContributionProgram.js';
 // import { RollupContribution, Round1Contract } from '../../contracts/Round1.js';
 // import { FinalizeRound2, Round2Contract } from '../../contracts/Round2.js';
-import { ComputeResult, RollupRequest } from '../../contracts/Request.js';
-import { RequestContract } from '../../contracts/Request.js';
+import { ComputeResult, RollupRequest } from '../../zkapps/Request.js';
+import { RequestContract } from '../../zkapps/Request.js';
 import {
     RollupTask,
     RequesterContract,
     TaskManagerContract,
     SubmissionContract,
-} from '../../contracts/Requester.js';
+} from '../../zkapps/Requester.js';
 import {
     ComputeResponse,
     FinalizeResponse,
     ResponseContract,
-} from '../../contracts/Response.js';
+} from '../../zkapps/Response.js';
 import {
     ContributionContract,
     RollupContribution,
-} from '../../contracts/Contribution.js';
+} from '../../zkapps/Contribution.js';
 
 export { compile };
 
